@@ -2,7 +2,7 @@
 
 System architecture, specification, and data model for PlannerCritic Engine.
 
-- `architecture-v0.1.0.md` — High-level architecture (to be written during design phase)
+- [`architecture-v0.1.0.md`](architecture-v0.1.0.md) — High-level architecture (D1 seed, authored in M1; finalized in M9)
 - `spec-v0.1.0.md` — Technical specification
 - `db-schema-sketch.md` — Plan store / versioning schema sketch
 
