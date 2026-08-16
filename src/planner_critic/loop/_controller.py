@@ -34,6 +34,7 @@ question so the escalation manager (M4) can present it to a human.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Literal
 
 from ..approval import ApprovalGate, meets_threshold, resolve_threshold
@@ -151,13 +152,23 @@ def _compose_question(goal: Goal, blockers: list[Finding], reason: ReasonCode) -
 
 
 def _plan_revision(plan: PlanVersion, next_id: str, parent: PlanVersion | None) -> PlanVersion:
-    """Wrap a replan result as the next immutable revision."""
+    """Wrap a replan result as the next immutable revision.
+
+    Args:
+        plan: The planner's replan output (usually derived from the parent).
+        next_id: Id to stamp on the new revision.
+        parent: The parent revision, or None to stamp from scratch.
+
+    Returns:
+        The new revision: fresh id/version/parent link and a fresh
+        ``created_at`` so each revision carries its own timestamp.
+    """
 
     data = plan.model_dump()
     data["id"] = next_id
     data["version"] = (parent.version + 1) if parent else 1
     data["parent_version"] = parent.id if parent else None
-    data["created_at"] = plan.created_at
+    data["created_at"] = datetime.now(UTC)
     return PlanVersion.model_validate(data)
 
 
@@ -186,16 +197,17 @@ def _run(
         gate_findings = run_deterministic_gates(plan)
 
         if config.mode == "deterministic-first" and _has_blocker(gate_findings):
-            plan = _revise_or_raise(
-                planner, plan, gate_findings,
-                next_id=f"plan-{goal.id}-r{revision + 1}",
-            )
-            continue
+            if budget_exceeded(goal.constraints.budget, state):
+                return _escalate(goal, plan, gate_findings, "budget_exceeded", revision)
+            if revision < config.revision_cap:
+                plan = _revise_or_raise(
+                    planner, plan, gate_findings,
+                    next_id=f"plan-{goal.id}-r{revision + 1}",
+                )
+                continue
+            return _escalate(goal, plan, gate_findings, "revision_cap_reached", revision)
 
-        if config.mode == "llm-every-revision":
-            findings = list(gate_findings) + _safe_audit(critic, plan, gate_findings)
-        else:
-            findings = list(gate_findings) + _safe_audit(critic, plan, gate_findings)
+        findings = list(gate_findings) + _safe_audit(critic, plan, gate_findings)
 
         threshold_ok, thresholds = resolve_threshold(findings, goal.risk_tolerance)
         if threshold_ok:
@@ -218,7 +230,9 @@ def _run(
             return _escalate(goal, plan, findings, "converged_stalled", revision)
 
         prior_plan, prior_findings = plan, findings
-        plan = _revise_or_raise(planner, plan, findings, next_id=f"plan-{goal.id}-r{revision + 1}")
+        if revision < config.revision_cap:
+            next_id = f"plan-{goal.id}-r{revision + 1}"
+            plan = _revise_or_raise(planner, plan, findings, next_id=next_id)
 
     return _escalate(goal, plan, prior_findings or [], "revision_cap_reached", config.revision_cap)
 

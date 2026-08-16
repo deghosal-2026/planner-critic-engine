@@ -10,7 +10,7 @@ dependencies family).
 from __future__ import annotations
 
 from ..reason_codes import UNVERIFIED_PRECONDITION
-from ..schema.plan import PlanVersion
+from ..schema.plan import PlanVersion, Task
 from ..types import Finding, Severity
 from .base import BaseGate
 
@@ -29,17 +29,24 @@ class Gate(BaseGate):
         Returns:
             One finding per ungrounded precondition.
         """
-        {task.id: index for index, task in enumerate(plan.tasks)}
-        established = self._established_facts(plan)
         findings: list[Finding] = []
+
+        #: Facts established by tasks that appear *earlier* in the plan list.
+        established_before: dict[str, frozenset[str]] = {}
+        run_facts: list[frozenset[str]] = []
         for task in plan.tasks:
+            established_before[task.id] = frozenset().union(*run_facts)
+            run_facts.append(self._task_facts(task))
+
+        for task in plan.tasks:
+            available = established_before[task.id]
             for precondition in task.preconditions:
                 grounded = False
                 if precondition.probe is not None:
                     grounded = True
                 elif precondition.established_by is not None:
                     grounding = precondition.established_by
-                    grounded = grounding in established or grounding.startswith("env:")
+                    grounded = grounding in available or grounding.startswith("env:")
                 if not grounded:
                     findings.append(
                         Finding(
@@ -50,7 +57,7 @@ class Gate(BaseGate):
                             reason_code=UNVERIFIED_PRECONDITION,
                             message=(
                                 f"precondition {precondition.fact!r} on task {task.id!r} "
-                                "references no established fact"
+                                "references no established fact from an earlier task"
                             ),
                             suggested_fix=(
                                 f"Point the precondition at an earlier task "
@@ -60,22 +67,17 @@ class Gate(BaseGate):
                     )
         return findings
 
-    def _established_facts(self, plan: PlanVersion) -> frozenset[str]:
-        """Collect facts established earlier in the ordering.
-
-        A fact is established by an earlier task id, a task's
-        ``verification.expected`` output, or an explicit env fact name.
+    def _task_facts(self, task: Task) -> frozenset[str]:
+        """Collect the facts a single task establishes.
 
         Args:
-            plan: The typed plan to audit.
+            task: The task whose outputs may ground later preconditions.
 
         Returns:
-            The set of established fact keys.
+            The set of fact keys this task establishes: its own id, the
+            environment fact named by its target, and any verification output.
         """
-        facts: set[str] = set()
-        for task in plan.tasks:
-            facts.add(task.id)
-            facts.add(f"env:{task.target}")
-            if task.verification is not None:
-                facts.add(f"verified:{task.verification.what}")
+        facts: set[str] = {task.id, f"env:{task.target}"}
+        if task.verification is not None:
+            facts.add(f"verified:{task.verification.what}")
         return frozenset(facts)

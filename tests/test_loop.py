@@ -78,6 +78,45 @@ class TestApprovePath:
         assert result.approved_plan is not None
         assert result.approved_plan.plan.version in (1, 2)
 
+    def test_escalation_plan_is_last_audited_revision(self, empty_critic: EmptyCritic) -> None:
+        """Surviving cap escalation must reference the audited revision+findings.
+
+        Regression: the loop previously stamped one extra r{cap+1} revision
+        that was never audited, while the escalation carried its (empty)
+        prior findings. The escalated plan must be the last audited revision
+        with the findings that blocked it.
+        """
+        goal = make_goal()
+        planner = ScriptedPlanner([_dirty_plan()])
+        result = run_loop(goal, planner, empty_critic, config=LoopConfig(revision_cap=2))
+        assert result.status == "escalated"
+        assert result.reason_code == REVISION_CAP_REACHED
+        escalation = result.escalation
+        assert escalation is not None
+        assert escalation.version == 2, "escalation must point at revision 2, not 3"
+        assert result.plan is not None
+        assert escalation.plan_id == result.plan.id
+        assert result.findings, "escalation must carry the blocking findings"
+        assert any(f.severity is Severity.BLOCKER for f in result.findings)
+
+    def test_plan_revision_gets_fresh_created_at(self, empty_critic: EmptyCritic) -> None:
+        """Each revision carries its own timestamp, not the parent's.
+
+        Regression: _plan_revision previously copied the parent's
+        ``created_at`` onto the new revision, so every revision in a chain
+        shared the root revision's timestamp.
+        """
+        goal = make_goal()
+        planner = ScriptedPlanner([_dirty_plan(), _revise_to_clean])
+        result = run_loop(goal, planner, empty_critic, config=LoopConfig(revision_cap=3))
+        assert result.is_approved
+        approved = result.approved_plan
+        assert approved is not None
+        parent_draft = planner.drafts[0]
+        assert isinstance(parent_draft, PlanVersion)
+        assert approved.plan.created_at is not None
+        assert approved.plan.created_at != parent_draft.created_at
+
 
 class TestEscalatePaths:
     """The four non-approval terminations."""
@@ -209,3 +248,108 @@ class TestPlanningErrors:
         with pytest.raises(PlanningError) as exc_info:
             run_loop(make_goal(), ScriptedPlanner([_clean_plan()]), BadCritic())  # type: ignore[arg-type]
         assert "critic blew up" in str(exc_info.value)
+
+    def test_planner_returns_non_planversion_fails_closed(self) -> None:
+        """A decompose that emits garbage must fail closed."""
+
+        class GarbagePlanner:
+            def decompose(self, goal: Goal) -> PlanVersion:
+                return "not a plan"  # type: ignore[return-value]
+
+        with pytest.raises(PlanningError) as exc_info:
+            run_loop(make_goal(), GarbagePlanner(), EmptyCritic())  # type: ignore[arg-type]
+        assert "non-PlanVersion" in str(exc_info.value)
+
+    def test_planner_revise_raises_fails_closed(self) -> None:
+        """A raise during revise fails the loop with PlanningError."""
+
+        class BoomRevisePlanner:
+            def decompose(self, goal: Goal) -> PlanVersion:
+                return _dirty_plan()
+
+            def revise(self, plan: PlanVersion, findings: list[Finding]) -> PlanVersion:
+                raise RuntimeError("provider down during revise")
+
+        with pytest.raises(PlanningError) as exc_info:
+            run_loop(make_goal(), BoomRevisePlanner(), EmptyCritic())  # type: ignore[arg-type]
+        assert "failed to revise" in str(exc_info.value)
+
+    def test_planner_revises_to_garbage_fails_closed(self) -> None:
+        """A revise that returns non-PlanVersion fails closed."""
+
+        class GarbageRevisePlanner:
+            def decompose(self, goal: Goal) -> PlanVersion:
+                return _dirty_plan()
+
+            def revise(self, plan: PlanVersion, findings: list[Finding]) -> PlanVersion:
+                return object()  # type: ignore[return-value]
+
+        with pytest.raises(PlanningError) as exc_info:
+            run_loop(make_goal(), GarbageRevisePlanner(), EmptyCritic())  # type: ignore[arg-type]
+        assert "non-PlanVersion" in str(exc_info.value)
+
+
+class TestEscalationQuestion:
+    """The escalated question matches the exit reason."""
+
+    def test_question_without_blockers_names_reason(self) -> None:
+        """A budget escalation with no blockers names the reason, not a blocker."""
+        goal = Goal(
+            id="g-question",
+            description="strict goal with warnings",
+            risk_tolerance=RiskTolerance.STRICT,
+            constraints=Constraints(budget=Budget(max_revisions=1)),
+        )
+        critic = ScriptedCritic(
+            [[finding("t1", "unsafe_ordering", severity=Severity.WARNING)]]
+        )
+        planner = ScriptedPlanner([_clean_plan()])
+        result = run_loop(
+            goal,
+            planner,
+            critic,
+            config=LoopConfig(revision_cap=3),
+        )
+        assert result.status == "escalated"
+        assert result.reason_code == BUDGET_EXCEEDED
+        assert result.escalation is not None
+        assert "budget_exceeded" in result.escalation.question
+
+    def test_budget_checked_in_deterministic_first_blocker_path(
+        self, empty_critic: EmptyCritic
+    ) -> None:
+        """A deterministic-first blocker loop still respects the budget."""
+        goal = Goal(
+            id="g-df-budget",
+            description="cheap goal",
+            constraints=Constraints(budget=Budget(max_revisions=1)),
+        )
+        planner = ScriptedPlanner([_dirty_plan()])
+        result = run_loop(
+            goal,
+            planner,
+            empty_critic,
+            config=LoopConfig(revision_cap=5, mode="deterministic-first"),
+        )
+        assert result.status == "escalated"
+        assert result.reason_code == BUDGET_EXCEEDED
+
+    def test_cap_fallthrough_in_llm_every_revision(self) -> None:
+        """LLM-every-revision with pending warnings escalates at the cap."""
+        goal = make_goal(tolerance=RiskTolerance.STRICT)
+        critic = ScriptedCritic(
+            [
+                [finding("t1", "unsafe_ordering", severity=Severity.WARNING)],
+                [finding("t2", "unsafe_ordering", severity=Severity.WARNING)],
+            ]
+        )
+        # Distinct task ids keep fingerprints apart so near-zero-diff does not
+        # fire early; the strict tolerance keeps warnings pending until the
+        # revision cap forces escalation.
+        plan_a = make_plan(plan_id="plan-a", tasks=[make_task("tA")])
+        plan_b = make_plan(plan_id="plan-b", tasks=[make_task("tB")])
+        planner = ScriptedPlanner([plan_a, plan_b])
+        result = run_loop(goal, planner, critic, config=LoopConfig(revision_cap=2))
+        assert result.status == "escalated"
+        assert result.reason_code == REVISION_CAP_REACHED
+        assert result.findings

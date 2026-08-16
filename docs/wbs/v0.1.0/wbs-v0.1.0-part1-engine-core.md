@@ -36,16 +36,16 @@
 
 | # | Task | Build (files) | Behavior + edge cases | Feature | Verify | Status |
 |---|------|---------------|----------------------|---------|--------|--------|
-| 1 | Package scaffold | Create `pyproject.toml` (src layout), `planner_critic/__init__.py` (exports `Engine`, `__version__`), pytest/ruff/mypy/coverage config | `pip install -e .` works; `plancritic --version` placeholder; ruff+mypy strict+coverage 95 preconfigured | F-60(partial) | clean venv install + import | [#1](https://github.com/deghosal-2026/planner-critic-engine/issues/1) · - [ ] |
-| 2 | Goal schema | Create `planner_critic/schema/goal.py` | Pydantic v2 model per §2.8; strict enums; `budget` optional; `approval_ttl` default ∞ | F-01 | valid/invalid fixtures; bad enum → `ValidationError` | [#2](https://github.com/deghosal-2026/planner-critic-engine/issues/2) · - [ ] |
-| 3 | Plan schema | Create `planner_critic/schema/plan.py` | `PlanVersion`, `Task`, `Branch`, `Dependency`, `VerificationStep`, `RollbackStep`; immutability; `to_dict`/`from_dict`; `plan_schema_version`; `parallel_group` + branch validation | F-02, F-15 | JSON round-trip; immutable-once-stored; branch join enum; parallel_group validity | [#3](https://github.com/deghosal-2026/planner-critic-engine/issues/3) · - [ ] |
-| 4 | Types + reason codes | Create `planner_critic/types.py`, `planner_critic/reason_codes.py` | `Finding`, `Escalation`, `ExecutionTrace`, `PlanComplexity`, `ApprovedPlan`, `PlanningError`; catalog in `reason_codes.py` | F-77 | every gate + loop decision maps to a stable code | [#4](https://github.com/deghosal-2026/planner-critic-engine/issues/4) · - [ ] |
-| 5 | Role protocols | Create `planner_critic/roles.py` | `PlannerRole.decompose(goal)->PlanVersion`, `CriticRole.audit(plan)->list[Finding]` abstract | F-03, F-04 | fake roles usable in tests | [#5](https://github.com/deghosal-2026/planner-critic-engine/issues/5) · - [ ] |
-| 6 | Deterministic gates | Create `planner_critic/gates/` (7 modules: `__init__`, `schema_valid`, `dep_cycles`, `ordering`, `verification`, `rollback`, `preconditions`, `parallel_safety`) | 6 gate functions per §2.5.2 + `parallel_safety` (F-15 unsafe-parallel audit); **return findings, never raise** on malformed input; injection-immune | F-12, F-15 | each gate flags its seeded-flaw fixture; malformed input → finding not exception | [#6](https://github.com/deghosal-2026/planner-critic-engine/issues/6) · - [ ] |
-| 7 | Loop controller | Create `planner_critic/loop.py`, `planner_critic/loop/{convergence,regression,budget,ttl}.py` | §2.6.1 pseudocode; revision cap 3 (configurable); convergence (circling blockers / near-zero diff); regression guard (new blocker); approval threshold; determinism | F-05, F-06, F-07, F-08, F-74 | fake-provider matrix (converge/cap/thrash/regress) + **identical inputs → identical decisions** | [#7](https://github.com/deghosal-2026/planner-critic-engine/issues/7) · - [ ] |
-| 8 | Approval + fail-closed | Create `planner_critic/approval.py` | `ApprovedPlan` wrapper; threshold resolver; no execute path except via `ApprovedPlan` | F-08, F-73 | strict/balanced matrices; non-approved plan cannot construct executor input | [#8](https://github.com/deghosal-2026/planner-critic-engine/issues/8) · - [ ] |
-| 9 | Unit + integration tests | Create `tests/` (test_types, test_schema, test_gates, test_loop, fixtures/loop_matrix.yaml) | cover schemas, gates, loop, approval; end-to-end loop with fake roles | — | >95% coverage on `planner_critic` | [#9](https://github.com/deghosal-2026/planner-critic-engine/issues/9) · - [ ] |
-| 10 | Acceptance matrix | Create `tests/fixtures/loop_matrix.yaml` + runner | Goal × fake-role-output × expected termination | — | 100% matrix cells pass in CI | [#10](https://github.com/deghosal-2026/planner-critic-engine/issues/10) · - [ ] |
+| 1 | Package scaffold | Create `pyproject.toml` (src layout), `planner_critic/__init__.py` (exports `Engine`, `__version__`), pytest/ruff/mypy/coverage config | `pip install -e .` works; `plancritic --version` placeholder; ruff+mypy strict+coverage 95 preconfigured | F-60(partial) | clean venv install + import | [#1](https://github.com/deghosal-2026/planner-critic-engine/issues/1) · [x] |
+| 2 | Goal schema | Create `planner_critic/schema/goal.py` | Pydantic v2 model per §2.8; strict enums; `budget` optional; `approval_ttl` default ∞ | F-01 | valid/invalid fixtures; bad enum → `ValidationError` | [#2](https://github.com/deghosal-2026/planner-critic-engine/issues/2) · [x] |
+| 3 | Plan schema | Create `planner_critic/schema/plan.py` | `PlanVersion`, `Task`, `Branch`, `Dependency`, `VerificationStep`, `RollbackStep`; immutability; `to_dict`/`from_dict`; `plan_schema_version`; `parallel_group` + branch validation | F-02, F-15 | JSON round-trip; immutable-once-stored; branch join enum; parallel_group validity | [#3](https://github.com/deghosal-2026/planner-critic-engine/issues/3) · [x] |
+| 4 | Types + reason codes | Create `planner_critic/types.py`, `planner_critic/reason_codes.py` | `Finding`, `Escalation`, `ExecutionTrace`, `PlanComplexity`, `ApprovedPlan`, `PlanningError`; catalog in `reason_codes.py` | F-77 | every gate + loop decision maps to a stable code | [#4](https://github.com/deghosal-2026/planner-critic-engine/issues/4) · [x] |
+| 5 | Role protocols | Create `planner_critic/roles.py` | `PlannerRole.decompose(goal)->PlanVersion`, `CriticRole.audit(plan)->list[Finding]` abstract | F-03, F-04 | fake roles usable in tests | [#5](https://github.com/deghosal-2026/planner-critic-engine/issues/5) · [x] |
+| 6 | Deterministic gates | Create `planner_critic/gates/` (7 modules: `__init__`, `schema_valid`, `dep_cycles`, `ordering`, `verification`, `rollback`, `preconditions`, `parallel_safety`) | 6 gate functions per §2.5.2 + `parallel_safety` (F-15 unsafe-parallel audit); **return findings, never raise** on malformed input; injection-immune | F-12, F-15 | each gate flags its seeded-flaw fixture; malformed input → finding not exception | [#6](https://github.com/deghosal-2026/planner-critic-engine/issues/6) · [x] |
+| 7 | Loop controller | Create `planner_critic/loop.py`, `planner_critic/loop/{convergence,regression,budget,ttl}.py` | §2.6.1 pseudocode; revision cap 3 (configurable); convergence (circling blockers / near-zero diff); regression guard (new blocker); approval threshold; determinism | F-05, F-06, F-07, F-08, F-74 | fake-provider matrix (converge/cap/thrash/regress) + **identical inputs → identical decisions** | [#7](https://github.com/deghosal-2026/planner-critic-engine/issues/7) · [x] |
+| 8 | Approval + fail-closed | Create `planner_critic/approval.py` | `ApprovedPlan` wrapper; threshold resolver; no execute path except via `ApprovedPlan` | F-08, F-73 | strict/balanced matrices; non-approved plan cannot construct executor input | [#8](https://github.com/deghosal-2026/planner-critic-engine/issues/8) · [x] |
+| 9 | Unit + integration tests | Create `tests/` (test_types, test_schema, test_gates, test_loop, fixtures/loop_matrix.yaml) | cover schemas, gates, loop, approval; end-to-end loop with fake roles | — | >95% coverage on `planner_critic` | [#9](https://github.com/deghosal-2026/planner-critic-engine/issues/9) · [x] |
+| 10 | Acceptance matrix | Create `tests/fixtures/loop_matrix.yaml` + runner | Goal × fake-role-output × expected termination | — | 100% matrix cells pass in CI | [#10](https://github.com/deghosal-2026/planner-critic-engine/issues/10) · [x] |
 
 ### M1 Success Metrics
 
@@ -60,12 +60,14 @@
 
 ### M1 Exit Gate
 
-- [ ] Code review passed
-- [ ] Coverage > 95%
-- [ ] Lint clean (ruff + mypy strict)
-- [ ] Comments + docstrings in all code
-- [ ] Loop matrix 100% green; determinism CI-asserted
-- [ ] **Design docs authored:** D1 (architecture seed), D2 (plan-schema), D3 (loop-controller), D13 (DD-01/02/03)
+- [x] Code review passed
+- [x] Coverage > 95%
+- [x] Lint clean (ruff + mypy strict)
+- [x] Comments + docstrings in all code
+- [x] Loop matrix 100% green; determinism CI-asserted
+- [x] **Design docs authored:** D1 (architecture seed), D2 (plan-schema), D3 (loop-controller), D13 (DD-01/02/03)
+
+> **M1 status: COMPLETE** — closed in commit `c1473bb` (feat/m1-core-engine); issues #1–10 closed. 94 tests pass; 96.81% coverage; ruff + strict mypy clean. **Exit-gate code review (Aug 16, 2026) found and fixed 4 issues** (uncommitted until reviewed here): loop off-by-one (escalation pointed at an un-audited `r{cap+1}` with empty findings), per-revision `created_at` copied from the parent, preconditions gate accepting forward/self task references, and a redundant mode branch + missing budget check on the deterministic-first blocker path.
 
 **Dependency:** none. **Produces for M2+:** `Goal`, `PlanVersion`, `Finding`, `Escalation`, `ExecutionTrace`, `PlanComplexity`, `ApprovedPlan`, role protocols, loop controller, reason codes.
 

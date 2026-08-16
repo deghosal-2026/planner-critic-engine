@@ -208,6 +208,40 @@ class TestPreconditionsGate:
         )
         assert UNVERIFIED_PRECONDITION not in {f.reason_code for f in run_deterministic_gates(plan)}
 
+    def test_forward_reference_precondition_flagged(self) -> None:
+        """A precondition may not reference a *later* task (not yet established).
+
+        Regression: _established_facts previously treated every task id as
+        grounded regardless of ordering, so a precondition pointing at a task
+        that runs *after* it slipped through.
+        """
+        plan = make_plan(
+            tasks=[
+                make_task(
+                    "t1",
+                    preconditions=[
+                        {"description": "p", "fact": "later output", "established_by": "t2"}
+                    ],
+                ),
+                make_task("t2"),
+            ]
+        )
+        assert UNVERIFIED_PRECONDITION in {f.reason_code for f in run_deterministic_gates(plan)}
+
+    def test_self_reference_precondition_flagged(self) -> None:
+        """A task cannot ground its own precondition."""
+        plan = make_plan(
+            tasks=[
+                make_task(
+                    "t1",
+                    preconditions=[
+                        {"description": "p", "fact": "own", "established_by": "t1"}
+                    ],
+                )
+            ]
+        )
+        assert UNVERIFIED_PRECONDITION in {f.reason_code for f in run_deterministic_gates(plan)}
+
 
 class TestParallelSafetyGate:
     """Two high-blast tasks racing in one parallel group are unsafe."""

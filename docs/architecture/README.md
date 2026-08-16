@@ -13,4 +13,4 @@ Authored with the milestone that built each subsystem (indexed in `../design/REA
 - `../design/design-seed.md` — M1 design seed (scope, tenets, exit criteria)
 - `../design/plan-schema-design.md` — Goal / PlanVersion / Task schema (D2)
 - `../design/loop-controller-design.md` — revise-until-approved loop controller (D3)
-- `../design/decision-log.md` — Design decision log (D13, DD-01..03)
+- `../design/design-decisions.md` — Design decision log (D13, DD-01..03)
