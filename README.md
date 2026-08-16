@@ -76,9 +76,15 @@ The plan is a persisted, versioned artifact — you can diff revisions, see whic
 
 ```
 planner_critic_engine/
-docs/           PRD, design spec, WBS
-tests/          Test suite
-examples/       Sample goal: draft → critique → revise trace
+docs/             Documentation (see below)
+docs/architecture/    System architecture and spec
+docs/design/          PRD, design spec, design decisions
+docs/reference/       API reference, quickstart
+docs/wbs/             Work breakdown structure
+docs/test/            Test plans and reports
+docs/field-test/      Field test plans and reports
+tests/            Test suite
+examples/         Sample goal: draft → critique → revise trace
 ```
 
 ---
