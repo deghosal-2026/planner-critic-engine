@@ -1,6 +1,6 @@
 # 08 — Risks & Open Questions
 
-> Sub-document of the [PlannerCritic Engine PRD](../PRD.md).
+> Sub-document of the [Design overview](../README.md).
 
 - **Critic shares the planner's blind spots** (both are LLMs) — mitigated by separate roles, recommended different model family, bounded loop, regression guard, and the missed-critique feedback loop.
 - **Critic can be net-negative** (research: a critic re-reading the same context with the same model family can disrupt more than it recovers — a 26-pp collapse case exists) — mitigated by typed rubric + deterministic gates + per-goal thresholds; validate on the field corpus before deployment.

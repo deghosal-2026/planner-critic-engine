@@ -1,6 +1,6 @@
 # 03 — Landscape & Identity
 
-> Sub-document of the [PlannerCritic Engine PRD](../PRD.md). What exists, what's missing, and our wedge.
+> Sub-document of the [Design overview](../README.md). What exists, what's missing, and our wedge.
 
 ## 3.1 The planner-critic / plan-review landscape
 

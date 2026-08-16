@@ -16,7 +16,7 @@
 
 ### v0.1.0
 - **Architecture & Spec** → `architecture/architecture-v0.1.0.md`
-- **PRD** → `design/PRD.md`
+- **PRD** → `design/README.md` (overview) → `design/prd/` sub-docs (why, architecture, landscape, users+CUJs, features, security, metrics, risks, roadmap)
 - **Design Spec** → `design/design-spec.md`
 - **Design Decisions** → `design/design-decisions.md`
 - **API Reference** → `reference/api.md`

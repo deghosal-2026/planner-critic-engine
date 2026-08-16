@@ -1,6 +1,6 @@
 # 04 — Target Users & Critical User Journeys
 
-> Sub-document of the [PlannerCritic Engine PRD](../PRD.md). Who it's for, and the journeys that define the feature set.
+> Sub-document of the [Design overview](../README.md). Who it's for, and the journeys that define the feature set.
 
 ## 4.1 Target users
 

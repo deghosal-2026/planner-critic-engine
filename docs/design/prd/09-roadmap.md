@@ -1,6 +1,6 @@
 # 09 — Roadmap (Milestone Sketch)
 
-> Sub-document of the [PlannerCritic Engine PRD](../PRD.md). The v0.1.0 release is deliberately feature-rich (see [05-features.md](05-features.md)).
+> Sub-document of the [Design overview](../README.md). The v0.1.0 release is deliberately feature-rich (see [05-features.md](05-features.md)).
 
 ## 9.1 v0.1.0 (P0) — the feature-rich first release
 

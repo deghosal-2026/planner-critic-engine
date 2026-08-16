@@ -1,6 +1,6 @@
 # 01 — Why (Business Requirements)
 
-> Sub-document of the [PlannerCritic Engine PRD](../PRD.md). Covers the market context, the pain we remove, and why this matters for the OSS portfolio.
+> Sub-document of the [Design overview](../README.md). Covers the market context, the pain we remove, and why this matters for the OSS portfolio.
 
 ## 1.1 The market context
 

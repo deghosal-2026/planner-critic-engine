@@ -1,6 +1,6 @@
 # 05 — Feature Set
 
-> Sub-document of the [PlannerCritic Engine PRD](../PRD.md). The full feature inventory.
+> Sub-document of the [Design overview](../README.md). The full feature inventory.
 >
 > Priority scale: **P0** (v0.1.0): must have; **P1** (v0.2.0); **P2** (v0.3.0+); **P3** backlog.
 >

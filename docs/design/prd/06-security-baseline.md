@@ -1,6 +1,6 @@
 # 06 — Security Compliance Baseline
 
-> Sub-document of the [PlannerCritic Engine PRD](../PRD.md). Mirrors the agent-tooltrust model: three public checklists, self-auditable, status published.
+> Sub-document of the [Design overview](../README.md). Mirrors the agent-tooltrust model: three public checklists, self-auditable, status published.
 
 PlannerCritic Engine targets three concrete baselines. **Target: medium across all three.**
 

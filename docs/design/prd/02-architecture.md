@@ -1,6 +1,6 @@
 # 02 — Architecture (What We Are Building)
 
-> Sub-document of the [PlannerCritic Engine PRD](../PRD.md). The technical heart: the core engine, the two pluggable surfaces, the critique engine, the loop, the plan schema, and the demo corpus.
+> Sub-document of the [Design overview](../README.md). The technical heart: the core engine, the two pluggable surfaces, the critique engine, the loop, the plan schema, and the demo corpus.
 
 ## 2.1 Core value
 
@@ -16,7 +16,18 @@
 
 **The core engine is model- and framework-agnostic.** It speaks plain typed JSON. Two pluggable surfaces reveal its power.
 
-## 2.2 Component diagram
+## 2.2 Non-Goals (v1.0)
+
+- **Executing the plan itself** — PlannerCritic plans and critiques; an existing runner executes. The adapters gate, re-gate, and serialize; they do not run the plan.
+- **Replacing execution engines or agent frameworks** (LangGraph, CrewAI, etc.).
+- **Guaranteeing plan correctness** — it reduces risk; it cannot eliminate it (the critic shares the planner's blind spots as an LLM).
+- **Arbitrary multi-planner architectures** — starts as one planner + one critic (multi-planner is v0.3, on request).
+- **Automatic goal intake from unstructured chat without a goal schema.**
+- **Exhaustive model-family support at v0.1** — the OpenAI-compatible transport covers most real deployments; Anthropic/Gemini are v0.2 transports on the same protocol.
+- **Full LessonExtractor** — missed-critique records and suggested checks ship; automated standing-rule promotion is the Week 8 flagship's job.
+- **Tool-layer security (data leakage, supply chain, tool prompt injection)** — covered by sibling repo ToolTrust; PlannerCritic focuses on plan-layer safety.
+
+## 2.3 Component diagram
 
 ```
                       ┌─────────────────────────────────────────────┐
@@ -53,7 +64,7 @@
         CLI · MCP server · HTTP service · (web UI v0.2)
 ```
 
-## 2.3 LLM provider layer (built registry-first)
+## 2.4 LLM provider layer (built registry-first)
 
 - **`LLMProvider` protocol** — a thin interface (`complete(messages, tool_schemas)` → structured output) that any model/transport implements: `name`, `base_url`, `model`, `transport` type, optional `api_key`.
 - **Config-driven registry** — providers are defined in config, not code: `plancritic providers add <name> --transport openai-compatible --base-url ... --model ...`. The engine loads whatever is configured. This is built *first*; the OpenAI-compatible transport is the first concrete implementation *on top of* it.
@@ -62,7 +73,7 @@
 - **Deterministic gates are injection-immune** — schema/dependency/ordering/rollback checks run as code, not as model output; a goal crafted to corrupt the plan cannot weaken the deterministic critique. The LLM critic is *not* injection-immune (it reads the goal text) — so it is always paired with the deterministic gates, never the sole gate.
 - CI never calls a paid LLM: the hermetic gate is deterministic-only.
 
-## 2.4 Critique engine (dual-mode)
+## 2.5 Critique engine (dual-mode)
 
 | Mode | Default | Behavior | Cost |
 |------|---------|----------|------|
@@ -71,7 +82,7 @@
 
 Same engine, one config knob (`critic.mode`). Users with cheap/audit-critical goals choose `llm-every-revision`; everyone else gets the low-cost default.
 
-### 2.4.1 The six critique heuristic families
+### 2.5.1 The six critique heuristic families
 
 | Family | What it audits | Example blocker | Deterministic / LLM |
 |---|---|---|---|
@@ -84,7 +95,7 @@ Same engine, one config knob (`critic.mode`). Users with cheap/audit-critical go
 
 Every finding carries a heuristic family, severity (`blocker` / `warning` / `info`), a task reference, a machine-readable `reason_code`, and a human message. **A blocker from a deterministic gate can never be overridden by the LLM critic** (injection-safety).
 
-### 2.4.2 Deterministic gates (the free layer)
+### 2.5.2 Deterministic gates (the free layer)
 
 | Gate | Check | Reason code |
 |---|---|---|
@@ -95,16 +106,16 @@ Every finding carries a heuristic family, severity (`blocker` / `warning` / `inf
 | `rollback_present` | High-blast-radius steps carry a rollback step | `missing_rollback` |
 | `preconditions_referenced` | Every precondition references an established earlier task or env fact | `unverified_precondition` (deterministic variant) |
 
-### 2.4.3 Diff-aware critique (cost optimization)
+### 2.5.3 Diff-aware critique (cost optimization)
 
 On revision N>1, the critic re-audits only **changed tasks + their dependents** rather than the whole plan — a cost optimization aligned with the budget. A full re-critique is still available via `critic.mode=llm-every-revision` when audit depth justifies it. The changed-task set is computed from the plan diff (F-78).
 
-## 2.5 Approval & loop semantics
+## 2.6 Approval & loop semantics
 
 - **Per-goal approval threshold** (from the goal schema's `risk_tolerance` field): `strict` = zero warnings tolerated; `balanced` = warnings tolerated but must be explicitly acknowledged in the final plan. **No blockers may ever remain.**
 - **Loop termination:** (a) critic approves (threshold met) ✓, (b) revision cap reached (default 3, configurable) → escalate, (c) **convergence detection** — revisions circling the same blockers, or plan diffs converging to near-zero between versions → escalate early, (d) **regression guard** — a revision introduces a *new* blocker → escalate (planner is thrashing), (e) **budget hit** → escalate.
 
-### 2.5.1 Loop controller algorithm (pseudocode)
+### 2.6.1 Loop controller algorithm (pseudocode)
 
 ```
 function run_loop(goal, provider_registry, config):
@@ -130,13 +141,13 @@ function run_loop(goal, provider_registry, config):
 
 The controller is **deterministic on identical inputs** (F-74, CI-asserted): given the same planner/critic outputs, the same loop decisions (approve/revise/escalate) result.
 
-## 2.6 Execution feedback (planning vs execution)
+## 2.7 Execution feedback (planning vs execution)
 
 - An approved plan can be linked to later executions and **tagged** `planning` / `execution` on failure.
 - A tagged failure that the critic *missed* is **recorded with its critique history** ("the critic said this was fine; execution proved otherwise") and **surfaces a suggested deterministic check** to the operator.
 - This feeds LessonExtractor (Week 8 flagship): the missed-critique records become a standing-rule corpus. The data model captures the miss at v0.1; automated promotion is a v0.2+ concern.
 
-## 2.7 Plan schema (typed sketch)
+## 2.8 Plan schema (typed sketch)
 
 ```
 Goal:
@@ -173,7 +184,7 @@ ExecutionTrace (plan ↔ run link):
   failure_class{planning|execution|null}, linked_finding_id (missed-critique)
 ```
 
-## 2.8 Demo corpus (seeded flaws)
+## 2.9 Demo corpus (seeded flaws)
 
 A domain-agnostic `examples/` set. Each goal has a known seeded flaw the critic must surface — this is what makes the "aha" demo and the field-test matrix credible, not staged.
 
@@ -184,6 +195,6 @@ A domain-agnostic `examples/` set. Each goal has a known seeded flaw the critic 
 | Refactor | "Split monolith module Z into two services" | Step assumes an outage window is booked; no step books it | Unverified dependencies |
 | Incident response | "Mitigate the auth-service 5xx spike" | No verification step confirms mitigation before declaring resolved | Weak rollback |
 
-## 2.9 Terminal-state definition ("done" for v0.1.0)
+## 2.10 Terminal-state definition ("done" for v0.1.0)
 
 A working `v0.1.0` you can `pip install planner-critic`, register a provider (`plancritic providers add ...`), give it a non-trivial goal, watch the critic flag a real gap in the planner's first draft, see the planner revise to approval — or escalate cleanly with a precise question when it can't — with every plan version and critique stored and diffs inspectable, re-gate catching a stale precondition mid-execution, failures classifiable as planning vs execution, and a field-test matrix green across all six frameworks against a local model.

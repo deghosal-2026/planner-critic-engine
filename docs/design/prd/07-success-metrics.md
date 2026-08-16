@@ -1,6 +1,6 @@
 # 07 — Success Criteria & Reliability
 
-> Sub-document of the [PlannerCritic Engine PRD](../PRD.md).
+> Sub-document of the [Design overview](../README.md).
 
 ## 7.1 Success criteria (by v0.1.0 release)
 
