@@ -56,4 +56,6 @@
 
 ## 9.5 WBS
 
-The detailed work breakdown (milestones M1–M8 with issue ranges, exit gates, and dependency graph) lives in `docs/wbs/v0.1.0/` — authored next, after this PRD is approved.
+The detailed work breakdown (milestones M1–M9 with issue ranges, exit gates, and dependency graph) lives in `docs/wbs/v0.1.0/` — see the [WBS index](../../wbs/v0.1.0/wbs-v0.1.0-index.md) for the milestone summary, dependency graph, issue ranges, and the standard milestone exit gate (code review, >95% coverage, lint clean, comments in all code). Each part file links every task to its PRD section, lists key items, carries a checkbox task checklist wired to GitHub issues, and lists success metrics + an exit gate.
+
+**Status:** all 71 v0.1.0 issues are created in the [**0.1.0 release**](https://github.com/deghosal-2026/planner-critic-engine/milestone/1) milestone.

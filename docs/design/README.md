@@ -59,9 +59,13 @@ The plan is a **first-class, versioned, inspectable artifact** — you can diff 
 
 ## Other Design Documents
 
-- `design-spec.md` — Technical design spec (to be written)
-- `design-decisions.md` — v0.1.0 decision records (to be written)
-- `demo-scenario.md` — Demo scenario walkthrough (to be written)
+- `design-spec.md` — Technical design spec (deferred by decision: the PRD already carries the technical heart — architecture, plan schema, loop pseudocode, gates, interface surfaces. Design docs are authored inline with each WBS milestone: see the [design-doc plan](../wbs/v0.1.0/wbs-v0.1.0-index.md#4-design-documents-to-author) (D1–D18) for the full list).
+- `design-decisions.md` — v0.1.0 decision records (DD-01…DD-12, authored across M1–M9 as implementation reveals decisions)
+- `demo-scenario.md` — Demo walkthrough (M7)
+- `security/posture.md` — Security posture (OWASP 6/10, Essential checklist — M9)
+- Subsystem design docs are in `docs/design/` (e.g., `plan-schema-design.md`, `loop-controller-design.md`, `critique-engine-design.md`, etc.) — each authored in the milestone that builds the subsystem.
+
+The build sequence is defined in the [v0.1.0 WBS](../wbs/v0.1.0/wbs-v0.1.0-index.md) — engine-first M1–M3, escalation/forensics M4, adapters + surfaces M5–M6, demo M7, field test M8, release M9. Every milestone ends with code review, >95% coverage, lint clean, and comments in all code.
 
 ---
 
