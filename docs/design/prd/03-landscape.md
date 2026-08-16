@@ -37,6 +37,7 @@ The planner-critic loop is **ubiquitous as research and prompt, and nearly absen
 4. **Structured, low-cost critique** — deterministic gates always on, LLM critic on the drafts that survive them; severity-graded typed findings, not free-text vibes. Optionally full-depth LLM critique per revision when the audit justifies it.
 5. **Escalation as a feature** — minimal, precise human questions with full revision context and direct plan patching — the EU-AI-Act / OWASP ASI08 compliance story, productized.
 6. **Planning-vs-execution forensics** — tagged failure classification and missed-critique feedback — an instrumentation surface no one else ships.
+7. **Multi-critic ensemble (v0.2)** — run ≥2 critics from different model families and escalate on *disagreement*; a stronger adversarial signal than any single critic, directly addressing the blind-spot research. No existing system productizes critic disagreement.
 
 ## 3.4 Sources
 

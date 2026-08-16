@@ -57,6 +57,10 @@ OWASP's 2026 Top 10 for Agentic Applications (ASI08, Cascading Failures) explici
 
 PlannerCritic is the **planning** layer in a coherent agentic infrastructure stack: *eval → observe → enforce → **plan** → persist → communicate → manage → isolate → secure*. It is the first project that sits *in front of* execution, making the others more valuable — EvalForge can score plans, ToolTrust gates the steps an approved plan authorized, LessonExtractor learns from plans that failed despite critique. No other project in the catalog closes this loop.
 
+### 1.3.2 Why the first draft should start from a template, not zero
+
+A blank decomposition is the hardest place for a planner to start. Plan templates / shape presets (F-87, v0.2) give the planner a known-good skeleton per goal class (migration, rollout, incident) so its first draft is *much* better and the critic's job becomes catching *deviations* from a proven shape, not auditing a from-scratch guess. This is the structural analogue of tooltrust's posture presets: "never start from a blank file."
+
 ---
 
 ## 1.4 Grounded in (sources)

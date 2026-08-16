@@ -15,6 +15,10 @@
 9. **Revisions-to-approval distribution:** median revisions-to-approval ≤ 2 on the demo corpus; tail tracked.
 10. **Budget integrity:** zero runs exceed their declared `constraints.budget`; budget-hit escalations audited in CI.
 11. **Replay & viz:** any stored plan can be replayed (`plancritic replay`) and its task DAG rendered (`--graph`) — demo/article enablers.
+12. **Shadow adoption:** a platform lead can run `--dry-run` shadow mode against an existing planner and diff shadow vs live decisions in one query (F-14).
+13. **Complexity/cost transparency:** every plan surfaces a deterministic complexity/cost estimate before approval (F-17); ≥95% of estimates are within 20% of actual run cost.
+14. **Replan correctness:** a seeded precondition drift triggers the *correct* replan policy (patch/restart/abort) 100% of the time on the CI gate; the replan lineage is reconstructable from the store (F-53).
+15. **Loop-decision explainability:** `plancritic explain <plan_id>` narratives let a reviewer identify what would have changed the outcome within ~10s (actionability-tested).
 
 OSS community (post-launch): 25+ stars, 3 external contributors, 1+ external framework-ecosystem adoption per quarter.
 

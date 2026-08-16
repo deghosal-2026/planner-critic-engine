@@ -25,16 +25,17 @@ The plan is a **first-class, versioned, inspectable artifact** — you can diff 
 ## Scope Snapshot (decided 2026-08-16)
 
 - **Delivery surfaces:** Python library + CLI + MCP server + HTTP service (full blast); React web UI in v0.2
-- **LLM providers:** config-driven registry built first; OpenAI-compatible transport built on it; per-goal spend budget enforced by the loop controller
-- **Critique:** dual-mode — `deterministic-first` (default, free gates before LLM critic) → `llm-every-revision` (option); six heuristic families; diff-aware critique on revisions N>1
-- **Loop:** revision cap + convergence detection + regression guard + budget-hit escalation
-- **Approval:** per-goal threshold via `risk_tolerance` (strict = zero warnings; balanced = warnings acknowledged)
-- **Escalation:** CLI + MCP tools in v0.1; AIDE-style web UI in v0.2
-- **Adapters:** the tooltrust six, *with* execution-time re-gate (`before-each-step | off`)
-- **Plan store:** pluggable interface; SQLite default, Postgres-ready
-- **Forensics:** planning-vs-execution failure tagging + missed-critique → suggested deterministic check (feeds LessonExtractor)
-- **Viz & observability:** plan-graph export (Mermaid), trace replay, reason-code catalog
-- **Demo:** domain-agnostic sample corpus (migration, rollout, refactor, incident-response) with seeded flaws
+- **Adoption:** `plancritic init` scaffold; shadow mode (`--dry-run`) as the adoption wedge; `plannercritic-demo` reference runner
+- **LLM providers:** config-driven registry built first; OpenAI-compatible transport built on it; `EnvProbe` interface grounds preconditions in live state; per-goal spend budget enforced by the loop controller
+- **Critique:** dual-mode — `deterministic-first` (default, free gates before LLM critic) → `llm-every-revision` (option); six heuristic families (incl. unsafe parallelization); diff-aware critique on revisions N>1
+- **Loop:** revision cap + convergence detection + regression guard + budget-hit escalation; deterministic complexity/cost estimate pre-approval
+- **Approval:** per-goal threshold via `risk_tolerance` (strict = zero warnings; balanced = warnings acknowledged); approval TTL / stale-plan
+- **Escalation:** CLI + MCP tools in v0.1; AIDE-style web UI in v0.2; multi-critic ensemble (escalate on disagreement) in v0.2
+- **Adapters:** the tooltrust six, *with* execution-time re-gate (`before-each-step | off`) and defined replan semantics (`patch`/`restart`/`abort`)
+- **Plan store:** pluggable interface; SQLite default, Postgres-ready; plan-schema versioning + `migrate`
+- **Forensics:** planning-vs-execution failure tagging + missed-critique → suggested deterministic check (feeds LessonExtractor); replan lineage
+- **Viz & observability:** plan-graph export (Mermaid), trace replay, reason-code catalog, loop-decision explain; OTel export in v0.2
+- **Demo:** domain-agnostic sample corpus (migration, rollout, refactor, incident-response) with seeded flaws; `plannercritic-demo` runner
 - **Field test:** hermetic CI gate (no paid LLM) + local-model (OMLX/Ollama) release sweep
 - **Security:** OWASP Agentic Top 10 (ASI01/02/05/08/09/10), OpenSSF Passing floor, PlannerCritic Essential → Hardened baseline
 
@@ -47,7 +48,7 @@ The plan is a **first-class, versioned, inspectable artifact** — you can diff 
 | # | Sub-document | Covers |
 |---|---|---|
 | 01 | [prd/01-why.md](prd/01-why.md) | Why — market context, the pain, OSS goals, sources |
-| 02 | [prd/02-architecture.md](prd/02-architecture.md) | What — core engine, provider layer, critique engine, loop, plan schema, non-goals, demo corpus |
+| 02 | [prd/02-architecture.md](prd/02-architecture.md) | What — core engine, provider layer + EnvProbe, critique engine, loop, replan semantics, shadow mode, plan schema (parallelism/versioning), non-goals, demo corpus |
 | 03 | [prd/03-landscape.md](prd/03-landscape.md) | Landscape & identity — competitive table, the gap, our wedge |
 | 04 | [prd/04-users-and-cujs.md](prd/04-users-and-cujs.md) | Target users + 12 CUJs |
 | 05 | [prd/05-features.md](prd/05-features.md) | Feature set (F-01…F-79) + interface surfaces |

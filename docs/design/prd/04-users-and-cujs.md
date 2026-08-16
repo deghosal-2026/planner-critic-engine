@@ -23,23 +23,25 @@
 
 ## 4.2 Critical User Journeys (CUJs)
 
-Twelve critical journeys, each with a gate / decision / acceptance criteria. North star for the feature set.
+Sixteen critical journeys, each with a gate / decision / acceptance criteria. North star for the feature set.
 
 ### CUJ 1 — Register a provider and plan a goal ("15 lines to a plan")
 
 As an engineer, I register my model endpoint (local or paid), submit a goal with constraints, and get a typed, structured plan I can see immediately.
 
 **Acceptance criteria (P0):**
+- `plancritic init` scaffolds a config + a registered provider (prompting for base_url/model) + an example goal, so the user never faces a blank file.
 - `plancritic providers add <name> --transport openai-compatible --base-url ... --model ...` works; provider list persists and loads on restart.
 - `plancritic plan "<goal>" --constraints ...` returns a typed plan (tasks, deps, ordering, verification, rollback) as JSON/YAML and prints a readable rendering.
+- A **deterministic complexity/cost estimate** (step count, parallel branches, irreversible ops, est. LLM calls/tokens) is printed before approval (F-17) so the user can gate on cost, not just risk.
 - Works with a local OpenAI-compatible endpoint (OMLX/Ollama) with zero paid spend; works with any configured provider.
-- The goal carries constraints + `risk_tolerance` + optional `budget`.
+- The goal carries constraints + `risk_tolerance` + optional `budget` + `replan_policy`.
 
 ### CUJ 2 — The critic catches a real flaw (the "aha" moment)
 
 As an engineer, I run a goal through planner+critic and watch the critic flag a genuine structural gap the planner missed — a missing verification step, an unsafe ordering, an unverified dependency — with a severity grade and a precise reason.
 
-**Acceptance criteria (P1, but the project isn't real without it):**
+**Acceptance criteria (P0):**
 - Demo corpus includes ≥1 goal where the first draft is critiqued with a *correct* blocker (a seeded flaw) that the planner actually fixes in revision.
 - Findings are structured (heuristic family, severity, task reference, reason code) — not free text.
 - `plancritic plan show <id> --findings` renders the critique.
@@ -112,11 +114,12 @@ Every adapter: audit trail for plan approval + any re-gate decision, and field-t
 
 ### CUJ 9 — Execution-time re-gate ("the plan was right, then the world moved")
 
-As an operator, I bind an approved plan to its executor; before each step executes, the critic optionally re-checks whether the step's preconditions still hold, and a stale step triggers a replan instead of blind execution.
+As an operator, I bind an approved plan to its executor; before each step executes, the critic optionally re-checks whether the step's preconditions still hold, and a stale step triggers a **defined replan** instead of blind execution.
 
 **Acceptance criteria (P0):**
-- Adapter supports `re-gate: before-each-step | off`. In `before-each-step`, the step's stated preconditions are re-verified against current context.
-- A false precondition produces a replan request, not a blind step execution.
+- Adapter supports `re-gate: before-each-step | off`. In `before-each-step`, the step's stated preconditions are re-verified against current context — grounded by an `EnvProbe` (F-19/F-26) where declared, not LLM-imagined.
+- A false precondition triggers a **defined replan** per the goal's `replan_policy` (`patch` default / `restart` / `abort`), not "a replan request" (F-16).
+- The replan is recorded as a linked sub-plan in the same plan history (F-53); partial execution is preserved in the trace.
 - The re-gate decision is recorded in the plan's execution trace.
 
 ### CUJ 10 — Diagnose a failed run (planning vs execution)
@@ -145,3 +148,37 @@ As a domain expert, I define a new critique heuristic family (or a deterministic
 **Acceptance criteria (P1):**
 - `plancritic heuristics add` flow: define a heuristic family (name, when to apply, deterministic check or LLM prompt) via a pack schema; `plancritic heuristics validate && test` passes without engine changes.
 - A one-page "how to contribute a heuristic pack" doc is the only reference needed.
+
+### CUJ 13 — Adopt via shadow mode ("trust before you enforce")
+
+As a platform lead, I run PlannerCritic in **shadow mode** alongside my agent's existing single-pass planner, monitor what PlannerCritic *would* have blocked/approved/escalated, compare against my current planner's output, tune, and only then flip to enforce — without changing a line of agent code.
+
+**Acceptance criteria (P0):**
+- `plannercritic plan "<goal>" --dry-run` runs the full planner→critic→revise→approve loop but does not gate execution; the decision is logged with `mode: shadow`.
+- `plannercritic plans list --mode shadow` shows the shadow decisions and what they would have changed vs. the live planner's plan.
+- Shadow vs enforced decisions are diffable in one query; flipping to enforce is a config change, not a code change.
+
+### CUJ 14 — Watch the full loop run end-to-end ("the demo runner")
+
+As a presenter or first-time user, I run `plannercritic-demo` and watch a stub executor run an approved plan end-to-end — plan → approve → re-gate → execute (with a seeded precondition drift) → replan → complete — in one narrative, without wiring up a real framework.
+
+**Acceptance criteria (P0):**
+- `plannercritic-demo` ships in `examples/demo-runner/` and demonstrates the full loop against a stub executor (no framework required).
+- The demo seeds a precondition drift so the re-gate fires and a defined replan (F-16) is visible.
+- The demo is the default `plancritic init` example goal so first-run users see the loop immediately.
+
+### CUJ 15 — Understand *why* the loop decided what it did ("loop-decision explain")
+
+As a reviewer, when a plan was approved, escalated, or replanned, I can read a plain-language narrative of the loop decision trail — why approved, why escalated, why replanned — within ~10 seconds, without reading the store by hand.
+
+**Acceptance criteria (P0):**
+- `plancritic explain <plan_id>` (and `GET /plans/{id}/explain`, MCP `explain` tool) prints a human-readable narrative of the loop decisions: which revision was approved/escalated/replanned, which findings drove it, and which termination rule fired.
+- The narrative is actionability-tested: a reader can identify, from the text alone, what would have changed the outcome.
+
+### CUJ 16 — Export the approved plan without adopting the gate ("plan portability")
+
+As an engineer who already has a runner, I export an approved plan to my framework's native format (LangGraph graph / CrewAI tasks / OpenAI SDK tool list) and feed it to my executor — without adopting PlannerCritic's gate.
+
+**Acceptance criteria (P1):**
+- `plancritic export <plan_id> --to langgraph|crewai|openai-sdk` emits framework-native artifacts from the approved plan.
+- The export is a faithful, deterministic render of the plan (no re-planning); the gate remains optional for teams that want it.

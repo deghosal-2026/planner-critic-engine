@@ -89,7 +89,7 @@ Same engine, one config knob (`critic.mode`). Users with cheap/audit-critical go
 | **Feasibility** | Each task is achievable with the stated environment/tools/constraints; no impossible or undefined steps | "Step 3 assumes a tool that isn't in the environment" | LLM |
 | **Risk** | Blast radius of each step vs the goal's `risk_tolerance`; irreversible / external / high-cost steps flagged | "Step 5 deletes prod data with no dry-run gate" | LLM |
 | **Missing steps** | Gaps between the stated goal and the plan — obvious prerequisites omitted | "No step verifies DB schema compatibility before the migration cutover" | LLM |
-| **Unsafe sequencing** | Dependency / ordering hazards — a step running before its precondition; parallelization that breaks safety | "Rollback step is scheduled after the 50% rollout step" | Deterministic (dependency graph) + LLM |
+| **Unsafe sequencing** | Dependency / ordering hazards — a step running before its precondition; **parallelization that breaks safety** (e.g. two prod writes in one `parallel_group`) | "Rollback step is scheduled after the 50% rollout step" / "Two irreversible prod writes run in the same parallel group" | Deterministic (dependency graph) + LLM |
 | **Unverified dependencies** | A step depends on a fact never established earlier in the plan (external state, a prior verification) | "Step 6 assumes the outage window is booked; no step books it" | LLM |
 | **Weak rollback** | High-blast-radius steps lack a rollback or verification step; rollback ordering unsound | "Irreversible prod write has no rollback step" | Deterministic (rollback presence) + LLM |
 
@@ -119,23 +119,23 @@ On revision N>1, the critic re-audits only **changed tasks + their dependents** 
 
 ```
 function run_loop(goal, provider_registry, config):
-    plan_v1 = planner.decompose(goal)              # LLM call
-    store.put(PlanVersion(plan_v1, parent=None))
+    plan_v = planner.decompose(goal)             # LLM call
+    store.put(PlanVersion(plan_v, parent=None))
     for revision in 1..config.revision_cap:
-        gates = deterministic_gates(plan_v)          # free, always run
+        gates = deterministic_gates(plan_v)        # free, always run
         if critic.mode == "deterministic-first":
-            if gates.has_blocker(): revise_or_escalate(); continue
+            if gates.has_blocker(): plan_v = planner.revise(plan_v, gates.as_findings()); continue
             findings = critic.audit(plan_v, changed_tasks_only=(revision>1))  # LLM
         else:  # llm-every-revision
             findings = gates.as_findings() + critic.audit(plan_v)
         store.put(Findings(plan_v, findings))
-        if meets_threshold(findings, goal.risk_tolerance):
-            return Approved(plan_v)
+        if meets_threshold(findings, goal.risk_tolerance): return Approved(plan_v)
         if budget_exceeded(goal.budget): return Escalate(budget)
         if regression_detected(findings, prior_findings): return Escalate(thrashing)
         if converged(plan_v, prior_plan): return Escalate(stalled)
-        plan_v = planner.revise(plan_v, findings)   # LLM call
-        store.put(PlanVersion(plan_v, parent=plan_v_prev))
+        prior_plan, prior_findings = plan_v, findings
+        plan_v = planner.revise(plan_v, findings)  # LLM call
+        store.put(PlanVersion(plan_v, parent=prior_plan))
     return Escalate(revision_cap)
 ```
 
@@ -147,26 +147,59 @@ The controller is **deterministic on identical inputs** (F-74, CI-asserted): giv
 - A tagged failure that the critic *missed* is **recorded with its critique history** ("the critic said this was fine; execution proved otherwise") and **surfaces a suggested deterministic check** to the operator.
 - This feeds LessonExtractor (Week 8 flagship): the missed-critique records become a standing-rule corpus. The data model captures the miss at v0.1; automated promotion is a v0.2+ concern.
 
+## 2.7b Replan semantics (mid-execution)
+
+When the re-gate (F-46) finds a stale precondition, "a replan request" is not enough — the behavior must be defined. PlannerCritic supports three policies, set per goal (`replan_policy`):
+
+| Policy | Behavior | When it fits |
+|---|---|---|
+| **`patch`** (default) | The planner revises only the remaining steps from the stale one onward; already-executed steps are preserved. The revision is a *sub-plan* linked to the parent plan's history (F-53). | Most goals — keep progress, fix the tail |
+| **`restart`** | The whole plan is re-decomposed from the goal, ignoring prior execution; the prior plan + execution trace is archived as a parent. | The goal's assumptions changed fundamentally |
+| **`abort`** | Stop; escalate to a human. A stale precondition that's *not* auto-replannable (e.g. an irreversible step's precondition failed mid-run). | High-stakes / irreversible mid-plan |
+
+A replan is recorded in the same plan history as a linked sub-plan (F-53), so the full execution lineage — original plan → partial execution → replan → completion — is reconstructable from the store.
+
+## 2.7c Shadow mode (the adoption wedge)
+
+`plannercritic plan "<goal>" --dry-run` (F-14) runs the full planner→critic→revise→approve loop *alongside* an agent's existing single-pass planner and logs what PlannerCritic **would** have blocked/approved/escalated — without gating execution. This is the tooltrust `dry_run` adoption pattern: deploy in observe mode, compare against your current planner's output, tune, then flip to enforce. The plan store records shadow decisions distinctly (`mode: shadow`) so a diff is one query.
+
+## 2.7d Plan complexity / cost estimate (deterministic, pre-approval)
+
+Before a user approves, PlannerCritic surfaces a deterministic derived summary (F-17): step count, parallel-branch count, irreversible-op count, est. LLM calls, est. token cost. The user can gate on **cost**, not just risk — and the estimate feeds the budget check. Zero LLM cost to compute.
+
+## 2.7e Approval expiry / stale plan
+
+An approved plan carries a TTL (`approval_ttl`, default ∞, configurable). An expired approval forces a replan per §2.7b — the world may have moved between approval and execution. The re-gate covers *per-step* drift; the TTL covers *whole-plan* drift.
+
 ## 2.8 Plan schema (typed sketch)
 
 ```
 Goal:
   id, description, constraints{budget, time, environment, tools[]},
-  risk_tolerance{strict|balanced}, metadata
+  risk_tolerance{strict|balanced}, replan_policy{patch|restart|abort},
+  approval_ttl (seconds, default ∞), metadata
 
 PlanVersion (one per revision; immutable once stored):
-  id, goal_id, version (int), parent_version (nullable), created_at
-  tasks: Task[]
-  deps: Dependency[]
-  ordering: task_id -> [task_id]      (explicit ordering beyond deps)
+  id, goal_id, plan_schema_version (semver), version (int),
+  parent_version (nullable; set for replans), created_at
+  tasks: Task[], deps: Dependency[], branches: Branch[]  (explicit parallel/branch beyond deps)
 
 Task:
   id, description, action (verb), target,
-  preconditions[], verification: VerificationStep|null,
+  parallel_group (nullable; tasks in the same group run concurrently),
+  preconditions[] (each may declare an EnvProbe to verify a live fact),
+  verification: VerificationStep|null,
   rollback: RollbackStep|null, risk_class, blast_radius
+
+Branch:
+  id, kind{fan_out|fan_in}, tasks[], join{all|any|quorum}
 
 Dependency:
   from_task, to_task, kind{hard|soft}, reason
+
+EnvProbe (optional; grounds a precondition in live state):
+  kind (e.g. env_var, db_query, http_check, deploy_status),
+  query, expected
 
 VerificationStep: what_to_check, how, expected
 RollbackStep:    trigger, action, safety_guard
@@ -182,6 +215,10 @@ Escalation:
 ExecutionTrace (plan ↔ run link):
   id, plan_id (approved version), task_id, outcome,
   failure_class{planning|execution|null}, linked_finding_id (missed-critique)
+
+PlanComplexity (deterministic, derived, pre-approval):
+  step_count, parallel_branch_count, irreversible_op_count,
+  est_llm_calls, est_token_cost
 ```
 
 ## 2.9 Demo corpus (seeded flaws)
@@ -197,4 +234,4 @@ A domain-agnostic `examples/` set. Each goal has a known seeded flaw the critic 
 
 ## 2.10 Terminal-state definition ("done" for v0.1.0)
 
-A working `v0.1.0` you can `pip install planner-critic`, register a provider (`plancritic providers add ...`), give it a non-trivial goal, watch the critic flag a real gap in the planner's first draft, see the planner revise to approval — or escalate cleanly with a precise question when it can't — with every plan version and critique stored and diffs inspectable, re-gate catching a stale precondition mid-execution, failures classifiable as planning vs execution, and a field-test matrix green across all six frameworks against a local model.
+A working `v0.1.0` you can `pip install planner-critic`, run `plancritic init` (config + provider + example goal), give it a non-trivial goal, watch the critic flag a real gap in the planner's first draft, see the planner revise to approval — or escalate cleanly with a precise question when it can't — with every plan version and critique stored and diffs inspectable, a `plannercritic-demo` runner showing plan→approve→re-gate→execute end-to-end, re-gate catching a stale precondition and triggering a defined replan, failures classifiable as planning vs execution, shadow mode logging what *would* have happened without gating, and a field-test matrix green across all six frameworks against a local model.
