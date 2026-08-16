@@ -1,6 +1,6 @@
-# D1 — Design Seed
+# M1 Design Seed
 
-> **Authored in:** M1 (Core Engine) · **Status:** Current baseline · **WBS:** D1 · **Refs:** [PRD 05 §2.6 verify-shrink loop](../../design/prd/05-features.md)
+> **Authored in:** M1 (Core Engine) · **Status:** Current baseline · **Refs:** [PRD 05 §2.6 verify-shrink loop](../design/prd/05-features.md), [Architecture v0.1.0 (D1)](../architecture/architecture-v0.1.0.md)
 
 ## What M1 Built
 
