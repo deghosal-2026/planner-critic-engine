@@ -1,0 +1,36 @@
+"""Shared plumbing for deterministic gates.
+
+A :class:`BaseGate` wraps a pure check function so every gate exposes the
+same surface (:meth:`~BaseGate.run`) to the aggregator while each module
+keeps its single responsibility.
+"""
+
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+
+from ..schema.plan import PlanVersion
+from ..types import Finding
+
+
+class BaseGate(ABC):
+    """Base class for a single deterministic gate."""
+
+    name: str = "base"
+
+    @abstractmethod
+    def run(self, plan: PlanVersion) -> list[Finding]:
+        """Audit one plan version and return its findings.
+
+        Args:
+            plan: The typed plan to check.
+
+        Returns:
+            Findings describing every violation this gate guards. Empty when
+            the plan passes. Never raises on malformed-but-typed input.
+        """
+        raise NotImplementedError
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        """Repr for the gate (e.g. in log output)."""
+        return f"{self.__class__.__name__}({self.name})"

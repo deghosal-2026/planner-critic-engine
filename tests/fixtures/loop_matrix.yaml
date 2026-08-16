@@ -1,0 +1,74 @@
+# Loop acceptance matrix (M1 Task 10 / issue #10).
+#
+# Each cell is: scenario name + expected termination. The runner builds a
+# ScriptedPlanner/ScriptedCritic from the "drafts"/"critic" keys and asserts
+# run_loop terminates with EXACTLY the expected status/reason_code.
+#
+# The dirty draft is a high-risk task with no verification/rollback (gate
+# blocker). The clean draft passes every gate. Every cell is deterministic:
+# identical inputs -> identical decision (F-74).
+
+scenarios:
+  - id: approve_immediate
+    goal: { tolerance: balanced }
+    mode: deterministic-first
+    revision_cap: 3
+    planner_drafts: [clean]
+    critic: [quiet]
+    expect: { status: approved, reason_code: approved }
+
+  - id: approve_after_fix
+    goal: { tolerance: balanced }
+    mode: deterministic-first
+    revision_cap: 3
+    planner_drafts: [dirty, clean]
+    critic: [quiet]
+    expect: { status: approved, reason_code: approved }
+
+  - id: approve_warning_acknowledged
+    goal: { tolerance: balanced }
+    mode: llm-every-revision
+    revision_cap: 3
+    planner_drafts: [clean]
+    critic: [warning_only]
+    expect: { status: approved, reason_code: approved }
+
+  - id: strict_pending_warning_revises
+    goal: { tolerance: strict }
+    mode: llm-every-revision
+    revision_cap: 3
+    planner_drafts: [clean, clean]
+    critic: [warning_only, quiet]
+    expect: { status: approved, reason_code: approved }
+
+  - id: revision_cap_escalation
+    goal: { tolerance: balanced }
+    mode: deterministic-first
+    revision_cap: 2
+    planner_drafts: [dirty]
+    critic: [quiet]
+    expect: { status: escalated, reason_code: revision_cap_reached }
+
+  - id: regression_thrash
+    goal: { tolerance: strict }
+    mode: llm-every-revision
+    revision_cap: 3
+    planner_drafts: [clean]
+    critic: [warning_then_blocker]
+    expect: { status: escalated, reason_code: regression_thrashing }
+
+  - id: budget_exceeded
+    goal: { tolerance: balanced, budget: { max_revisions: 1 } }
+    mode: llm-every-revision
+    revision_cap: 5
+    planner_drafts: [dirty, dirty]
+    critic: [quiet]
+    expect: { status: escalated, reason_code: budget_exceeded }
+
+  - id: converged_stalled
+    goal: { tolerance: balanced }
+    mode: llm-every-revision
+    revision_cap: 6
+    planner_drafts: [clean]
+    critic: [blocker]
+    expect: { status: escalated, reason_code: converged_stalled }
