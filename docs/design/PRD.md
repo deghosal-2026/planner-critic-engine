@@ -19,7 +19,7 @@ The plan is a **first-class, versioned, inspectable artifact** — you can diff 
 
 **Core architectural principle (decided 2026-08-16):** PlannerCritic Engine is **fully LLM- and framework-agnostic**. The core engine owns the mechanics (plan schema, critique heuristics, loop controller, convergence detection, escalation manager, plan store) and speaks plain typed JSON. Two pluggable surfaces hang off it: an **LLM provider layer** (config-driven registry; any model/transport plugs in via a thin protocol — the OpenAI-compatible transport is the first implementation, built *on top of* the registry) and **framework adapters** (raw Python, LangGraph, PydanticAI, CrewAI, OpenAI Agents SDK, MCP — the same six-agent-adapters pattern that shipped in agent-tooltrust). The engine never knows which model or framework called it.
 
-**Scoping snapshot (decided 2026-08-16):** Python library + CLI + MCP server + HTTP service (full blast); pluggable plan-store interface with SQLite default and Postgres-ready; dual-mode critique (`deterministic-first` default → `llm-every-revision` option); per-goal approval thresholds via goal `risk_tolerance`; loop = revision cap + convergence detection + regression guard; escalation = all three surfaces (CLI + MCP tools in v0.1, React web UI in v0.2); execution-trace tagging with planning-vs-execution classification and missed-critique → suggested-check feedback; domain-agnostic sample goal corpus; hermetic CI gate (no paid LLM) + local-model (OMLX/Ollama) field-test release gate.
+**Scoping snapshot (decided 2026-08-16):** Python library + CLI + MCP server + HTTP service (full blast); pluggable plan-store interface with SQLite default and Postgres-ready; dual-mode critique (`deterministic-first` default → `llm-every-revision` option); per-goal approval thresholds via goal `risk_tolerance`; **per-goal spend budget enforced by the loop controller**; loop = revision cap + convergence detection + regression guard; escalation = all three surfaces (CLI + MCP tools in v0.1, React web UI in v0.2); execution-trace tagging with planning-vs-execution classification and missed-critique → suggested-check feedback; domain-agnostic sample goal corpus; hermetic CI gate (no paid LLM) + local-model (OMLX/Ollama) field-test release gate; **security baselines: OWASP Agentic Top 10 (partial v0.1 → broader v0.2), OpenSSF Passing floor, PlannerCritic Essential → Hardened baseline.**
 
 ---
 
@@ -69,6 +69,8 @@ The plan is a **first-class, versioned, inspectable artifact** — you can diff 
 - **`LLMProvider` protocol** — a thin interface (`complete(messages, tool_schemas)` → structured output) that any model/transport implements: `name`, `base_url`, `model`, `transport` type, optional `api_key`.
 - **Config-driven registry** — providers are defined in config, not code: `plancritic providers add <name> --transport openai-compatible --base-url ... --model ...`. The engine loads whatever is configured. This is built *first*; the OpenAI-compatible transport is the first concrete implementation *on top of* it.
 - **Cost control** — the default config points at local/cheap endpoints (OMLX, Ollama, vLLM). Paid providers are only used when explicitly registered. The planner and critic can use *different* providers/models (a different family for the critic is recommended, per the blind-spot research).
+- **Per-goal spend budget** — every goal carries an optional spend ceiling (`constraints.budget`: max tokens, max LLM calls, max revisions). The loop controller enforces it: hitting the budget escalates rather than spending more. A runaway plan on a paid provider cannot rack up unbounded spend.
+- **Deterministic gates are injection-immune** — schema/dependency/ordering/rollback checks run as code, not as model output; a goal crafted to corrupt the plan cannot weaken the deterministic critique. The LLM critic is *not* injection-immune (it reads the goal text) — so it is always paired with the deterministic gates, never the sole gate.
 - CI never calls a paid LLM: the hermetic gate is deterministic-only.
 
 ### 3.2 Critique engine (dual-mode)
@@ -80,6 +82,19 @@ The plan is a **first-class, versioned, inspectable artifact** — you can diff 
 
 Same engine, one config knob (`critic.mode`). Users with cheap/audit-critical goals choose `llm-every-revision`; everyone else gets the low-cost default.
 
+#### 3.2.1 The six critique heuristic families
+
+| Family | What it audits | Example blocker | Deterministic / LLM |
+|---|---|---|---|
+| **Feasibility** | Each task is achievable with the stated environment/tools/constraints; no impossible or undefined steps | "Step 3 assumes a tool that isn't in the environment" | LLM |
+| **Risk** | Blast radius of each step vs the goal's `risk_tolerance`; irreversible / external / high-cost steps flagged | "Step 5 deletes prod data with no dry-run gate" | LLM |
+| **Missing steps** | Gaps between the stated goal and the plan — obvious prerequisites omitted | "No step verifies DB schema compatibility before the migration cutover" | LLM |
+| **Unsafe sequencing** | Dependency / ordering hazards — a step running before its precondition; parallelization that breaks safety | "Rollback step is scheduled after the 50% rollout step" | Deterministic (dependency graph) + LLM |
+| **Unverified dependencies** | A step depends on a fact never established earlier in the plan (external state, a prior verification) | "Step 6 assumes the outage window is booked; no step books it" | LLM |
+| **Weak rollback** | High-blast-radius steps lack a rollback or verification step; rollback ordering unsound | "Irreversible prod write has no rollback step" | Deterministic (rollback presence) + LLM |
+
+Every finding carries a heuristic family, severity (`blocker` / `warning` / `info`), a task reference, a machine-readable `reason_code`, and a human message. A blocker from a deterministic gate can never be overridden by the LLM critic.
+
 ### 3.3 Approval & loop semantics
 
 - **Per-goal approval threshold** (from the goal schema's `risk_tolerance` field): `strict` = zero warnings tolerated; `balanced` = warnings tolerated but must be explicitly acknowledged in the final plan. No blockers may ever remain.
@@ -90,6 +105,54 @@ Same engine, one config knob (`critic.mode`). Users with cheap/audit-critical go
 - An approved plan can be linked to later executions and **tagged** `planning` / `execution` on failure.
 - A tagged failure that the critic *missed* is **recorded with its critique history** ("the critic said this was fine; execution proved otherwise") and **surfaces a suggested deterministic check** to the operator.
 - This feeds LessonExtractor (Week 8 flagship): the missed-critique records become a standing-rule corpus. The data model captures the miss at v0.1; automated promotion is a v0.2+ concern.
+
+### 3.5 Plan schema (typed sketch)
+
+```
+Goal:
+  id, description, constraints{budget, time, environment, tools[]},
+  risk_tolerance{strict|balanced}, metadata
+
+PlanVersion (one per revision; immutable once stored):
+  id, goal_id, version (int), parent_version (nullable), created_at
+  tasks: Task[]
+  deps: Dependency[]
+  ordering: task_id -> [task_id]      (explicit ordering beyond deps)
+
+Task:
+  id, description, action (verb), target,
+  preconditions[], verification: VerificationStep|null,
+  rollback: RollbackStep|null, risk_class, blast_radius
+
+Dependency:
+  from_task, to_task, kind{hard|soft}, reason
+
+VerificationStep: what_to_check, how, expected
+RollbackStep:    trigger, action, safety_guard
+
+Finding (critic output; one per task per version):
+  id, task_id, version, heuristic_family, severity{blocker|warning|info},
+  reason_code, message, suggested_fix
+
+Escalation:
+  id, plan_id, version, blocker_finding_id, question,
+  status{open|approved|denied}, resolution, resolved_at
+
+ExecutionTrace (v0.2; plan ↔ run link):
+  id, plan_id (approved version), task_id, outcome,
+  failure_class{planning|execution|null}, linked_finding_id (missed-critique)
+```
+
+### 3.6 Demo corpus (seeded flaws)
+
+A domain-agnostic `examples/` set. Each goal has a known seeded flaw the critic must surface — this is what makes the "aha" demo and the field-test matrix credible, not staged.
+
+| Goal domain | One-liner | Seeded flaw the critic must catch |
+|---|---|---|
+| Service migration | "Migrate service X to the new auth provider" | No step verifies DB schema compatibility before cutover (missing step) |
+| Rollout | "Canary-deploy feature Y to 10% then 50%" | Rollback step scheduled after the 50% step (unsafe sequencing) |
+| Refactor | "Split monolith module Z into two services" | Step assumes an outage window is booked; no step books it (unverified dependency) |
+| Incident response | "Mitigate the auth-service 5xx spike" | No verification step confirms mitigation before declaring resolved (weak verification) |
 
 ### Terminal-state definition ("done" for v0.1.0)
 
@@ -260,6 +323,7 @@ As a reliability engineer, given a failed agent run tied to an approved plan, I 
 | F-10 | `deterministic-first` critique mode (default) | P0 | free gates before LLM critic |
 | F-11 | `llm-every-revision` critique mode (option, config `critic.mode`) | P0 | full six-heuristic critique per revision |
 | F-12 | Deterministic critique gates: schema validity, dependency cycles, ordering sanity, verification presence, rollback presence | P0 | zero-LLM-cost |
+| F-13 | Per-goal spend budget (max tokens / calls / revisions) enforced by the loop controller → escalate on budget hit | P0 | cost safety on paid providers |
 
 ### 7.2 LLM provider layer
 | ID | Feature | Priority | Notes |
@@ -320,6 +384,35 @@ As a reliability engineer, given a failed agent run tied to an approved plan, I 
 | F-73 | Fail-closed default: unapproved plan cannot be handed to an executor | P0 | |
 | F-74 | Determinism contract for the loop controller (same inputs, same loop decisions) | P1 | CI-assertable |
 
+### 7.8 Interface surfaces (reference)
+
+**CLI (`plancritic`)**
+| Command | Purpose | P |
+|---|---|---|
+| `providers add/list/rm` | manage the LLM provider registry | P0 |
+| `plan "<goal>" --constraints ...` | decompose a goal → typed plan | P0 |
+| `critique <plan>` | run the critic on a plan version | P0 |
+| `escalate list` / `approve <id>` / `deny <id>` [--patch ...] | escalation round-trip | P0 |
+| `plans list` / `show <id>` / `diff <v1> <v2>` | versioned plan store | P0 |
+| `field-test` | release field sweep | P0 |
+| `baseline check` | security baseline self-audit | P1 |
+
+**HTTP (FastAPI)**
+| Method | Path | Purpose | P |
+|---|---|---|---|
+| POST | `/plan` | submit a goal → plan | P0 |
+| POST | `/critique` | critique a plan version | P0 |
+| GET | `/escalations` | list pending escalations | P0 |
+| POST | `/escalations/{id}/approve` · `/deny` | resolve an escalation (with optional patch) | P0 |
+| GET | `/plans` · `/plans/{id}` · `/plans/{id}/diff?v2=` | store queries & diffs | P0 |
+
+**MCP server tools**
+| Tool | Purpose | P |
+|---|---|---|
+| `plan` | decompose a goal into a typed plan | P0 |
+| `critique` | critique a plan version | P0 |
+| `escalate_list` / `escalate_approve` / `escalate_deny` | resolution from the agent's own workspace | P0 |
+
 ---
 
 ## 8. Non-Goals (v1.0)
@@ -345,6 +438,8 @@ Product-level success (by v0.1.0 release):
 6. **Cost:** the entire HTTP/CLI/deterministic test suite runs with $0 LLM spend (hermetic CI gate); the field sweep runs on a local model.
 7. **Forensics value:** plan–execution failure classification and missed-critique records are queryable from the store for any approved plan.
 8. **Determinism:** loop-controller decisions are deterministic on identical inputs (CI-asserted).
+9. **Revisions-to-approval distribution:** median revisions-to-approval ≤ 2 on the demo corpus; tail tracked (vault-listed metric).
+10. **Budget integrity:** zero runs exceed their declared `constraints.budget`; budget-hit escalations audited in CI.
 
 OSS community (post-launch): 25+ stars, 3 external contributors, 1+ external framework-ecosystem adoption per quarter.
 
@@ -360,7 +455,55 @@ OSS community (post-launch): 25+ stars, 3 external contributors, 1+ external fra
 
 ---
 
-## 11. Risks & Open Questions
+## 11. Security Compliance Baseline
+
+PlannerCritic Engine targets three concrete baselines (mirrors the agent-tooltrust model). Each is a public checklist; users can self-audit and the project publishes its status. **Target: medium across all three.**
+
+### 11.1 OWASP Agentic AI Top 10 — Target: Partial v0.1 → Broader v0.2
+
+| OWASP Risk | PlannerCritic mitigation | Feature IDs | Coverage |
+|---|---|---|---|
+| **ASI01: Agent Goal Hijack** | Goal schema is typed & validated; deterministic gates audit structure, not goal semantics; the original goal is recorded in the plan store | F-01, F-12, F-09 | v0.1 ✅ |
+| **ASI05: Unexpected Code Execution** | Fail-closed: an unapproved plan can never reach an executor | F-73 | v0.1 ✅ |
+| **ASI08: Cascading Failures** | Independent critic reviews the plan before execution; loop bounded by revision cap + convergence + regression guard | F-04, F-05, F-06, F-07 | v0.1 ✅ |
+| **ASI09: Human-Agent Trust Exploitation** | Escalation to a human with a minimal, precise question; resolution audited in plan history | F-30, F-34 | v0.1 ✅ |
+| **ASI10: Insufficient Monitoring & Logging** | Plan versions, critique history, escalations, and execution traces stored and queryable | F-09, F-50 | v0.1 partial → v0.2 full |
+| **ASI02: Tool Misuse** | Execution-time re-gate re-verifies preconditions before each step; adapters gate, they do not execute | F-46 | v0.2 |
+| ASI03/04/06/07 | Out of direct scope (data leakage, supply chain, prompt injection at the tool layer) — covered by sibling repos (ToolTrust) | — | defer |
+
+**v0.1: 4/10 direct coverage (ASI01/05/08/09) + ASI10 partial. v0.2: +ASI02 + ASI10 full.**
+
+### 11.2 OpenSSF Best Practices Badge — Target: Passing (floor)
+
+| Criterion | Requirement | PlannerCritic action | Milestone |
+|---|---|---|---|
+| Passing (baseline) | Basic OSS hygiene | MIT license, SECURITY.md, CONTRIBUTING, CI, tests, .gitignore (already scaffolded) | v0.1 ✅ |
+| Branch protection | PR review required | GitHub branch protection on `main` | v0.1 |
+| Signed releases | Cryptographically signed artifacts | Sigstore / PyPI trusted publishing | v0.2 |
+| Dynamic analysis | Fuzzer in CI | Property-based fuzzer for plan-schema / loop-controller | v0.2 |
+| Silver (aspirational) | 2+ independent reviewers | Post-community maturity | Post v0.3 |
+
+### 11.3 Custom PlannerCritic Security Baseline — Target: Essential (v0.1) → Hardened (v0.2)
+
+| Tier | Posture | Key requirements | Target |
+|---|---|---|---|
+| **Essential** | balanced | Deterministic gates always on; fail-closed; plan store versioning; escalation round-trip; per-goal budget; OpenSSF Passing; OWASP ASI01/05/08/09 | v0.1 ✅ |
+| **Hardened** | strict | All Essential + execution-time re-gate; plan–execution failure classification; missed-critique feedback; adversarial field matrix; OpenSSF Silver; OWASP ASI02 + ASI10 | v0.2 |
+| **Certified** (aspirational) | strict | All Hardened + tamper-evident plan store; external security review | v0.3+ |
+
+`plancritic baseline check` (P1) audits a deployment against its chosen tier.
+
+### Summary
+
+| Baseline | v0.1 | v0.2 (MEDIUM target) | Aspirational |
+|---|---|---|---|
+| OWASP Agentic Top 10 | 4/10 + ASI10 partial | 6/10 | broader via siblings |
+| OpenSSF Best Practices | Passing | Silver | Gold |
+| PlannerCritic Security Baseline | Essential | Hardened | Certified (v0.3+) |
+
+---
+
+## 12. Risks & Open Questions
 
 - **Critic shares the planner's blind spots** (both are LLMs) — mitigated by separate roles, recommended different model family, bounded loop, regression guard, and the missed-critique feedback loop.
 - **Critic can be net-negative** (research: a critic re-reading the same context with the same model family can disrupt more than it recovers) — mitigated by typed rubric + deterministic gates + per-goal thresholds; validate on the field corpus before deployment.
@@ -369,19 +512,20 @@ OSS community (post-launch): 25+ stars, 3 external contributors, 1+ external fra
 - **Scope of v0.1 is large** (engine + provider registry + two critique modes + six adapters + CLI + MCP + HTTP + stores + field test) — sequenced inside the WBS so the engine is testable before the breadth lands; risk is schedule, not architecture.
 - **Planner and critic as separate model families at v0.1** — technically cheap (config), but the *default* demo should pick a free/local pairing that demonstrates cross-family critique.
 - **Fairness of the demo corpus** — the seeded-flaw goals must be genuinely hard (blade-length ordering, unverified deps) so the critic's catch is credible, not staged.
+- **Adversarial goals / prompt injection** — the LLM critic reads the goal text and is therefore injectable; a goal crafted to corrupt the plan cannot weaken the deterministic gates (they're code), but *can* bias the LLM critic. Mitigation: deterministic gates always run and cannot be skipped; a blocker from the deterministic layer cannot be overridden by the LLM; the field-test matrix includes an adversarial goal that attempts to suppress a blocker.
 
 ---
 
-## 12. Roadmap (Milestone Sketch)
+## 13. Roadmap (Milestone Sketch)
 
-- **v0.1.0 (P0):** core engine (F-01–F-12), provider registry + OpenAI-compatible transport (F-20–F-24), both critique modes, escalation CLI + MCP tools (F-30–F-32, F-34), six adapters with gate (F-40–F-45), SQLite store (F-63), CLI + HTTP service (F-61–F-62), sample-goal corpus + demo trace (F-65–F-66), hermetic CI gate + field sweep (F-67–F-68), fail-closed modes (F-70–F-73). **Shipped when CUJs 1–9 (P0) pass and the field-test matrix is green.**
-- **v0.2.0 (P1):** execution feedback (F-50–F-52), re-gate (F-46), AIDE web UI (F-33), Postgres store (F-64), Anthropic/Gemini transports (F-25), determinism contract (F-74), automated missed-critique → standing-rule promotion interface for LessonExtractor.
+- **v0.1.0 (P0):** core engine (F-01–F-13), provider registry + OpenAI-compatible transport (F-20–F-24), both critique modes, escalation CLI + MCP tools (F-30–F-32, F-34), six adapters with gate (F-40–F-45), SQLite store (F-63), CLI + HTTP service (F-61–F-62), sample-goal corpus + demo trace (F-65–F-66), hermetic CI gate + field sweep (F-67–F-68), fail-closed modes (F-70–F-73). **Security: OWASP ASI01/05/08/09, OpenSSF Passing, PlannerCritic Essential. Shipped when CUJs 1–9 (P0) pass and the field-test matrix is green.**
+- **v0.2.0 (P1):** execution feedback (F-50–F-52), re-gate (F-46), AIDE web UI (F-33), Postgres store (F-64), Anthropic/Gemini transports (F-25), determinism contract (F-74), automated missed-critique → standing-rule promotion interface for LessonExtractor, `baseline check`. **Security: +OWASP ASI02 + ASI10, OpenSSF Silver, PlannerCritic Hardened.**
 - **v0.3.0 (P2):** multi-planner variants (deliberate, on user request), planning-quality eval suite via EvalForge, fleet escalation analytics, plan-shape recommendation.
 - **v0.4.0 (P3):** SwarmOS coordination integration, community packs of critique heuristics, escalation-approval-rate dashboards.
 
 ---
 
-## 13. Connected
+## 14. Connected
 
 - Vault: [[projects/High/146-PlannerCritic.md]] · [[projects/Agentic-AI-Ideas/01-Multi-Agent-Reasoning.md]] · [[_6-MONTH-PLAN.md]]
 - Siblings: EvalForge (measures planning quality), ToolTrust (gates tool calls), LessonExtractor (consumes missed-critique feedback), AgentLab (execution backend)
