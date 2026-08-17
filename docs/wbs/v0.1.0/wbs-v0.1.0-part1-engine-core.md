@@ -14,7 +14,7 @@
 
 ### M1 Design Documents (author during this milestone)
 
-- **D1 — Architecture v0.1.0** (`docs/architecture/architecture-v0.1.0.md`): *seed* the component diagram (§2.3) + module map. Finalize in M9.
+- **D1 — Architecture v0.1.0** (`docs/architecture/architecture-v0.1.0.md`): *seed* the component diagram (§2.3) + module map. Finalize in M10.
 - **D2 — Plan schema design** (`docs/design/plan-schema-design.md`): every typed field, validation rule, serialization contract for `Goal`/`PlanVersion`/`Task`/`Branch`/`Dependency`/`VerificationStep`/`RollbackStep`.
 - **D3 — Loop controller design** (`docs/design/loop-controller-design.md`): the loop algorithm (§2.6.1), termination semantics, determinism contract, convergence + regression rules.
 - **D13 — Design decisions** (`docs/design/design-decisions.md`): DD-01 (repo/package/CLI naming — `planner-critic`/`planner_critic`/`plancritic`), DD-02 (fail-closed boundary — `ApprovedPlan` is the only executable type), DD-03 (determinism contract scope).

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add opt-in **field tests** that exercise the full critique loop against a real **local OMLX** LLM, covering all three critique strategies: **all heuristic** (gates only), **LLM + heuristic** (deterministic-first), and **all LLM** (llm-every-revision). Field tests do **not** run in CI — they are a local-model release sweep (see WBS M8).
+**Goal:** Add opt-in **field tests** that exercise the full critique loop against a real **local OMLX** LLM, covering all three critique strategies: **all heuristic** (gates only), **LLM + heuristic** (deterministic-first), and **all LLM** (llm-every-revision). Field tests do **not** run in CI — they are a local-model release sweep (see WBS M9).
 
 **Architecture:** These tests are *opt-in and hermetic-safe*: they skip by default and only run when a local OMLX endpoint is configured via `PC_OMLX_BASE_URL`. They drive the real `OpenAICompatibleProvider` + `LLMCritic` + loop against a live local model, asserting a seeded goal flaw is surfaced as a blocker. A `heuristic-only` critique mode is added so "gates only, no LLM" is a first-class, testable strategy (today the engine only has `deterministic-first` and `llm-every-revision`).
 
@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Field tests do **not** run in CI. They are skipped unless `PC_OMLX_BASE_URL` is set, and executed as part of the local-model field sweep (M8) — see issues #74, #75, #76.
+- Field tests do **not** run in CI. They are skipped unless `PC_OMLX_BASE_URL` is set, and executed as part of the local-model field sweep (M9) — see issues #74, #75, #76. (The **containerized** twin of these three modes — a reproducible local LLM running in Docker with the engine's CLI/HTTP/MCP surfaces — is tracked separately in WBS M8 `test_loop_real_llm.py`, issue #82.)
 - Hermetic default: `python -m pytest` MUST NOT require a network or a running LLM. Field-test files are skipped unless `PC_OMLX_BASE_URL` is set.
 - No paid LLM, ever: the field tests only hit a locally configured OMLX endpoint.
 - Same repo conventions: strict mypy on `src/`, ruff clean, coverage gate `--cov-fail-under=95`, milestone names never used in file/document names.

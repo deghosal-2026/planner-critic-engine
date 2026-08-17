@@ -1,32 +1,32 @@
 # WBS — PlannerCritic Engine v0.1.0 Part 6: Pre-Release + Release
 
-> **Milestone covered:** M9 (Pre-Release + Release — security baseline, docs, packaging, PyPI, ship)
+> **Milestone covered:** M10 (Pre-Release + Release — security baseline, docs, packaging, PyPI, ship)
 > **PRD covering this milestone:** [06-security](../../design/prd/06-security-baseline.md) (§6.1, §6.2, §6.3) · [07-success-metrics](../../design/prd/07-success-metrics.md) (§7.1 criteria roll-up, §7.2) · [02-architecture §2.10](../../design/prd/02-architecture.md#210-terminal-state-definition-done-for-v010) (terminal state)
 
 ---
 
-## Milestone 9: Pre-Release + Release — security, docs, packaging, ship
+## Milestone 10: Pre-Release + Release — security, docs, packaging, ship
 
 **Objective:** Make v0.1.0 shippable and credible: PyPI publish (`planner-critic`), OWASP 6/10 agentic-AI coverage, OpenSSF Passing hygiene, PlannerCritic Essential security tier, complete docs (quickstart, interfaces, security, escalation, replay/viz, design decisions, release notes), and the open-source release checklist (repo public, branch protection, CI badge, CHANGELOG, tag).
 
 **PRD coverage:** F-60 (+ full docs), OWASP ASI01/02/05/08/09/10, OpenSSF Passing, PlannerCritic Essential, [§7.1 criteria roll-up](../../design/prd/07-success-metrics.md#71-success-criteria-by-v010-release)
 **CUJs covered:** all P0 (1–11, 13–15 — verify on shipped package)
 
-### M9 Design Documents
+### M10 Design Documents
 
-- **D13 — Design decisions** (`docs/design/design-decisions.md`): finalize all DD records (DD-01 through DD-12); add any post-implementation records.
+- **D13 — Design decisions** (`docs/design/design-decisions.md`): finalize all DD records (DD-01 through DD-14); add any post-implementation records.
 - **D15 — Quickstart** (`docs/reference/quickstart.md`): CUJ 1 path from `pip install` to first approved plan; verified fresh each release.
 - **D16 — Release notes v0.1.0** (`docs/reference/release-notes-v0.1.0.md`): changelog, breaking changes, upgrade path (from nothing), known issues.
 - **D17 — Security posture** (`SECURITY.md`): OWASP 6/10 mitigation table, OpenSSF checklist, Essential tier self-audit.
 - **D18 — Contributing** (`CONTRIBUTING.md`): tests/coverage/mypy gate, commit conventions, PR template, development setup.
 
-### M9 Key Items (explicitly called out)
+### M10 Key Items (explicitly called out)
 
 #### 9.1 Security Baseline
 
 - **OWASP Agentic AI Top 10** ([§6.1](../../design/prd/06-security-baseline.md#61-owasp-agentic-ai-top-10--target-partial-v010--broader-v02)): 6/10 direct coverage — ASI01 (goal schema typed/validated/recorded in store), ASI02 (execution-time re-gate + adapters gate), ASI05 (fail-closed F-73: unapproved → no executor), ASI08 (independent critic + bounded loop), ASI09 (escalation + audited resolution), ASI10 (plans/findings/escalations/executions tracked + reason codes). Write the mitigation table in `SECURITY.md`.
 - **OpenSSF Passing** ([§6.2](../../design/prd/06-security-baseline.md#62-openssf-best-practices-badge--target-passing-floor)): MIT license (present), `SECURITY.md`, `CONTRIBUTING.md` (tests/coverage/mypy gate), CI on pushes, `.gitignore`, branch protection on `main` (PR review required).
-- **PlannerCritic Essential** ([§6.3](../../design/prd/06-security-baseline.md#63-custom-plannercritic-security-baseline--essential-v01--hardened-v02)): deterministic gates always on; fail-closed; versioned store; escalation round-trip; per-goal budget; reason codes; field-test gate (from M8). `plancritic baseline check` (P1) is deferred to v0.2 but the Essential checklist is documented and self-auditable.
+- **PlannerCritic Essential** ([§6.3](../../design/prd/06-security-baseline.md#63-custom-plannercritic-security-baseline--essential-v01--hardened-v02)): deterministic gates always on; fail-closed; versioned store; escalation round-trip; per-goal budget; reason codes; field-test gate (from M9). `plancritic baseline check` (P1) is deferred to v0.2 but the Essential checklist is documented and self-auditable.
 
 #### 9.2 Docs Completion
 
@@ -44,7 +44,7 @@
 - **Success criteria roll-up** ([§7.1](../../design/prd/07-success-metrics.md#71-success-criteria-by-v010-release)): confirm all 15 criteria at the terminal state; document any deviation in the release notes.
 - **Terminal state** ([§2.10](../../design/prd/02-architecture.md#210-terminal-state-definition-done-for-v010)): a working v0.1.0 you can `pip install`, run `plancritic init`, give it a non-trivial goal, watch the critic flag a real gap, see the planner revise to approval — or escalate cleanly — with every version stored and diffs inspectable, `plannercritic-demo` running end-to-end, re-gate catching stale preconditions and triggering defined replan, failures classifiable as planning vs execution, shadow mode logging what *would* have happened, and a field-test matrix green across all six frameworks against a local model.
 
-### M9 Task Checklist
+### M10 Task Checklist
 
 | # | Task | Build (files) | Behavior + edge cases | Feature | Verify | Status |
 |---|------|---------------|----------------------|---------|--------|--------|
@@ -56,7 +56,7 @@
 | 6 | Success-criteria roll-up | Audit §7.1 items 1–15 against the built package; document in release notes or a `SUCCESS_CRITERIA_AUDIT.md` | Every criterion has a yes/partial/no with evidence (test, report, demo) | — | 15 criteria audited; deviations documented | [#70](https://github.com/deghosal-2026/planner-critic-engine/issues/70) · - [ ] |
 | 7 | Release run | Tag `v0.1.0`, GitHub release (+ notes), PyPI publish (trusted publishing if configured, else manual `twine`), CI badge in README, repo public | `pip install planner-critic==0.1.0` from PyPI; GitHub release page renders; CI badge shows passing | F-60 | `pip install planner-critic==0.1.0` from PyPI; repo public | [#71](https://github.com/deghosal-2026/planner-critic-engine/issues/71) · - [ ] |
 
-### M9 Success Metrics
+### M10 Success Metrics
 
 | Metric | Target | Verification |
 |--------|--------|-------------|
@@ -69,7 +69,7 @@
 | Coverage | >95% | `--cov-fail-under=95` |
 | Lint | 0 ruff + 0 mypy strict | `ruff` + `mypy` |
 
-### M9 Exit Gate
+### M10 Exit Gate
 
 - [ ] Code review passed (all shipped files + release branch reviewed)
 - [ ] Coverage > 95%
@@ -78,8 +78,8 @@
 - [ ] OWASP 6/10 + OpenSSF Passing + PlannerCritic Essential verified + documented in SECURITY.md
 - [ ] Quickstart reproduces CUJ 1 from a clean venv
 - [ ] `pip install planner-critic==0.1.0` from PyPI verified
-- [ ] Field-test report (M8) present and all P0 cells pass
+- [ ] Field-test report (M9) present and all P0 cells pass
 - [ ] All design docs D1–D18 authored and reviewed against shipped behavior
 - [ ] GitHub release + tag + CHANGELOG complete; repo public (if timing decided)
 
-**Dependency:** M1–M8 (everything ships through here). **Produces:** v0.1.0 release artifact + foundation for v0.2.0 (P1 items: web UI, Postgres, Anthropic/Gemini, multi-critic, plan templates, export, OTel, heuristic packs, property-based fuzzing — see [index](wbs-v0.1.0-index.md)).
+**Dependency:** M1–M9 (everything ships through here). **Produces:** v0.1.0 release artifact + foundation for v0.2.0 (P1 items: web UI, Postgres, Anthropic/Gemini, multi-critic, plan templates, export, OTel, heuristic packs, property-based fuzzing — see [index](wbs-v0.1.0-index.md)).
