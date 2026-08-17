@@ -1,16 +1,16 @@
 # D1 — Architecture v0.1.0
 
-> **Authored in:** M1 (Core Engine) — *seed* status · **Finalize:** M9 · **WBS:** D1 ·
+> **Authored in:** M1 (Core Engine) — *seed* status · **Finalize:** M10 · **WBS:** D1 ·
 > **Refs:** [PRD §2.3 component diagram](../design/prd/02-architecture.md#23-component-diagram), §2.4 LLM provider, §2.5 critique engine
 
 This is the **seed** of the high-level architecture: the §2.3 component diagram with M1's
 built surface marked, and the module map for the currently shipped package. It is written
-during M1 and finalized in M9 as the remaining subsystems land.
+during M1 and finalized in M10 as the remaining subsystems land.
 
 ## 1. Component diagram — M1 scope annotated
 
 Reproduces [PRD §2.3](../design/prd/02-architecture.md#23-component-diagram) with each
-component tagged **M1 · built**, **M2–M8 · later**, or **M9 · finalize**:
+component tagged **M1 · built**, **M2–M9 · later**, or **M10 · finalize**:
 
 ```
                       ┌─────────────────────────────────────────────┐
@@ -41,7 +41,7 @@ component tagged **M1 · built**, **M2–M8 · later**, or **M9 · finalize**:
                       └─────────────────┘  OpenAI SDK / MCP   M3
               ┌──────────────────────────────────────────────────┐
               ▼                                                   │
-        CLI · MCP server · HTTP service · (web UI v0.2)     M6/M8 │
+        CLI · MCP server · HTTP service · (web UI v0.2)     M5/M6 │
 ```
 
 Legend:
@@ -57,7 +57,7 @@ Legend:
 | **Escalation Manager** | Loop-side escalation in code — standalone manager/UI is **M2** |
 | **Plan Store** | Not built — M2 |
 | **LLM Provider Layer** | Not built — M2; core owns protocol seams only |
-| **Framework Adapters** | Not built — M9 |
+| **Framework Adapters** | Not built — M5 |
 | **CLI / MCP / HTTP / UI** | CLI `plancritic --version` placeholder (M1); full CLI is M6 |
 
 ## Module map (shipped surface, src/planner_critic)
@@ -74,7 +74,7 @@ Legend:
 | `reason_codes.py` | F-77 stable reason-code catalog |
 | `_cli.py` | M1 `plancritic --version` placeholder; full CLI is M6 |
 
-## M9 finalization checklist
+## M10 finalization checklist
 
 - [ ] Fold in the M2 provider layer + registry
 - [ ] Fold in the M2 plan store + versioning

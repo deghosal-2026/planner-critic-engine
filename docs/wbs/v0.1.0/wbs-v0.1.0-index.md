@@ -1,6 +1,6 @@
 # WBS — PlannerCritic Engine v0.1.0 (Index)
 
-> The work breakdown for the **feature-rich first release** (see [PRD 09 — Roadmap](../../design/prd/09-roadmap.md)). Nine milestones (M1–M9) across six part files. **Author:** Debashish Ghosal · **Date:** 2026-08-16 · **Status:** In Progress — M1 **COMPLETE** (6/9 milestones planned → M1 done, M2 next)
+> The work breakdown for the **feature-rich first release** (see [PRD 09 — Roadmap](../../design/prd/09-roadmap.md)). Ten milestones (M1–M10) across seven part files. **Author:** Debashish Ghosal · **Date:** 2026-08-16 · **Status:** In Progress — M1 + M2 **COMPLETE** (merged), M3 **code-complete (uncommitted)**
 >
 > PRDs: [01-why](../../design/prd/01-why.md) · [02-architecture](../../design/prd/02-architecture.md) · [04-users-and-cujs](../../design/prd/04-users-and-cujs.md) · [05-features](../../design/prd/05-features.md) · [06-security](../../design/prd/06-security-baseline.md) · [07-success-metrics](../../design/prd/07-success-metrics.md) · [08-risks](../../design/prd/08-risks.md)
 
@@ -11,14 +11,15 @@
 | M# | Name | Core features | CUJs | Issues | Part file | Status |
 |----|------|---------------|------|--------|-----------|--------|
 | **M1** | **Core Engine — schemas, gates, loop** | F-01, F-02, F-12, F-05, F-06, F-07, F-08, F-73, F-74, F-15(F-77) | CUJ 4 | [#1–#10](https://github.com/deghosal-2026/planner-critic-engine/issues/1) | [part1](wbs-v0.1.0-part1-engine-core.md) | **DONE** (commit `c1473bb`) |
-| M2 | Plan Store + LLM Provider Layer | F-09, F-63, F-27, F-20, F-21, F-22, F-23, F-24, F-19, F-26 | CUJ 1, CUJ 6 | [#11–#19](https://github.com/deghosal-2026/planner-critic-engine/issues/11) | [part1](wbs-v0.1.0-part1-engine-core.md) |
-| M3 | Critique Engine + Loop Semantics | F-04, F-10, F-11, F-13, F-14, F-17, F-18, F-78 | CUJ 2, CUJ 3, CUJ 13 | [#20–#29](https://github.com/deghosal-2026/planner-critic-engine/issues/20) | [part2](wbs-v0.1.0-part2-critique-escalation.md) |
+| M2 | Plan Store + LLM Provider Layer | F-09, F-63, F-27, F-20, F-21, F-22, F-23, F-24, F-19, F-26 | CUJ 1, CUJ 6 | [#11–#19](https://github.com/deghosal-2026/planner-critic-engine/issues/11) | [part1](wbs-v0.1.0-part1-engine-core.md) | **DONE** (commit `a4cfe38`) |
+| M3 | Critique Engine + Loop Semantics | F-04, F-10, F-11, F-13, F-14, F-17, F-18, F-78 | CUJ 2, CUJ 3, CUJ 13 | [#20–#29](https://github.com/deghosal-2026/planner-critic-engine/issues/20) | [part2](wbs-v0.1.0-part2-critique-escalation.md) | **IN PROGRESS** — code complete, uncommitted (`feat/m3-critique-engine`) |
 | M4 | Escalation + Forensics + Replan + Viz | F-30, F-31, F-32, F-34, F-50, F-51, F-52, F-16, F-53, F-75, F-76 | CUJ 5, CUJ 7, CUJ 9, CUJ 10 | [#30–#39](https://github.com/deghosal-2026/planner-critic-engine/issues/30) | [part2](wbs-v0.1.0-part2-critique-escalation.md) |
 | M5 | Framework Adapters (tooltrust six) + re-gate | F-40..F-45, F-46 | CUJ 8 | [#40–#47](https://github.com/deghosal-2026/planner-critic-engine/issues/40) | [part3](wbs-v0.1.0-part3-adapters-surfaces.md) |
 | M6 | CLI + HTTP Service + Explain + Init | F-61, F-62, F-80, F-85 | CUJ 1, CUJ 15 | [#48–#54](https://github.com/deghosal-2026/planner-critic-engine/issues/48) | [part3](wbs-v0.1.0-part3-adapters-surfaces.md) |
 | M7 | Demo Corpus + Demo Runner | F-65, F-66, F-86 | CUJ 14 | [#55–#58](https://github.com/deghosal-2026/planner-critic-engine/issues/55) | [part4](wbs-v0.1.0-part4-demo.md) |
-| M8 | Field Test — hermetic CI + local-model sweep | F-67, F-68 | CUJ 11 | [#59–#64](https://github.com/deghosal-2026/planner-critic-engine/issues/59) | [part5](wbs-v0.1.0-part5-field-test.md) |
-| M9 | Pre-Release + Release + Security + Docs | F-60, OWASP 6/10, OpenSSF Passing, Essential | all P0 | [#65–#71](https://github.com/deghosal-2026/planner-critic-engine/issues/65) | [part6](wbs-v0.1.0-part6-prerelease-release.md) |
+| M8 | Docker Integration Tests — containerized engine + surfaces vs local LLM | F-60, F-61, F-62, F-45, F-67 | CUJ 1, CUJ 15 | [#77–#84](https://github.com/deghosal-2026/planner-critic-engine/issues/77) | [part5](wbs-v0.1.0-part5-docker-integration.md) |
+| M9 | Field Test — hermetic CI + local-model sweep | F-67, F-68 | CUJ 11 | [#59–#64](https://github.com/deghosal-2026/planner-critic-engine/issues/59) | [part6](wbs-v0.1.0-part6-field-test.md) |
+| M10 | Pre-Release + Release + Security + Docs | F-60, OWASP 6/10, OpenSSF Passing, Essential | all P0 | [#65–#71](https://github.com/deghosal-2026/planner-critic-engine/issues/65) | [part7](wbs-v0.1.0-part7-prerelease-release.md) |
 
 **Deferred to v0.2.0 (P1):** web UI (F-33), Postgres store (F-64), Anthropic/Gemini transports (F-25), multi-critic (F-37), plan templates (F-87), export F-47/F-81, OTel (F-82), heuristic packs (F-79), property-based fuzzing. See [PRD 09 §9.2](../../design/prd/09-roadmap.md#92-v020-p1).
 
@@ -45,19 +46,22 @@ M5 (Adapters)   M6 (CLI+HTTP)   ── M5 and M6 parallel after M4
 M7 (Demo corpus + runner)   ← needs M5 (adapters) + M6 (CLI)
   │
   ▼
-M8 (Field test)   ← needs M7 (corpus) + M5 (adapters)
+M8 (Docker integration)   ← needs M5 (MCP) + M6 (CLI+HTTP) + M7 (corpus)
+  │  containerized engine + surfaces vs a real local LLM
+  ▼
+M9 (Field test)   ← needs M7 (corpus) + M5 (adapters) + M8 (container gate)
   │
   ▼
-M9 (Pre-release + release)   ← needs all preceding
+M10 (Pre-release + release)   ← needs all preceding
 ```
 
-**Hard ordering:** M1 → M2 → M3 → M4 → M7 → M8 → M9. **Parallel:** M5 and M6 (both consume M4; M7 needs both). M8 cannot start before M7 passes its gate.
+**Hard ordering:** M1 → M2 → M3 → M4 → M7 → M8 → M9 → M10. **Parallel:** M5 and M6 (both consume M4; M7 needs both). M8 cannot start before M7 passes its gate; M9 (field test) cannot start before M8 (docker integration) passes its gate.
 
 **Sequencing rationale** (per [PRD 08 — risks](../../design/prd/08-risks.md)): the v0.1.0 scope is large, so the WBS is sequenced *engine-first* — the core engine (M1–M3) is fully testable with fake providers before any breadth (adapters/surfaces) lands. Hermetic everything: zero paid LLM in CI.
 
 ## 3. GitHub Issue Ranges
 
-> **Status: IN PROGRESS** — all 71 issues are open, attached to the [**0.1.0 release**](https://github.com/deghosal-2026/planner-critic-engine/milestone/1) milestone. Each task row in the part files has a live issue link + checkbox — flip the checkbox when the issue is closed; milestone progress is visible in the GitHub milestone view. **M1 issues #1–10 closed (commit `c1473bb`).**
+> **Status: IN PROGRESS** — all issues are attached to the [**0.1.0 release**](https://github.com/deghosal-2026/planner-critic-engine/milestone/1) milestone. Each task row in the part files has a live issue link + checkbox — flip the checkbox when the issue is closed; milestone progress is visible in the GitHub milestone view. **Closed so far: M1 #1–10 (commit `c1473bb`) and M2 #11–19 (commit `a4cfe38`). Open: M3 #20–29 (code complete, uncommitted), M4–M7 #30–58, Docker M8 #77–84, Field M9 #59–64 + #74–76, Release M10 #65–71.**
 
 | Milestone | Issue range | API scope |
 |-----------|-------------|-----------|
@@ -68,8 +72,9 @@ M9 (Pre-release + release)   ← needs all preceding
 | M5 Adapters + MCP | [#40–#47](https://github.com/deghosal-2026/planner-critic-engine/issues/40) | raw/LangGraph/PydanticAI/CrewAI/OpenAI/MCP, re-gate |
 | M6 CLI + HTTP | [#48–#54](https://github.com/deghosal-2026/planner-critic-engine/issues/48) | CLI, HTTP, explain, init |
 | M7 Demo | [#55–#58](https://github.com/deghosal-2026/planner-critic-engine/issues/55) | corpus, demo runner |
-| M8 Field Test | [#59–#64](https://github.com/deghosal-2026/planner-critic-engine/issues/59) | hermetic gate, sweep, report |
-| M9 Pre-Release + Release | [#65–#71](https://github.com/deghosal-2026/planner-critic-engine/issues/65) | security, docs, packaging, ship |
+| M8 Docker Integration | [#77–#84](https://github.com/deghosal-2026/planner-critic-engine/issues/77) | Dockerfile, compose, CLI/HTTP/MCP vs local LLM, CI |
+| M9 Field Test | [#59–#64](https://github.com/deghosal-2026/planner-critic-engine/issues/59) + [#74–#76](https://github.com/deghosal-2026/planner-critic-engine/issues/74) | hermetic gate, sweep, report, critique-mode sweep |
+| M10 Pre-Release + Release | [#65–#71](https://github.com/deghosal-2026/planner-critic-engine/issues/65) | security, docs, packaging, ship |
 
 ## 4. Canonical Package Layout
 
@@ -165,7 +170,7 @@ We currently have zero design docs (the PRD is a requirements document, not an a
 
 | # | Doc | Path | Authored in | Contents |
 |---|-----|------|-------------|----------|
-| D1 | Architecture v0.1.0 | `docs/architecture/architecture-v0.1.0.md` | M1 (seed) → M9 (finalize) | Component diagram, module map, data flow |
+| D1 | Architecture v0.1.0 | `docs/architecture/architecture-v0.1.0.md` | M1 (seed) → M10 (finalize) | Component diagram, module map, data flow |
 | D2 | Plan schema design | `docs/design/plan-schema-design.md` | M1 | Every typed field in Goal/PlanVersion/Task/Branch/Dependency, validation rules, serialization |
 | D3 | Loop controller design | `docs/design/loop-controller-design.md` | M1 | Loop algorithm, termination semantics, determinism contract, convergence + regression logic |
 | D4 | DB schema sketch | `docs/architecture/db-schema-sketch.md` | M2 | SQLite DDL, tables/columns/indices, migration versioning |
@@ -176,13 +181,14 @@ We currently have zero design docs (the PRD is a requirements document, not an a
 | D9 | Adapter design | `docs/design/adapters-design.md` | M5 | Six-adapters pattern, re-gate wiring per framework, audit-train interface |
 | D10 | Explain engine design | `docs/design/explain-engine-design.md` | M6 | Reason-code → narrative mapping, template structure, actionability standard |
 | D11 | Demo scenario | `docs/design/demo-scenario.md` | M7 | Walkthrough of `plannercritic-demo`, seeded drift, replan visible |
-| D12 | Field test design | `docs/design/field-test-design.md` | M8 | Matrix design, hermetic-gate architecture, field-sweep harness |
-| D13 | Design decisions | `docs/design/design-decisions.md` | M1–M9 | DD-01..N decision records (naming, contracts, defaults, deferrals) |
+| D12 | Field test design | `docs/design/field-test-design.md` | M9 | Matrix design, hermetic-gate architecture, field-sweep harness |
+| D13 | Design decisions | `docs/design/design-decisions.md` | M1–M10 | DD-01..N decision records (naming, contracts, defaults, deferrals) |
 | D14 | API reference | `docs/reference/api.md` | M6 | CLI cheat-sheet, HTTP endpoints, MCP tools |
-| D15 | Quickstart | `docs/reference/quickstart.md` | M9 | `pip install` → `init` → first approved plan |
-| D16 | Release notes v0.1.0 | `docs/reference/release-notes-v0.1.0.md` | M9 | Changelog, breaking changes, upgrade path |
-| D17 | Security posture | `SECURITY.md` + OWASP table | M9 | OWASP 6/10 mapping, Essential checklist |
-| D18 | Contributing | `CONTRIBUTING.md` | M9 | tests/coverage/mypy gate, commit conventions |
+| D15 | Quickstart | `docs/reference/quickstart.md` | M10 | `pip install` → `init` → first approved plan |
+| D16 | Release notes v0.1.0 | `docs/reference/release-notes-v0.1.0.md` | M10 | Changelog, breaking changes, upgrade path |
+| D17 | Security posture | `SECURITY.md` + OWASP table | M10 | OWASP 6/10 mapping, Essential checklist |
+| D18 | Contributing | `CONTRIBUTING.md` | M10 | tests/coverage/mypy gate, commit conventions |
+| D19 | Docker integration test design | `docs/design/docker-integration-design.md` | M8 | Image layout, compose topology, local-LLM wiring, CI strategy, three modes under containers |
 
 ## 6. Standard Milestone Exit Gate
 

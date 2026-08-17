@@ -41,7 +41,7 @@
 
 | Metric | Target | Verification |
 |--------|--------|-------------|
-| Framework coverage | all six adapters exercise plan→approve→(re-gate)→execute | field-test harness (M8) |
+| Framework coverage | all six adapters exercise plan→approve→(re-gate)→execute | field-test harness (M9) |
 | Re-gate correctness | false precondition → correct replan 100% | re-gate tests |
 | Audit trail | every adapter records approval + re-gate | audit assertions per adapter |
 | Zero LLM in CI | all tests hermetic | CI config |
@@ -60,7 +60,7 @@
 - [ ] Audit trail present in every adapter integration test
 - [ ] **Design docs authored:** D9 (adapters) + D13 (DD-11)
 
-**Dependency:** M1–M4 (loop, store, escalation, replan, EnvProbe, MCP escalate tools). **Produces for M7/M8:** six adapters, MCP server, re-gate core.
+**Dependency:** M1–M4 (loop, store, escalation, replan, EnvProbe, MCP escalate tools). **Produces for M7/M8/M9:** six adapters, MCP server, re-gate core.
 
 ---
 
@@ -79,7 +79,7 @@
 
 ### M6 Key Items (explicitly called out)
 
-- **CLI command surface** ([§5.9 CLI table](../../design/prd/05-features.md)): `init`, `providers add/list/rm`, `plan [--dry-run]`, `critique`, `explain`, `escalate list/approve/deny`, `plans list/show/diff [--graph]`, `replay`, `migrate`, `field-test` (stub → M8).
+- **CLI command surface** ([§5.9 CLI table](../../design/prd/05-features.md)): `init`, `providers add/list/rm`, `plan [--dry-run]`, `critique`, `explain`, `escalate list/approve/deny`, `plans list/show/diff [--graph]`, `replay`, `migrate`, `field-test` (stub → M9).
 - **`plancritic init`** (F-85): scaffolds config (default: local endpoint, OMLX/Ollama prompt) + provider registration + an example goal (demo corpus goal from M7).
 - **Loop-decision explain** (F-80, [§CUJ15](../../design/prd/04-users-and-cujs.md#cuj-15--understand-why-the-loop-decided-what-it-did-loop-decision-explain)): `plancritic explain <plan_id>` and `GET /plans/{id}/explain`~narrates why approved/escalated/replanned in plain language ≤10s; actionability-tested.
 - **HTTP service** (F-62, [§5.9 HTTP table](../../design/prd/05-features.md)): `POST /plan`, `POST /critique`, `GET /plans/{id}/explain`, `GET /escalations`, `POST /escalations/{id}/approve|deny`, `GET /plans`, `GET /plans/{id}`, `GET /plans/{id}/diff?v2=`, `GET /plans/{id}/graph`.
@@ -118,4 +118,4 @@
 - [ ] Explain actionability test passes
 - [ ] **Design docs authored:** D10 (explain), D14 (API reference) + D13 (DD-12)
 
-**Dependency:** M1–M4 + M5 (MCP server). **Produces for M7/M8:** full CLI, HTTP service, explain, init scaffold.
+**Dependency:** M1–M4 + M5 (MCP server). **Produces for M7/M8/M9:** full CLI, HTTP service, explain, init scaffold.

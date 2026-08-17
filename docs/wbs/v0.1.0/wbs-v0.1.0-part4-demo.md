@@ -51,4 +51,4 @@
 - [ ] `init` example goal → `plan` gives immediate first approved plan
 - [ ] **Design doc authored:** D11 (demo scenario)
 
-**Dependency:** M5 (six adapters — demo re-gate needs re-gate, runner uses adapter) + M6 (CLI init + plan). **Produces for M8/M9:** corpus fixtures, demo runner, init-example linkage.
+**Dependency:** M5 (six adapters — demo re-gate needs re-gate, runner uses adapter) + M6 (CLI init + plan). **Produces for M8/M9/M10:** corpus fixtures, demo runner, init-example linkage.

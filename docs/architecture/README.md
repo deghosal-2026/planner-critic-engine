@@ -2,7 +2,7 @@
 
 System architecture, specification, and data model for PlannerCritic Engine.
 
-- [`architecture-v0.1.0.md`](architecture-v0.1.0.md) — High-level architecture (D1 seed, authored in M1; finalized in M9)
+- [`architecture-v0.1.0.md`](architecture-v0.1.0.md) — High-level architecture (D1 seed, authored in M1; finalized in M10)
 - `spec-v0.1.0.md` — Technical specification
 - [`db-schema-sketch.md`](db-schema-sketch.md) — Plan store / versioning schema sketch (D4, authored in M2)
 
@@ -18,3 +18,7 @@ Authored with the milestone that built each subsystem (indexed in `../design/REA
 ## M2 subsystem design docs
 
 - `../design/provider-layer-design.md` — config-driven provider registry + transport (D5)
+
+## M3 subsystem design docs
+
+- `../design/critique-engine-design.md` — six-heuristic critic + three modes + diff-aware + budget (D6)

@@ -16,7 +16,7 @@
 
 **Viz & observability:** plan graph export (F-75); trace replay (F-76); reason-code catalog (F-77); plan-complexity/cost estimate (F-17).
 
-**Demo & field test:** domain-agnostic sample corpus (F-65); seeded-flaw demo trace (F-66); hermetic CI gate (F-67); local-model release field sweep (F-68).
+**Demo & field test:** domain-agnostic sample corpus (F-65); seeded-flaw demo trace (F-66); hermetic CI gate (F-67); containerized Docker integration gate (engine + surfaces vs a local LLM); local-model release field sweep (F-68).
 
 **Reliability:** fail-closed modes (F-70, F-71, F-73).
 
@@ -56,6 +56,6 @@
 
 ## 9.5 WBS
 
-The detailed work breakdown (milestones M1–M9 with issue ranges, exit gates, and dependency graph) lives in `docs/wbs/v0.1.0/` — see the [WBS index](../../wbs/v0.1.0/wbs-v0.1.0-index.md) for the milestone summary, dependency graph, issue ranges, and the standard milestone exit gate (code review, >95% coverage, lint clean, comments in all code). Each part file links every task to its PRD section, lists key items, carries a checkbox task checklist wired to GitHub issues, and lists success metrics + an exit gate.
+The detailed work breakdown (milestones M1–M10 with issue ranges, exit gates, and dependency graph) lives in `docs/wbs/v0.1.0/` — see the [WBS index](../../wbs/v0.1.0/wbs-v0.1.0-index.md) for the milestone summary, dependency graph, issue ranges, and the standard milestone exit gate (code review, >95% coverage, lint clean, comments in all code). Each part file links every task to its PRD section, lists key items, carries a checkbox task checklist wired to GitHub issues, and lists success metrics + an exit gate.
 
-**Status:** all 71 v0.1.0 issues are created in the [**0.1.0 release**](https://github.com/deghosal-2026/planner-critic-engine/milestone/1) milestone.
+**Status:** v0.1.0 issues are created in the [**0.1.0 release**](https://github.com/deghosal-2026/planner-critic-engine/milestone/1) milestone — #1–84 (M1 #1–10 and M2 #11–19 closed; M3 #20–29 code-complete).

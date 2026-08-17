@@ -1,23 +1,23 @@
 # WBS — PlannerCritic Engine v0.1.0 Part 5: Field Test
 
-> **Milestone covered:** M8 (Field Test — hermetic CI gate + local-model release sweep)
+> **Milestone covered:** M9 (Field Test — hermetic CI gate + local-model release sweep)
 > **PRD covering this milestone:** [02-architecture](../../design/prd/02-architecture.md) (§2.4 hermetic, §2.10 terminal state) · [04-users-and-cujs](../../design/prd/04-users-and-cujs.md) (CUJ 11) · [07-success-metrics](../../design/prd/07-success-metrics.md) (§7.1 #2, #4, #5, #6, #11)
 
 ---
 
-## Milestone 8: Field Test — hermetic CI gate + local-model sweep
+## Milestone 9: Field Test — hermetic CI gate + local-model sweep
 
 **Objective:** Make the release *verified*: a hermetic CI gate (fake providers — never flakes, never costs money) that asserts loop-correctness, budget integrity, and determinism; and a local-model release sweep (`plancritic field-test`, OMLX/Ollama) that runs the sample corpus through real planner/critic calls across all six framework adapters. The field-test report is the release gate — any P0 miss blocks the release.
 
 **PRD coverage:** F-67, F-68
 **CUJs covered:** CUJ 11 (field test — it actually works in real agent loops)
 
-### M8 Design Documents
+### M9 Design Documents
 
 - **D12 — Field test design** (`docs/design/field-test-design.md`): matrix design (goals × frameworks × expected/actual), hermetic gate architecture, field-sweep harness, report template.
-- **Field-test report** (`docs/field-test/FIELD_TEST_REPORT.md`): regenerated per release — the artifact that gates M9.
+- **Field-test report** (`docs/field-test/FIELD_TEST_REPORT.md`): regenerated per release — the artifact that gates M10.
 
-### M8 Key Items (explicitly called out)
+### M9 Key Items (explicitly called out)
 
 - **Hermetic CI gate** (F-67, [§CUJ11](../../design/prd/04-users-and-cujs.md#cuj-11--field-test-it-actually-works-in-real-agent-loops)): deterministic gates + loop controller + convergence/regression/budget semantics asserted with fake providers in CI. Never flakes (no network), never costs money ($0 LLM spend). A flake in the hermetic gate is a CI bug, not a field-signal bug. Tests: loop matrix (converge, cap-escalate, thrash-escalate, regress-escalate, approve), budget-hit test (exceed → escalate, never overspend), determinism (identical inputs → identical decisions), adversarial-goal safety (deterministic blocker not overridable).
 
@@ -27,7 +27,7 @@
 
 - **Adversarial goal test:** the adversarial goal from the corpus (M7) is run in a dedicated sweep row — assertion: deterministic gates hold; LLM critic may be biased but its blocker equivalent is already surfaced by the gate.
 
-### M8 Task Checklist
+### M9 Task Checklist
 
 | # | Task | Build (files) | Behavior + edge cases | Feature | Verify | Status |
 |---|------|---------------|----------------------|---------|--------|--------|
@@ -41,7 +41,7 @@
 | 8 | Critique-mode sweep — LLM + heuristic | Create `tests/test_omlx_field_test.py` (LLM+heuristic case, `omlx`-marked, opt-in) | `mode=deterministic-first`: gates first, LLM critic on gate-surviving drafts only; gate-blocked draft never spends the LLM | F-04, F-10, F-11, F-67 | passes against local OMLX when `PC_OMLX_BASE_URL` set; SKIPPED otherwise (not CI) | [#75](https://github.com/deghosal-2026/planner-critic-engine/issues/75) · - [ ] |
 | 9 | Critique-mode sweep — all LLM | Create `tests/test_omlx_field_test.py` (all-LLM case, `omlx`-marked, opt-in) | `mode=llm-every-revision`: six-heuristic LLM critic on every revision incl. gate-blocked; structured output validated, reasons mapped | F-04, F-10, F-11, F-67 | passes against local OMLX when `PC_OMLX_BASE_URL` set; SKIPPED otherwise (not CI) | [#76](https://github.com/deghosal-2026/planner-critic-engine/issues/76) · - [ ] |
 
-### M8 Success Metrics
+### M9 Success Metrics
 
 | Metric | Target | Verification |
 |--------|--------|-------------|
@@ -54,7 +54,7 @@
 | Coverage (existing) | no regression; >95% on all existing code | CI coverage gate |
 | Lint | 0 ruff + 0 mypy strict | `ruff` + `mypy` |
 
-### M8 Exit Gate
+### M9 Exit Gate
 
 - [ ] Code review passed (field-test harness + CLI)
 - [ ] Coverage > 95% (no regression)
@@ -66,4 +66,4 @@
 - [ ] `plancritic field-test` driver functional end-to-end
 - [ ] **Design docs authored:** D12 (field test design) + `FIELD_TEST_REPORT.md`
 
-**Dependency:** M1–M7 (corpus from M7, adapters from M5, loop from M3, CLI from M6). **Produces for M9:** field-test report (the release gate), deterministic confidence in the release.
+**Dependency:** M1–M8 (corpus from M7, adapters from M5, loop from M3, CLI from M6, containerized gate from M8). **Produces for M10:** field-test report (the release gate), deterministic confidence in the release.
