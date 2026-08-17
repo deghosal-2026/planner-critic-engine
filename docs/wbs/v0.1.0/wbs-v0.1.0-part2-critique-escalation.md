@@ -32,16 +32,16 @@
 
 | # | Task | Build (files) | Behavior + edge cases | Feature | Verify | Status |
 |---|------|---------------|----------------------|---------|--------|--------|
-| 1 | LLM critic role | Create `planner_critic/critique/critic.py` | six-heuristic prompt + structured findings; severity grading; reason codes mapped to the catalog | F-04 | fake-provider test: seeded-flaw goal → correct blocker surfaced | [#20](https://github.com/deghosal-2026/planner-critic-engine/issues/20) · - [ ] |
-| 2 | Dual critique mode | Create `planner_critic/critique/mode.py` | `deterministic-first` vs `llm-every-revision` toggled by `critic.mode` config; gate integration | F-10, F-11 | same goal, both modes; deterministic-first skips LLM when gates block | [#21](https://github.com/deghosal-2026/planner-critic-engine/issues/21) · - [ ] |
-| 3 | Diff-aware critique | Create `planner_critic/critique/diff.py` | compute changed-task set from plan diff; re-audit changed + dependents only on N>1 | F-78 | diff decreases audit scope; `llm-every-revision` does full | [#22](https://github.com/deghosal-2026/planner-critic-engine/issues/22) · - [ ] |
-| 4 | Budget enforcement | Create `planner_critic/loop/budget.py` | track per-run tokens/calls/revisions against `budget`; budget-hit → escalate; 0 runs exceed their budget | F-13 | CI budget-audit test; escalation on budget hit | [#23](https://github.com/deghosal-2026/planner-critic-engine/issues/23) · - [ ] |
-| 5 | Complexity estimate | Create `planner_critic/estimate.py` | deterministic summary per §2.7d; zero LLM cost | F-17 | estimated calls/tokens within 20% of actual on fixtures | [#24](https://github.com/deghosal-2026/planner-critic-engine/issues/24) · - [ ] |
-| 6 | Shadow mode | Create `planner_critic/shadow.py` | `dry_run` flag; full loop decisions stored `mode:shadow`; shadow vs live diffable via store | F-14 | `--dry-run` does not gate; store distinguishes shadow | [#25](https://github.com/deghosal-2026/planner-critic-engine/issues/25) · - [ ] |
-| 7 | Approval expiry | Create `planner_critic/loop/ttl.py` | `approval_ttl` enforcement on approved plans; expired → forced replan per `replan_policy` | F-18 | TTL set → replan fires; ∞ default → no expiry | [#26](https://github.com/deghosal-2026/planner-critic-engine/issues/26) · - [ ] |
-| 8 | Injection-safety test | Create `tests/fixtures/adversarial_goal.yaml` + test | adversarial goal tries to suppress a blocker; deterministic gates hold (LLM cannot override) | F-12, F-04 | adversarial fixture green in CI (hermetic) | [#27](https://github.com/deghosal-2026/planner-critic-engine/issues/27) · - [ ] |
-| 9 | Critique acceptance tests | Create `tests/fixtures/seeded_goals/` + `tests/test_critique.py` | each heuristic family catches its seeded case; inject fake LLM output that simulates a successful critique | F-04 | ≥90% seeded flaws surfaced (target 100%) | [#28](https://github.com/deghosal-2026/planner-critic-engine/issues/28) · - [ ] |
-| 10 | End-to-end loop test | Create `tests/test_e2e_loop.py` | Full loop run with fake providers: plan → gates → critique → revise → approve; all termination paths exercised | F-05, F-10 | e2e green on fake providers | [#29](https://github.com/deghosal-2026/planner-critic-engine/issues/29) · - [ ] |
+| 1 | LLM critic role | Create `planner_critic/critique/critic.py` | six-heuristic prompt + structured findings; severity grading; reason codes mapped to the catalog | F-04 | fake-provider test: seeded-flaw goal → correct blocker surfaced | [#20](https://github.com/deghosal-2026/planner-critic-engine/issues/20) · [x] |
+| 2 | Dual critique mode | Create `planner_critic/critique/mode.py` | `deterministic-first` vs `llm-every-revision` toggled by `critic.mode` config; gate integration | F-10, F-11 | same goal, both modes; deterministic-first skips LLM when gates block | [#21](https://github.com/deghosal-2026/planner-critic-engine/issues/21) · [x] |
+| 3 | Diff-aware critique | Create `planner_critic/critique/diff.py` | compute changed-task set from plan diff; re-audit changed + dependents only on N>1 | F-78 | diff decreases audit scope; `llm-every-revision` does full | [#22](https://github.com/deghosal-2026/planner-critic-engine/issues/22) · [x] |
+| 4 | Budget enforcement | Create `planner_critic/loop/budget.py` | track per-run tokens/calls/revisions against `budget`; budget-hit → escalate; 0 runs exceed their budget | F-13 | CI budget-audit test; escalation on budget hit | [#23](https://github.com/deghosal-2026/planner-critic-engine/issues/23) · [x] |
+| 5 | Complexity estimate | Create `planner_critic/estimate.py` | deterministic summary per §2.7d; zero LLM cost | F-17 | estimated calls/tokens within 20% of actual on fixtures | [#24](https://github.com/deghosal-2026/planner-critic-engine/issues/24) · [x] |
+| 6 | Shadow mode | Create `planner_critic/shadow.py` | `dry_run` flag; full loop decisions stored `mode:shadow`; shadow vs live diffable via store | F-14 | `--dry-run` does not gate; store distinguishes shadow | [#25](https://github.com/deghosal-2026/planner-critic-engine/issues/25) · [x] |
+| 7 | Approval expiry | Create `planner_critic/loop/ttl.py` | `approval_ttl` enforcement on approved plans; expired → forced replan per `replan_policy` | F-18 | TTL set → replan fires; ∞ default → no expiry | [#26](https://github.com/deghosal-2026/planner-critic-engine/issues/26) · [x] |
+| 8 | Injection-safety test | Create `tests/fixtures/adversarial_goal.yaml` + test | adversarial goal tries to suppress a blocker; deterministic gates hold (LLM cannot override) | F-12, F-04 | adversarial fixture green in CI (hermetic) | [#27](https://github.com/deghosal-2026/planner-critic-engine/issues/27) · [x] |
+| 9 | Critique acceptance tests | Create `tests/fixtures/seeded_goals/` + `tests/test_critique.py` | each heuristic family catches its seeded case; inject fake LLM output that simulates a successful critique | F-04 | ≥90% seeded flaws surfaced (target 100%) | [#28](https://github.com/deghosal-2026/planner-critic-engine/issues/28) · [x] |
+| 10 | End-to-end loop test | Create `tests/test_e2e_loop.py` | Full loop run with fake providers: plan → gates → critique → revise → approve; all termination paths exercised | F-05, F-10 | e2e green on fake providers | [#29](https://github.com/deghosal-2026/planner-critic-engine/issues/29) · [x] |
 
 ### M3 Success Metrics
 
@@ -56,14 +56,16 @@
 
 ### M3 Exit Gate
 
-- [ ] Code review passed
-- [ ] Coverage > 95%
-- [ ] Lint clean (ruff + mypy strict)
-- [ ] Comments + docstrings in all code
-- [ ] Seeded-flaw critique acceptance suite green; injection-safety fixture green
-- [ ] `deterministic-first` skips LLM on gate-blocked drafts; `llm-every-revision` fully loads
-- [ ] Budget + shadow mode + TTL behaviors verified in CI (hermetic)
-- [ ] **Design docs authored:** D6 (critique engine) + D13 (DD-07/08)
+- [x] Code review passed
+- [x] Coverage > 95% (97.64%)
+- [x] Lint clean (ruff + mypy strict)
+- [x] Comments + docstrings in all code
+- [x] Seeded-flaw critique acceptance suite green (6/6 families); injection-safety fixture green
+- [x] `deterministic-first` skips LLM on gate-blocked drafts; `llm-every-revision` fully loads
+- [x] Budget + shadow mode + TTL behaviors verified in CI (hermetic)
+- [x] **Design docs authored:** D6 (critique engine) + D13 (DD-07/08)
+
+> **M3 status: COMPLETE** — built on `feat/m3-critique-engine`; issues #20–29. 230 tests pass; 97.64% coverage; ruff + strict mypy clean (exit-gate review fixed a shadowed duplicate e2e test name + a line-too-long in `_controller.py`). Three critique modes (`heuristic-only` / `deterministic-first` / `llm-every-revision`); six-heuristic LLM critic via structured-output enforcer; diff-aware re-audit (F-78); budget + cost estimate (F-13/F-17); shadow mode (F-14); approval TTL (F-18); injection-safety + adversarial fixture. Field-test plan for the three modes against local OMLX tracked in issues #74–76 / WBS M9 rows 7–9 (the containerized twin lives in M8 Docker T6).
 
 **Dependency:** M1 + M2 (types, gates, loop, store, providers, EnvProbe). **Produces for M4+:** six-heuristic critic, dual-mode critique, diff-aware audit, budget enforcement, complexity estimate, shadow mode, TTL.
 
