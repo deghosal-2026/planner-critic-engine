@@ -1,6 +1,6 @@
 # WBS — PlannerCritic Engine v0.1.0 (Index)
 
-> The work breakdown for the **feature-rich first release** (see [PRD 09 — Roadmap](../../design/prd/09-roadmap.md)). Ten milestones (M1–M10) across seven part files. **Author:** Debashish Ghosal · **Date:** 2026-08-16 · **Status:** In Progress — M1 + M2 **COMPLETE** (merged), M3 **code-complete (uncommitted)**
+> The work breakdown for the **feature-rich first release** (see [PRD 09 — Roadmap](../../design/prd/09-roadmap.md)). Ten milestones (M1–M10) across seven part files. **Author:** Debashish Ghosal · **Date:** 2026-08-16 · **Status:** In Progress — M1 + M2 + M3 **COMPLETE** (merged), M4 next
 >
 > PRDs: [01-why](../../design/prd/01-why.md) · [02-architecture](../../design/prd/02-architecture.md) · [04-users-and-cujs](../../design/prd/04-users-and-cujs.md) · [05-features](../../design/prd/05-features.md) · [06-security](../../design/prd/06-security-baseline.md) · [07-success-metrics](../../design/prd/07-success-metrics.md) · [08-risks](../../design/prd/08-risks.md)
 
@@ -12,7 +12,7 @@
 |----|------|---------------|------|--------|-----------|--------|
 | **M1** | **Core Engine — schemas, gates, loop** | F-01, F-02, F-12, F-05, F-06, F-07, F-08, F-73, F-74, F-15(F-77) | CUJ 4 | [#1–#10](https://github.com/deghosal-2026/planner-critic-engine/issues/1) | [part1](wbs-v0.1.0-part1-engine-core.md) | **DONE** (commit `c1473bb`) |
 | M2 | Plan Store + LLM Provider Layer | F-09, F-63, F-27, F-20, F-21, F-22, F-23, F-24, F-19, F-26 | CUJ 1, CUJ 6 | [#11–#19](https://github.com/deghosal-2026/planner-critic-engine/issues/11) | [part1](wbs-v0.1.0-part1-engine-core.md) | **DONE** (commit `a4cfe38`) |
-| M3 | Critique Engine + Loop Semantics | F-04, F-10, F-11, F-13, F-14, F-17, F-18, F-78 | CUJ 2, CUJ 3, CUJ 13 | [#20–#29](https://github.com/deghosal-2026/planner-critic-engine/issues/20) | [part2](wbs-v0.1.0-part2-critique-escalation.md) | **IN PROGRESS** — code complete, uncommitted (`feat/m3-critique-engine`) |
+| M3 | Critique Engine + Loop Semantics | F-04, F-10, F-11, F-13, F-14, F-17, F-18, F-78 | CUJ 2, CUJ 3, CUJ 13 | [#20–#29](https://github.com/deghosal-2026/planner-critic-engine/issues/20) | [part2](wbs-v0.1.0-part2-critique-escalation.md) | **DONE** (commit `bc1156a`) |
 | M4 | Escalation + Forensics + Replan + Viz | F-30, F-31, F-32, F-34, F-50, F-51, F-52, F-16, F-53, F-75, F-76 | CUJ 5, CUJ 7, CUJ 9, CUJ 10 | [#30–#39](https://github.com/deghosal-2026/planner-critic-engine/issues/30) | [part2](wbs-v0.1.0-part2-critique-escalation.md) |
 | M5 | Framework Adapters (tooltrust six) + re-gate | F-40..F-45, F-46 | CUJ 8 | [#40–#47](https://github.com/deghosal-2026/planner-critic-engine/issues/40) | [part3](wbs-v0.1.0-part3-adapters-surfaces.md) |
 | M6 | CLI + HTTP Service + Explain + Init | F-61, F-62, F-80, F-85 | CUJ 1, CUJ 15 | [#48–#54](https://github.com/deghosal-2026/planner-critic-engine/issues/48) | [part3](wbs-v0.1.0-part3-adapters-surfaces.md) |
@@ -61,7 +61,7 @@ M10 (Pre-release + release)   ← needs all preceding
 
 ## 3. GitHub Issue Ranges
 
-> **Status: IN PROGRESS** — all issues are attached to the [**0.1.0 release**](https://github.com/deghosal-2026/planner-critic-engine/milestone/1) milestone. Each task row in the part files has a live issue link + checkbox — flip the checkbox when the issue is closed; milestone progress is visible in the GitHub milestone view. **Closed so far: M1 #1–10 (commit `c1473bb`) and M2 #11–19 (commit `a4cfe38`). Open: M3 #20–29 (code complete, uncommitted), M4–M7 #30–58, Docker M8 #77–84, Field M9 #59–64 + #74–76, Release M10 #65–71.**
+> **Status: IN PROGRESS** — all issues are attached to the [**0.1.0 release**](https://github.com/deghosal-2026/planner-critic-engine/milestone/1) milestone. Each task row in the part files has a live issue link + checkbox — flip the checkbox when the issue is closed; milestone progress is visible in the GitHub milestone view. **Closed so far: M1 #1–10 (commit `c1473bb`), M2 #11–19 (commit `a4cfe38`), M3 #20–29 (commit `bc1156a`). Open: M4–M7 #30–58, Docker M8 #77–84, Field M9 #59–64 + #74–76, Release M10 #65–71.**
 
 | Milestone | Issue range | API scope |
 |-----------|-------------|-----------|

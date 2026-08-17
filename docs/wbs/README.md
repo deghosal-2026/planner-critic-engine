@@ -2,7 +2,7 @@
 
 Work Breakdown Structure — milestone plans and task breakdowns for all versions.
 
-> **Live status:** v0.1.0 issues are attached to the [**0.1.0 release**](https://github.com/deghosal-2026/planner-critic-engine/milestone/1) GitHub milestone. M1 #1–10 and M2 #11–19 closed; M3 #20–29 code-complete (uncommitted); the rest open. Each WBS task row links its issue; flip the checkbox when closing the issue.
+> **Live status:** v0.1.0 issues are attached to the [**0.1.0 release**](https://github.com/deghosal-2026/planner-critic-engine/milestone/1) GitHub milestone. M1 #1–10, M2 #11–19, M3 #20–29 closed; the rest open. Each WBS task row links its issue; flip the checkbox when closing the issue.
 
 | File | Milestones | Version | GitHub Issues | Status |
 |------|-----------|---------|---------------|--------|
