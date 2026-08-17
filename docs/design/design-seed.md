@@ -50,8 +50,19 @@ M1 delivered the **core engine**: the typed schema, deterministic critique gates
 - [x] Tests: 84 passing, 95.21% coverage (≥ 95% required), ruff + strict mypy clean
 - [x] Acceptance matrix (lo): 13 scenarios green incl. regression_thrashing
 
-## Open Questions for M2
+## M2 Exit Criteria — Met
+
+- [x] `PlanStore` protocol (in-memory + SQLite) with structural `diff`
+- [x] Schema versioning + reversible migrations (`migrate` up/down), old data readable
+- [x] `LLMProvider` protocol + structured-output envelope + fail-closed error types
+- [x] Config-driven registry (TOML) + `plancritic providers add/list/rm`, distinct planner/critic roles
+- [x] OpenAI-compatible transport with `base_url` override, zero paid LLM in CI
+- [x] Structured-output enforcer with bounded retries then `planning_unavailable`
+- [x] `EnvProbe` read-only built-ins (`env_var`, `http_check` real; `db_query`, `deploy_status` stubs)
+- [x] Tests: 178 passing, 97.98% coverage (≥ 95% required), ruff + strict mypy clean
+
+## Open Questions for M3
 
 1. Diff-aware critique — how do we represent "what changed" to the critic without leaking the planner's prompt? (Candidate: emit the union of `id`s of new/changed tasks into the critique context.)
-2. Complexity estimate — deterministic proxy (task count × fan-out × blast radius) before M2's real heuristic cost model lands.
-3. Deterministic-first mode — should gate findings be *merged* into the critic's findings or kept separate for audit? (M1 merges; revisit in M2 with diff-critique.)
+2. Complexity estimate — deterministic proxy (task count × fan-out × blast radius) before M3's real heuristic cost model lands.
+3. Deterministic-first mode — should gate findings be *merged* into the critic's findings or kept separate for audit? (M1 merges; revisit in M3 with diff-critique.)
