@@ -32,3 +32,32 @@ Log every design decision with status (Accepted / Proposed / Rejected), context,
 - **Alternative considered:** Mutable plan objects with in-place fixes. Rejected: mutation destroys the audit trail and makes convergence detection unsound.
 - **Outcome:** `PlanVersion` is a frozen Pydantic model; new revisions get `id`, incremented `version`, and `parent_version`. Task allocations are stable — `findings` carry `task_id` — so `regression_detected` and `circling_blockers` compare the same identity space across revisions.
 - **Consequences:** The plan is a first-class versioned artifact per PRD; M2 diff-aware critique will emit changed-task unions into the critique context on the same identity space.
+
+## M2 Entries
+
+### DD-04 — Provider config is TOML, registry-first (providers in config, not code)
+
+- **Status:** Accepted
+- **Context:** §2.4 requires a registry-first provider layer: the engine loads whatever is configured, and a config edit — not a code change — swaps local OMLX/Ollama for a paid provider.
+- **Drivers:** cost control (paid providers only when explicitly registered); operator ergonomics (swap endpoints without redeploying); the OpenAI-compatible transport must be the first concrete impl *on top of* the registry, not instead of it.
+- **Alternative considered:** Code-level provider registration (a Python API to register transports). Rejected: requires redeploy and forks the config; TOML keeps a single source of truth that `plancritic providers` and the engine both read.
+- **Outcome:** `llm/registry.py` reads/writes `plancritic.toml` (`[providers."name"]` specs + `[roles]` role→provider mapping). `plancritic providers add/list/rm` persists the file. A missing config yields an empty registry (roles unbound → `PlanningError`), never a crash.
+- **Consequences:** M2 ships the registry + one transport; future transports (Anthropic/Gemini) are new `[providers]` entries on the same protocol.
+
+### DD-05 — Plan store is a side channel: down → warn + continue in memory
+
+- **Status:** Accepted
+- **Context:** §7.2 makes the plan store explicitly a side channel — planning continues in memory if the store is down, with a warning, and persists when healthy.
+- **Drivers:** the store must never block planning (reliability); forensics lose data only during an outage, never corrupt it; Postgres-ready means the protocol is DB-agnostic.
+- **Alternative considered:** The store as a hard dependency of the loop. Rejected: a store outage would halt planning, violating §7.2 and the fail-open-availability (fail-closed-*safety*) split.
+- **Outcome:** `PlanStore` protocol; `InMemoryStore` (never fails) is the test/default; `SQLiteStore` raises `StoreUnavailable` on any DB failure; `warn_and_continue` logs the warning. The loop is untouched by store failures.
+- **Consequences:** Store writes are best-effort until the store recovers; M2 integration tests assert the loop result is usable even when the store is down.
+
+### DD-06 — EnvProbe is read-only by contract, recorded in the trace, never gate-critical
+
+- **Status:** Accepted
+- **Context:** §2.8 probes ground preconditions in live state; §2.4 says deterministic gates never depend on a probe (a probe's result may change between runs).
+- **Drivers:** determinism (gates must be pure functions of the plan); safety (probes observe, never mutate); re-gating (M4) needs the recorded result at execution time.
+- **Alternative considered:** Probes as inputs to deterministic gates. Rejected: breaks the determinism contract — the same plan could pass or fail a gate depending on live state.
+- **Outcome:** `probe/base.py` defines `ProbeRequest`/`ProbeResult` and the `Probe` protocol; `run_probe` dispatches to built-ins (`env_var`, `http_check` real; `db_query`, `deploy_status` M2 stubs). A probe failure is recorded as `ok=False`, never raised. Deterministic gates ignore probes entirely.
+- **Consequences:** Probe results enrich execution-time re-gating and the execution trace; M2 probes run read-only and are recorded, satisfying the hermetic no-network test contract via injectable httpx clients.

@@ -8,6 +8,8 @@ in tests/test_loop_matrix.py.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
 from conftest import (
@@ -20,6 +22,8 @@ from conftest import (
     make_task,
 )
 from planner_critic.loop import LoopConfig, run_loop
+from planner_critic.loop.budget import SpendState
+from planner_critic.loop.ttl import approval_expired
 from planner_critic.reason_codes import (
     BUDGET_EXCEEDED,
     REGRESSION_THRASHING,
@@ -353,3 +357,59 @@ class TestEscalationQuestion:
         assert result.status == "escalated"
         assert result.reason_code == REVISION_CAP_REACHED
         assert result.findings
+
+
+# --- Budget unit tests (SpendState) -----------------------------------------
+
+
+def test_spend_state_already_exceeded_latches() -> None:
+    """Once exceeded, check() returns True even if counters are within budget."""
+    state = SpendState()
+    state.exceeded = True
+    assert state.check(Budget()) is True
+
+
+def test_spend_state_max_calls_breach() -> None:
+    """Exceeding max_calls sets exceeded and records the ceiling."""
+    state = SpendState()
+    state.calls_used = 5
+    assert state.check(Budget(max_calls=3)) is True
+    assert "max_calls" in state._hits
+
+
+def test_spend_state_max_tokens_breach() -> None:
+    """Exceeding max_tokens sets exceeded and records the ceiling."""
+    state = SpendState()
+    state.tokens_used = 1000
+    assert state.check(Budget(max_tokens=500)) is True
+    assert "max_tokens" in state._hits
+
+
+def test_spend_state_record_llm_call_with_tokens() -> None:
+    """record_llm_call increments both calls and tokens."""
+    state = SpendState()
+    state.record_llm_call(tokens=42)
+    assert state.calls_used == 1
+    assert state.tokens_used == 42
+
+
+# --- TTL unit tests (approval_expired) --------------------------------------
+
+
+def test_approval_expired_no_ttl_never_expires() -> None:
+    """approval_ttl=None means the approval never expires."""
+    assert approval_expired(datetime(2020, 1, 1, tzinfo=UTC), None) is False
+
+
+def test_approval_expired_within_ttl() -> None:
+    """An approval within its TTL window is not expired."""
+    now = datetime(2026, 8, 16, 12, 0, 0, tzinfo=UTC)
+    approved = now - timedelta(minutes=5)
+    assert approval_expired(approved, timedelta(hours=1), now=now) is False
+
+
+def test_approval_expired_beyond_ttl() -> None:
+    """An approval past its TTL is expired."""
+    now = datetime(2026, 8, 16, 12, 0, 0, tzinfo=UTC)
+    approved = now - timedelta(hours=2)
+    assert approval_expired(approved, timedelta(hours=1), now=now) is True
