@@ -16,7 +16,7 @@ these same protocols.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from .schema.goal import Goal
 from .schema.plan import PlanVersion
@@ -57,6 +57,7 @@ class PlannerRole(Protocol):
         ...
 
 
+@runtime_checkable
 class CriticRole(Protocol):
     """Anything that audits a plan and returns findings."""
 

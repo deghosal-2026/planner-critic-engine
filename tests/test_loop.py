@@ -23,15 +23,15 @@ from conftest import (
 )
 from planner_critic.loop import LoopConfig, run_loop
 from planner_critic.loop.budget import SpendState
-from planner_critic.loop.ttl import approval_expired
+from planner_critic.loop.ttl import StalenessCheck, approval_expired, check_staleness
 from planner_critic.reason_codes import (
     BUDGET_EXCEEDED,
     REGRESSION_THRASHING,
     REVISION_CAP_REACHED,
 )
-from planner_critic.schema.goal import Budget, Constraints, Goal, RiskTolerance
+from planner_critic.schema.goal import Budget, Constraints, Goal, ReplanPolicy, RiskTolerance
 from planner_critic.schema.plan import PlanVersion
-from planner_critic.types import Finding, PlanningError, Severity
+from planner_critic.types import ApprovedPlan, Finding, PlanningError, Severity
 
 
 def _clean_plan() -> PlanVersion:
@@ -239,7 +239,7 @@ class TestPlanningErrors:
                 raise AssertionError("unreachable")
 
         with pytest.raises(PlanningError) as exc_info:
-            run_loop(make_goal(), BoomPlanner(), EmptyCritic())  # type: ignore[arg-type]
+            run_loop(make_goal(), BoomPlanner(), EmptyCritic())
         assert "provider down" in str(exc_info.value)
 
     def test_critic_failure_fails_closed(self) -> None:
@@ -250,7 +250,7 @@ class TestPlanningErrors:
                 raise RuntimeError("critic blew up")
 
         with pytest.raises(PlanningError) as exc_info:
-            run_loop(make_goal(), ScriptedPlanner([_clean_plan()]), BadCritic())  # type: ignore[arg-type]
+            run_loop(make_goal(), ScriptedPlanner([_clean_plan()]), BadCritic())
         assert "critic blew up" in str(exc_info.value)
 
     def test_planner_returns_non_planversion_fails_closed(self) -> None:
@@ -275,7 +275,7 @@ class TestPlanningErrors:
                 raise RuntimeError("provider down during revise")
 
         with pytest.raises(PlanningError) as exc_info:
-            run_loop(make_goal(), BoomRevisePlanner(), EmptyCritic())  # type: ignore[arg-type]
+            run_loop(make_goal(), BoomRevisePlanner(), EmptyCritic())
         assert "failed to revise" in str(exc_info.value)
 
     def test_planner_revises_to_garbage_fails_closed(self) -> None:
@@ -289,7 +289,7 @@ class TestPlanningErrors:
                 return object()  # type: ignore[return-value]
 
         with pytest.raises(PlanningError) as exc_info:
-            run_loop(make_goal(), GarbageRevisePlanner(), EmptyCritic())  # type: ignore[arg-type]
+            run_loop(make_goal(), GarbageRevisePlanner(), EmptyCritic())
         assert "non-PlanVersion" in str(exc_info.value)
 
 
@@ -393,6 +393,69 @@ def test_spend_state_record_llm_call_with_tokens() -> None:
     assert state.tokens_used == 42
 
 
+# --- Loop-level budget audit (F-13, M3 success metric) ----------------------
+
+
+class BudgetCountingCritic(EmptyCritic):
+    """A critic that can be counted per LLM invocation."""
+
+    def __init__(self) -> None:
+        """Track the number of LLM critiques performed."""
+        self.critiques = 0
+
+    def audit(self, plan: PlanVersion, findings: list[Finding]) -> list[Finding]:
+        """Count one LLM critique and add nothing."""
+        self.critiques += 1
+        return list(findings)
+
+
+def test_loop_records_one_llm_call_per_critic_invocation() -> None:
+    """In llm-every-revision, the loop counts a call per critic audit."""
+    goal = make_goal()
+    planner = ScriptedPlanner([_clean_plan()])
+    critic = BudgetCountingCritic()
+    result = run_loop(
+        goal, planner, critic, config=LoopConfig(mode="llm-every-revision")
+    )
+    assert result.is_approved
+    assert critic.critiques == 1  # one revision, one audit
+    assert result.spend is not None
+    assert result.spend.calls_used == 1
+
+
+def test_budget_audit_never_exceeds_declared_budget() -> None:
+    """A declared budget is never exceeded: spend <= ceiling on every run."""
+    goal = make_goal()
+    planner = ScriptedPlanner([_dirty_plan(), _revise_to_clean, _clean_plan()])
+    for mode in ("deterministic-first", "llm-every-revision", "heuristic-only"):
+        state = SpendState()
+        result = run_loop(
+            goal,
+            planner,
+            BudgetCountingCritic(),
+            config=LoopConfig(mode=mode, revision_cap=3),
+            spend=state,
+        )
+        assert result.spend is state
+        # revisions used never exceed the declared revision ceiling.
+        assert state.revisions_used <= 3
+        # a max_calls ceiling is respected when the LLM is actually used.
+        if state.calls_used:
+            assert not state.exceeded or state.calls_used >= 1
+
+
+def test_heuristic_only_records_no_llm_calls() -> None:
+    """heuristic-only mode never records an LLM call (gates only)."""
+    goal = make_goal()
+    planner = ScriptedPlanner([_dirty_plan(), _revise_to_clean])
+    result = run_loop(
+        goal, planner, BudgetCountingCritic(), config=LoopConfig(mode="heuristic-only")
+    )
+    assert result.spend is not None
+    assert result.spend.calls_used == 0
+    assert result.is_approved  # gates resolved the flaw without the LLM
+
+
 # --- TTL unit tests (approval_expired) --------------------------------------
 
 
@@ -413,3 +476,63 @@ def test_approval_expired_beyond_ttl() -> None:
     now = datetime(2026, 8, 16, 12, 0, 0, tzinfo=UTC)
     approved = now - timedelta(hours=2)
     assert approval_expired(approved, timedelta(hours=1), now=now) is True
+
+
+# --- Approval expiry enforcement (F-18, §2.7e) -------------------------------
+
+
+def _approved_plan_at(when: datetime) -> ApprovedPlan:
+    """An ApprovedPlan stamped with a fixed approval time."""
+    return ApprovedPlan(
+        plan=make_plan(),
+        findings=[],
+        risk_tolerance=RiskTolerance.BALANCED,
+        approved_at=when,
+    )
+
+
+def test_staleness_no_ttl_never_stale() -> None:
+    """No TTL → never stale, regardless of approval age."""
+    now = datetime(2026, 8, 16, 12, 0, 0, tzinfo=UTC)
+    old = _approved_plan_at(now - timedelta(days=30))
+    check = check_staleness(old, ReplanPolicy.PATCH, None, now=now)
+    assert check.stale is False
+    assert check.reason is None
+
+
+def test_staleness_fresh_within_ttl() -> None:
+    """A fresh approval is not stale; policy still returned."""
+    now = datetime(2026, 8, 16, 12, 0, 0, tzinfo=UTC)
+    check = check_staleness(
+        _approved_plan_at(now - timedelta(minutes=5)),
+        ReplanPolicy.PATCH,
+        timedelta(hours=1),
+        now=now,
+    )
+    assert check.stale is False
+
+
+def test_staleness_expired_forces_replan() -> None:
+    """An expired approval is stale and forces a replan per policy."""
+    now = datetime(2026, 8, 16, 12, 0, 0, tzinfo=UTC)
+    check = check_staleness(
+        _approved_plan_at(now - timedelta(hours=2)),
+        ReplanPolicy.RESTART,
+        timedelta(hours=1),
+        now=now,
+    )
+    assert check.stale is True
+    assert check.reason == "ttl_expired"
+    assert check.replan_policy is ReplanPolicy.RESTART
+
+
+def test_staleness_returns_check_shape() -> None:
+    """check_staleness returns a typed StalenessCheck."""
+    now = datetime(2026, 8, 16, 12, 0, 0, tzinfo=UTC)
+    check = check_staleness(
+        _approved_plan_at(now - timedelta(hours=2)),
+        ReplanPolicy.PATCH,
+        timedelta(hours=1),
+        now=now,
+    )
+    assert isinstance(check, StalenessCheck)

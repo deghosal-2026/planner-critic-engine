@@ -27,17 +27,20 @@ function run_loop(goal, planner, critic, config):
 ```
 
 M1 keeps the loop model-agnostic (fake roles in tests, real ones later) and
-store-less (persistence lands with M2). Escalation surfaces a precise
-question so the escalation manager (M4) can present it to a human.
+store-less. Escalation surfaces a precise question so the escalation manager
+can present it to a human.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Literal, cast
 
 from ..approval import ApprovalGate, meets_threshold, resolve_threshold
+from ..critique.diff import scope_between
+from ..critique.mode import CriticMode, should_invoke_llm
 from ..gates import run_deterministic_gates
 from ..reason_codes import ReasonCode
 from ..roles import CriticRole, PlannerRole
@@ -47,8 +50,6 @@ from ..types import ApprovedPlan, Escalation, Finding, PlanningError, Severity
 from .budget import SpendState, budget_exceeded
 from .convergence import stalled
 from .regression import regression_detected
-
-CriticMode = Literal["deterministic-first", "llm-every-revision"]
 
 
 @dataclass(frozen=True)
@@ -69,6 +70,8 @@ class LoopResult:
     reason_code: ReasonCode | None = None
     approved_plan: ApprovedPlan | None = None
     escalation: Escalation | None = None
+    spend: SpendState | None = None
+    mode: Literal["live", "shadow"] = "live"
 
     @property
     def is_approved(self) -> bool:
@@ -111,6 +114,7 @@ def run_loop(
         config=cfg,
         state=state,
     )
+    result.spend = state
     return result
 
 
@@ -207,7 +211,23 @@ def _run(
                 continue
             return _escalate(goal, plan, gate_findings, "revision_cap_reached", revision)
 
-        findings = list(gate_findings) + _safe_audit(critic, plan, gate_findings)
+        if should_invoke_llm(config.mode, gate_findings):
+            # Pre-call guard: never spend a call beyond the configured budget.
+            if (
+                goal.constraints.budget.max_calls is not None
+                and state.calls_used >= goal.constraints.budget.max_calls
+            ):
+                return _escalate(goal, plan, gate_findings, "budget_exceeded", revision)
+            state.record_llm_call()
+            if config.mode == "deterministic-first":
+                # Cost optimization (§2.5.3): re-audit only changed + dependents.
+                findings = list(gate_findings) + _safe_audit_diff(
+                    critic, plan, gate_findings, prior_plan
+                )
+            else:
+                findings = list(gate_findings) + _safe_audit(critic, plan, gate_findings)
+        else:
+            findings = list(gate_findings)
 
         threshold_ok, thresholds = resolve_threshold(findings, goal.risk_tolerance)
         if threshold_ok:
@@ -254,12 +274,44 @@ def _safe_audit(critic: CriticRole, plan: PlanVersion, findings: list[Finding]) 
         The critic's findings. The deterministic gates have already
         collected gate findings separately, so a critic error maps to an
         empty list here rather than breaking the loop (the gates remain the
-        free/immune layer; real critic integration is M3).
+        free/immune layer).
     """
     try:
         return critic.audit(plan, findings)
     except Exception as exc:
         raise PlanningError(f"critic role failed: {exc}") from exc
+
+
+def _safe_audit_diff(
+    critic: CriticRole,
+    plan: PlanVersion,
+    findings: list[Finding],
+    prior_plan: PlanVersion | None,
+) -> list[Finding]:
+    """Diff-aware audit on revision N>1 when the critic supports it (F-78).
+
+    Args:
+        critic: The critic role.
+        plan: The current plan revision.
+        findings: Gate findings flowing through to the critic's view.
+        prior_plan: The previous revision, or None on the root revision.
+
+    Returns:
+        The critic's findings. A full audit is used on the root revision or
+        when the critic has no diff-aware entry point.
+    """
+    diff_method = getattr(critic, "audit_diff", None)
+    if diff_method is None:
+        return _safe_audit(critic, plan, findings)
+    audit_diff = cast(
+        "Callable[[PlanVersion, list[Finding], Sequence[str]], list[Finding]]",
+        diff_method,
+    )
+    try:
+        scope = scope_between(prior_plan, plan)
+        return audit_diff(plan, findings, scope)
+    except Exception as exc:
+        raise PlanningError(f"critic role failed (diff audit): {exc}") from exc
 
 
 def _revise_or_raise(

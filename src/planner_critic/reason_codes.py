@@ -34,6 +34,14 @@ PLANNING_UNAVAILABLE: Literal["planning_unavailable"] = "planning_unavailable"
 # --- Approval / fail-closed codes -------------------------------------------
 APPROVAL_THRESHOLD_NOT_MET: Literal["approval_threshold_not_met"] = "approval_threshold_not_met"
 
+# --- LLM critic heuristic codes (PRD §2.5.1, F-80) ---------------------------
+LLM_FEASIBILITY: Literal["llm_feasibility"] = "llm_feasibility"
+LLM_RISK: Literal["llm_risk"] = "llm_risk"
+LLM_MISSING_STEPS: Literal["llm_missing_steps"] = "llm_missing_steps"
+LLM_UNSAFE_SEQUENCING: Literal["llm_unsafe_sequencing"] = "llm_unsafe_sequencing"
+LLM_UNVERIFIED_DEPENDENCIES: Literal["llm_unverified_dependencies"] = "llm_unverified_dependencies"
+LLM_WEAK_ROLLBACK: Literal["llm_weak_rollback"] = "llm_weak_rollback"
+
 ReasonCode: TypeAlias = Literal[
     "plan_schema_invalid",
     "dependency_cycle",
@@ -49,6 +57,12 @@ ReasonCode: TypeAlias = Literal[
     "approved",
     "planning_unavailable",
     "approval_threshold_not_met",
+    "llm_feasibility",
+    "llm_risk",
+    "llm_missing_steps",
+    "llm_unsafe_sequencing",
+    "llm_unverified_dependencies",
+    "llm_weak_rollback",
 ]
 
 # Descriptions are the source of truth for docs and any generated API reference.
@@ -67,6 +81,12 @@ REASON_CODE_DESCRIPTIONS: dict[ReasonCode, str] = {
     APPROVED: "Loop terminated by meeting the approval threshold",
     PLANNING_UNAVAILABLE: "A provider failed; planning is unavailable and must fail closed",
     APPROVAL_THRESHOLD_NOT_MET: "Findings do not meet the goal's risk-tolerance threshold",
+    LLM_FEASIBILITY: "LLM critic: task is not achievable with the stated environment/tools",
+    LLM_RISK: "LLM critic: risk/blast-radius exceeds the goal's tolerance",
+    LLM_MISSING_STEPS: "LLM critic: an obvious prerequisite or step is missing",
+    LLM_UNSAFE_SEQUENCING: "LLM critic: ordering or parallelization breaks safety",
+    LLM_UNVERIFIED_DEPENDENCIES: "LLM critic: a step depends on a fact never established earlier",
+    LLM_WEAK_ROLLBACK: "LLM critic: a high-blast-radius step lacks sound rollback coverage",
 }
 
 # All valid codes; a test asserts every produced reason code is in this set.

@@ -1,6 +1,6 @@
 # D13 — Design Decision Log
 
-> **Authored in:** M1 (Core Engine) · **Status:** Active · **WBS:** D13 · **Refs:** [PRD 05 §2.4 design-decision log](../../design/prd/05-features.md)
+> **Authored in:** M1 (Core Engine) · **Status:** Active · **WBS:** D13 · **Refs:** [PRD 05 §2.4 design-decision log](../design/prd/05-features.md)
 
 Log every design decision with status (Accepted / Proposed / Rejected), context, drivers, the alternate considered, the outcome, and consequences. New entries are appended; statuses change in place.
 
@@ -61,3 +61,23 @@ Log every design decision with status (Accepted / Proposed / Rejected), context,
 - **Alternative considered:** Probes as inputs to deterministic gates. Rejected: breaks the determinism contract — the same plan could pass or fail a gate depending on live state.
 - **Outcome:** `probe/base.py` defines `ProbeRequest`/`ProbeResult` and the `Probe` protocol; `run_probe` dispatches to built-ins (`env_var`, `http_check` real; `db_query`, `deploy_status` M2 stubs). A probe failure is recorded as `ok=False`, never raised. Deterministic gates ignore probes entirely.
 - **Consequences:** Probe results enrich execution-time re-gating and the execution trace; M2 probes run read-only and are recorded, satisfying the hermetic no-network test contract via injectable httpx clients.
+
+## M3 Entries
+
+### DD-07 — Deterministic-first is the default critique mode
+
+- **Status:** Accepted
+- **Context:** §2.5 makes `deterministic-first` the default: free, injection-immune gates run before any model spend; the LLM critic only fires on drafts that survive the gates.
+- **Drivers:** cost discipline (don't pay a model to re-find a schema error); injection-immunity; the critique engine must stay testable with zero LLM (hermetic CI).
+- **Alternative considered:** `llm-every-revision` as the default for audit depth. Rejected: full-depth audit is the option, not the baseline — it spends on drafts the gates already rejected.
+- **Outcome:** `CriticMode` gains a third value `heuristic-only` (gates only, no LLM); `deterministic-first` remains the default; `should_invoke_llm(mode, findings)` is a pure dispatch. A gate blocker short-circuits the model in deterministic-first.
+- **Consequences:** Three critique strategies are first-class and field-testable against a real local model (see `docs/field-test/omlx-critique-modes-field-test.md`); the default path is cheap and hermetic.
+
+### DD-08 — Diff-aware scope is changed tasks + transitive dependents
+
+- **Status:** Accepted
+- **Context:** §2.5.3 asks for a cost optimization: on revision N>1 re-audit only what changed rather than the whole plan; a full re-critique stays available via `llm-every-revision`.
+- **Drivers:** budget alignment (fewer tokens per revision); correctness (a change to task X can invalidate its dependents, so scope must include them); determinism (scope is computed from the plan diff, never from the model).
+- **Alternative considered:** Re-audit changed tasks only, without dependents. Rejected: a changed dependency edge silently stale-audits downstream tasks.
+- **Outcome:** `critique/diff.py` computes `changed_tasks` from `PlanDiff` (added + changed ids) and expands via `dependent_closure` (transitive dependents through the dependency DAG). `audit_scope` returns the full plan on the root revision. The loop calls `audit_diff` in deterministic-first mode and `audit` in llm-every-revision.
+- **Consequences:** `llm-every-revision` always does a full audit (no scope reduction); the diff scope is a pure function of plan history, preserving determinism.
