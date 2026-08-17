@@ -103,15 +103,15 @@
 
 | # | Task | Build (files) | Behavior + edge cases | Feature | Verify | Status |
 |---|------|---------------|----------------------|---------|--------|--------|
-| 1 | Store protocol | Create `planner_critic/store/base.py` | `PlanStore` ABC per §2.1; side-channel warning behavior; in-memory impl for tests | F-09 | fake-store protocol tests; store-down → warn + continue | [#11](https://github.com/deghosal-2026/planner-critic-engine/issues/11) · - [ ] |
-| 2 | SQLite store | Create `planner_critic/store/sqlite.py` | DDL + CRUD + `diff` + execution-trace link | F-63, F-09 | CRUD + diff round-trip on temp DB | [#12](https://github.com/deghosal-2026/planner-critic-engine/issues/12) · - [ ] |
-| 3 | Schema versioning + migrate | Create `planner_critic/store/versions.py`, `planner_critic/cli/migrate.py` | `plan_schema_version` tracked; reversible migration registry; old versions readable | F-27 | migrate up/down; old data still readable | [#13](https://github.com/deghosal-2026/planner-critic-engine/issues/13) · - [ ] |
-| 4 | Provider protocol | Create `planner_critic/llm/base.py` | protocol + structured-output envelope; error types (timeout, bad JSON, schema mismatch) | F-20 | fake provider conforms; error types raised | [#14](https://github.com/deghosal-2026/planner-critic-engine/issues/14) · - [ ] |
-| 5 | Provider registry | Create `planner_critic/llm/registry.py`, `planner_critic/cli/providers.py` | config file (TOML) load/save; role→provider mapping; CLI add/list/rm | F-21, F-23 | registry round-trip; role mapping; CLI persists | [#15](https://github.com/deghosal-2026/planner-critic-engine/issues/15) · - [ ] |
-| 6 | OpenAI-compat transport | Create `planner_critic/llm/transport_openai.py` | Chat Completions + JSON mode; base_url override; optional api_key | F-22 | httpx-mocked tests: request/response shape, base_url | [#16](https://github.com/deghosal-2026/planner-critic-engine/issues/16) · - [ ] |
-| 7 | Structured-output enforcement | Create `planner_critic/llm/structured.py` | validate against Goal/Plan/Finding schemas; bounded retries then `planning_unavailable` | F-24, F-70 | mismatch→retry→success; persistent mismatch→failure mode | [#17](https://github.com/deghosal-2026/planner-critic-engine/issues/17) · - [ ] |
-| 8 | EnvProbe | Create `planner_critic/probe/` (base, env_var, http_check, db_query stub, deploy_status stub) | read-only by contract; result recorder; deterministic gates never depend on probe | F-19, F-26 | probe result recorded; never mutates | [#18](https://github.com/deghosal-2026/planner-critic-engine/issues/18) · - [ ] |
-| 9 | Integration test | Create `tests/test_store.py`, `tests/test_llm.py`, `tests/test_probe.py` | store + provider against fake transport; full store round-trip of a loop run | — | end-to-end with zero network | [#19](https://github.com/deghosal-2026/planner-critic-engine/issues/19) · - [ ] |
+| 1 | Store protocol | Create `planner_critic/store/base.py` | `PlanStore` ABC per §2.1; side-channel warning behavior; in-memory impl for tests | F-09 | fake-store protocol tests; store-down → warn + continue | [#11](https://github.com/deghosal-2026/planner-critic-engine/issues/11) · [x] |
+| 2 | SQLite store | Create `planner_critic/store/sqlite.py` | DDL + CRUD + `diff` + execution-trace link | F-63, F-09 | CRUD + diff round-trip on temp DB | [#12](https://github.com/deghosal-2026/planner-critic-engine/issues/12) · [x] |
+| 3 | Schema versioning + migrate | Create `planner_critic/store/versions.py`, `planner_critic/cli/migrate.py` | `plan_schema_version` tracked; reversible migration registry; old versions readable | F-27 | migrate up/down; old data still readable | [#13](https://github.com/deghosal-2026/planner-critic-engine/issues/13) · [x] |
+| 4 | Provider protocol | Create `planner_critic/llm/base.py` | protocol + structured-output envelope; error types (timeout, bad JSON, schema mismatch) | F-20 | fake provider conforms; error types raised | [#14](https://github.com/deghosal-2026/planner-critic-engine/issues/14) · [x] |
+| 5 | Provider registry | Create `planner_critic/llm/registry.py`, `planner_critic/cli/providers.py` | config file (TOML) load/save; role→provider mapping; CLI add/list/rm | F-21, F-23 | registry round-trip; role mapping; CLI persists | [#15](https://github.com/deghosal-2026/planner-critic-engine/issues/15) · [x] |
+| 6 | OpenAI-compat transport | Create `planner_critic/llm/transport_openai.py` | Chat Completions + JSON mode; base_url override; optional api_key | F-22 | httpx-mocked tests: request/response shape, base_url | [#16](https://github.com/deghosal-2026/planner-critic-engine/issues/16) · [x] |
+| 7 | Structured-output enforcement | Create `planner_critic/llm/structured.py` | validate against Goal/Plan/Finding schemas; bounded retries then `planning_unavailable` | F-24, F-70 | mismatch→retry→success; persistent mismatch→failure mode | [#17](https://github.com/deghosal-2026/planner-critic-engine/issues/17) · [x] |
+| 8 | EnvProbe | Create `planner_critic/probe/` (base, env_var, http_check, db_query stub, deploy_status stub) | read-only by contract; result recorder; deterministic gates never depend on probe | F-19, F-26 | probe result recorded; never mutates | [#18](https://github.com/deghosal-2026/planner-critic-engine/issues/18) · [x] |
+| 9 | Integration test | Create `tests/test_store.py`, `tests/test_llm.py`, `tests/test_probe.py` | store + provider against fake transport; full store round-trip of a loop run | — | end-to-end with zero network | [#19](https://github.com/deghosal-2026/planner-critic-engine/issues/19) · [x] |
 
 ### M2 Success Metrics
 
@@ -128,12 +128,14 @@
 
 ### M2 Exit Gate
 
-- [ ] Code review passed
-- [ ] Coverage > 95%
-- [ ] Lint clean (ruff + mypy strict)
-- [ ] Comments + docstrings in all code
-- [ ] Side-channel contract verified (store down → warn + continue)
-- [ ] `plancritic providers add/list/rm` functional, zero paid LLM
-- [ ] **Design docs authored:** D4 (DB schema), D5 (provider layer), D13 (DD-04/05/06)
+- [x] Code review passed
+- [x] Coverage > 95% (97.88%)
+- [x] Lint clean (ruff + mypy strict)
+- [x] Comments + docstrings in all code
+- [x] Side-channel contract verified (store down → warn + continue)
+- [x] `plancritic providers add/list/rm` functional, zero paid LLM
+- [x] **Design docs authored:** D4 (DB schema), D5 (provider layer), D13 (DD-04/05/06)
+
+> **M2 status: COMPLETE** — closed on `feat/m2-store-provider`; issues #11–19 built. 184 tests pass; 97.88% coverage; ruff + strict mypy clean. **Exit-gate code review found and fixed 2 issues**: (1) `ProviderRegistry._from_dict` documented "skip malformed entries" but crashed on a non-table provider spec — now skips with a warning; (2) `InMemoryStore.list_plans` and `SQLiteStore.list_plans` disagreed on global ordering (id desc vs id asc) — aligned to `(plan_id asc, version desc)` and locked with a cross-implementation test. CLI verified end-to-end: `--version`, `migrate`, `providers add/list/rm`.
 
 **Dependency:** M1. **Produces for M3+:** `PlanStore` (+ SQLite), schema versioning, `LLMProvider` + registry, OpenAI-compat transport, `EnvProbe`, provider failure modes.
