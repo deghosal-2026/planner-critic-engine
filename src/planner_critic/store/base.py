@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ..schema.plan import Dependency, PlanVersion
 from ..types import Escalation, ExecutionTrace, Finding
+from .replan_trace import ReplanLink
 
 logger = logging.getLogger(__name__)
 
@@ -170,6 +171,58 @@ class PlanStore(ABC):
             trace_id: The execution trace the plan was run against.
         """
 
+    @abstractmethod
+    def put_replan_link(self, link: ReplanLink) -> None:
+        """Record a replan linkage (F-53).
+
+        Args:
+            link: The replan link to persist.
+        """
+
+    @abstractmethod
+    def get_replan_link(self, plan_id: str, version: int) -> ReplanLink | None:
+        """Fetch the replan link for a revision, if any.
+
+        Args:
+            plan_id: The replanned plan.
+            version: The replanned revision number.
+
+        Returns:
+            The replan link, or None if the revision was not a replan.
+        """
+
+    @abstractmethod
+    def get_child_replan_links(self, parent_plan_id: str, parent_version: int) -> list[ReplanLink]:
+        """Fetch all replan links that point at a given parent revision.
+
+        Args:
+            parent_plan_id: The parent plan id.
+            parent_version: The parent revision number.
+
+        Returns:
+            All replan links whose parent is the given revision.
+        """
+
+    @abstractmethod
+    def put_missed_critique(self, plan_id: str, body: str) -> None:
+        """Persist a missed-critique record (F-51).
+
+        Args:
+            plan_id: The plan the missed critique belongs to.
+            body: JSON-serialized missed-critique record.
+        """
+
+    @abstractmethod
+    def get_missed_critique(self, plan_id: str) -> str | None:
+        """Fetch the missed-critique record for a plan, if any.
+
+        Args:
+            plan_id: The plan to look up.
+
+        Returns:
+            The JSON body, or None if no missed critique was recorded.
+        """
+
     def warn_and_continue(self, err: Exception) -> None:
         """Side-channel contract (§7.2): warn, then let the caller continue.
 
@@ -209,6 +262,8 @@ class InMemoryStore(PlanStore):
         self._escalations: dict[str, Escalation] = {}
         self._traces: dict[str, list[ExecutionTrace]] = {}
         self._links: set[tuple[str, int, str]] = set()
+        self._replan_links: dict[tuple[str, int], ReplanLink] = {}
+        self._missed_critiques: dict[str, str] = {}
 
     def put_plan_version(self, plan: PlanVersion) -> None:
         """Persist a plan revision in the in-memory index."""
@@ -259,6 +314,30 @@ class InMemoryStore(PlanStore):
     def link(self, plan_id: str, version: int, trace_id: str) -> None:
         """Record the approved-revision ↔ execution-trace link."""
         self._links.add((plan_id, version, trace_id))
+
+    def put_replan_link(self, link: ReplanLink) -> None:
+        """Record a replan linkage by (plan_id, version)."""
+        self._replan_links[(link.plan_id, link.version)] = link
+
+    def get_replan_link(self, plan_id: str, version: int) -> ReplanLink | None:
+        """Return the replan link for a revision, or None."""
+        return self._replan_links.get((plan_id, version))
+
+    def get_child_replan_links(self, parent_plan_id: str, parent_version: int) -> list[ReplanLink]:
+        """Return all replan links whose parent is the given revision."""
+        return [
+            link
+            for link in self._replan_links.values()
+            if link.parent_plan_id == parent_plan_id and link.parent_version == parent_version
+        ]
+
+    def put_missed_critique(self, plan_id: str, body: str) -> None:
+        """Persist a missed-critique record by plan id."""
+        self._missed_critiques[plan_id] = body
+
+    def get_missed_critique(self, plan_id: str) -> str | None:
+        """Return the missed-critique JSON for a plan, or None."""
+        return self._missed_critiques.get(plan_id)
 
 
 def _compute_diff(a: PlanVersion, b: PlanVersion) -> PlanDiff:

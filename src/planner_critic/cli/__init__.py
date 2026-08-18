@@ -10,12 +10,18 @@ module so a command is self-describing and testable in isolation.
 
 from __future__ import annotations
 
+from .escalate import build_escalate_parser, run_escalate
 from .migrate import build_migrate_parser, run_migrate
 from .providers import build_providers_parser, run_providers
+from .replay import build_replay_parser, run_replay
 
 __all__ = [
+    "build_escalate_parser",
     "build_migrate_parser",
     "build_providers_parser",
+    "build_replay_parser",
+    "run_escalate",
     "run_migrate",
     "run_providers",
+    "run_replay",
 ]

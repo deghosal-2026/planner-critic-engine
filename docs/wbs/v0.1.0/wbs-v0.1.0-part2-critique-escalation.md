@@ -100,16 +100,16 @@
 
 | # | Task | Build (files) | Behavior + edge cases | Feature | Verify | Status |
 |---|------|---------------|----------------------|---------|--------|--------|
-| 1 | Escalation manager | Create `planner_critic/escalation.py` | create/list/resolve; single-question design; resolution recorded in plan history | F-30, F-34 | escalation question precision test (one resolvable question) | [#30](https://github.com/deghosal-2026/planner-critic-engine/issues/30) · - [ ] |
-| 2 | Escalation CLI + patch | Modify `planner_critic/cli/escalate.py` | list/approve/deny `[--patch ...]`; patched plan re-submitted to critic | F-31, F-34 | CLI round-trip; patched plan re-critiqued | [#31](https://github.com/deghosal-2026/planner-critic-engine/issues/31) · - [ ] |
-| 3 | Escalation MCP tools | Create `planner_critic/server/mcp_tools_escalate.py` | `escalate_list/approve/deny` tools | F-32 | MCP tool tests (server wiring in M5) | [#32](https://github.com/deghosal-2026/planner-critic-engine/issues/32) · - [ ] |
-| 4 | Replan semantics | Create `planner_critic/replan.py` | `patch`/`restart`/`abort` per §2.7b; per-goal `replan_policy` | F-16 | per-policy fixtures: correct policy fires; lineage reconstructable | [#33](https://github.com/deghosal-2026/planner-critic-engine/issues/33) · - [ ] |
-| 5 | Replan trace | Create `planner_critic/store/replan_trace.py` | link sub-plan into same history; partial execution preserved | F-53 | full lineage: original → partial → replan → completion | [#34](https://github.com/deghosal-2026/planner-critic-engine/issues/34) · - [ ] |
-| 6 | Execution link + tagging | Create `planner_critic/execution.py` | bind execution to ApprovedPlan; per-task outcome; `failure_class` | F-50 | trace stored; classification recorded for failure | [#35](https://github.com/deghosal-2026/planner-critic-engine/issues/35) · - [ ] |
-| 7 | Missed-critique + suggested check | Create `planner_critic/forensics.py` (reuse/collocate with execution.py or separate) | planning failure critic missed → record with critique snapshot + surfaced suggested deterministic check | F-51, F-52 | missed-critique fixture → record + suggested check generated | [#36](https://github.com/deghosal-2026/planner-critic-engine/issues/36) · - [ ] |
-| 8 | Plan-graph export | Create `planner_critic/viz/graph.py` | DAG → Mermaid + JSON | F-75 | Mermaid + JSON from any stored plan | [#37](https://github.com/deghosal-2026/planner-critic-engine/issues/37) · - [ ] |
-| 9 | Trace replay | Create `planner_critic/viz/replay.py`, `planner_critic/cli/replay.py` | walk version history; `--step <n>`, `--format json` | F-76 | replay reproduces loop trace | [#38](https://github.com/deghosal-2026/planner-critic-engine/issues/38) · - [ ] |
-| 10 | Integration test | End-to-end scenario in `tests/test_e2e_m4.py` | escalate → human patches → re-critique → approve → execute → failure → tag → missed-critique | F-30, F-16, F-50 | full arc green on fake provider | [#39](https://github.com/deghosal-2026/planner-critic-engine/issues/39) · - [ ] |
+| 1 | Escalation manager | Create `planner_critic/escalation.py` | create/list/resolve; single-question design; resolution recorded in plan history | F-30, F-34 | escalation question precision test (one resolvable question) | [#30](https://github.com/deghosal-2026/planner-critic-engine/issues/30) · [x] |
+| 2 | Escalation CLI + patch | Modify `planner_critic/cli/escalate.py` | list/approve/deny `[--patch ...]`; patched plan re-submitted to critic | F-31, F-34 | CLI round-trip; patched plan re-critiqued | [#31](https://github.com/deghosal-2026/planner-critic-engine/issues/31) · [x] |
+| 3 | Escalation MCP tools | Create `planner_critic/server/mcp_tools_escalate.py` | `escalate_list/approve/deny` tools | F-32 | MCP tool tests (server wiring in M5) | [#32](https://github.com/deghosal-2026/planner-critic-engine/issues/32) · [x] |
+| 4 | Replan semantics | Create `planner_critic/replan.py` | `patch`/`restart`/`abort` per §2.7b; per-goal `replan_policy` | F-16 | per-policy fixtures: correct policy fires; lineage reconstructable | [#33](https://github.com/deghosal-2026/planner-critic-engine/issues/33) · [x] |
+| 5 | Replan trace | Create `planner_critic/store/replan_trace.py` | link sub-plan into same history; partial execution preserved | F-53 | full lineage: original → partial → replan → completion | [#34](https://github.com/deghosal-2026/planner-critic-engine/issues/34) · [x] |
+| 6 | Execution link + tagging | Create `planner_critic/execution.py` | bind execution to ApprovedPlan; per-task outcome; `failure_class` | F-50 | trace stored; classification recorded for failure | [#35](https://github.com/deghosal-2026/planner-critic-engine/issues/35) · [x] |
+| 7 | Missed-critique + suggested check | Create `planner_critic/forensics.py` | planning failure critic missed → record with critique snapshot + surfaced suggested deterministic check | F-51, F-52 | missed-critique fixture → record + suggested check generated | [#36](https://github.com/deghosal-2026/planner-critic-engine/issues/36) · [x] |
+| 8 | Plan-graph export | Create `planner_critic/viz/graph.py` | DAG → Mermaid + JSON | F-75 | Mermaid + JSON from any stored plan | [#37](https://github.com/deghosal-2026/planner-critic-engine/issues/37) · [x] |
+| 9 | Trace replay | Create `planner_critic/viz/replay.py`, `planner_critic/cli/replay.py` | walk version history; `--step <n>`, `--format json` | F-76 | replay reproduces loop trace | [#38](https://github.com/deghosal-2026/planner-critic-engine/issues/38) · [x] |
+| 10 | Integration test | End-to-end scenario in `tests/test_e2e_m4.py` | escalate → human patches → re-critique → approve → execute → failure → tag → missed-critique | F-30, F-16, F-50 | full arc green on fake provider | [#39](https://github.com/deghosal-2026/planner-critic-engine/issues/39) · [x] |
 
 ### M4 Success Metrics
 
@@ -124,14 +124,16 @@
 
 ### M4 Exit Gate
 
-- [ ] Code review passed
-- [ ] Coverage > 95%
-- [ ] Lint clean (ruff + mypy strict)
-- [ ] Comments + docstrings in all code
-- [ ] Escalation round-trip (CLI); patched plan re-critiqued
-- [ ] Replan policies `patch`/`restart`/`abort` behave per §2.7b; lineage reconstructable
-- [ ] Missed-critique → suggested check recorded + queryable
-- [ ] Plan graph + replay work end-to-end
-- [ ] **Design docs authored:** D7 (escalation), D8 (replan+regate), D13 (DD-09/10)
+- [x] Code review passed
+- [x] Coverage > 95% (96.06%)
+- [x] Lint clean (ruff + mypy strict)
+- [x] Comments + docstrings in all code
+- [x] Escalation round-trip (CLI); patched plan re-critiqued
+- [x] Replan policies `patch`/`restart`/`abort` behave per §2.7b; lineage reconstructable
+- [x] Missed-critique → suggested check recorded + queryable
+- [x] Plan graph + replay work end-to-end
+- [x] **Design docs authored:** D7 (escalation), D8 (replan+regate), D13 (DD-09/10)
+
+> **M4 status: COMPLETE** — built on `feat/m4-escalation-forensics-replan-viz`; issues #30–39 closed. 300 tests pass; 96.06% coverage; ruff + strict mypy clean. Escalation manager with precision contract, CLI (`escalate list/approve/deny --patch`), MCP tools, replan (patch/restart/abort) with trace, execution recorder + failure tagging, forensics (missed-critique → suggested deterministic check), plan-graph export (Mermaid + JSON), and trace replay (CLI `replay --step --format`). Full end-to-end arc green. Design docs D7/D8/D13 authored.
 
 **Dependency:** M1–M3. **Produces for M5+:** escalation manager + CLI/MCP tools, replan semantics + trace, forensics, graph export, replay.

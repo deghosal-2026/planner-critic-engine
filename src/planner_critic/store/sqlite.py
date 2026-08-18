@@ -22,6 +22,7 @@ from typing import Any, cast
 from ..schema.plan import PlanVersion
 from ..types import Escalation, ExecutionTrace, Finding
 from .base import PlanDiff, PlanStore, StoreUnavailable, _compute_diff
+from .replan_trace import ReplanLink
 from .versions import apply_migrations
 
 
@@ -158,6 +159,59 @@ class SQLiteStore(PlanStore):
             "INSERT OR IGNORE INTO links (plan_id, version, trace_id) VALUES (?, ?, ?)",
             (plan_id, version, trace_id),
         )
+
+    def put_replan_link(self, link: ReplanLink) -> None:
+        """Record a replan linkage (F-53)."""
+        self._execute(
+            """
+            INSERT OR REPLACE INTO replan_links
+                (plan_id, version, parent_plan_id, parent_version, policy, partial_execution, body)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                link.plan_id,
+                link.version,
+                link.parent_plan_id,
+                link.parent_version,
+                link.policy,
+                link.partial_execution,
+                link.model_dump_json(),
+            ),
+        )
+
+    def get_replan_link(self, plan_id: str, version: int) -> ReplanLink | None:
+        """Fetch the replan link for a revision, if any."""
+        row = self._fetchone(
+            "SELECT body FROM replan_links WHERE plan_id = ? AND version = ?",
+            (plan_id, version),
+        )
+        if row is None:
+            return None
+        return ReplanLink.model_validate_json(row["body"])
+
+    def get_child_replan_links(self, parent_plan_id: str, parent_version: int) -> list[ReplanLink]:
+        """Fetch all replan links that point at a given parent revision."""
+        rows = self._fetchall(
+            "SELECT body FROM replan_links WHERE parent_plan_id = ? AND parent_version = ?",
+            (parent_plan_id, parent_version),
+        )
+        return [ReplanLink.model_validate_json(r["body"]) for r in rows]
+
+    def put_missed_critique(self, plan_id: str, body: str) -> None:
+        """Persist a missed-critique record (F-51)."""
+        self._execute(
+            "INSERT OR REPLACE INTO missed_critiques (plan_id, body) VALUES (?, ?)",
+            (plan_id, body),
+        )
+
+    def get_missed_critique(self, plan_id: str) -> str | None:
+        """Fetch the missed-critique record for a plan, if any."""
+        row = self._fetchone(
+            "SELECT body FROM missed_critiques WHERE plan_id = ?", (plan_id,)
+        )
+        if row is None:
+            return None
+        return str(row["body"])
 
     def close(self) -> None:
         """Close the underlying connection."""

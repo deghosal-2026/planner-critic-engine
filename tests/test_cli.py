@@ -22,6 +22,7 @@ def test_cli_no_command_prints_help(capsys: pytest.CaptureFixture) -> None:
     assert main([]) == 0
     out = capsys.readouterr().out
     assert "usage:" in out
+    assert "escalate" in out
     assert "migrate" in out
     assert "providers" in out
 

@@ -15,17 +15,23 @@ from collections.abc import Callable, Sequence
 
 from . import __version__
 from .cli import (
+    build_escalate_parser,
     build_migrate_parser,
     build_providers_parser,
+    build_replay_parser,
+    run_escalate,
     run_migrate,
     run_providers,
+    run_replay,
 )
 
 SubcommandRunner = Callable[[list[str]], int]
 
 _SUBCOMMANDS: dict[str, tuple[argparse.ArgumentParser, SubcommandRunner]] = {
+    "escalate": (build_escalate_parser(), run_escalate),
     "migrate": (build_migrate_parser(), run_migrate),
     "providers": (build_providers_parser(), run_providers),
+    "replay": (build_replay_parser(), run_replay),
 }
 
 
