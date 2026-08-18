@@ -106,3 +106,23 @@ Log every design decision with status (Accepted / Proposed / Rejected), context,
 
   The store keying by `plan_id` enforces the "one per plan" constraint at the persistence layer. A resolved escalation (approved or denied) is a terminal state — the same escalation cannot be resolved twice.
 - **Consequences:** Reviewers see exactly one question per escalation. Complex failures with multiple blockers result in multiple sequential escalations — the first resolved (possibly via patch) may clear the second automatically. The escalation + patch flow replaces the need for multi-issue escalations.
+
+## M5 / M6 Entries
+
+### DD-11 — Adapter gate-not-execute boundary: the adapter serializes for *your* executor, it does not become the executor
+
+- **Status:** Accepted
+- **Context:** §2.3 requires the six adapters to gate and serialize approved plans, but never run the plan themselves. The framework's own executor runs the plan; the adapter just ensures it's approved first.
+- **Drivers:** separation of concerns (the engine owns approval, the framework owns execution); adaptability (the adapter should work with any executor the framework provides); security (if the adapter became the executor, a bug in the adapter could bypass the approval gate).
+- **Alternative considered:** Adapters that wrap the framework's executor, running each step and checking approval internally. Rejected: couples the adapter to the framework's execution model, making it fragile across framework versions.
+- **Outcome:** Every adapter calls `Engine.plan(goal)`, caches the `ApprovedPlan`, and gates each step/tool call against the cached plan. The adapter never calls `execute()` or `run()` — it returns the approved plan for the framework's own executor. The re-gate (`check_preconditions`) is advisory (off by default) and the adapter surfaces stale preconditions without blocking execution.
+- **Consequences:** Adapters are thin (30–80 lines each) and framework-version-independent. The audit trail records every gate decision. A user who wants the adapter to also execute must wrap it themselves.
+
+### DD-12 — Explain narrative format: templated with reason-code spine
+
+- **Status:** Accepted
+- **Context:** CUJ 15 requires the explain narrative to identify the outcome-changing factor from the text alone. The narrative must be ≤10s to render and deterministic.
+- **Drivers:** actionability (the reader must understand *why* without reading the plan); speed (deterministic template rendering is instant); determinism (no LLM variance in the explain output).
+- **Alternative considered:** LLM-generated narrative (summarize the plan history with a model). Rejected: non-deterministic, slow, expensive, and violates the hermetic CI contract. A templated approach is free, instant, and deterministic.
+- **Outcome:** `explain.py` uses `REASON_CODE_DESCRIPTIONS` from `reason_codes.py` as the narrative spine. Each revision's findings are mapped to template sentences: "Revision {N} was revised: {reason}." / "Revision {N} was escalated: {blocker description}." The actionability test asserts that a seeded blocker produces a narrative containing the blocker's description.
+- **Consequences:** The explain narrative is always deterministic and zero-cost. Adding a new reason code automatically adds a new narrative template. The explain engine is testable with zero LLM (hermetic).
