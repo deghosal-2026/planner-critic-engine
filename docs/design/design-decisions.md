@@ -81,3 +81,28 @@ Log every design decision with status (Accepted / Proposed / Rejected), context,
 - **Alternative considered:** Re-audit changed tasks only, without dependents. Rejected: a changed dependency edge silently stale-audits downstream tasks.
 - **Outcome:** `critique/diff.py` computes `changed_tasks` from `PlanDiff` (added + changed ids) and expands via `dependent_closure` (transitive dependents through the dependency DAG). `audit_scope` returns the full plan on the root revision. The loop calls `audit_diff` in deterministic-first mode and `audit` in llm-every-revision.
 - **Consequences:** `llm-every-revision` always does a full audit (no scope reduction); the diff scope is a pure function of plan history, preserving determinism.
+
+## M4 Entries
+
+### DD-09 — Replan policy defaults to `patch`
+
+- **Status:** Accepted
+- **Context:** §2.7b defines three replan policies — `patch`, `restart`, `abort` — and requires a sensible default for goals that don't explicitly set one.
+- **Drivers:** the most common failure mode is a single step that goes wrong (transient infrastructure issue, a precondition not met, a step that was underspecified); `patch` fixes that with minimal churn. `restart` is expensive (re-decompose the entire goal) and `abort` halts everything.
+- **Alternative considered:** `restart` as the default for safety (fresh plan every time). Rejected: restarts are disproportionately expensive for small failures, and the fail-closed boundary already prevents a bad patch from reaching an executor (deterministic gates re-run on every patch).
+- **Outcome:** `Goal.replan_policy` defaults to `ReplanPolicy.PATCH`. The goal can override via the `replan_policy` field. `replan()` reads `goal.replan_policy` and switches on it: `patch` stamps the next version; `restart` stamps the next version (still preserves lineage); `abort` raises `ReplanAbort`.
+- **Consequences:** Every planner must handle a `patch` request (producing a new `PlanVersion` with remaining steps). For manual/reviewer-initiated patches (the escalation patch flow), the CLI supplies the patch directly via `--patch <file>`.
+
+### DD-10 — Escalation precision contract: one resolvable question per escalation
+
+- **Status:** Accepted
+- **Context:** §2.1 requires the escalation to present a "minimal precise single question" to the human reviewer. The escalation must be resolvable with a single decision (approve or deny), not a laundry list of open issues.
+- **Drivers:** reviewer ergonomics (a single question can be answered in seconds; a list is deferred); actionability (each escalation is a concrete choice, not a status report); fail-closed precision (if an escalation had multiple blockers, the reviewer might only address one — leaving the plan in an inconsistent state).
+- **Alternative considered:** Escalations that summarize all open blockers with a multi-part question. Rejected: multi-issue escalations create ambiguity — "approve" might mean "I accept the risk of all blockers" or "I'm overriding only the first one". A single question forces a single decision, and the patch flow handles the case where the reviewer wants to fix one specific blocker without accepting others.
+- **Outcome:** The `EscalationManager.create()` enforces:
+  1. The escalation's `question` is non-blank.
+  2. The escalation references exactly one `blocker_finding_id` (the loop's `_escalate` already picks the first blocker).
+  3. No second open escalation is allowed for the same plan (one precise question at a time).
+
+  The store keying by `plan_id` enforces the "one per plan" constraint at the persistence layer. A resolved escalation (approved or denied) is a terminal state — the same escalation cannot be resolved twice.
+- **Consequences:** Reviewers see exactly one question per escalation. Complex failures with multiple blockers result in multiple sequential escalations — the first resolved (possibly via patch) may clear the second automatically. The escalation + patch flow replaces the need for multi-issue escalations.

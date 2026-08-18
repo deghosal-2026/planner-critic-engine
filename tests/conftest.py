@@ -14,7 +14,7 @@ import pytest
 
 from planner_critic.reason_codes import ReasonCode
 from planner_critic.roles import CriticRole, PlannerRole
-from planner_critic.schema.goal import Goal, RiskTolerance
+from planner_critic.schema.goal import Goal, ReplanPolicy, RiskTolerance
 from planner_critic.schema.plan import (
     Branch,
     Dependency,
@@ -29,13 +29,13 @@ def make_goal(
     goal_id: str = "goal-1",
     tolerance: RiskTolerance = RiskTolerance.BALANCED,
     description: str = "Migrate service X to the new auth provider",
+    replan_policy: ReplanPolicy | None = None,
 ) -> Goal:
     """Build a minimal valid goal with deterministic defaults."""
-    return Goal(
-        id=goal_id,
-        description=description,
-        risk_tolerance=tolerance,
-    )
+    goal = Goal(id=goal_id, description=description, risk_tolerance=tolerance)
+    if replan_policy is not None:
+        goal = goal.model_copy(update={"replan_policy": replan_policy})
+    return goal
 
 
 def make_task(
