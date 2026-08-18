@@ -1,0 +1,1 @@
+"""Adapter tests — all hermetic with fake roles and zero network."""
