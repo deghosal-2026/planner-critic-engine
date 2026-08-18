@@ -1,6 +1,6 @@
 # WBS — PlannerCritic Engine v0.1.0 (Index)
 
-> The work breakdown for the **feature-rich first release** (see [PRD 09 — Roadmap](../../design/prd/09-roadmap.md)). Ten milestones (M1–M10) across seven part files. **Author:** Debashish Ghosal · **Date:** 2026-08-16 · **Status:** In Progress — M1 + M2 + M3 **COMPLETE** (merged), M4 next
+> The work breakdown for the **feature-rich first release** (see [PRD 09 — Roadmap](../../design/prd/09-roadmap.md)). Ten milestones (M1–M10) across seven part files. **Author:** Debashish Ghosal · **Date:** 2026-08-16 · **Status:** In Progress — M1–M6 **COMPLETE** (merged), M7 next
 >
 > PRDs: [01-why](../../design/prd/01-why.md) · [02-architecture](../../design/prd/02-architecture.md) · [04-users-and-cujs](../../design/prd/04-users-and-cujs.md) · [05-features](../../design/prd/05-features.md) · [06-security](../../design/prd/06-security-baseline.md) · [07-success-metrics](../../design/prd/07-success-metrics.md) · [08-risks](../../design/prd/08-risks.md)
 
@@ -14,8 +14,8 @@
 | M2 | Plan Store + LLM Provider Layer | F-09, F-63, F-27, F-20, F-21, F-22, F-23, F-24, F-19, F-26 | CUJ 1, CUJ 6 | [#11–#19](https://github.com/deghosal-2026/planner-critic-engine/issues/11) | [part1](wbs-v0.1.0-part1-engine-core.md) | **DONE** (commit `a4cfe38`) |
 | M3 | Critique Engine + Loop Semantics | F-04, F-10, F-11, F-13, F-14, F-17, F-18, F-78 | CUJ 2, CUJ 3, CUJ 13 | [#20–#29](https://github.com/deghosal-2026/planner-critic-engine/issues/20) | [part2](wbs-v0.1.0-part2-critique-escalation.md) | **DONE** (commit `bc1156a`) |
 | **M4** | **Escalation + Forensics + Replan + Viz** | F-30, F-31, F-32, F-34, F-50, F-51, F-52, F-16, F-53, F-75, F-76 | CUJ 5, CUJ 7, CUJ 9, CUJ 10 | [#30–#39](https://github.com/deghosal-2026/planner-critic-engine/issues/30) | [part2](wbs-v0.1.0-part2-critique-escalation.md) | **DONE** (commit `e0495df`) |
-| M5 | Framework Adapters (tooltrust six) + re-gate | F-40..F-45, F-46 | CUJ 8 | [#40–#47](https://github.com/deghosal-2026/planner-critic-engine/issues/40) | [part3](wbs-v0.1.0-part3-adapters-surfaces.md) |
-| M6 | CLI + HTTP Service + Explain + Init | F-61, F-62, F-80, F-85 | CUJ 1, CUJ 15 | [#48–#54](https://github.com/deghosal-2026/planner-critic-engine/issues/48) | [part3](wbs-v0.1.0-part3-adapters-surfaces.md) |
+| **M5** | **Framework Adapters (tooltrust six) + re-gate** | F-40..F-45, F-46 | CUJ 8 | [#40–#47](https://github.com/deghosal-2026/planner-critic-engine/issues/40) | [part3](wbs-v0.1.0-part3-adapters-surfaces.md) | **DONE** (commit `5663f16`) |
+| **M6** | **CLI + HTTP Service + Explain + Init** | F-61, F-62, F-80, F-85 | CUJ 1, CUJ 15 | [#48–#54](https://github.com/deghosal-2026/planner-critic-engine/issues/48) | [part3](wbs-v0.1.0-part3-adapters-surfaces.md) | **DONE** (commit `5663f16`) |
 | M7 | Demo Corpus + Demo Runner | F-65, F-66, F-86 | CUJ 14 | [#55–#58](https://github.com/deghosal-2026/planner-critic-engine/issues/55) | [part4](wbs-v0.1.0-part4-demo.md) |
 | M8 | Docker Integration Tests — containerized engine + surfaces vs local LLM | F-60, F-61, F-62, F-45, F-67 | CUJ 1, CUJ 15 | [#77–#84](https://github.com/deghosal-2026/planner-critic-engine/issues/77) | [part5](wbs-v0.1.0-part5-docker-integration.md) |
 | M9 | Field Test — hermetic CI + local-model sweep | F-67, F-68 | CUJ 11 | [#59–#64](https://github.com/deghosal-2026/planner-critic-engine/issues/59) | [part6](wbs-v0.1.0-part6-field-test.md) |
@@ -61,7 +61,7 @@ M10 (Pre-release + release)   ← needs all preceding
 
 ## 3. GitHub Issue Ranges
 
-> **Status: IN PROGRESS** — all issues are attached to the [**0.1.0 release**](https://github.com/deghosal-2026/planner-critic-engine/milestone/1) milestone. Each task row in the part files has a live issue link + checkbox — flip the checkbox when the issue is closed; milestone progress is visible in the GitHub milestone view. **Closed so far: M1 #1–10 (commit `c1473bb`), M2 #11–19 (commit `a4cfe38`), M3 #20–29 (commit `bc1156a`), M4 #30–39 (commit `e0495df`). Open: M5–M7 #40–58, Docker M8 #77–84, Field M9 #59–64 + #74–76, Release M10 #65–71.**
+> **Status: IN PROGRESS** — all issues are attached to the [**0.1.0 release**](https://github.com/deghosal-2026/planner-critic-engine/milestone/1) milestone. Each task row in the part files has a live issue link + checkbox — flip the checkbox when the issue is closed; milestone progress is visible in the GitHub milestone view. **Closed so far: M1 #1–10 (commit `c1473bb`), M2 #11–19 (commit `a4cfe38`), M3 #20–29 (commit `bc1156a`), M4 #30–39 (commit `e0495df`), M5 #40–47 (commit `5663f16`), M6 #48–54 (commit `5663f16`). Open: M7 #55–58, Docker M8 #77–84, Field M9 #59–64 + #74–76, Release M10 #65–71.**
 
 | Milestone | Issue range | API scope |
 |-----------|-------------|-----------|
