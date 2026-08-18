@@ -16,6 +16,7 @@ import pytest
 
 from conftest import hard_dep, make_plan, make_task
 from planner_critic.store.base import InMemoryStore, PlanDiff, StoreUnavailable
+from planner_critic.store.replan_trace import ReplanLink
 from planner_critic.store.sqlite import SQLiteStore
 from planner_critic.store.versions import (
     SCHEMA_VERSION,
@@ -323,6 +324,15 @@ def test_protocol_conformance_latest_and_diff(factory) -> None:
         assert store._links == {("p", 2, "t")}
     else:
         assert store._fetchone("SELECT 1 FROM links LIMIT 1") is not None
+
+    # replan link conformance
+    store.put_replan_link(
+        ReplanLink(plan_id="p", version=2, parent_plan_id="p", parent_version=1, policy="patch")
+    )
+    assert store.get_replan_link("p", 2) is not None
+    children = store.get_child_replan_links("p", 1)
+    assert len(children) == 1
+    assert children[0].version == 2
 
 
 # --- Schema versioning + migrate (F-27) -------------------------------------

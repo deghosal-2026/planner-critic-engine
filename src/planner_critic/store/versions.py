@@ -89,6 +89,40 @@ MIGRATIONS: tuple[Migration, ...] = (
         DROP TABLE IF EXISTS plan_versions;
         """,
     ),
+    Migration(
+        version=2,
+        name="replan links table",
+        up="""
+        CREATE TABLE IF NOT EXISTS replan_links (
+            plan_id          TEXT NOT NULL,
+            version          INTEGER NOT NULL,
+            parent_plan_id   TEXT NOT NULL,
+            parent_version   INTEGER NOT NULL,
+            policy           TEXT NOT NULL,
+            partial_execution TEXT,
+            body             TEXT NOT NULL,
+            PRIMARY KEY (plan_id, version)
+        );
+        CREATE INDEX IF NOT EXISTS idx_replan_parent
+            ON replan_links (parent_plan_id, parent_version);
+        """,
+        down="""
+        DROP TABLE IF EXISTS replan_links;
+        """,
+    ),
+    Migration(
+        version=3,
+        name="missed critiques",
+        up="""
+        CREATE TABLE IF NOT EXISTS missed_critiques (
+            plan_id TEXT NOT NULL PRIMARY KEY,
+            body    TEXT NOT NULL
+        );
+        """,
+        down="""
+        DROP TABLE IF EXISTS missed_critiques;
+        """,
+    ),
 )
 
 #: Highest schema version known to this release.
