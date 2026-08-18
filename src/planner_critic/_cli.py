@@ -15,12 +15,20 @@ from collections.abc import Callable, Sequence
 
 from . import __version__
 from .cli import (
+    build_critique_parser,
     build_escalate_parser,
+    build_init_parser,
     build_migrate_parser,
+    build_plan_parser,
+    build_plans_parser,
     build_providers_parser,
     build_replay_parser,
+    run_critique,
     run_escalate,
+    run_init,
     run_migrate,
+    run_plan,
+    run_plans,
     run_providers,
     run_replay,
 )
@@ -28,8 +36,12 @@ from .cli import (
 SubcommandRunner = Callable[[list[str]], int]
 
 _SUBCOMMANDS: dict[str, tuple[argparse.ArgumentParser, SubcommandRunner]] = {
+    "critique": (build_critique_parser(), run_critique),
     "escalate": (build_escalate_parser(), run_escalate),
+    "init": (build_init_parser(), run_init),
     "migrate": (build_migrate_parser(), run_migrate),
+    "plan": (build_plan_parser(), run_plan),
+    "plans": (build_plans_parser(), run_plans),
     "providers": (build_providers_parser(), run_providers),
     "replay": (build_replay_parser(), run_replay),
 }

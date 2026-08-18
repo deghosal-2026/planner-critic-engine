@@ -223,6 +223,10 @@ class PlanStore(ABC):
             The JSON body, or None if no missed critique was recorded.
         """
 
+    @abstractmethod
+    def close(self) -> None:
+        """Close the store and release resources."""
+
     def warn_and_continue(self, err: Exception) -> None:
         """Side-channel contract (§7.2): warn, then let the caller continue.
 
@@ -264,6 +268,9 @@ class InMemoryStore(PlanStore):
         self._links: set[tuple[str, int, str]] = set()
         self._replan_links: dict[tuple[str, int], ReplanLink] = {}
         self._missed_critiques: dict[str, str] = {}
+
+    def close(self) -> None:
+        """No-op for in-memory store."""
 
     def put_plan_version(self, plan: PlanVersion) -> None:
         """Persist a plan revision in the in-memory index."""
