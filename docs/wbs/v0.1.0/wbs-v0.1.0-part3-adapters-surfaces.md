@@ -58,7 +58,7 @@
 - [x] MCP server starts, 6 tools discovered
 - [x] Re-gate `before-each-step` / `off` verified
 - [x] Audit trail present in every adapter integration test
-- [ ] **Design docs authored:** D9 (adapters) + D13 (DD-11) — deferred
+- [x] **Design docs authored:** D9 (adapters) + D13 (DD-11)
 
 > **M5 status: COMPLETE** — built on `feat/m5-m6-adapters-surfaces` merged in `5663f16`; issues #40–47 closed. Re-gate core, 5 framework adapters (raw Python, LangGraph, PydanticAI, CrewAI, OpenAI Agents SDK), MCP server with 6 tools, shared audit trail. All hermetic, zero paid LLM.
 
@@ -118,7 +118,7 @@
 - [x] `plancritic init` → first approved plan path verified end-to-end in CI
 - [x] All §5.9 CLI + HTTP commands functional
 - [x] Explain actionability test passes
-- [ ] **Design docs authored:** D10 (explain), D14 (API reference) + D13 (DD-12) — deferred
+- [x] **Design docs authored:** D10 (explain), D14 (API reference) + D13 (DD-12)
 
 > **M6 status: COMPLETE** — built on `feat/m5-m6-adapters-surfaces` merged in `5663f16`; issues #48–54 closed. CLI init, plan, critique, plans list/show/diff --graph, explain, replay, escalate. HTTP service with 10 endpoints. CUJ 1 e2e test green.
 
