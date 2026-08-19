@@ -23,6 +23,7 @@ from .cli import (
     build_plan_parser,
     build_plans_parser,
     build_providers_parser,
+    build_quickstart_parser,
     build_replay_parser,
     run_critique,
     run_demo,
@@ -32,6 +33,7 @@ from .cli import (
     run_plan,
     run_plans,
     run_providers,
+    run_quickstart,
     run_replay,
 )
 
@@ -46,6 +48,7 @@ _SUBCOMMANDS: dict[str, tuple[argparse.ArgumentParser, SubcommandRunner]] = {
     "plan": (build_plan_parser(), run_plan),
     "plans": (build_plans_parser(), run_plans),
     "providers": (build_providers_parser(), run_providers),
+    "quickstart": (build_quickstart_parser(), run_quickstart),
     "replay": (build_replay_parser(), run_replay),
 }
 

@@ -507,3 +507,23 @@ def test_transport_non_string_content_is_bad_json() -> None:
     )
     with pytest.raises(BadJSONError):
         provider.complete([Message(role="user", content="hi")])
+
+
+def test_transport_length_truncation_is_fail_closed() -> None:
+    """A truncated JSON-mode completion surfaces ProviderTimeout immediately."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": "[1.1]"}, "finish_reason": "length"}]},
+            request=request,
+        )
+
+    provider = OpenAICompatibleProvider(
+        name="local",
+        base_url="http://x/v1",
+        model="m",
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    with pytest.raises(ProviderTimeout):
+        provider.complete([Message(role="user", content="hi")])

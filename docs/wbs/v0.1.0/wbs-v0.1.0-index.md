@@ -61,7 +61,7 @@ M10 (Pre-release + release)   ← needs all preceding
 
 ## 3. GitHub Issue Ranges
 
-> **Status: IN PROGRESS** — all issues are attached to the [**0.1.0 release**](https://github.com/deghosal-2026/planner-critic-engine/milestone/1) milestone. Each task row in the part files has a live issue link + checkbox — flip the checkbox when the issue is closed; milestone progress is visible in the GitHub milestone view. **Closed so far: M1 #1–10 (commit `c1473bb`), M2 #11–19 (commit `a4cfe38`), M3 #20–29 (commit `bc1156a`), M4 #30–39 (commit `e0495df`), M5 #40–47 (commit `5663f16`), M6 #48–54 (commit `5663f16`). Open: M7 #55–58, Docker M8 #77–84, Field M9 #59–64 + #74–76, Release M10 #65–71.**
+> **Status: IN PROGRESS** — all issues are attached to the [**0.1.0 release**](https://github.com/deghosal-2026/planner-critic-engine/milestone/1) milestone. Each task row in the part files has a live issue link + checkbox — flip the checkbox when the issue is closed; milestone progress is visible in the GitHub milestone view. **Closed so far: M1 #1–10 (commit `c1473bb`), M2 #11–19 (commit `a4cfe38`), M3 #20–29 (commit `bc1156a`), M4 #30–39 (commit `e0495df`), M5 #40–47 (commit `5663f16`), M6 #48–54 (commit `5663f16`), M7 #55–58 (gate passed, re-scoped hermetic). Open: Docker M8 #77–84, Field M9 #59–64 + #74–76, Release M10 #65–71.**
 
 | Milestone | Issue range | API scope |
 |-----------|-------------|-----------|

@@ -12,6 +12,7 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 
+import pytest
 import yaml
 
 from conftest import make_goal, make_plan, make_task
@@ -31,12 +32,12 @@ from planner_critic.schema.plan import Dependency, DependencyKind, PlanVersion
 from planner_critic.types import Finding, HeuristicFamily, Severity
 
 
-def _json(payload: dict) -> str:
+def _json(payload: dict[str, object]) -> str:
     """Render a dict as JSON (provider payload)."""
     return json.dumps(payload)
 
 
-def _critique_json(items: list[dict] | None = None) -> str:
+def _critique_json(items: list[dict[str, object]] | None = None) -> str:
     """A valid CritiqueOutput payload."""
     return _json({"findings": items or []})
 
@@ -52,6 +53,7 @@ class CannedCriticProvider:
         """Store the canned completion."""
         self.content = content
         self.calls = 0
+        self.last_messages: list[Message] = []
 
     def complete(
         self,
@@ -60,6 +62,7 @@ class CannedCriticProvider:
     ) -> Completion:
         """Return the canned completion and count calls."""
         self.calls += 1
+        self.last_messages = list(messages)
         return Completion(content=self.content, finish_reason="stop")
 
 
@@ -166,11 +169,14 @@ def test_critic_appends_to_existing_findings() -> None:
     assert len(findings) == 2
 
 
-def test_critic_fail_closed_on_bad_output() -> None:
-    """Malformed model output yields no new findings, never a crash."""
+def test_critic_bad_output_raises_planning_error() -> None:
+    """Malformed critic output fails closed instead of being treated as clean."""
+    from planner_critic.types import PlanningError
+
     provider = CannedCriticProvider("not json at all")
     critic = _critic(provider)
-    assert critic.audit(make_plan(), []) == []
+    with pytest.raises(PlanningError):
+        critic.audit(make_plan(), [])
 
 
 def test_critic_audit_satisfies_protocol() -> None:

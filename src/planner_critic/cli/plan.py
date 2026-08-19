@@ -18,6 +18,31 @@ from ..types import Finding
 DEFAULT_CONFIG_PATH = "plancritic.toml"
 DEFAULT_STORE_PATH = ".plancritic/plans.db"
 
+_PLAN_EXAMPLE = (
+    '{"id":"plan-x","goal_id":"g","version":1,'
+    '"tasks":[{"id":"backup","description":"Back up the database",'
+    '"action":"backup","target":"db","risk_class":"medium"},'
+    '{"id":"migrate","description":"Apply schema migration",'
+    '"action":"migrate","target":"schema","risk_class":"high",'
+    '"rollback":{"trigger":"migration fails","action":"restore from backup",'
+    '"safety_guard":"verify backup integrity"},'
+    '"verification":{"what":"schema version","how":"run checks",'
+    '"expected":"v2"}}],'
+    '"dependencies":[{"from_task":"backup","to_task":"migrate","kind":"hard"}]}'
+)
+
+_PLANNER_SYSTEM_PROMPT = (
+    "/no_think You are a planner. Reply with ONLY a JSON object "
+    "(no markdown, no prose, no thinking). Use EXACTLY these field names: "
+    "id, goal_id, version, tasks, dependencies, branches. "
+    "Each task uses: id, description, action, target, risk_class, optional "
+    "rollback{trigger,action,safety_guard}, optional verification{what,how,expected}, "
+    "optional preconditions, optional parallel_group, optional blast_radius. "
+    "Each dependency uses: from_task, to_task, kind, optional reason. "
+    "Each branch uses: id, kind, tasks, join. High/critical risk tasks MUST have rollback. "
+    f"Example shape: {_PLAN_EXAMPLE}"
+)
+
 
 class _CLIPlanner(PlannerRole):
     def __init__(self, provider: LLMProvider) -> None:
@@ -27,16 +52,13 @@ class _CLIPlanner(PlannerRole):
         messages = [
             Message(
                 role="system",
-                content=(
-                    "You are a planner. Decompose the goal into a typed plan "
-                    "with tasks, dependencies, branches, and rollback steps."
-                ),
+                content=_PLANNER_SYSTEM_PROMPT,
             ),
             Message(
                 role="user",
                 content=(
                     f"GOAL:\n{goal.model_dump(mode='json')}\n\n"
-                    "Produce a PlanVersion JSON."
+                    "Produce the PlanVersion JSON now. version=1."
                 ),
             ),
         ]
@@ -46,14 +68,18 @@ class _CLIPlanner(PlannerRole):
         messages = [
             Message(
                 role="system",
-                content="You are a planner. Revise the plan to address the critique findings.",
+                content=(
+                    _PLANNER_SYSTEM_PROMPT
+                    + " Revise the plan to address the critique findings. "
+                    "Keep version unchanged; the loop stamps it."
+                ),
             ),
             Message(
                 role="user",
                 content=(
                     f"PLAN:\n{plan.model_dump(mode='json')}\n\n"
                     + f"FINDINGS:\n{json.dumps([f.model_dump(mode='json') for f in findings])}\n\n"
-                    + "Produce a revised PlanVersion JSON."
+                    + "Produce the revised PlanVersion JSON now."
                 ),
             ),
         ]

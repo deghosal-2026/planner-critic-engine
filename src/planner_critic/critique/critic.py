@@ -79,13 +79,14 @@ _FAMILY_TO_CODE: dict[str, ReasonCode] = {
 }
 
 _SYSTEM_PROMPT = (
-    "You are an adversarial plan reviewer. Audit the given plan against six "
-    "heuristic families: feasibility, risk, missing_steps, unsafe_sequencing, "
-    "unverified_dependencies, weak_rollback. For each problem, return a finding "
-    "with heuristic_family (one of those six names), severity (blocker, warning, "
-    "or info), task_id (the task the problem affects, or omit for plan-level), "
-    "message (specific, actionable), and suggested_fix (optional). Return JSON "
-    "with a top-level 'findings' array."
+    "/no_think You are an adversarial plan reviewer. Reply with ONLY a JSON "
+    "object (no markdown, no prose, no thinking). Audit the given plan against "
+    "six heuristic families: feasibility, risk, missing_steps, "
+    "unsafe_sequencing, unverified_dependencies, weak_rollback. For each "
+    "problem, return a finding with heuristic_family (one of those six names), "
+    "severity (blocker, warning, or info), task_id (the task the problem "
+    "affects, or omit for plan-level), message (specific, actionable), and "
+    "suggested_fix (optional). Return JSON with a top-level 'findings' array."
 )
 
 
@@ -176,11 +177,8 @@ class LLMCritic:
     ) -> list[Finding]:
         """Run the critique and append mapped findings."""
         messages = _build_messages(self.goal, plan, scope)
-        try:
-            output = self._enforcer.complete(messages, CritiqueOutput)
-            return [*findings, *(_to_findings(plan.version, output.findings))]
-        except Exception:  # fail-closed: a broken critic appends nothing
-            return list(findings)
+        output = self._enforcer.complete(messages, CritiqueOutput)
+        return [*findings, *(_to_findings(plan.version, output.findings))]
 
 
 def _to_findings(version: int, items: Sequence[CritiqueItem]) -> list[Finding]:
