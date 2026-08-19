@@ -21,7 +21,9 @@ DEFAULT_STORE_PATH = ".plancritic/plans.db"
 _PLAN_EXAMPLE = (
     '{"id":"plan-x","goal_id":"g","version":1,'
     '"tasks":[{"id":"backup","description":"Back up the database",'
-    '"action":"backup","target":"db","risk_class":"medium"},'
+    '"action":"backup","target":"db","risk_class":"medium",'
+    '"preconditions":[{"description":"db is reachable",'
+    '"fact":"db_healthy","established_by":"env"}]},'
     '{"id":"migrate","description":"Apply schema migration",'
     '"action":"migrate","target":"schema","risk_class":"high",'
     '"rollback":{"trigger":"migration fails","action":"restore from backup",'
@@ -37,7 +39,9 @@ _PLANNER_SYSTEM_PROMPT = (
     "id, goal_id, version, tasks, dependencies, branches. "
     "Each task uses: id, description, action, target, risk_class, optional "
     "rollback{trigger,action,safety_guard}, optional verification{what,how,expected}, "
-    "optional preconditions, optional parallel_group, optional blast_radius. "
+    "optional preconditions (array of {description, fact, established_by}), "
+    "optional parallel_group, optional blast_radius. "
+    "preconditions MUST be objects with description, fact, established_by fields — NEVER strings. "
     "Each dependency uses: from_task, to_task, kind, optional reason. "
     "Each branch uses: id, kind, tasks, join. High/critical risk tasks MUST have rollback. "
     f"Example shape: {_PLAN_EXAMPLE}"

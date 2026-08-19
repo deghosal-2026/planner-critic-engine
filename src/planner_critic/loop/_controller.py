@@ -33,6 +33,7 @@ can present it to a human.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -51,6 +52,8 @@ from .budget import SpendState, budget_exceeded
 from .convergence import stalled
 from .regression import regression_detected
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class LoopConfig:
@@ -58,6 +61,37 @@ class LoopConfig:
 
     mode: CriticMode = "deterministic-first"
     revision_cap: int = 3
+
+    @staticmethod
+    def from_env() -> LoopConfig:
+        """Build a LoopConfig from PC_* environment variables.
+
+        Env vars:
+            PC_CRITIQUE_MODE: one of heuristic-only|deterministic-first|llm-every-revision
+            PC_REVISION_CAP: positive integer (default 3)
+
+        Returns:
+            A LoopConfig, falling back to defaults on missing/invalid env.
+        """
+        import os
+
+        from ..critique.mode import validate_mode
+
+        mode_str = os.environ.get("PC_CRITIQUE_MODE", "deterministic-first")
+        try:
+            mode = validate_mode(mode_str)
+        except ValueError:
+            logger.warning("invalid PC_CRITIQUE_MODE=%r, using default", mode_str)
+            mode = "deterministic-first"
+
+        cap_str = os.environ.get("PC_REVISION_CAP", "3")
+        try:
+            cap = max(1, int(cap_str))
+        except ValueError:
+            logger.warning("invalid PC_REVISION_CAP=%r, using default", cap_str)
+            cap = 3
+
+        return LoopConfig(mode=mode, revision_cap=cap)
 
 
 @dataclass
@@ -184,12 +218,26 @@ def _run(
     state: SpendState,
 ) -> LoopResult:
     """Internal deterministic loop body."""
+    logger.info(
+        "loop start — goal=%s mode=%s revision_cap=%d risk=%s",
+        goal.id,
+        config.mode,
+        config.revision_cap,
+        goal.risk_tolerance,
+    )
     try:
+        logger.info("loop: planner.decompose(goal=%s)", goal.id)
         plan = planner.decompose(goal)
     except Exception as exc:
+        logger.error("loop: planner.decompose failed: %s", exc)
         raise PlanningError(f"planner role failed to decompose: {exc}") from exc
     if not isinstance(plan, PlanVersion):
         raise PlanningError(f"planner returned non-PlanVersion: {type(plan).__name__}")
+
+    logger.info(
+        "loop: planner produced plan=%s v%d (%d tasks)",
+        plan.id, plan.version, len(plan.tasks),
+    )
 
     approval: ApprovalGate = ApprovalGate(goal.risk_tolerance, goal.approval_ttl)
     prior_plan: PlanVersion | None = None
@@ -197,11 +245,23 @@ def _run(
 
     for revision in range(1, config.revision_cap + 1):
         state.record_revision()
+        logger.info(
+            "loop: revision %d/%d — plan=%s v%d",
+            revision, config.revision_cap, plan.id, plan.version,
+        )
 
         gate_findings = run_deterministic_gates(plan)
+        gate_blockers = [f for f in gate_findings if f.severity is Severity.BLOCKER]
+        logger.info(
+            "loop: gates — %d findings (%d blockers)",
+            len(gate_findings),
+            len(gate_blockers),
+        )
 
         if config.mode == "deterministic-first" and _has_blocker(gate_findings):
+            logger.info("loop: gate blocker → revise (no LLM critic spend)")
             if budget_exceeded(goal.constraints.budget, state):
+                logger.info("loop: budget exceeded → escalate")
                 return _escalate(goal, plan, gate_findings, "budget_exceeded", revision)
             if revision < config.revision_cap:
                 plan = _revise_or_raise(
@@ -209,29 +269,37 @@ def _run(
                     next_id=f"plan-{goal.id}-r{revision + 1}",
                 )
                 continue
+            logger.info("loop: revision cap reached → escalate")
             return _escalate(goal, plan, gate_findings, "revision_cap_reached", revision)
 
         if should_invoke_llm(config.mode, gate_findings):
-            # Pre-call guard: never spend a call beyond the configured budget.
             if (
                 goal.constraints.budget.max_calls is not None
                 and state.calls_used >= goal.constraints.budget.max_calls
             ):
+                logger.info("loop: LLM call budget exceeded → escalate")
                 return _escalate(goal, plan, gate_findings, "budget_exceeded", revision)
+            logger.info("loop: invoking LLM critic (call %d)", state.calls_used + 1)
             state.record_llm_call()
             if config.mode == "deterministic-first":
-                # Cost optimization (§2.5.3): re-audit only changed + dependents.
                 findings = list(gate_findings) + _safe_audit_diff(
                     critic, plan, gate_findings, prior_plan
                 )
             else:
                 findings = list(gate_findings) + _safe_audit(critic, plan, gate_findings)
+            crit_blockers = [f for f in findings if f.severity is Severity.BLOCKER]
+            logger.info(
+                "loop: critic — %d total findings (%d blockers)",
+                len(findings),
+                len(crit_blockers),
+            )
         else:
             findings = list(gate_findings)
 
         threshold_ok, thresholds = resolve_threshold(findings, goal.risk_tolerance)
         if threshold_ok:
             approved = approval.approve(plan, thresholds)
+            logger.info("loop: threshold met → APPROVED plan=%s v%d", plan.id, plan.version)
             return LoopResult(
                 status="approved",
                 plan=plan,
@@ -241,19 +309,24 @@ def _run(
             )
 
         if budget_exceeded(goal.constraints.budget, state):
+            logger.info("loop: budget exceeded → escalate")
             return _escalate(goal, plan, findings, "budget_exceeded", revision)
 
         if regression_detected(prior_findings, findings):
+            logger.info("loop: regression detected → escalate (thrashing)")
             return _escalate(goal, plan, findings, "regression_thrashing", revision)
 
         if stalled(prior_plan, prior_findings, plan, findings):
+            logger.info("loop: convergence detected → escalate (stalled)")
             return _escalate(goal, plan, findings, "converged_stalled", revision)
 
         prior_plan, prior_findings = plan, findings
         if revision < config.revision_cap:
+            logger.info("loop: revising plan (revision %d → %d)", revision, revision + 1)
             next_id = f"plan-{goal.id}-r{revision + 1}"
             plan = _revise_or_raise(planner, plan, findings, next_id=next_id)
 
+    logger.info("loop: revision cap reached → escalate")
     return _escalate(goal, plan, prior_findings or [], "revision_cap_reached", config.revision_cap)
 
 

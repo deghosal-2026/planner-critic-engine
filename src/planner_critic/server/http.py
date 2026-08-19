@@ -53,7 +53,8 @@ class PlannerCriticHTTPServer:
 
         Mirrors mcp.py's _build_engine so HTTP serves the same provider-bound
         planner/critic loop. Falls back to self._engine if explicitly set via
-        :meth:`set_engine` (hermetic tests).
+        :meth:`set_engine` (hermetic tests). Loop config is read from PC_*
+        env vars so the container can tune revision cap and critique mode.
         """
         if self._engine is not None:
             return self._engine
@@ -66,7 +67,7 @@ class PlannerCriticHTTPServer:
 
         registry = ProviderRegistry.load(self._config_path)
         planner, critic = _build_roles(registry, goal)
-        return Engine(planner, critic, config=LoopConfig())
+        return Engine(planner, critic, config=LoopConfig.from_env())
 
     def close(self) -> None:
         if self._store is not None:
