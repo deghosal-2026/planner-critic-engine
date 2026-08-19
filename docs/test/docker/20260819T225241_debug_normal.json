@@ -1,0 +1,346 @@
+{
+  "label": "normal",
+  "request": {
+    "goal": {
+      "constraints": {
+        "budget": {
+          "max_revisions": 5
+        },
+        "environment": "staging",
+        "tools": [
+          "docker",
+          "kubectl"
+        ]
+      },
+      "description": "Deploy a Python web service to a staging environment with a health check",
+      "id": "quickstart",
+      "replan_policy": "patch",
+      "risk_tolerance": "balanced"
+    }
+  },
+  "response": {
+    "data": {
+      "escalation": {
+        "blocker_finding_id": "crit:3:unverified_dependencies:deploy_to_staging",
+        "id": "escalation:quickstart:3:3",
+        "plan_id": "plan-quickstart-r3",
+        "question": "Plan for goal 'quickstart' cannot be approved: blockers remain (llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+        "resolution": null,
+        "resolved_at": null,
+        "status": "open",
+        "version": 3
+      },
+      "findings": [
+        {
+          "heuristic_family": "missing_steps",
+          "id": "crit:3:missing_steps:push_image",
+          "message": "Plan does not include a step to authenticate with the container registry before pushing the image.",
+          "reason_code": "llm_missing_steps",
+          "severity": "warning",
+          "suggested_fix": "Add a task to perform registry login (e.g., `docker login registry.example.com`) before push_image.",
+          "task_id": "push_image",
+          "version": 3
+        },
+        {
+          "heuristic_family": "missing_steps",
+          "id": "crit:3:missing_steps:deploy_to_staging",
+          "message": "Plan does not include a step to create or update the Kubernetes deployment resource; it assumes deployment/my-web-service already exists.",
+          "reason_code": "llm_missing_steps",
+          "severity": "warning",
+          "suggested_fix": "Add a task to apply a deployment manifest or ensure the deployment exists before setting the image.",
+          "task_id": "deploy_to_staging",
+          "version": 3
+        },
+        {
+          "heuristic_family": "unverified_dependencies",
+          "id": "crit:3:unverified_dependencies:deploy_to_staging",
+          "message": "Precondition 'image_in_registry' depends on push_image but push_image may fail silently if registry is unreachable or authentication fails; no verification of push success beyond generic 'success' check.",
+          "reason_code": "llm_unverified_dependencies",
+          "severity": "blocker",
+          "suggested_fix": "Add explicit verification that the image tag is present in the registry (e.g., using docker manifest inspect or registry API).",
+          "task_id": "deploy_to_staging",
+          "version": 3
+        },
+        {
+          "heuristic_family": "weak_rollback",
+          "id": "crit:3:weak_rollback:deploy_to_staging",
+          "message": "Rollback only triggers if deployment fails or health check fails, but does not address cases where the rollout completes but the service is degraded. Also, rollback action uses `kubectl rollout undo` but does not specify which revision to revert to.",
+          "reason_code": "llm_weak_rollback",
+          "severity": "warning",
+          "suggested_fix": "Specify a concrete revision (e.g., `--to-revision=1`) or add a step to capture the previous revision before change.",
+          "task_id": "deploy_to_staging",
+          "version": 3
+        },
+        {
+          "heuristic_family": "unsafe_sequencing",
+          "id": "crit:3:unsafe_sequencing:health_check",
+          "message": "Health check is sequenced after deploy_to_staging, but no explicit wait for pod readiness or service endpoint propagation is included.",
+          "reason_code": "llm_unsafe_sequencing",
+          "severity": "info",
+          "suggested_fix": "Add a brief polling loop or wait step after rollout status before performing HTTP health check.",
+          "task_id": "health_check",
+          "version": 3
+        },
+        {
+          "heuristic_family": "risk",
+          "id": "crit:3:risk:push_image",
+          "message": "Pushing to `registry.example.com/my-python-web:latest` uses a mutable `latest` tag, which can lead to confusion and non-reproducible deployments.",
+          "reason_code": "llm_risk",
+          "severity": "warning",
+          "suggested_fix": "Use a unique tag (e.g., build ID, git commit SHA) instead of `latest` to allow traceability and rollback.",
+          "task_id": "push_image",
+          "version": 3
+        },
+        {
+          "heuristic_family": "feasibility",
+          "id": "crit:3:feasibility:build_image",
+          "message": "Assumes a Dockerfile exists at `./Dockerfile` but does not verify that it contains a valid Python web service configuration (e.g., exposes a port, runs a web server).",
+          "reason_code": "llm_feasibility",
+          "severity": "info",
+          "suggested_fix": "Add a lightweight validation of the Dockerfile contents (e.g., check for EXPOSE or CMD directives).",
+          "task_id": "build_image",
+          "version": 3
+        }
+      ],
+      "plan": {
+        "branches": [],
+        "created_at": "2026-08-19T22:52:26.744888Z",
+        "dependencies": [
+          {
+            "from_task": "check_dir_access",
+            "kind": "hard",
+            "reason": "precondition verification",
+            "to_task": "check_dockerfile"
+          },
+          {
+            "from_task": "check_dockerfile",
+            "kind": "hard",
+            "reason": "precondition verification",
+            "to_task": "build_image"
+          },
+          {
+            "from_task": "build_image",
+            "kind": "hard",
+            "reason": "image must be built before pushing",
+            "to_task": "push_image"
+          },
+          {
+            "from_task": "push_image",
+            "kind": "hard",
+            "reason": "image must be in registry before deployment",
+            "to_task": "deploy_to_staging"
+          },
+          {
+            "from_task": "check_kubectl_config",
+            "kind": "hard",
+            "reason": "precondition verification",
+            "to_task": "check_cluster"
+          },
+          {
+            "from_task": "check_cluster",
+            "kind": "hard",
+            "reason": "precondition verification",
+            "to_task": "deploy_to_staging"
+          },
+          {
+            "from_task": "deploy_to_staging",
+            "kind": "hard",
+            "reason": "deployment must be ready before health check",
+            "to_task": "health_check"
+          }
+        ],
+        "goal_id": "quickstart",
+        "id": "plan-quickstart-r3",
+        "parent_version": "plan-quickstart-r2",
+        "plan_schema_version": "0.1.0",
+        "tasks": [
+          {
+            "action": "stat",
+            "blast_radius": "local",
+            "description": "Ensure current directory is accessible",
+            "id": "check_dir_access",
+            "parallel_group": null,
+            "preconditions": [],
+            "risk_class": "low",
+            "rollback": null,
+            "target": ".",
+            "verification": {
+              "expected": "success",
+              "how": "stat .",
+              "what": "directory access"
+            }
+          },
+          {
+            "action": "file_check",
+            "blast_radius": "local",
+            "description": "Verify Dockerfile exists in current directory",
+            "id": "check_dockerfile",
+            "parallel_group": null,
+            "preconditions": [
+              {
+                "description": "current directory is accessible",
+                "established_by": "check_dir_access",
+                "fact": "dir_accessible",
+                "probe": null
+              }
+            ],
+            "risk_class": "low",
+            "rollback": null,
+            "target": "./Dockerfile",
+            "verification": {
+              "expected": "true",
+              "how": "ls -la ./Dockerfile",
+              "what": "file existence"
+            }
+          },
+          {
+            "action": "docker_build",
+            "blast_radius": "local",
+            "description": "Build Docker image for Python web service",
+            "id": "build_image",
+            "parallel_group": null,
+            "preconditions": [
+              {
+                "description": "Dockerfile exists",
+                "established_by": "check_dockerfile",
+                "fact": "dockerfile_exists",
+                "probe": null
+              }
+            ],
+            "risk_class": "medium",
+            "rollback": null,
+            "target": "my-python-web:latest",
+            "verification": {
+              "expected": "my-python-web:latest present",
+              "how": "docker images output",
+              "what": "image built successfully"
+            }
+          },
+          {
+            "action": "docker_push",
+            "blast_radius": "registry",
+            "description": "Push Docker image to registry",
+            "id": "push_image",
+            "parallel_group": null,
+            "preconditions": [
+              {
+                "description": "Image exists locally",
+                "established_by": "build_image",
+                "fact": "image_built",
+                "probe": null
+              }
+            ],
+            "risk_class": "medium",
+            "rollback": null,
+            "target": "registry.example.com/my-python-web:latest",
+            "verification": {
+              "expected": "success",
+              "how": "docker manifest inspect",
+              "what": "image pushed"
+            }
+          },
+          {
+            "action": "kubectl_version",
+            "blast_radius": "local",
+            "description": "Verify kubectl is configured and accessible",
+            "id": "check_kubectl_config",
+            "parallel_group": null,
+            "preconditions": [],
+            "risk_class": "low",
+            "rollback": null,
+            "target": "client",
+            "verification": {
+              "expected": "success",
+              "how": "kubectl version --client",
+              "what": "kubectl version"
+            }
+          },
+          {
+            "action": "kubectl_cluster_info",
+            "blast_radius": "staging",
+            "description": "Verify Kubernetes cluster is accessible",
+            "id": "check_cluster",
+            "parallel_group": null,
+            "preconditions": [
+              {
+                "description": "kubectl is configured",
+                "established_by": "check_kubectl_config",
+                "fact": "kubectl_configured",
+                "probe": null
+              }
+            ],
+            "risk_class": "low",
+            "rollback": null,
+            "target": "staging-cluster",
+            "verification": {
+              "expected": "success",
+              "how": "kubectl cluster-info",
+              "what": "cluster info"
+            }
+          },
+          {
+            "action": "kubectl_set_image",
+            "blast_radius": "staging",
+            "description": "Deploy the new image to staging environment using kubectl",
+            "id": "deploy_to_staging",
+            "parallel_group": null,
+            "preconditions": [
+              {
+                "description": "Image exists in registry",
+                "established_by": "push_image",
+                "fact": "image_in_registry",
+                "probe": null
+              },
+              {
+                "description": "Kubernetes cluster is accessible",
+                "established_by": "check_cluster",
+                "fact": "cluster_accessible",
+                "probe": null
+              }
+            ],
+            "risk_class": "high",
+            "rollback": {
+              "action": "kubectl rollout undo deployment/my-web-service",
+              "safety_guard": "verify previous deployment is healthy",
+              "trigger": "deployment fails or health check fails"
+            },
+            "target": "deployment/my-web-service",
+            "verification": {
+              "expected": "success",
+              "how": "kubectl rollout status deployment/my-web-service",
+              "what": "deployment rollout status"
+            }
+          },
+          {
+            "action": "http_get",
+            "blast_radius": "staging",
+            "description": "Perform health check on the deployed service",
+            "id": "health_check",
+            "parallel_group": null,
+            "preconditions": [
+              {
+                "description": "Deployment is ready",
+                "established_by": "deploy_to_staging",
+                "fact": "deployment_ready",
+                "probe": null
+              }
+            ],
+            "risk_class": "low",
+            "rollback": null,
+            "target": "http://staging.my-web-service/health",
+            "verification": {
+              "expected": "200 OK",
+              "how": "curl -f",
+              "what": "HTTP response"
+            }
+          }
+        ],
+        "version": 3
+      },
+      "reason_code": "revision_cap_reached",
+      "status": "escalated"
+    },
+    "status": 200
+  },
+  "timestamp": "20260819T225241"
+}

@@ -9,6 +9,7 @@ models so no paid provider is ever hit on the default path.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 
 import httpx
@@ -21,7 +22,10 @@ from .base import (
     ToolSchema,
 )
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_TIMEOUT_S = 180.0
+DEFAULT_MAX_TOKENS = 16384
 
 
 class OpenAICompatibleProvider:
@@ -33,6 +37,7 @@ class OpenAICompatibleProvider:
         model: Model name to request.
         api_key: Optional bearer key for paid/authenticated endpoints.
         timeout: Per-request timeout in seconds.
+        max_tokens: Max response tokens (default 16384; env: ``PC_MAX_TOKENS``).
         client: Optional ``httpx.Client`` (tests inject a ``MockTransport``).
     """
 
@@ -44,14 +49,24 @@ class OpenAICompatibleProvider:
         model: str,
         api_key: str | None = None,
         timeout: float = DEFAULT_TIMEOUT_S,
+        max_tokens: int | None = None,
         client: httpx.Client | None = None,
     ) -> None:
         """Configure the transport."""
+        import os
+
         self.name = name
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.api_key = api_key
         self._timeout = timeout
+        if max_tokens is not None:
+            self._max_tokens = max_tokens
+        else:
+            try:
+                self._max_tokens = int(os.environ.get("PC_MAX_TOKENS", str(DEFAULT_MAX_TOKENS)))
+            except ValueError:
+                self._max_tokens = DEFAULT_MAX_TOKENS
         self._client = client if client is not None else httpx.Client()
 
     def complete(
@@ -80,7 +95,7 @@ class OpenAICompatibleProvider:
             "model": self.model,
             "messages": [m.model_dump() for m in messages],
             "response_format": {"type": "json_object"},
-            "max_tokens": 4096,
+            "max_tokens": self._max_tokens,
             "chat_template_kwargs": {"enable_thinking": False},
         }
         if tool_schemas:
@@ -96,6 +111,12 @@ class OpenAICompatibleProvider:
                 for t in tool_schemas
             ]
 
+        logger.info(
+            "provider '%s' POST chat/completions — model=%s tokens=%d",
+            self.name,
+            self.model,
+            self._max_tokens,
+        )
         try:
             resp = self._client.post(
                 f"{self.base_url}/chat/completions",
@@ -104,13 +125,22 @@ class OpenAICompatibleProvider:
                 timeout=self._timeout,
             )
         except httpx.TimeoutException as err:
+            logger.error("provider '%s' timed out after %ss", self.name, self._timeout)
             raise ProviderTimeout(
                 f"provider '{self.name}' timed out after {self._timeout}s"
             ) from err
         except httpx.HTTPError as err:
+            logger.error("provider '%s' transport error: %s", self.name, err)
             raise ProviderTimeout(f"provider '{self.name}' transport error: {err}") from err
 
         if resp.status_code >= 400:
+            logger.error(
+                "provider '%s' HTTP %d — model=%s body=%s",
+                self.name,
+                resp.status_code,
+                self.model,
+                resp.text[:500],
+            )
             raise ProviderTimeout(
                 f"provider '{self.name}' returned HTTP {resp.status_code}: {resp.text[:200]}"
             )
@@ -120,9 +150,23 @@ class OpenAICompatibleProvider:
             content = data["choices"][0]["message"]["content"]
             finish_reason = data["choices"][0].get("finish_reason", "stop")
         except (KeyError, IndexError, ValueError) as err:
+            logger.error(
+                "provider '%s' malformed response — model=%s raw=%s",
+                self.name,
+                self.model,
+                resp.text[:1000],
+            )
             raise BadJSONError(
                 f"provider '{self.name}' returned malformed response shape"
             ) from err
+
+        logger.info(
+            "provider '%s' completed — model=%s finish=%s content_len=%d",
+            self.name,
+            self.model,
+            finish_reason,
+            len(content),
+        )
 
         if not isinstance(content, str):
             raise BadJSONError(
