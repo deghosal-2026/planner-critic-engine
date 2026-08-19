@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from importlib.resources import files
 from pathlib import Path
 
 DEFAULT_CONFIG = """# PlannerCritic provider registry
@@ -15,6 +16,15 @@ transport = "openai-compatible"
 base_url = "http://localhost:11434/v1"
 model = "llama3.2"
 """
+
+#: The packaged demo goal (D11 §7) so ``init`` → ``plan`` works immediately.
+_PACKAGED_GOAL_NAME = "migration.json"
+
+
+def _packaged_goal_text() -> str:
+    """Read the packaged demo goal bundled inside the wheel."""
+    resource = files("planner_critic.demo").joinpath("data", _PACKAGED_GOAL_NAME)
+    return resource.read_text(encoding="utf-8")
 
 
 def build_init_parser() -> argparse.ArgumentParser:
@@ -43,6 +53,7 @@ def run_init(argv: list[str]) -> int:
     plancritic_dir = target / ".plancritic"
     config_path = target / "plancritic.toml"
     db_path = plancritic_dir / "plans.db"
+    goal_path = plancritic_dir / "goal.json"
 
     if config_path.exists() and not args.force:
         print(f"plancritic.toml already exists at {config_path}; use --force to overwrite")
@@ -51,10 +62,13 @@ def run_init(argv: list[str]) -> int:
     plancritic_dir.mkdir(parents=True, exist_ok=True)
     config_path.write_text(DEFAULT_CONFIG)
     db_path.write_text("")
+    goal_path.write_text(_packaged_goal_text())
 
     print(f"Initialized PlannerCritic project in {target}")
     print(f"  Config: {config_path}")
     print(f"  Store:  {db_path}")
+    print(f"  Example goal: {goal_path}")
+    print(f"Run: plancritic plan {goal_path}")
     return 0
 
 

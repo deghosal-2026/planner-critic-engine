@@ -26,10 +26,10 @@
 
 | # | Task | Build (files) | Behavior + edge cases | Feature | Verify | Status |
 |---|------|---------------|----------------------|---------|--------|--------|
-| 1 | Sample corpus | Create `examples/goals/` (migration.yaml, rollout.yaml, refactor.yaml, incident.yaml, adversarial.yaml) | 4 seeded-flaw goals + 1 adversarial; each valid against Goal schema; each seeded flaw documented in the file as a comment | F-65 | all parse; seeded flaws documented | [#55](https://github.com/deghosal-2026/planner-critic-engine/issues/55) · - [ ] |
-| 2 | Demo runner | Create `examples/demo-runner/` (main.py or script) | stub executor; plan→approve→re-gate (seeded precondition drift from an EnvProbe) → replan (patch) → complete; prints narrative | F-86 | demo script reproduces full loop; replan visible | [#56](https://github.com/deghosal-2026/planner-critic-engine/issues/56) · - [ ] |
-| 3 | Demo as init example | Modify `planner_critic/cli/init.py` to reference demo corpus goal | `init` points the example goal at a corpus goal so `plancritic plan` works immediately after `init` | F-85, F-86 | `init` → `plan` → first result without extra config | [#57](https://github.com/deghosal-2026/planner-critic-engine/issues/57) · - [ ] |
-| 4 | Replay + graph in demo | Demonstration script uses `replay --step` and `--graph` in its output | The demo narrative shows the catch *watchable*, not just reported — replay trace + DAG rendered inline | F-76, F-75 | demo output includes replay steps + Mermaid | [#58](https://github.com/deghosal-2026/planner-critic-engine/issues/58) · - [ ] |
+| 1 | Sample corpus | Create `examples/goals/` (migration.yaml, rollout.yaml, refactor.yaml, incident.yaml, adversarial.yaml) | 4 seeded-flaw goals + 1 adversarial; each valid against Goal schema; each seeded flaw documented in the file as a comment | F-65 | all parse; seeded flaws documented | [#55](https://github.com/deghosal-2026/planner-critic-engine/issues/55) · - [x] |
+| 2 | Demo runner | Create `examples/demo-runner/` (main.py or script) | stub executor; plan→approve→re-gate (seeded precondition drift from an EnvProbe) → replan (patch) → complete; prints narrative | F-86 | demo script reproduces full loop; replan visible | [#56](https://github.com/deghosal-2026/planner-critic-engine/issues/56) · - [x] |
+| 3 | Demo as init example | Modify `planner_critic/cli/init.py` to reference demo corpus goal | `init` points the example goal at a corpus goal so `plancritic plan` works immediately after `init` | F-85, F-86 | `init` → `plan` → first result without extra config | [#57](https://github.com/deghosal-2026/planner-critic-engine/issues/57) · - [x] |
+| 4 | Replay + graph in demo | Demonstration script uses `replay --step` and `--graph` in its output | The demo narrative shows the catch *watchable*, not just reported — replay trace + DAG rendered inline | F-76, F-75 | demo output includes replay steps + Mermaid | [#58](https://github.com/deghosal-2026/planner-critic-engine/issues/58) · - [x] |
 
 ### M7 Success Metrics
 
@@ -45,10 +45,10 @@
 
 - [ ] Code review passed (demo script review now, corpus YAML validation review)
 - [ ] Coverage > 95% maintained
-- [ ] Lint clean (ruff + mypy strict)
-- [ ] Comments + docstrings in all code (demo script well-documented)
-- [ ] `plannercritic-demo` runs plan→approve→re-gate→replan→complete end-to-end
+- [x] Lint clean (ruff + mypy strict)
+- [x] Comments + docstrings in all code (demo script well-documented)
+- [x] `plannercritic-demo` runs plan→approve→re-gate→replan→complete end-to-end
 - [ ] `init` example goal → `plan` gives immediate first approved plan
-- [ ] **Design doc authored:** D11 (demo scenario)
+- [x] **Design doc authored:** D11 (demo scenario)
 
 **Dependency:** M5 (six adapters — demo re-gate needs re-gate, runner uses adapter) + M6 (CLI init + plan). **Produces for M8/M9/M10:** corpus fixtures, demo runner, init-example linkage.
