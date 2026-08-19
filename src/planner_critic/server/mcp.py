@@ -20,74 +20,16 @@ import json
 import sys
 from typing import Any
 
-from ..critique.critic import LLMCritic
+from ..critique.critic import LLMCritic  # noqa: F401  (re-exported for callers)
 from ..engine import Engine
 from ..gates import run_deterministic_gates
-from ..llm.base import LLMProvider, Message
 from ..llm.registry import ProviderRegistry
-from ..llm.structured import StructuredEnforcer
 from ..loop import LoopConfig
 from ..roles import CriticRole, PlannerRole
 from ..schema.goal import Goal
 from ..schema.plan import PlanVersion
-from ..types import Finding, PlanningError
+from ..types import PlanningError
 from . import mcp_tools_escalate as esc
-
-_PLANNER_SYSTEM_PROMPT = (
-    "You are a task planner. Given a goal, produce a typed plan with tasks, "
-    "dependencies, and branches. Return a valid PlanVersion JSON object "
-    "matching the schema exactly."
-)
-
-
-class ProviderPlanner:
-    """A :class:`PlannerRole` backed by an LLM provider via structured output.
-
-    Args:
-        provider: The LLM transport to call.
-    """
-
-    def __init__(self, provider: LLMProvider) -> None:
-        self.provider = provider
-        self._enforcer = StructuredEnforcer(provider)
-
-    def decompose(self, goal: Goal) -> PlanVersion:
-        """Decompose a goal into a first-draft plan.
-
-        Args:
-            goal: The typed planning request.
-
-        Returns:
-            A plan version (revision 1).
-        """
-        messages = [
-            Message(role="system", content=_PLANNER_SYSTEM_PROMPT),
-            Message(role="user", content=goal.model_dump_json()),
-        ]
-        return self._enforcer.complete(messages, PlanVersion)
-
-    def revise(self, plan: PlanVersion, findings: list[Finding]) -> PlanVersion:
-        """Revise a plan in response to critique findings.
-
-        Args:
-            plan: The previous plan version.
-            findings: Findings to address.
-
-        Returns:
-            A new plan revision.
-        """
-        messages = [
-            Message(role="system", content=_PLANNER_SYSTEM_PROMPT),
-            Message(
-                role="user",
-                content=(
-                    "Revise this plan to address the findings:\n\n"
-                    f"PLAN:\n{plan.model_dump_json()}\n\n"
-                    f"FINDINGS:\n{json.dumps([f.model_dump(mode='json') for f in findings])}"
-                ),
-            ),
-        ]
-        return self._enforcer.complete(messages, PlanVersion)
 
 
 def _goal_from_json(goal_json: str) -> Goal:
@@ -390,11 +332,9 @@ class PlannerCriticMCPServer:
             raise PlanningError("no providers configured (llm_config_path not provided)")
 
         registry = ProviderRegistry.load(self.llm_config_path)
-        planner_provider = registry.get_provider("planner")
-        critic_provider = registry.get_provider("critic")
+        from ..cli.plan import _build_roles
 
-        planner = ProviderPlanner(planner_provider)
-        critic = LLMCritic(goal, critic_provider)
+        planner, critic = _build_roles(registry, goal)
 
         self._planner = planner
         self._critic = critic
@@ -456,6 +396,5 @@ def create_server(
 
 __all__ = [
     "PlannerCriticMCPServer",
-    "ProviderPlanner",
     "create_server",
 ]

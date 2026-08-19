@@ -243,15 +243,22 @@ class TestPlanningErrors:
         assert "provider down" in str(exc_info.value)
 
     def test_critic_failure_fails_closed(self) -> None:
-        """A critic that throws cannot silently approve a plan."""
+        """A critic that throws cannot silently approve a gate-dirty plan.
+
+        The critic failure degrades to gates-only findings (the free, immune
+        layer) rather than killing the loop, but a gate-blocking plan still
+        escalates — the deterministic gates remain the fail-closed floor.
+        """
 
         class BadCritic:
             def audit(self, plan: PlanVersion, findings: list[Finding]) -> list[Finding]:
                 raise RuntimeError("critic blew up")
 
-        with pytest.raises(PlanningError) as exc_info:
-            run_loop(make_goal(), ScriptedPlanner([_clean_plan()]), BadCritic())
-        assert "critic blew up" in str(exc_info.value)
+        goal = make_goal()
+        planner = ScriptedPlanner([_dirty_plan()])
+        result = run_loop(goal, planner, BadCritic())  # type: ignore[arg-type]
+        assert not result.is_approved
+        assert result.status == "escalated"
 
     def test_planner_returns_non_planversion_fails_closed(self) -> None:
         """A decompose that emits garbage must fail closed."""

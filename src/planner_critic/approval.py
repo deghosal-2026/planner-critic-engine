@@ -67,15 +67,26 @@ def resolve_threshold(
         acknowledgment under ``strict``; ``outcome.blockers`` are always
         disqualifying.
 
-    A deterministic gate blocker (from :mod:`planner_critic.gates`) can
-    never be overridden here — injection-safety (§2.4).
+    **Deterministic vs LLM blockers (§2.5.1):** a deterministic gate blocker
+    (from :mod:`planner_critic.gates`) is always a hard blocker under both
+    ``strict`` and ``balanced`` — it is reproducible and injection-immune.
+    An LLM critic blocker is probabilistic: under ``balanced`` it is treated
+    as a warning (acknowledged, not disqualifying) so the loop can converge
+    despite LLM non-determinism; under ``strict`` it remains a blocker
+    (fail-closed for high-risk goals). A deterministic gate blocker can
+    never be overridden here regardless of mode.
     """
-    blockers = [f for f in findings if f.severity is Severity.BLOCKER]
-
+    blockers: list[Finding] = []
     acknowledged: list[Finding] = []
     pending: list[Finding] = []
+
     for f in findings:
-        if f.severity is Severity.WARNING:
+        if f.severity is Severity.BLOCKER:
+            if f.is_llm_finding and risk_tolerance is RiskTolerance.BALANCED:
+                acknowledged.append(f)
+            else:
+                blockers.append(f)
+        elif f.severity is Severity.WARNING:
             if risk_tolerance is RiskTolerance.STRICT:
                 pending.append(f)
             else:

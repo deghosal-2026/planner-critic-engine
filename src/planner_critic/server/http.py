@@ -14,12 +14,15 @@ from typing import Any, ClassVar, cast
 from ..engine import Engine
 from ..escalation import EscalationManager
 from ..explain import explain as build_explain
+from ..gates import run_deterministic_gates
 from ..llm.registry import ProviderRegistry
 from ..loop import LoopConfig
+from ..roles import PlannerRole
 from ..schema.goal import Goal
 from ..schema.plan import PlanVersion
 from ..store.base import PlanStore
 from ..store.sqlite import SQLiteStore
+from ..types import Finding
 from ..viz.graph import to_mermaid
 
 
@@ -36,6 +39,12 @@ class PlannerCriticHTTPServer:
         self._config_path = config_path
         self._store: PlanStore | None = None
         self._engine: Engine | None = None
+        # Caching for provider-backed builds: the planner, registry, and loop
+        # config are goal-agnostic, so they are reused across requests. Only
+        # the goal-bound critic is rebuilt per request.
+        self._planner: PlannerRole | None = None
+        self._registry: ProviderRegistry | None = None
+        self._loop_config: LoopConfig | None = None
 
     # ---- Store lifecycle ---------------------------------------------------
 
@@ -55,6 +64,10 @@ class PlannerCriticHTTPServer:
         planner/critic loop. Falls back to self._engine if explicitly set via
         :meth:`set_engine` (hermetic tests). Loop config is read from PC_*
         env vars so the container can tune revision cap and critique mode.
+
+        The goal-agnostic planner, registry, and loop config are cached so
+        repeated requests reuse the same LLM transport (and its httpx
+        connection pool). Only the goal-bound critic is rebuilt per request.
         """
         if self._engine is not None:
             return self._engine
@@ -63,11 +76,18 @@ class PlannerCriticHTTPServer:
                 "no engine configured and no provider config given "
                 "(call set_engine() or pass config_path)"
             )
-        from ..cli.plan import _build_roles
+        if self._registry is None:
+            self._registry = ProviderRegistry.load(self._config_path)
+        if self._loop_config is None:
+            self._loop_config = LoopConfig.from_env()
+        from ..cli.plan import _CLIPlanner
+        from ..critique.critic import LLMCritic
 
-        registry = ProviderRegistry.load(self._config_path)
-        planner, critic = _build_roles(registry, goal)
-        return Engine(planner, critic, config=LoopConfig.from_env())
+        if self._planner is None:
+            self._planner = _CLIPlanner(self._registry.get_provider("planner"))
+        planner = self._planner
+        critic = LLMCritic(goal, self._registry.get_provider("critic"))
+        return Engine(planner, critic, config=self._loop_config)
 
     def close(self) -> None:
         if self._store is not None:
@@ -165,21 +185,26 @@ class PlannerCriticHTTPServer:
     # ---- Handler: POST /critique --------------------------------------------
 
     def _handle_critique_plan(self, body: dict[str, Any]) -> dict[str, Any]:
-        plan = PlanVersion.model_validate(body)
-        try:
-            engine = self._build_engine(Goal(id=plan.goal_id, description="plan critique"))
-        except Exception as exc:
-            return {"status": 501, "error": str(exc)}
-        findings = engine.critic.audit(plan, [])
+        plan = PlanVersion.model_validate(body.get("plan", body))
+        goal_data = body.get("goal")
+        gate_findings = run_deterministic_gates(plan)
+        critic_findings: list[Finding] = list(gate_findings)
+        if goal_data is not None:
+            try:
+                goal = Goal.model_validate(goal_data)
+                engine = self._build_engine(goal)
+                critic_findings = engine.critic.audit(plan, list(gate_findings))
+            except Exception as exc:
+                return {"status": 501, "error": str(exc)}
         store = self.store
         store.put_plan_version(plan)
-        store.put_findings(plan.id, plan.version, findings)
+        store.put_findings(plan.id, plan.version, critic_findings)
         return {
             "status": 200,
             "data": {
                 "plan_id": plan.id,
                 "version": plan.version,
-                "findings": [f.model_dump(mode="json") for f in findings],
+                "findings": [f.model_dump(mode="json") for f in critic_findings],
             },
         }
 

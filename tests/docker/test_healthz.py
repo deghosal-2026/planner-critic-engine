@@ -79,8 +79,9 @@ def test_bootstrap_config_writes_toml(tmp_path: Path) -> None:
 
     config = tmp_path / "plancritic.toml"
     env = {
-        "PC_OMLX_BASE_URL": "http://127.0.0.1:8000/v1",
-        "PC_OMLX_MODEL": "test-model",
+        "PC_OPENAI_BASE_URL": "http://127.0.0.1:8000/v1",
+        "PC_OPENAI_MODEL": "test-model",
+        "PC_OPENAI_API_KEY": "test-key",
         "PC_CONFIG": str(config),
     }
     old = {k: os.environ.pop(k, None) for k in env}
@@ -99,3 +100,5 @@ def test_bootstrap_config_writes_toml(tmp_path: Path) -> None:
     registry = ProviderRegistry.load(config)
     assert registry.roles == {"planner": "local", "critic": "local"}
     assert registry.providers["local"].base_url == "http://127.0.0.1:8000/v1"
+    assert registry.providers["local"].model == "test-model"
+    assert registry.providers["local"].api_key == "test-key"

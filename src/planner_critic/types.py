@@ -79,6 +79,18 @@ class Finding(BaseModel):
         """Log-friendly one-line rendering."""
         return f"[{self.severity.value}] {self.reason_code}: {self.message}"
 
+    @property
+    def is_llm_finding(self) -> bool:
+        """True when this finding came from the LLM critic (not a gate).
+
+        LLM findings carry a :class:`HeuristicFamily`; deterministic gate
+        findings do not. This discriminator lets the loop apply different
+        termination rules: gate blockers are hard (deterministic,
+        reproducible); LLM blockers are advisory (probabilistic, may vary
+        across audits of the same plan).
+        """
+        return self.heuristic_family is not None
+
 
 class Escalation(BaseModel):
     """A minimal, precise question to a human when the loop cannot converge."""

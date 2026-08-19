@@ -15,7 +15,7 @@ from typing import TypeVar, cast
 from pydantic import BaseModel
 
 from ..types import PlanningError
-from .base import BadJSONError, LLMProvider, Message
+from .base import BadJSONError, LLMProvider, Message, ProviderError
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -54,7 +54,11 @@ class StructuredEnforcer:
         """
         last_error: Exception | None = None
         for _ in range(self.max_retries + 1):
-            completion = self.provider.complete(messages)
+            try:
+                completion = self.provider.complete(messages)
+            except ProviderError as err:
+                last_error = err
+                continue
             try:
                 parsed = _parse_json(completion.content)
             except BadJSONError as err:

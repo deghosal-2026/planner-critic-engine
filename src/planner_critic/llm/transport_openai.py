@@ -39,6 +39,10 @@ class OpenAICompatibleProvider:
         timeout: Per-request timeout in seconds.
         max_tokens: Max response tokens (default 16384; env: ``PC_MAX_TOKENS``).
         client: Optional ``httpx.Client`` (tests inject a ``MockTransport``).
+        extra_payload: Optional dict of provider-specific extras merged into
+            the chat-completions payload (e.g. vLLM's ``chat_template_kwargs``).
+            Default: ``{}`` (strict OpenAI-compatible). Use ``enable_thinking``
+            on the provider spec to enable vLLM thinking suppression.
     """
 
     def __init__(
@@ -51,6 +55,7 @@ class OpenAICompatibleProvider:
         timeout: float = DEFAULT_TIMEOUT_S,
         max_tokens: int | None = None,
         client: httpx.Client | None = None,
+        extra_payload: dict[str, object] | None = None,
     ) -> None:
         """Configure the transport."""
         import os
@@ -68,6 +73,7 @@ class OpenAICompatibleProvider:
             except ValueError:
                 self._max_tokens = DEFAULT_MAX_TOKENS
         self._client = client if client is not None else httpx.Client()
+        self._extra_payload = extra_payload or {}
 
     def complete(
         self,
@@ -96,8 +102,8 @@ class OpenAICompatibleProvider:
             "messages": [m.model_dump() for m in messages],
             "response_format": {"type": "json_object"},
             "max_tokens": self._max_tokens,
-            "chat_template_kwargs": {"enable_thinking": False},
         }
+        payload.update(self._extra_payload)
         if tool_schemas:
             payload["tools"] = [
                 {
@@ -160,6 +166,11 @@ class OpenAICompatibleProvider:
                 f"provider '{self.name}' returned malformed response shape"
             ) from err
 
+        if not isinstance(content, str):
+            raise BadJSONError(
+                f"provider '{self.name}' returned non-string content"
+            )
+
         logger.info(
             "provider '%s' completed — model=%s finish=%s content_len=%d",
             self.name,
@@ -168,12 +179,8 @@ class OpenAICompatibleProvider:
             len(content),
         )
 
-        if not isinstance(content, str):
-            raise BadJSONError(
-                f"provider '{self.name}' returned non-string content"
-            )
         if finish_reason != "stop":
-            raise ProviderTimeout(
+            raise BadJSONError(
                 f"provider '{self.name}' returned truncated response "
                 f"(finish_reason={finish_reason})"
             )

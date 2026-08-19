@@ -69,21 +69,32 @@ class _CLIPlanner(PlannerRole):
         return self._enforcer.complete(messages, PlanVersion)
 
     def revise(self, plan: PlanVersion, findings: list[Finding]) -> PlanVersion:
+        blocker_findings = [f for f in findings if f.severity.value == "blocker"]
+        fix_lines = [
+            f"- [{f.severity.value}] task={f.task_id or 'plan'} "
+            f"reason={f.reason_code}: {f.message}"
+            + (f" FIX: {f.suggested_fix}" if f.suggested_fix else "")
+            for f in blocker_findings
+        ]
+        fix_summary = "\n".join(fix_lines) or "No blockers — address warnings if any."
         messages = [
             Message(
                 role="system",
                 content=(
                     _PLANNER_SYSTEM_PROMPT
-                    + " Revise the plan to address the critique findings. "
-                    "Keep version unchanged; the loop stamps it."
+                    + " Revise the plan to address the critique findings listed below. "
+                    "Apply each FIX instruction. Resolve blockers first; warnings second. "
+                    "Keep version unchanged; the loop stamps it. "
+                    "Do NOT introduce new tasks that re-create the same blocker reasons."
                 ),
             ),
             Message(
                 role="user",
                 content=(
                     f"PLAN:\n{plan.model_dump(mode='json')}\n\n"
-                    + f"FINDINGS:\n{json.dumps([f.model_dump(mode='json') for f in findings])}\n\n"
-                    + "Produce the revised PlanVersion JSON now."
+                    f"FINDINGS:\n{json.dumps([f.model_dump(mode='json') for f in findings])}\n\n"
+                    f"BLOCKERS TO FIX (in order):\n{fix_summary}\n\n"
+                    "Produce the revised PlanVersion JSON now."
                 ),
             ),
         ]

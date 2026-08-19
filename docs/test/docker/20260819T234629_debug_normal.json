@@ -1,0 +1,147 @@
+{
+  "label": "normal",
+  "request": {
+    "goal": {
+      "constraints": {
+        "budget": {
+          "max_revisions": 5
+        },
+        "environment": "staging",
+        "tools": [
+          "docker",
+          "kubectl"
+        ]
+      },
+      "description": "Deploy a Python web service to a staging environment with a health check",
+      "id": "quickstart",
+      "replan_policy": "patch",
+      "risk_tolerance": "balanced"
+    }
+  },
+  "response": {
+    "data": {
+      "escalation": null,
+      "findings": [
+        {
+          "heuristic_family": "missing_steps",
+          "id": "crit:1:missing_steps:setup_health_check",
+          "message": "Health check configuration may need to verify if the health check itself is functioning properly.",
+          "reason_code": "llm_missing_steps",
+          "severity": "warning",
+          "suggested_fix": "Add verification step to ensure health check is set up correctly.",
+          "task_id": "setup_health_check",
+          "version": 1
+        },
+        {
+          "heuristic_family": "unsafe_sequencing",
+          "id": "crit:1:unsafe_sequencing:deploy_service",
+          "message": "Deploying the service should not proceed until the health check is fully configured and verified.",
+          "reason_code": "llm_unsafe_sequencing",
+          "severity": "warning",
+          "suggested_fix": "Ensure 'setup_health_check' is completed before 'deploy_service'.",
+          "task_id": "deploy_service",
+          "version": 1
+        },
+        {
+          "heuristic_family": "unverified_dependencies",
+          "id": "crit:1:unverified_dependencies:deploy_service",
+          "message": "Deployment relies on successful image push but lacks verification for the successful push before deployment.",
+          "reason_code": "llm_unverified_dependencies",
+          "severity": "warning",
+          "suggested_fix": "Add a verification step to confirm 'push_image' completed successfully before triggering 'deploy_service'.",
+          "task_id": "deploy_service",
+          "version": 1
+        },
+        {
+          "heuristic_family": "weak_rollback",
+          "id": "crit:1:weak_rollback:deploy_service",
+          "message": "Rollback procedure may not adequately handle failure states during deployment.",
+          "reason_code": "llm_weak_rollback",
+          "severity": "warning",
+          "suggested_fix": "Enhance rollback plan to cover scenarios where the application fails to respond post-deployment.",
+          "task_id": "deploy_service",
+          "version": 1
+        }
+      ],
+      "plan": {
+        "branches": [],
+        "created_at": "2026-08-19T23:46:26.716567Z",
+        "dependencies": [
+          {
+            "from_task": "push_image",
+            "kind": "hard",
+            "reason": "",
+            "to_task": "deploy_service"
+          }
+        ],
+        "goal_id": "quickstart",
+        "id": "plan-quickstart",
+        "parent_version": null,
+        "plan_schema_version": "0.1.0",
+        "tasks": [
+          {
+            "action": "build",
+            "blast_radius": "medium",
+            "description": "Build the Docker image for the web service",
+            "id": "build_image",
+            "parallel_group": null,
+            "preconditions": [],
+            "risk_class": "medium",
+            "rollback": null,
+            "target": "docker_image",
+            "verification": null
+          },
+          {
+            "action": "push",
+            "blast_radius": "medium",
+            "description": "Push the Docker image to the registry",
+            "id": "push_image",
+            "parallel_group": null,
+            "preconditions": [],
+            "risk_class": "medium",
+            "rollback": null,
+            "target": "docker_registry",
+            "verification": null
+          },
+          {
+            "action": "deploy",
+            "blast_radius": "medium",
+            "description": "Deploy the web service using kubectl",
+            "id": "deploy_service",
+            "parallel_group": null,
+            "preconditions": [],
+            "risk_class": "high",
+            "rollback": {
+              "action": "rollback deployment",
+              "safety_guard": "ensure previous version is running",
+              "trigger": "deployment fails"
+            },
+            "target": "staging_environment",
+            "verification": {
+              "expected": "healthy response",
+              "how": "run health check",
+              "what": "service health"
+            }
+          },
+          {
+            "action": "configure",
+            "blast_radius": "medium",
+            "description": "Set up health check for the deployed service",
+            "id": "setup_health_check",
+            "parallel_group": null,
+            "preconditions": [],
+            "risk_class": "medium",
+            "rollback": null,
+            "target": "health_check",
+            "verification": null
+          }
+        ],
+        "version": 1
+      },
+      "reason_code": "approved",
+      "status": "approved"
+    },
+    "status": 200
+  },
+  "timestamp": "20260819T234629"
+}

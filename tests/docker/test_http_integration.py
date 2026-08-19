@@ -45,22 +45,23 @@ def test_plan_vs_mlx(client: httpx.Client) -> None:
 
 def test_critique_vs_mlx(client: httpx.Client) -> None:
     plan = _load("plan.json")
-    r = client.post("/critique", json={
+    r = client.post("/critique", json={"plan": {
         "id": plan["id"],
         "goal_id": plan["goal_id"],
         "version": plan["version"],
         "tasks": plan["tasks"],
         "dependencies": plan["dependencies"],
-    })
+    }})
     assert r.status_code == 200
     assert "findings" in r.json()["data"]
 
 
 def test_explain_and_graph(client: httpx.Client) -> None:
     r = client.post("/plan", json=_load("goal.json"))
-    plan = r.json().get("plan")
+    body = r.json()
+    plan = body.get("data", {}).get("plan") if body.get("status") == 200 else None
     if plan is None:
-        pytest.skip("no approved plan from MLX this run")
+        pytest.skip("no plan returned from this run")
     plan_id = plan["id"]
     ex = client.get(f"/plans/{plan_id}/explain")
     assert ex.status_code == 200

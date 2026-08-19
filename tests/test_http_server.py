@@ -190,11 +190,29 @@ def test_post_critique(server: PlannerCriticHTTPServer) -> None:
 
 
 def test_post_critique_no_engine(server: PlannerCriticHTTPServer) -> None:
-    """POST /critique without engine returns 501."""
+    """POST /critique without engine or goal runs gates-only and returns 200.
+
+    Without a goal the LLM critic cannot be bound, so the handler falls back
+    to the deterministic gates (the free, injection-immune layer). A
+    gate-clean plan returns 200 with empty findings.
+    """
     plan = make_plan()
-    resp = server.handle_request("POST", "/critique", plan.model_dump(mode="json"))
-    assert resp["status"] == 501
-    assert "no engine configured" in resp["error"]
+    resp = server.handle_request("POST", "/critique", {"plan": plan.model_dump(mode="json")})
+    assert resp["status"] == 200
+    assert resp["data"]["plan_id"] == "plan-1"
+    assert isinstance(resp["data"]["findings"], list)
+
+
+def test_post_critique_no_engine_gate_dirty(server: PlannerCriticHTTPServer) -> None:
+    """POST /critique without engine on a gate-dirty plan returns gate findings."""
+    dirty_plan = make_plan(tasks=[make_task("t1", risk_class="critical")])
+    resp = server.handle_request(
+        "POST", "/critique", {"plan": dirty_plan.model_dump(mode="json")}
+    )
+    assert resp["status"] == 200
+    findings = resp["data"]["findings"]
+    assert len(findings) > 0
+    assert all(not f.get("heuristic_family") for f in findings)  # gates only, no LLM
 
 
 def test_get_plan_diff(server: PlannerCriticHTTPServer) -> None:

@@ -17,7 +17,7 @@ from typing import cast
 
 from ..types import PlanningError
 from .base import LLMProvider
-from .transport_openai import OpenAICompatibleProvider
+from .transport_openai import DEFAULT_TIMEOUT_S, OpenAICompatibleProvider
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +50,14 @@ class ProviderSpec:
         base_url: Endpoint base URL (local endpoints override via this).
         model: Model name served at that endpoint.
         api_key: Optional API key; None means unauthenticated/local.
+        max_tokens: Optional max response tokens; None falls back to the
+            transport default (env: ``PC_MAX_TOKENS``, default 16384).
+        timeout_s: Optional per-request timeout in seconds; None uses the
+            transport default (180s).
+        suppress_thinking: When True, send vLLM's ``chat_template_kwargs``
+            with ``enable_thinking=False`` to suppress chain-of-thought on
+            Qwen-family models. Off by default (strict OpenAI-compatible);
+            only enable for vLLM/Ollama endpoints that accept this field.
     """
 
     name: str
@@ -57,6 +65,9 @@ class ProviderSpec:
     base_url: str
     model: str
     api_key: str | None = None
+    max_tokens: int | None = None
+    timeout_s: float | None = None
+    suppress_thinking: bool = False
 
 
 @dataclass
@@ -112,12 +123,24 @@ class ProviderRegistry:
                     continue
                 spec_dict = cast("dict[str, object]", spec)
                 api_key = spec_dict.get("api_key")
+                max_tokens_raw = spec_dict.get("max_tokens")
+                timeout_raw = spec_dict.get("timeout_s")
+                suppress_thinking_raw = spec_dict.get("suppress_thinking")
                 providers[name] = ProviderSpec(
                     name=name,
                     transport=str(spec_dict.get("transport", "openai-compatible")),
                     base_url=str(spec_dict.get("base_url", "")),
                     model=str(spec_dict.get("model", "")),
                     api_key=str(api_key) if isinstance(api_key, str) else None,
+                    max_tokens=(
+                        int(max_tokens_raw) if isinstance(max_tokens_raw, (int, float)) else None
+                    ),
+                    timeout_s=(
+                        float(timeout_raw) if isinstance(timeout_raw, (int, float)) else None
+                    ),
+                    suppress_thinking=bool(suppress_thinking_raw) if isinstance(
+                        suppress_thinking_raw, bool
+                    ) else False,
                 )
         raw_roles = data.get("roles")
         roles: dict[str, str] = {}
@@ -142,6 +165,9 @@ class ProviderRegistry:
         transport: str = "openai-compatible",
         api_key: str | None = None,
         role: str | None = None,
+        max_tokens: int | None = None,
+        timeout_s: float | None = None,
+        suppress_thinking: bool = False,
     ) -> None:
         """Add (or replace) a provider and optionally bind it to a role.
 
@@ -152,9 +178,21 @@ class ProviderRegistry:
             transport: Transport kind (default openai-compatible).
             api_key: Optional API key.
             role: Optional role to bind (planner/critic).
+            max_tokens: Optional max response tokens override.
+            timeout_s: Optional per-request timeout in seconds.
+            suppress_thinking: When True, send vLLM's thinking-suppression
+                kwargs (Qwen-family models). Off by default for strict
+                OpenAI-compatible endpoints.
         """
         self.providers[name] = ProviderSpec(
-            name=name, transport=transport, base_url=base_url, model=model, api_key=api_key
+            name=name,
+            transport=transport,
+            base_url=base_url,
+            model=model,
+            api_key=api_key,
+            max_tokens=max_tokens,
+            timeout_s=timeout_s,
+            suppress_thinking=suppress_thinking,
         )
         if role is not None:
             self.roles[role] = name
@@ -226,9 +264,15 @@ class ProviderRegistry:
             raise PlanningError(
                 f"unsupported transport '{spec.transport}' for provider '{provider_name}'"
             )
+        extra_payload: dict[str, object] = {}
+        if spec.suppress_thinking:
+            extra_payload["chat_template_kwargs"] = {"enable_thinking": False}
         return OpenAICompatibleProvider(
             name=spec.name,
             base_url=spec.base_url,
             model=spec.model,
             api_key=spec.api_key,
+            max_tokens=spec.max_tokens,
+            timeout=spec.timeout_s if spec.timeout_s is not None else DEFAULT_TIMEOUT_S,
+            extra_payload=extra_payload or None,
         )

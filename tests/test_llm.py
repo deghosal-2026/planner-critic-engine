@@ -510,7 +510,7 @@ def test_transport_non_string_content_is_bad_json() -> None:
 
 
 def test_transport_length_truncation_is_fail_closed() -> None:
-    """A truncated JSON-mode completion surfaces ProviderTimeout immediately."""
+    """A truncated JSON-mode completion surfaces BadJSONError (retriable by the enforcer)."""
 
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
@@ -525,5 +525,5 @@ def test_transport_length_truncation_is_fail_closed() -> None:
         model="m",
         client=httpx.Client(transport=httpx.MockTransport(handler)),
     )
-    with pytest.raises(ProviderTimeout):
+    with pytest.raises(BadJSONError):
         provider.complete([Message(role="user", content="hi")])
