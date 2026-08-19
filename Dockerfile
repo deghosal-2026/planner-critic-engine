@@ -13,7 +13,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 WORKDIR /opt/plancritic
 COPY --from=builder /build/dist/*.whl /tmp/
-RUN pip install --no-cache-dir "/tmp/planner_critic-0.1.0-py3-none-any.whl[server]" && rm -f /tmp/*.whl
+RUN pip install --no-cache-dir "/tmp/planner_critic-0.1.0-py3-none-any.whl[server]" && rm -f /tmp/*.whl \
+    && mkdir -p /data && chmod 777 /data
 USER nobody
 ENTRYPOINT ["plancritic"]
 CMD ["--version"]
