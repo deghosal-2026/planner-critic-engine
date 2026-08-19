@@ -1,0 +1,37 @@
+{
+  "id": "migrate-db",
+  "goal_id": "quickstart",
+  "version": 1,
+  "tasks": [
+    {
+      "id": "backup",
+      "description": "Full logical dump with --no-owner and verified restore checks",
+      "action": "backup",
+      "target": "billing-db",
+      "risk_class": "high",
+      "rollback": {"trigger": "backup incomplete", "action": "retry backup", "safety_guard": "verify dump size"},
+      "verification": {"what": "restore proof", "how": "restore dump to scratch instance", "expected": "row counts match"}
+    },
+    {
+      "id": "migrate",
+      "description": "pg_upgrade 14 to 16 in an offline maintenance window",
+      "action": "migrate",
+      "target": "billing-db",
+      "risk_class": "critical",
+      "rollback": {"trigger": "migration fails", "action": "restore from verified backup", "safety_guard": "verify backup integrity first"},
+      "verification": {"what": "server version + data integrity", "how": "SELECT version(); sample row checks", "expected": "16.x and row counts match"}
+    },
+    {
+      "id": "verify",
+      "description": "Route 5% of reads to the new instance and watch error rates",
+      "action": "verify",
+      "target": "billing-db",
+      "risk_class": "medium",
+      "verification": {"what": "error rate", "how": "observe metrics", "expected": "< 0.1%"}
+    }
+  ],
+  "dependencies": [
+    {"from_task": "backup", "to_task": "migrate", "kind": "hard"},
+    {"from_task": "migrate", "to_task": "verify", "kind": "hard"}
+  ]
+}
