@@ -121,4 +121,4 @@ The real-LLM loop is the containerized twin of the M9 #74–#76 field sweep.
 - [ ] CLI smoke + HTTP + MCP integration pass vs host MLX
 - [ ] Real-LLM loop passes in all three critique modes
 - [ ] CI workflow green (or documented opt-in)
-- [ ] D13 DD-11/DD-12 recorded
+- [ ] D13 DD-13/DD-14 recorded
