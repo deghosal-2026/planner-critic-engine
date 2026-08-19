@@ -282,50 +282,50 @@ def create_fastapi_app(store_path: str) -> Any | None:
         available.
     """
     try:
-        from fastapi import FastAPI  # type: ignore[import-not-found]
+        from fastapi import FastAPI
     except ImportError:
         return None
 
     server = PlannerCriticHTTPServer(store_path)
     app = FastAPI(title="PlannerCritic Engine", version="0.1.0")
 
-    @app.on_event("shutdown")  # type: ignore[untyped-decorator]
+    @app.on_event("shutdown")
     async def _shutdown() -> None:
         server.close()
 
-    @app.post("/plan")  # type: ignore[untyped-decorator]
+    @app.post("/plan")
     async def post_plan(body: dict[str, Any]) -> dict[str, Any]:
         return server.handle_request("POST", "/plan", body)
 
-    @app.post("/critique")  # type: ignore[untyped-decorator]
+    @app.post("/critique")
     async def post_critique(body: dict[str, Any]) -> dict[str, Any]:
         return server.handle_request("POST", "/critique", body)
 
-    @app.get("/plans")  # type: ignore[untyped-decorator]
+    @app.get("/plans")
     async def get_plans() -> dict[str, Any]:
         return server.handle_request("GET", "/plans")
 
-    @app.get("/plans/{plan_id}")  # type: ignore[untyped-decorator]
+    @app.get("/plans/{plan_id}")
     async def get_plan(plan_id: str) -> dict[str, Any]:
         return server.handle_request("GET", f"/plans/{plan_id}")
 
-    @app.get("/plans/{plan_id}/diff")  # type: ignore[untyped-decorator]
+    @app.get("/plans/{plan_id}/diff")
     async def get_plan_diff(plan_id: str, v2: int) -> dict[str, Any]:
         return server.handle_request("GET", f"/plans/{plan_id}/diff", {"v2": str(v2)})
 
-    @app.get("/plans/{plan_id}/graph")  # type: ignore[untyped-decorator]
+    @app.get("/plans/{plan_id}/graph")
     async def get_plan_graph(plan_id: str) -> dict[str, Any]:
         return server.handle_request("GET", f"/plans/{plan_id}/graph")
 
-    @app.get("/plans/{plan_id}/explain")  # type: ignore[untyped-decorator]
+    @app.get("/plans/{plan_id}/explain")
     async def get_plan_explain(plan_id: str) -> dict[str, Any]:
         return server.handle_request("GET", f"/plans/{plan_id}/explain")
 
-    @app.get("/escalations")  # type: ignore[untyped-decorator]
+    @app.get("/escalations")
     async def get_escalations() -> dict[str, Any]:
         return server.handle_request("GET", "/escalations")
 
-    @app.post("/escalations/{escalation_id}/approve")  # type: ignore[untyped-decorator]
+    @app.post("/escalations/{escalation_id}/approve")
     async def post_escalate_approve(
         escalation_id: str,
         body: dict[str, Any] | None = None,
@@ -334,7 +334,7 @@ def create_fastapi_app(store_path: str) -> Any | None:
             "POST", f"/escalations/{escalation_id}/approve", body or {}
         )
 
-    @app.post("/escalations/{escalation_id}/deny")  # type: ignore[untyped-decorator]
+    @app.post("/escalations/{escalation_id}/deny")
     async def post_escalate_deny(
         escalation_id: str,
         body: dict[str, Any] | None = None,
@@ -342,6 +342,10 @@ def create_fastapi_app(store_path: str) -> Any | None:
         return server.handle_request(
             "POST", f"/escalations/{escalation_id}/deny", body or {}
         )
+
+    @app.get("/healthz")
+    async def get_healthz() -> dict[str, str]:
+        return {"status": "ok"}
 
     return app
 

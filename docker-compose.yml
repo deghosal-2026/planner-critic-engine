@@ -1,0 +1,50 @@
+services:
+  engine-http:
+    build: .
+    image: planner-critic-engine:test
+    command: ["python", "-m", "planner_critic.server.http_serve"]
+    ports:
+      - "8080:8080"
+    environment:
+      PC_OMLX_BASE_URL: "http://host.docker.internal:8000/v1"
+      PC_OMLX_MODEL: "Qwen3.5-9B-MLX-4bit"
+      PC_STORE: "/data/plans.db"
+      PC_CONFIG: "/data/plancritic.toml"
+      PC_PORT: "8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - engine-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8080/healthz',timeout=3).status==200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  engine-mcp:
+    build: .
+    image: planner-critic-engine:test
+    command: ["python", "-m", "planner_critic.server.mcp_http_run"]
+    ports:
+      - "9090:9090"
+    environment:
+      PC_OMLX_BASE_URL: "http://host.docker.internal:8000/v1"
+      PC_OMLX_MODEL: "Qwen3.5-9B-MLX-4bit"
+      PC_STORE: "/data/plans.db"
+      PC_CONFIG: "/data/plancritic.toml"
+      PC_HOST: "0.0.0.0"
+      PC_PORT: "9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - engine-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:9090/healthz',timeout=3).status==200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  engine-data:
