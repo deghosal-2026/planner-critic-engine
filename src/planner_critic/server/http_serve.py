@@ -33,8 +33,9 @@ def main() -> None:
     from .http import create_fastapi_app
 
     store = os.environ.get("PC_STORE", DEFAULT_STORE)
+    config = os.environ.get("PC_CONFIG", DEFAULT_CONFIG)
     port = int(os.environ.get("PC_PORT", DEFAULT_PORT))
-    app = create_fastapi_app(store)
+    app = create_fastapi_app(store, config_path=config)
     if app is None:
         raise RuntimeError("fastapi extra not installed")
     uvicorn.run(app, host="0.0.0.0", port=port)  # noqa: S104 - container binding to all interfaces
