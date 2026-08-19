@@ -26,14 +26,14 @@ def test_init_creates_project_structure(tmp_path: Path) -> None:
 
 
 def test_init_writes_demo_goal(tmp_path: Path) -> None:
-    """init copies the packaged migration goal so plan works immediately (F-85/F-86)."""
+    """init copies the packaged quickstart goal so plan works immediately (F-85)."""
     rc = run_init(["--dir", str(tmp_path)])
     assert rc == 0
 
     goal_path = tmp_path / ".plancritic" / "goal.json"
     assert goal_path.is_file()
     goal = Goal.model_validate(json.loads(goal_path.read_text()))
-    assert goal.id == "demo-migration"
+    assert goal.id == "quickstart"
 
 
 def test_init_prints_plan_hint(tmp_path: Path, capsys) -> None:

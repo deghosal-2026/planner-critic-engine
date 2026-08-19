@@ -21,7 +21,7 @@ from .base import (
     ToolSchema,
 )
 
-DEFAULT_TIMEOUT_S = 60.0
+DEFAULT_TIMEOUT_S = 180.0
 
 
 class OpenAICompatibleProvider:
@@ -80,6 +80,8 @@ class OpenAICompatibleProvider:
             "model": self.model,
             "messages": [m.model_dump() for m in messages],
             "response_format": {"type": "json_object"},
+            "max_tokens": 4096,
+            "chat_template_kwargs": {"enable_thinking": False},
         }
         if tool_schemas:
             payload["tools"] = [
@@ -125,5 +127,10 @@ class OpenAICompatibleProvider:
         if not isinstance(content, str):
             raise BadJSONError(
                 f"provider '{self.name}' returned non-string content"
+            )
+        if finish_reason != "stop":
+            raise ProviderTimeout(
+                f"provider '{self.name}' returned truncated response "
+                f"(finish_reason={finish_reason})"
             )
         return Completion(content=content, finish_reason=str(finish_reason))

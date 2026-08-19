@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from planner_critic.cli.plan import build_plan_parser, run_plan
+from planner_critic.schema.goal import Goal
 
 
 def _make_goal_file(tmp_path: Path, **overrides: object) -> str:
@@ -25,7 +26,13 @@ def _make_goal_file(tmp_path: Path, **overrides: object) -> str:
 def _make_config(tmp_path: Path) -> str:
     config = tmp_path / "plancritic.toml"
     config.write_text(
-        "[roles]\nplanner = \"local\"\ncritic = \"local\"\n\n[providers.local]\ntransport = \"openai-compatible\"\nbase_url = \"http://localhost:11434/v1\"\nmodel = \"llama3.2\"\n"
+        "[roles]\n"
+        "planner = \"local\"\n"
+        "critic = \"local\"\n\n"
+        "[providers.local]\n"
+        "transport = \"openai-compatible\"\n"
+        "base_url = \"http://localhost:11434/v1\"\n"
+        "model = \"llama3.2\"\n"
     )
     return str(config)
 
@@ -50,7 +57,7 @@ def test_run_plan_invalid_json(tmp_path: Path) -> None:
     assert rc == 1
 
 
-def test_run_plan_no_providers(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+def test_run_plan_no_providers(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """Missing provider config returns exit code 1."""
     goal_file = _make_goal_file(tmp_path)
     config_file = tmp_path / "plancritic.toml"
@@ -76,7 +83,9 @@ def test_run_plan_dry_run_with_config(tmp_path: Path) -> None:
     assert rc in (0, 1)
 
 
-def test_run_plan_goal_validation_failure(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+def test_run_plan_goal_validation_failure(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """Invalid goal fields return exit code 1 (line 109-111)."""
     goal_file = tmp_path / "goal.json"
     goal_file.write_text(json.dumps({"id": 123}))  # wrong type for id
@@ -85,7 +94,9 @@ def test_run_plan_goal_validation_failure(tmp_path: Path, capsys: pytest.Capture
     assert "goal validation failed" in capsys.readouterr().out
 
 
-def test_run_plan_config_load_failure(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+def test_run_plan_config_load_failure(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """A config file with bad TOML returns exit code 1 (line 115-117)."""
     goal_file = _make_goal_file(tmp_path)
     config_file = tmp_path / "bad.toml"
@@ -93,3 +104,45 @@ def test_run_plan_config_load_failure(tmp_path: Path, capsys: pytest.CaptureFixt
     rc = run_plan([str(goal_file), "--config", str(config_file)])
     assert rc == 1
     assert "failed to load config" in capsys.readouterr().out
+
+
+def test_cli_planner_uses_no_think_and_structured_example_prompt() -> None:
+    """The real CLI planner prompt carries the no-think + schema-shape guidance."""
+    from planner_critic.cli.plan import _CLIPlanner
+    from planner_critic.llm.base import Completion, Message, ToolSchema
+    from planner_critic.schema.plan import PlanVersion
+
+    class CaptureProvider:
+        name = "fake"
+        base_url = "http://fake.local"
+        model = "fake-model"
+
+        def __init__(self) -> None:
+            self.messages: list[Message] = []
+
+        def complete(
+            self,
+            messages: list[Message],
+            tool_schemas: tuple[ToolSchema, ...] = (),
+        ) -> Completion:
+            self.messages = list(messages)
+            plan = PlanVersion(
+                id="p1",
+                goal_id="g1",
+                version=1,
+                tasks=[],
+                dependencies=[],
+                branches=[],
+            )
+            return Completion(content=json.dumps(plan.to_dict()), finish_reason="stop")
+
+    provider = CaptureProvider()
+    planner = _CLIPlanner(provider)  # type: ignore[arg-type]
+    goal = Goal.model_validate({"id": "g1", "description": "Ship a service"})
+
+    planner.decompose(goal)
+
+    assert provider.messages[0].role == "system"
+    assert "/no_think" in provider.messages[0].content
+    assert "Reply with ONLY a JSON object" in provider.messages[0].content
+    assert "High/critical risk tasks MUST have rollback" in provider.messages[0].content

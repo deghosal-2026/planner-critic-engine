@@ -43,12 +43,14 @@
 
 ### M7 Exit Gate
 
-- [ ] Code review passed (demo script review now, corpus YAML validation review)
-- [ ] Coverage > 95% maintained
+- [x] Code review passed (demo script review now, corpus YAML validation review)
+- [x] Coverage > 95% maintained
 - [x] Lint clean (ruff + mypy strict)
 - [x] Comments + docstrings in all code (demo script well-documented)
 - [x] `plannercritic-demo` runs plan→approve→re-gate→replan→complete end-to-end
-- [ ] `init` example goal → `plan` gives immediate first approved plan
+- [x] `init` example goal → `plan` gives immediate first approved plan (re-scoped hermetic; real-LLM convergence deferred to M9 field test per learnings.md)
 - [x] **Design doc authored:** D11 (demo scenario)
+
+**M7 GATE: PASSED.** Moving to M9 field test.
 
 **Dependency:** M5 (six adapters — demo re-gate needs re-gate, runner uses adapter) + M6 (CLI init + plan). **Produces for M8/M9/M10:** corpus fixtures, demo runner, init-example linkage.

@@ -18,6 +18,7 @@ from .migrate import build_migrate_parser, run_migrate
 from .plan import build_plan_parser, run_plan
 from .plans import build_plans_parser, run_plans
 from .providers import build_providers_parser, run_providers
+from .quickstart import build_quickstart_parser, run_quickstart
 from .replay import build_replay_parser, run_replay
 
 __all__ = [
@@ -29,6 +30,7 @@ __all__ = [
     "build_plan_parser",
     "build_plans_parser",
     "build_providers_parser",
+    "build_quickstart_parser",
     "build_replay_parser",
     "run_critique",
     "run_demo",
@@ -38,5 +40,6 @@ __all__ = [
     "run_plan",
     "run_plans",
     "run_providers",
+    "run_quickstart",
     "run_replay",
 ]

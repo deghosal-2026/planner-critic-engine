@@ -18,7 +18,7 @@ model = "llama3.2"
 """
 
 #: The packaged demo goal (D11 §7) so ``init`` → ``plan`` works immediately.
-_PACKAGED_GOAL_NAME = "migration.json"
+_PACKAGED_GOAL_NAME = "quickstart.json"
 
 
 def _packaged_goal_text() -> str:
