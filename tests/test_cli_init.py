@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import os
 
 import pytest
 
 from planner_critic.cli.init import run_init
+from planner_critic.schema.goal import Goal
 
 
 def test_init_creates_project_structure(tmp_path: Path) -> None:
@@ -21,6 +23,26 @@ def test_init_creates_project_structure(tmp_path: Path) -> None:
     config_text = (tmp_path / "plancritic.toml").read_text()
     assert "local" in config_text
     assert "localhost:11434" in config_text
+
+
+def test_init_writes_demo_goal(tmp_path: Path) -> None:
+    """init copies the packaged migration goal so plan works immediately (F-85/F-86)."""
+    rc = run_init(["--dir", str(tmp_path)])
+    assert rc == 0
+
+    goal_path = tmp_path / ".plancritic" / "goal.json"
+    assert goal_path.is_file()
+    goal = Goal.model_validate(json.loads(goal_path.read_text()))
+    assert goal.id == "demo-migration"
+
+
+def test_init_prints_plan_hint(tmp_path: Path, capsys) -> None:
+    """init tells the user the next command: `plancritic plan`."""
+    rc = run_init(["--dir", str(tmp_path)])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "plancritic plan" in out
+    assert ".plancritic/goal.json" in out
 
 
 def test_init_refuses_overwrite_without_force(tmp_path: Path) -> None:

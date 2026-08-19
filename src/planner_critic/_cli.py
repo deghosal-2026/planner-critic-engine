@@ -16,6 +16,7 @@ from collections.abc import Callable, Sequence
 from . import __version__
 from .cli import (
     build_critique_parser,
+    build_demo_parser,
     build_escalate_parser,
     build_init_parser,
     build_migrate_parser,
@@ -24,6 +25,7 @@ from .cli import (
     build_providers_parser,
     build_replay_parser,
     run_critique,
+    run_demo,
     run_escalate,
     run_init,
     run_migrate,
@@ -37,6 +39,7 @@ SubcommandRunner = Callable[[list[str]], int]
 
 _SUBCOMMANDS: dict[str, tuple[argparse.ArgumentParser, SubcommandRunner]] = {
     "critique": (build_critique_parser(), run_critique),
+    "demo": (build_demo_parser(), run_demo),
     "escalate": (build_escalate_parser(), run_escalate),
     "init": (build_init_parser(), run_init),
     "migrate": (build_migrate_parser(), run_migrate),

@@ -1,6 +1,6 @@
 # WBS — PlannerCritic Engine v0.1.0 (Index)
 
-> The work breakdown for the **feature-rich first release** (see [PRD 09 — Roadmap](../../design/prd/09-roadmap.md)). Ten milestones (M1–M10) across seven part files. **Author:** Debashish Ghosal · **Date:** 2026-08-16 · **Status:** In Progress — M1–M6 **COMPLETE** (merged), M7 next
+> The work breakdown for the **feature-rich first release** (see [PRD 09 — Roadmap](../../design/prd/09-roadmap.md)). Ten milestones (M1–M10) across seven part files. **Author:** Debashish Ghosal · **Date:** 2026-08-16 · **Status:** In Progress — M1–M6 **COMPLETE** (merged), M7 **IMPLEMENTED** (gate open: code review, coverage, init→plan), M8 next
 >
 > PRDs: [01-why](../../design/prd/01-why.md) · [02-architecture](../../design/prd/02-architecture.md) · [04-users-and-cujs](../../design/prd/04-users-and-cujs.md) · [05-features](../../design/prd/05-features.md) · [06-security](../../design/prd/06-security-baseline.md) · [07-success-metrics](../../design/prd/07-success-metrics.md) · [08-risks](../../design/prd/08-risks.md)
 
@@ -16,7 +16,7 @@
 | **M4** | **Escalation + Forensics + Replan + Viz** | F-30, F-31, F-32, F-34, F-50, F-51, F-52, F-16, F-53, F-75, F-76 | CUJ 5, CUJ 7, CUJ 9, CUJ 10 | [#30–#39](https://github.com/deghosal-2026/planner-critic-engine/issues/30) | [part2](wbs-v0.1.0-part2-critique-escalation.md) | **DONE** (commit `e0495df`) |
 | **M5** | **Framework Adapters (tooltrust six) + re-gate** | F-40..F-45, F-46 | CUJ 8 | [#40–#47](https://github.com/deghosal-2026/planner-critic-engine/issues/40) | [part3](wbs-v0.1.0-part3-adapters-surfaces.md) | **DONE** (commit `5663f16`) |
 | **M6** | **CLI + HTTP Service + Explain + Init** | F-61, F-62, F-80, F-85 | CUJ 1, CUJ 15 | [#48–#54](https://github.com/deghosal-2026/planner-critic-engine/issues/48) | [part3](wbs-v0.1.0-part3-adapters-surfaces.md) | **DONE** (commit `5663f16`) |
-| M7 | Demo Corpus + Demo Runner | F-65, F-66, F-86 | CUJ 14 | [#55–#58](https://github.com/deghosal-2026/planner-critic-engine/issues/55) | [part4](wbs-v0.1.0-part4-demo.md) |
+| M7 | Demo Corpus + Demo Runner | F-65, F-66, F-86 | CUJ 14 | [#55–#58](https://github.com/deghosal-2026/planner-critic-engine/issues/55) | [part4](wbs-v0.1.0-part4-demo.md) | **IMPLEMENTED** (gate open: review/coverage/init→plan) |
 | M8 | Docker Integration Tests — containerized engine + surfaces vs local LLM | F-60, F-61, F-62, F-45, F-67 | CUJ 1, CUJ 15 | [#77–#84](https://github.com/deghosal-2026/planner-critic-engine/issues/77) | [part5](wbs-v0.1.0-part5-docker-integration.md) |
 | M9 | Field Test — hermetic CI + local-model sweep | F-67, F-68 | CUJ 11 | [#59–#64](https://github.com/deghosal-2026/planner-critic-engine/issues/59) | [part6](wbs-v0.1.0-part6-field-test.md) |
 | M10 | Pre-Release + Release + Security + Docs | F-60, OWASP 6/10, OpenSSF Passing, Essential | all P0 | [#65–#71](https://github.com/deghosal-2026/planner-critic-engine/issues/65) | [part7](wbs-v0.1.0-part7-prerelease-release.md) |
