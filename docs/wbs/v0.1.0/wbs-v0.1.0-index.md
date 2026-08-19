@@ -17,7 +17,7 @@
 | **M5** | **Framework Adapters (tooltrust six) + re-gate** | F-40..F-45, F-46 | CUJ 8 | [#40–#47](https://github.com/deghosal-2026/planner-critic-engine/issues/40) | [part3](wbs-v0.1.0-part3-adapters-surfaces.md) | **DONE** (commit `5663f16`) |
 | **M6** | **CLI + HTTP Service + Explain + Init** | F-61, F-62, F-80, F-85 | CUJ 1, CUJ 15 | [#48–#54](https://github.com/deghosal-2026/planner-critic-engine/issues/48) | [part3](wbs-v0.1.0-part3-adapters-surfaces.md) | **DONE** (commit `5663f16`) |
 | M7 | Demo Corpus + Demo Runner | F-65, F-66, F-86 | CUJ 14 | [#55–#58](https://github.com/deghosal-2026/planner-critic-engine/issues/55) | [part4](wbs-v0.1.0-part4-demo.md) | **IMPLEMENTED** (gate open: review/coverage/init→plan) |
-| M8 | Docker Integration Tests — containerized engine + surfaces vs local LLM | F-60, F-61, F-62, F-45, F-67 | CUJ 1, CUJ 15 | [#77–#84](https://github.com/deghosal-2026/planner-critic-engine/issues/77) | [part5](wbs-v0.1.0-part5-docker-integration.md) |
+| M8 | Docker Integration Tests — containerized engine + surfaces vs local LLM | F-60, F-61, F-62, F-45, F-67 | CUJ 1, CUJ 15 | [#77–#84](https://github.com/deghosal-2026/planner-critic-engine/issues/77) | [part5](wbs-v0.1.0-part5-docker-integration.md) | **IN PROGRESS** (#77–#81 done, #82–#84 open) |
 | M9 | Field Test — hermetic CI + local-model sweep | F-67, F-68 | CUJ 11 | [#59–#64](https://github.com/deghosal-2026/planner-critic-engine/issues/59) | [part6](wbs-v0.1.0-part6-field-test.md) |
 | M10 | Pre-Release + Release + Security + Docs | F-60, OWASP 6/10, OpenSSF Passing, Essential | all P0 | [#65–#71](https://github.com/deghosal-2026/planner-critic-engine/issues/65) | [part7](wbs-v0.1.0-part7-prerelease-release.md) |
 
