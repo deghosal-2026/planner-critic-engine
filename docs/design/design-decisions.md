@@ -126,3 +126,27 @@ Log every design decision with status (Accepted / Proposed / Rejected), context,
 - **Alternative considered:** LLM-generated narrative (summarize the plan history with a model). Rejected: non-deterministic, slow, expensive, and violates the hermetic CI contract. A templated approach is free, instant, and deterministic.
 - **Outcome:** `explain.py` uses `REASON_CODE_DESCRIPTIONS` from `reason_codes.py` as the narrative spine. Each revision's findings are mapped to template sentences: "Revision {N} was revised: {reason}." / "Revision {N} was escalated: {blocker description}." The actionability test asserts that a seeded blocker produces a narrative containing the blocker's description.
 - **Consequences:** The explain narrative is always deterministic and zero-cost. Adding a new reason code automatically adds a new narrative template. The explain engine is testable with zero LLM (hermetic).
+
+## M8 Entries
+
+### DD-13 — Host MLX as the benchmark local LLM (deviation from WBS's containerized LLM)
+
+> **Ref:** [D19 — Docker integration design](docker-integration-design.md) (DD-M8-1)
+
+- **Status:** Accepted
+- **Context:** The WBS proposed a containerized `llm` service (OMLX/Ollama) in the compose topology. MLX is macOS-only and cannot be containerized; the host already runs `Qwen3.5-9B-MLX-4bit` at `http://127.0.0.1:8000/v1`; the M9 field sweep targets local models regardless of runtime.
+- **Drivers:** reuses the proven M7 thinking-mode/truncation transport fix; keeps compose/CI footprint small (two engine services, no model pull); keeps the gate truly free (no GPU in CI).
+- **Alternative considered:** Containerized Ollama model service, replicated in CI. Rejected: heavy image/model pulls in CI, GPU-less hosted runners cannot run MLX, and the WBS already permits an opt-in workflow for heavy model images.
+- **Outcome:** Compose has exactly two services (`engine-http`, `engine-mcp`). Both reach host MLX through `host.docker.internal:8000/v1`, wired purely via `PC_OMLX_BASE_URL` / `PC_OMLX_MODEL` env — the same image runs against Ollama/vLLM later with zero code change. CI is opt-in via `workflow_dispatch`.
+- **Consequences:** The containerized LLM portion of the M8 gate is deliberately re-scoped to "containers + a real local LLM on the host." The real-LLM loop test SKIPs cleanly when the host endpoint is unreachable, keeping the hermetic suite green on non-MLX hosts.
+
+### DD-14 — Container glue wraps existing sprint surfaces; no new server framework
+
+> **Ref:** [D19 — Docker integration design](docker-integration-design.md) (DD-M8-2)
+
+- **Status:** Accepted
+- **Context:** M5/M6 shipped transport-agnostic servers: `PlannerCriticHTTPServer.handle_request` + `create_fastapi_app` (HTTP) and `handle_tool`/`list_tools`/`run_stdio` (MCP). The containers need runnable entrypoints, not a second server implementation.
+- **Drivers:** reuse; no new HTTP/MCP library dependency; the servers are already thin and framework-independent.
+- **Alternative considered:** Introduce FastMCP / a web framework in the runtime image. Rejected: duplicates the existing dispatch logic and bloats the image for no behavioral gain.
+- **Outcome:** `engine-http` mounts `create_fastapi_app` under uvicorn (FastAPI is an optional extra); `engine-mcp` exposes the existing `list_tools`/`handle_tool` logic over a minimal HTTP JSON-lines transport so the MCP client test can connect over TCP (stdio is unusable across containers). Both add `/healthz`.
+- **Consequences:** The MCP-over-HTTP adapter is a thin shim, unit-testable hermetic-ally; the container tests exercise the same call paths as the CLI/HTTP surfaces.
