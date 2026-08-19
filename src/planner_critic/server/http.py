@@ -14,6 +14,8 @@ from typing import Any, ClassVar, cast
 from ..engine import Engine
 from ..escalation import EscalationManager
 from ..explain import explain as build_explain
+from ..llm.registry import ProviderRegistry
+from ..loop import LoopConfig
 from ..schema.goal import Goal
 from ..schema.plan import PlanVersion
 from ..store.base import PlanStore
@@ -45,6 +47,26 @@ class PlannerCriticHTTPServer:
 
     def set_engine(self, engine: Engine) -> None:
         self._engine = engine
+
+    def _build_engine(self, goal: Goal) -> Engine:
+        """Build per-goal roles from the configured provider registry.
+
+        Mirrors mcp.py's _build_engine so HTTP serves the same provider-bound
+        planner/critic loop. Falls back to self._engine if explicitly set via
+        :meth:`set_engine` (hermetic tests).
+        """
+        if self._engine is not None:
+            return self._engine
+        if self._config_path is None:
+            raise ValueError(
+                "no engine configured and no provider config given "
+                "(call set_engine() or pass config_path)"
+            )
+        from ..cli.plan import _build_roles
+
+        registry = ProviderRegistry.load(self._config_path)
+        planner, critic = _build_roles(registry, goal)
+        return Engine(planner, critic, config=LoopConfig())
 
     def close(self) -> None:
         if self._store is not None:
@@ -113,9 +135,11 @@ class PlannerCriticHTTPServer:
 
     def _handle_plan_goal(self, body: dict[str, Any]) -> dict[str, Any]:
         goal = Goal.model_validate(body)
-        if self._engine is None:
-            return {"status": 501, "error": "no engine configured"}
-        result = self._engine.plan(goal)
+        try:
+            engine = self._build_engine(goal)
+        except Exception as exc:
+            return {"status": 501, "error": str(exc)}
+        result = engine.plan(goal)
         store = self.store
         if result.plan is not None:
             store.put_plan_version(result.plan)
@@ -141,9 +165,11 @@ class PlannerCriticHTTPServer:
 
     def _handle_critique_plan(self, body: dict[str, Any]) -> dict[str, Any]:
         plan = PlanVersion.model_validate(body)
-        if self._engine is None:
-            return {"status": 501, "error": "no engine configured"}
-        findings = self._engine.critic.audit(plan, [])
+        try:
+            engine = self._build_engine(Goal(id=plan.goal_id, description="plan critique"))
+        except Exception as exc:
+            return {"status": 501, "error": str(exc)}
+        findings = engine.critic.audit(plan, [])
         store = self.store
         store.put_plan_version(plan)
         store.put_findings(plan.id, plan.version, findings)
@@ -271,11 +297,15 @@ class PlannerCriticHTTPServer:
 
 # ---- FastAPI adapter (import-safe) -------------------------------------------
 
-def create_fastapi_app(store_path: str) -> Any | None:
+def create_fastapi_app(store_path: str, config_path: str | None = None) -> Any | None:
     """Build a FastAPI application wrapping the PlannerCritic HTTP surface.
 
     Args:
         store_path: Path to the SQLite plan-store database.
+        config_path: Optional path to the provider TOML config. When provided,
+            the server builds per-goal roles from the registry (used by the
+            container entrypoint). When omitted, ``set_engine()`` must be called
+            before ``/plan`` or ``/critique`` (hermetic tests).
 
     Returns:
         A configured ``FastAPI`` instance, or ``None`` if FastAPI is not
@@ -286,7 +316,7 @@ def create_fastapi_app(store_path: str) -> Any | None:
     except ImportError:
         return None
 
-    server = PlannerCriticHTTPServer(store_path)
+    server = PlannerCriticHTTPServer(store_path, config_path=config_path)
     app = FastAPI(title="PlannerCritic Engine", version="0.1.0")
 
     @app.on_event("shutdown")
