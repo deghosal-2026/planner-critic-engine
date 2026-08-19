@@ -28,6 +28,7 @@ REVISION_CAP_REACHED: Literal["revision_cap_reached"] = "revision_cap_reached"
 CONVERGED_STALLED: Literal["converged_stalled"] = "converged_stalled"
 REGRESSION_THRASHING: Literal["regression_thrashing"] = "regression_thrashing"
 BUDGET_EXCEEDED: Literal["budget_exceeded"] = "budget_exceeded"
+REPLAN_ABORTED: Literal["replan_aborted"] = "replan_aborted"
 APPROVED: Literal["approved"] = "approved"
 PLANNING_UNAVAILABLE: Literal["planning_unavailable"] = "planning_unavailable"
 
@@ -54,6 +55,7 @@ ReasonCode: TypeAlias = Literal[
     "converged_stalled",
     "regression_thrashing",
     "budget_exceeded",
+    "replan_aborted",
     "approved",
     "planning_unavailable",
     "approval_threshold_not_met",
@@ -78,6 +80,7 @@ REASON_CODE_DESCRIPTIONS: dict[ReasonCode, str] = {
     CONVERGED_STALLED: "Revisions are circling the same blockers or diff converges to zero",
     REGRESSION_THRASHING: "A revision introduced a new blocker",
     BUDGET_EXCEEDED: "The per-goal spend budget was exceeded",
+    REPLAN_ABORTED: "replan_policy=abort: the loop escalated without revising",
     APPROVED: "Loop terminated by meeting the approval threshold",
     PLANNING_UNAVAILABLE: "A provider failed; planning is unavailable and must fail closed",
     APPROVAL_THRESHOLD_NOT_MET: "Findings do not meet the goal's risk-tolerance threshold",

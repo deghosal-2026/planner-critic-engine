@@ -2,8 +2,10 @@
 
 Escalates early when the loop is making no progress:
 
-* **Circling blockers** — the revision did not change the blocker set
-  between consecutive revisions.
+* **Circling blockers** — the revision did not change the deterministic-gate
+  blocker set between consecutive revisions. LLM critic blockers are excluded
+  from this check because they are non-deterministic and would almost never
+  match exactly across audits, making the signal useless (§2.5.1).
 * **Near-zero diff** — the newest revision is structurally identical to the
   previous one (same task ids, same dependency set, same branch shapes), so
   further revisions will never diverge.
@@ -41,26 +43,31 @@ def _plan_fingerprint(plan: PlanVersion) -> str:
 
 
 def circling_blockers(prior: list[Finding], current: list[Finding]) -> bool:
-    """True when the blocker set did not change between revisions.
+    """True when the deterministic-gate blocker set did not change.
+
+    LLM critic blockers are excluded — they are non-deterministic and would
+    almost never match exactly across audits of the same plan.
 
     Args:
         prior: Findings from the previous revision.
         current: Findings from the current revision.
 
     Returns:
-        True when both revisions flag the same blocker reason-codes on the
-        same tasks — the planner is circling.
+        True when both revisions flag the same gate blocker reason-codes on
+        the same tasks — the planner is circling.
     """
-    def blocker_keys(findings: list[Finding]) -> frozenset[tuple[str, str | None]]:
+    def gate_blocker_keys(findings: list[Finding]) -> frozenset[tuple[str, str | None]]:
         return frozenset(
             (f.reason_code, f.task_id)
             for f in findings
-            if f.severity is Severity.BLOCKER
+            if f.severity is Severity.BLOCKER and not f.is_llm_finding
         )
 
     if not prior or not current:
         return False
-    return blocker_keys(prior) == blocker_keys(current) and bool(blocker_keys(current))
+    prior_keys = gate_blocker_keys(prior)
+    current_keys = gate_blocker_keys(current)
+    return prior_keys == current_keys and bool(current_keys)
 
 
 def near_zero_diff(prior: PlanVersion | None, current: PlanVersion) -> bool:

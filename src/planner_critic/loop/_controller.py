@@ -45,7 +45,7 @@ from ..critique.mode import CriticMode, should_invoke_llm
 from ..gates import run_deterministic_gates
 from ..reason_codes import ReasonCode
 from ..roles import CriticRole, PlannerRole
-from ..schema.goal import Goal
+from ..schema.goal import Goal, ReplanPolicy
 from ..schema.plan import PlanVersion
 from ..types import ApprovedPlan, Escalation, Finding, PlanningError, Severity
 from .budget import SpendState, budget_exceeded
@@ -312,6 +312,10 @@ def _run(
             logger.info("loop: budget exceeded → escalate")
             return _escalate(goal, plan, findings, "budget_exceeded", revision)
 
+        if goal.replan_policy is ReplanPolicy.ABORT:
+            logger.info("loop: replan_policy=abort → escalate (no revise)")
+            return _escalate(goal, plan, findings, "replan_aborted", revision)
+
         if regression_detected(prior_findings, findings):
             logger.info("loop: regression detected → escalate (thrashing)")
             return _escalate(goal, plan, findings, "regression_thrashing", revision)
@@ -336,7 +340,7 @@ def _has_blocker(findings: list[Finding]) -> bool:
 
 
 def _safe_audit(critic: CriticRole, plan: PlanVersion, findings: list[Finding]) -> list[Finding]:
-    """Audit via critic, but never let a single bad finding kill the loop.
+    """Audit via critic, but never let a critic failure kill the loop.
 
     Args:
         critic: The critic role.
@@ -347,12 +351,13 @@ def _safe_audit(critic: CriticRole, plan: PlanVersion, findings: list[Finding]) 
         The critic's findings. The deterministic gates have already
         collected gate findings separately, so a critic error maps to an
         empty list here rather than breaking the loop (the gates remain the
-        free/immune layer).
+        free/immune layer). The error is logged so the failure is visible.
     """
     try:
         return critic.audit(plan, findings)
     except Exception as exc:
-        raise PlanningError(f"critic role failed: {exc}") from exc
+        logger.warning("critic role failed (full audit): %s — continuing with gates only", exc)
+        return []
 
 
 def _safe_audit_diff(
@@ -384,7 +389,8 @@ def _safe_audit_diff(
         scope = scope_between(prior_plan, plan)
         return audit_diff(plan, findings, scope)
     except Exception as exc:
-        raise PlanningError(f"critic role failed (diff audit): {exc}") from exc
+        logger.warning("critic role failed (diff audit): %s — continuing with gates only", exc)
+        return []
 
 
 def _revise_or_raise(
