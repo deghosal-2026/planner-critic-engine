@@ -357,18 +357,18 @@ def run_cli_migrate(out):
 
 DIMENSIONS = {
     "core-api":       {"goals": "__all__", "fn": run_core_api, "needs_llm": True},
-    "critique-modes": {"goals": ["db-01","k8s-01","ir-01","ci-01"], "fn": run_critique_modes, "needs_llm": True},
+    "critique-modes": {"goals": ["db-01-schema-migration"], "fn": run_critique_modes, "needs_llm": True},
     "store":          {"goals": "__all__", "fn": run_store, "needs_llm": False},
-    "escalation":     {"goals": ["adv-01","adv-02"], "fn": run_escalation, "needs_llm": False},
-    "explain":        {"goals": ["db-01","adv-01"], "fn": run_explain, "needs_llm": False},
-    "viz":            {"goals": ["db-01","k8s-01"], "fn": run_viz, "needs_llm": False},
-    "complexity":     {"goals": ["db-01","k8s-01"], "fn": run_complexity, "needs_llm": False},
-    "probes":         {"goals": ["inf-02"], "fn": run_probes, "needs_llm": False},
-    "budget":         {"goals": ["db-01"], "fn": run_budget, "needs_llm": True},
-    "replan":         {"goals": ["db-01"], "fn": run_replan, "needs_llm": True},
-    "adapters":       {"goals": ["ci-01","data-01"], "fn": run_adapters, "needs_llm": False},
-    "cli-surface":    {"goals": ["db-01","k8s-01"], "fn": run_cli_surface, "needs_llm": False},
-    "http-surface":   {"goals": ["db-01","k8s-01"], "fn": run_http_surface, "needs_llm": False},
+    "escalation":     {"goals": ["adv-01-billing-no-safety"], "fn": run_escalation, "needs_llm": False},
+    "explain":        {"goals": ["db-01-schema-migration"], "fn": run_explain, "needs_llm": False},
+    "viz":            {"goals": ["db-01-schema-migration"], "fn": run_viz, "needs_llm": False},
+    "complexity":     {"goals": ["db-01-schema-migration"], "fn": run_complexity, "needs_llm": False},
+    "probes":         {"goals": ["inf-02-terraform-migration"], "fn": run_probes, "needs_llm": False},
+    "budget":         {"goals": ["db-01-schema-migration"], "fn": run_budget, "needs_llm": True},
+    "replan":         {"goals": ["db-01-schema-migration"], "fn": run_replan, "needs_llm": True},
+    "adapters":       {"goals": ["ci-01-multistage-pipeline"], "fn": run_adapters, "needs_llm": False},
+    "cli-surface":    {"goals": ["db-01-schema-migration"], "fn": run_cli_surface, "needs_llm": False},
+    "http-surface":   {"goals": ["db-01-schema-migration"], "fn": run_http_surface, "needs_llm": False},
     "cli-demo":       {"goals": [], "fn": run_cli_demo, "needs_llm": False},
     "cli-quickstart": {"goals": [], "fn": run_cli_quickstart, "needs_llm": False},
     "cli-migrate":    {"goals": [], "fn": run_cli_migrate, "needs_llm": False},
@@ -426,26 +426,28 @@ def run_sweep(goals_root, output_dir, dimensions=None, config_path=None, loop_co
                     if tr.get("escalation"):
                         from .types import Escalation
                         store.put_escalation(Escalation(**tr["escalation"]))
-                elif dim_name in ("critique-modes", "budget", "replan"):
+                elif dim_name in ("critique-modes",):
                     tr = runner(goal, assertions, planner_cache, registry, dim_out)
+                elif dim_name in ("budget", "replan"):
+                    tr = runner(goal, planner_cache, registry, dim_out)
                 elif dim_name in ("cli-surface",):
                     tr = runner(goal, goal_path, dim_out)
                 elif dim_name in ("http-surface",):
                     tr = runner(goal, http_base_url or "http://localhost:8080", dim_out)
                 elif dim_name in ("store",):
-                    plan = _get_plan(store, goal.id)
+                    plan = _get_plan(store, goal.id, out_root)
                     tr = runner(goal, plan, store, dim_out)
                 elif dim_name in ("escalation",):
                     tr = runner(goal, store, dim_out)
                 elif dim_name in ("explain",):
-                    plan = _get_plan(store, goal.id)
+                    plan = _get_plan(store, goal.id, out_root)
                     pid = plan["id"] if plan else goal.id
                     tr = runner(goal, pid, store, dim_out)
                 elif dim_name in ("viz",):
-                    plan = _get_plan(store, goal.id)
+                    plan = _get_plan(store, goal.id, out_root)
                     tr = runner(goal, plan, store, dim_out)
                 elif dim_name in ("complexity", "adapters"):
-                    plan = _get_plan(store, goal.id)
+                    plan = _get_plan(store, goal.id, out_root)
                     tr = runner(goal, plan, dim_out)
                 elif dim_name in ("probes",):
                     tr = runner(goal, dim_out)
@@ -473,11 +475,20 @@ def run_sweep(goals_root, output_dir, dimensions=None, config_path=None, loop_co
     logger.info("Sweep complete: %d/%d passed across %d dimensions", passed, total, len(dims))
     return summary
 
-def _get_plan(store, goal_id):
+def _get_plan(store, goal_id, output_dir=None):
+    # Try the in-memory store first
     try:
         plans = store.list_plans()
         for p in plans:
             if p.goal_id == goal_id:
                 return p.model_dump(mode="json")
     except: pass
+    # Fall back to the trace file on disk
+    if output_dir:
+        trace_path = Path(output_dir) / "core-api" / goal_id / "trace.json"
+        if trace_path.exists():
+            try:
+                t = json.loads(trace_path.read_text())
+                return t.get("plan")
+            except: pass
     return None
