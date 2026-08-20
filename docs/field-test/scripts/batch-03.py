@@ -70,7 +70,7 @@ def main():
 
     from collections import Counter
     verdicts = Counter(r["verdict"] for r in results)
-    print(f"\n  Batch {batch_num} done: {verdicts.get("PASS",0)} PASS, {verdicts.get("FAIL",0)} FAIL, {verdicts.get("ERROR",0)} ERROR\n")
+    print(f"\n  Batch {batch_num} done: {verdicts.get('PASS',0)} PASS, {verdicts.get('FAIL',0)} FAIL, {verdicts.get('ERROR',0)} ERROR\n")
 
-if __name__ == "__main__:
+if __name__ == "__main__":
     main()
