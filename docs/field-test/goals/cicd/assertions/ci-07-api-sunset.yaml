@@ -1,34 +1,11 @@
-assertions:
-  - phase: deprecate-announce
-    must_execute: true
-    postcondition: "v1 endpoints return 'Sunset: Sat, DD Mon YYYY HH:MM:SS GMT' header; v1 deprecation notice in API docs"
-    failure_action: "Rollback header change; verify load balancer config"
-    rollback_plan: "Revert API gateway routing to pre-deprecation state"
-
-  - phase: notify-consumers
-    must_execute: true
-    depends_on: ["deprecate-announce"]
-    postcondition: "Email sent to all known v1 API key holders; Slack posted in #api-users; 7-day grace acknowledged"
-    failure_action: "Retry notification batch; extract consumer list from API gateway logs"
-    rollback_plan: "Send correction notice if notification contained errors"
-
-  - phase: redirect-traffic
-    must_execute: true
-    depends_on: ["notify-consumers"]
-    postcondition: "All v1 routes 301-redirect to v2 equivalents; existing v1 clients receive redirect warning"
-    failure_action: "Restore v1 routes immediately; page API team"
-    rollback_plan: "Revert ingress rules; disable redirect middleware"
-
-  - phase: monitor-orphans
-    must_execute: true
-    depends_on: ["redirect-traffic"]
-    postcondition: "v1 endpoint call volume < 0.1% of total API traffic for 30 consecutive days"
-    failure_action: "Extend monitoring window; contact remaining consumers individually"
-    rollback_plan: "Re-enable v1 for specific consumers via allowlist"
-
-  - phase: remove-code
-    must_execute: true
-    depends_on: ["monitor-orphans"]
-    postcondition: "v1 controllers, routes, tests, and docs deleted; v1 data migration complete; cleanup PR merged"
-    failure_action: "Revert cleanup PR; restore from git"
-    rollback_plan: "Revert merge commit; redeploy with v1 code intact"
+invariants:
+  approve_expected: true
+  max_revisions: 4
+  min_tasks: 3
+  mandatory_elements:
+    - verification
+    - rollback
+  forbidden_blockers: []
+  acceptable_escalation_reasons:
+    - revision_cap_reached
+    - replan_aborted

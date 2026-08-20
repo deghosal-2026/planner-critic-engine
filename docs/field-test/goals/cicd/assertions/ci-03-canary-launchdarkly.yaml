@@ -1,47 +1,11 @@
-assertions:
-  - action: enable-flag-5pct
-    must_execute: true
-    postcondition: "LaunchDarkly flag enabled for beta cohort (5% of users); non-beta users see old code"
-    failure_action: "Abort canary; mark release as failed"
-
-  - action: observe-metrics-5pct
-    must_execute: true
-    depends_on: ["enable-flag-5pct"]
-    postcondition: "Error rate < 1.0%, p99 latency < 500ms, throughput within 10% of baseline over 10 min window"
-    failure_action: "Auto-rollback: disable flag, notify on-call"
-
-  - action: ramp-to-25pct
-    must_execute: false
-    depends_on: ["observe-metrics-5pct"]
-    postcondition: "LaunchDarkly flag rolled to 25% of users"
-    failure_action: "Halt ramp; revert to 0%"
-
-  - action: observe-metrics-25pct
-    must_execute: true
-    depends_on: ["ramp-to-25pct"]
-    postcondition: "All metrics remain within thresholds for 10 minutes"
-    failure_action: "Auto-rollback to 0%; page SRE"
-
-  - action: ramp-to-50pct
-    must_execute: false
-    depends_on: ["observe-metrics-25pct"]
-    postcondition: "LaunchDarkly flag rolled to 50% of users"
-    failure_action: "Halt; revert to 0%"
-
-  - action: observe-metrics-50pct
-    must_execute: true
-    depends_on: ["ramp-to-50pct"]
-    postcondition: "All metrics remain within thresholds for 10 minutes"
-    failure_action: "Auto-rollback; page SRE"
-
-  - action: ramp-to-100pct
-    must_execute: false
-    depends_on: ["observe-metrics-50pct"]
-    postcondition: "LaunchDarkly flag enabled for 100% of users"
-    failure_action: "Halt; revert to 0%"
-
-  - action: final-observation
-    must_execute: true
-    depends_on: ["ramp-to-100pct"]
-    postcondition: "All metrics stable for 30 minutes post-full-rollout"
-    failure_action: "Rollback flag; declare incident"
+invariants:
+  approve_expected: true
+  max_revisions: 4
+  min_tasks: 3
+  mandatory_elements:
+    - verification
+    - rollback
+  forbidden_blockers: []
+  acceptable_escalation_reasons:
+    - revision_cap_reached
+    - replan_aborted

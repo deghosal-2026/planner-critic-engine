@@ -1,35 +1,9 @@
-assertions:
-  - action: terraform-apply
-    must_execute: true
-    postcondition: "Auto-scaling group, launch template, and IAM role provisioned; plan matches expected state"
-    failure_action: "Halt; review Terraform state drift"
-
-  - action: runner-registration
-    must_execute: true
-    depends_on: ["terraform-apply"]
-    postcondition: "New EC2 instance starts, runs runner registration script, appears as 'online' in GitHub Actions"
-    failure_action: "Terminate instance; check registration token and network"
-
-  - action: scale-up-test
-    must_execute: true
-    depends_on: ["runner-registered"]
-    postcondition: "Queue 10 jobs simultaneously; all picked up within 2 minutes; max 20 instances launched"
-    failure_action: "Increase max_runners; check AMI bootstrap time"
-
-  - action: job-execution
-    must_execute: true
-    depends_on: ["scale-up-test"]
-    postcondition: "All 10 jobs complete successfully on self-hosted runners"
-    failure_action: "Debug runner environment; check Docker and dependency caching"
-
-  - action: scale-down-idle
-    must_execute: true
-    depends_on: ["job-execution"]
-    postcondition: "After 15 minutes idle, instances terminated down to min_runners (2)"
-    failure_action: "Check Lambda lifecycle hook; verify deregistration"
-
-  - action: cleanup
-    must_execute: false
-    final: true
-    postcondition: "Terraform destroy completes; all resources removed"
-    failure_action: "Tag orphaned resources; manual cleanup required"
+invariants:
+  approve_expected: true
+  max_revisions: 4
+  min_tasks: 3
+  mandatory_elements: []
+  forbidden_blockers: []
+  acceptable_escalation_reasons:
+    - revision_cap_reached
+    - replan_aborted

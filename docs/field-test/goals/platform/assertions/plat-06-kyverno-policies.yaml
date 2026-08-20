@@ -1,43 +1,11 @@
-id: plat-06-kyverno-policies
-goal_id: plat-06-kyverno-policies
-phase: post-execution
-category: functional
-severity: major
-description: >
-  Kyverno ClusterPolicies for Pod Security Standards are deployed, transitioned
-  from audit to enforce mode, and violation metrics are visible in Prometheus.
-check:
-  - type: command_output
-    command: "kubectl get crd | grep -c clusterpolicies.kyverno.io"
-    expected: "1"
-    description: "Kyverno CRDs are installed"
-  - type: command_output
-    command: "kubectl get clusterpolicy -o json | jq -r '.items[].metadata.name' | sort"
-    expected: |-
-      psa-baseline
-      psa-restricted
-    description: "PSA baseline and restricted cluster policies exist"
-  - type: command_output
-    command: >
-      kubectl get clusterpolicy psa-restricted
-      -o jsonpath='{.spec.validationFailureAction}'
-    expected: "enforce"
-    description: "Policies have transitioned from audit to enforce mode"
-  - type: command_output
-    command: >
-      kubectl get clusterpolicy psa-restricted
-      -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
-    expected: "True"
-    description: "All policies report Ready=True"
-  - type: command_output
-    command: >
-      kubectl create deployment nginx-bad --image=nginx:latest --replicas=1
-      -o json --dry-run=server 2>&1 | grep -c "violate Kyverno policy"
-    expected: "1"
-    description: "Non-compliant workload is rejected by enforce mode"
-  - type: command_output
-    command: >
-      curl -s "http://prometheus.{org}.com:9090/api/v1/query?query=kyverno_policy_rule_info_total"
-      | jq -r '.data.result[0].value[1]'
-    expected: ".+"
-    description: "Kyverno policy metrics are scraped by Prometheus"
+invariants:
+  profile: balanced
+  approve_expected: true
+  max_revisions: 4
+  min_tasks: 3
+  mandatory_elements:
+    - verification
+  forbidden_blockers: []
+  acceptable_escalation_reasons:
+    - revision_cap_reached
+    - replan_aborted
