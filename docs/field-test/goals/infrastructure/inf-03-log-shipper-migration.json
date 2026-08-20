@@ -1,0 +1,31 @@
+{
+  "id": "inf-03-log-shipper-migration",
+  "title": "Log Shipper Migration (Fluentd to FluentBit)",
+  "description": "Replace Fluentd with FluentBit across 200 nodes using dual-ship, compare, and cutover strategy",
+  "constraints": {
+    "environment": "production",
+    "tools": ["kubectl", "helm", "prometheus", "python", "jq"],
+    "services": ["eks", "cloudwatch", "elasticsearch", "s3"]
+  },
+  "risk_tolerance": "balanced",
+  "replan_policy": "patch",
+  "steps": [
+    {"id": "baseline", "description": "Document current Fluentd config: inputs, filters, outputs, buffer settings, resource usage per node", "mandatory": true},
+    {"id": "config", "description": "Create FluentBit config matching Fluentd pipeline: same tags, parsers, output destinations", "mandatory": true},
+    {"id": "dual-ship", "description": "Deploy FluentBit as sidecar alongside Fluentd on 10 canary nodes; both ship to same outputs", "mandatory": true},
+    {"id": "compare", "description": "Compare log volume, latency, and dropped events between Fluentd and FluentBit over 24h canary period", "mandatory": true},
+    {"id": "threshold-check", "description": "Confirm FluentBit: <1% log loss vs Fluentd, <10% CPU increase, <20% memory increase", "mandatory": true},
+    {"id": "rollout", "description": "Gradually replace Fluentd DaemonSet with FluentBit across 200 nodes (50 nodes per wave)", "mandatory": true},
+    {"id": "verify", "description": "Validate log completeness, latency SLI, and no alert spike for 48h post-full-cutover", "mandatory": true}
+  ],
+  "verification": {
+ "metrics": ["log_volume_match", "log_latency_p99", "cpu_usage_mcpu", "memory_usage_mb", "dropped_events_count"],
+    "success_criteria": {
+      "log_volume_delta": "< 1% difference vs Fluentd baseline",
+      "p99_latency": "same or lower than Fluentd",
+      "cpu_overhead": "< 10% increase per node",
+      "memory_reduction": ">= 30% reduction per node"
+    },
+    "canary_duration_hours": 24
+  }
+}

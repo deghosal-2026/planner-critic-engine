@@ -1,0 +1,32 @@
+goal_id: arch-01-microservice-extract
+checks:
+  - id: dual-write-parity
+    description: Dual-write parity between monolith and new service is within tolerance
+    type: metric
+    metric: dual_write_parity
+    operator: gte
+    value: 99.9
+    unit: percent
+  - id: latency-regression
+    description: P99 latency does not regress beyond 5ms
+    type: metric
+    metric: p99_latency
+    operator: lte
+    value: 5
+    unit: ms
+  - id: zero-data-loss
+    description: No data loss during cutover windows
+    type: audit
+    source: datadog_logs
+    query: 'status:error AND "data_loss" AND service:payments'
+    expected_count: 0
+  - id: caller-routes-updated
+    description: All callers have been updated to point to new service
+    type: configuration
+    resource: ingress
+    check: 'routing.destination == "payments-service"'
+  - id: monolith-decommissioned
+    description: Legacy payments code path in monolith is decommissioned
+    type: configuration
+    resource: monolith_deployment
+    check: 'env.PAYMENTS_MODULE_ENABLED == "false"'

@@ -1,0 +1,39 @@
+{
+  "id": "inf-01-ecs-migration",
+  "title": "EC2 to ECS Fargate Migration",
+  "description": "Lift-and-shift 20 EC2 instances running containerized workloads to ECS Fargate with traffic drain and cutover",
+  "constraints": {
+    "environment": "production",
+    "tools": ["terraform", "aws-cli", "kubectl"],
+    "services": ["ecs", "ec2", "elbv2", "cloudwatch", "sns"]
+  },
+  "risk_tolerance": "strict",
+  "replan_policy": "restart",
+  "steps": [
+    {"id": "discover", "description": "Inventory 20 EC2 instances: image, ports, env vars, volumes, resource limits", "mandatory": true},
+    {"id": "define", "description": "Create ECS task definitions, services, target groups matching each instance workload", "mandatory": true},
+    {"id": "provision", "description": "Deploy ECS cluster, Fargate services, and ALB listener rules via Terraform", "mandatory": true},
+    {"id": "drain", "description": "Register Fargate targets, drain EC2 targets from ALB, monitor connection drainage", "mandatory": true},
+    {"id": "cutover", "description": "Shift 100% traffic to Fargate targets, verify all 20 workloads health-check passing", "mandatory": true},
+    {"id": "verify", "description": "Run smoke tests, log inspection, metric comparison; confirm 0 errors and <5% latency increase", "mandatory": true},
+    {"id": "rollback", "description": "Re-register EC2 targets, drain Fargate targets, revert Terraform state", "mandatory": true}
+  ],
+  "verification": {
+    "metrics": ["target_health_percentage", "error_rate", "p99_latency", "cpu_utilization", "memory_utilization"],
+    "success_criteria": {
+      "target_health_percentage": "100",
+      "error_rate": "0",
+      "p99_latency_increase": "<5%"
+    },
+    "smoke_tests": ["health_endpoint", "business_transaction_flow", "log_emission"]
+  },
+  "rollback_plan": {
+    "trigger_condition": "any workload fails health check within 15 minutes post-cutover",
+    "steps": [
+      "Re-register all EC2 targets in ALB target groups",
+      "Drain all Fargate targets from ALB",
+      "Revert Terraform apply to previous state",
+      "Confirm EC2-based traffic at 100% with health checks passing"
+    ]
+  }
+}

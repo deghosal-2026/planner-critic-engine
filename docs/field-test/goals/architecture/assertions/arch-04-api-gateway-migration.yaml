@@ -1,0 +1,32 @@
+goal_id: arch-04-api-gateway-migration
+checks:
+  - id: route-parity
+    description: Every route/path/method from NGINX is present in Kong
+    type: configuration
+    resource: kong_routes
+    check: 'set(@.routes.map(r => r.paths).flat()) == set(expected_nginx_paths)'
+  - id: latency-parity
+    description: P99 latency through Kong is within 10ms of NGINX baseline
+    type: metric
+    metric: p99_latency
+    operator: lte
+    value: 10
+    unit: ms_over_baseline
+  - id: auth-success-rate
+    description: Authentication success rate matches or exceeds NGINX baseline
+    type: metric
+    metric: auth_success_rate
+    operator: gte
+    value: 99.9
+    unit: percent
+  - id: rate-limiting-active
+    description: Rate limiting rules from NGINX are enforced in Kong
+    type: configuration
+    resource: kong_rate_limiting_plugin
+    check: 'exists(@.plugins[?name=="rate-limiting"])'
+  - id: dns-cutover
+    description: DNS resolves Kong load balancer, not NGINX
+    type: dns
+    record_type: A
+    domain: api.example.com
+    expected_contains: kong-lb

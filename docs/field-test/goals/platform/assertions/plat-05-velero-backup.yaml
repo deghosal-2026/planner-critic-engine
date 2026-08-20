@@ -1,0 +1,37 @@
+id: plat-05-velero-backup
+goal_id: plat-05-velero-backup
+phase: post-execution
+category: functional
+severity: critical
+description: >
+  Velero is installed, daily backup schedules exist, manual backup+restore
+  succeeds with PV data intact, and retention policies are enforced.
+check:
+  - type: command_output
+    command: "velero version --client-only 2>/dev/null | grep -c 'Version'"
+    expected: "1"
+    description: "Velero CLI is available"
+  - type: command_output
+    command: "kubectl get pods -n velero -o jsonpath='{.items[*].status.phase}'"
+    expected: "Running"
+    description: "Velero server pod is Running"
+  - type: command_output
+    command: "velero get schedules -o json | jq -r '.items[0].spec.schedule'"
+    expected: "0 0 \\* \\* \\*"
+    description: "Daily backup schedule exists at midnight"
+  - type: command_output
+    command: "velero get schedules -o json | jq -r '.items[0].spec.template.ttl'"
+    expected: "720h"
+    description: "Retention policy is 30 days (720 hours)"
+  - type: command_output
+    command: >
+      velero backup create test-verify --include-namespaces validation --ttl 24h --wait
+      && velero restore create --from-backup test-verify --wait
+      && kubectl get pods -n validation -o jsonpath='{.items[*].status.phase}'
+    expected: "Running"
+    description: "Manual backup and restore of validation namespace succeeds with pods Running"
+  - type: command_output
+    command: >
+      kubectl exec -n validation deploy/app -- cat /data/verify.txt
+    expected: "backup-verified"
+    description: "Restored PV data matches pre-backup content"

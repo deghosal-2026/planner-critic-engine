@@ -1,0 +1,41 @@
+{
+  "id": "inf-04-workload-identity",
+  "title": "Workload Identity Migration",
+  "description": "Migrate workload identity: create service account, migrate pods, verify, remove old credentials",
+  "constraints": {
+    "environment": "production",
+    "tools": ["kubectl", "gcloud", "aws-cli", "jq"],
+    "services": ["gke", "iam", "secret-manager", "cloud-audit"]
+  },
+  "risk_tolerance": "strict",
+  "replan_policy": "restart",
+  "steps": [
+    {"id": "audit", "description": "Identify all workloads using static service account keys; document permissions and usage patterns", "mandatory": true},
+    {"id": "create-sa", "description": "Create workload identity-enabled service account with equivalent IAM roles", "mandatory": true},
+    {"id": "annotate", "description": "Annotate Kubernetes service accounts with iam.gke.io/gcp-service-account binding", "mandatory": true},
+    {"id": "migrate-pods", "description": "Rolling restart of all annotated deployments; pods inherit workload identity", "mandatory": true},
+    {"id": "verify", "description": "Confirm pods authenticate via metadata server, not static keys; run integration tests for each workload", "mandatory": true},
+    {"id": "remove-old", "description": "Delete static service account keys from Secret Manager and GCP IAM; confirm no workload depends on them", "mandatory": true},
+    {"id": "rollback", "description": "Recreate static keys, re-annotate pods to use key-based auth, restore secrets", "mandatory": true}
+  ],
+  "verification": {
+    "checks": [
+      "All annotated pods authenticate via workload identity (metadata server)",
+      "Zero pods fail auth after rolling restart",
+      "Integration tests pass for all migrated workloads",
+      "Static keys count drops to 0 for migrated SAs",
+      "Audit log confirms no static key usage post-migration"
+    ],
+    "success_criteria": "100% of target workloads authenticated via workload identity with zero regression"
+  },
+  "rollback_plan": {
+    "trigger_condition": "Any workload fails authentication after migration OR integration test failure rate > 0%",
+    "steps": [
+      "Recreate static service account keys from backup",
+      "Restore Secret Manager secrets with static keys",
+      "Remove iam.gke.io annotations from KSA",
+      "Rolling restart pods to revert to static key auth",
+      "Verify all workloads authenticate successfully"
+    ]
+  }
+}
