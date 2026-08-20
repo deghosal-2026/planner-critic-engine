@@ -1,25 +1,26 @@
 # Field Test Report
 
-**Date:** 2026-08-20 02:10:23 UTC
+**Date:** 2026-08-20 02:21:54 UTC
 **Config:** plancritic.toml
-**Loop:** {'mode': 'deterministic-first', 'revision_cap': 1}
-**Total executions:** 6
-**Passed:** 4
-**Failed:** 2
-**Pass rate:** 67%
+**Loop:** {'mode': 'deterministic-first', 'revision_cap': 4}
+**Total executions:** 3
+**Passed:** 0
+**Failed:** 3
+**Pass rate:** 0%
 
 ## Dimensions
 
 | Dimension | Total | Passed | Failed |
 |-----------|-------|--------|--------|
-| core-api | 6 | 4 | 2 |
+| core-api | 3 | 0 | 3 |
 
 ## Failures
 
 | Dimension | Goal | Error |
 |-----------|------|-------|
-| core-api | plat-02-cert-manager | None |
-| core-api | plat-05-velero-backup | None |
+| core-api | ci-02-hotfix-rollback | None |
+| core-api | db-01-schema-migration | None |
+| core-api | k8s-01-canary-deploy | None |
 
 ## Per-Goal Results (core-api dimension)
 
@@ -36,7 +37,7 @@
 | arch-04-api-gateway-migration | ❌ | escalated | revision_cap_reached | 1 | 1 | 5 | 5 |
 | arch-05-schema-evolution | ❌ | escalated | revision_cap_reached | 1 | 1 | 5 | 3 |
 | ci-01-multistage-pipeline | ✅ | approved | approved | 1 | 1 | 6 | 5 |
-| ci-02-hotfix-rollback | ❌ | escalated | revision_cap_reached | 1 | 1 | 4 | 4 |
+| ci-02-hotfix-rollback | ❌ | escalated | converged_stalled | 3 | 3 | 5 | 4 |
 | ci-03-canary-launchdarkly | ✅ | approved | approved | 1 | 1 | 4 | 5 |
 | ci-04-feature-flag | ✅ | approved | approved | 1 | 1 | 6 | 5 |
 | ci-05-ci-runner-scaling | ✅ | approved | approved | 1 | 1 | 5 | 5 |
@@ -48,7 +49,7 @@
 | data-03-great-expectations | ✅ | approved | approved | 1 | 1 | 3 | 4 |
 | data-04-streaming-pipeline | ❌ | escalated | revision_cap_reached | 1 | 1 | 6 | 5 |
 | data-05-warehouse-model | ❌ | escalated | revision_cap_reached | 1 | 1 | 4 | 4 |
-| db-01-schema-migration | ❌ | escalated | revision_cap_reached | 1 | 1 | 5 | 5 |
+| db-01-schema-migration | ❌ | escalated | converged_stalled | 2 | 2 | 4 | 3 |
 | db-02-streaming-replication | ✅ | approved | approved | 1 | 1 | 6 | 3 |
 | db-03-index-backfill | ❌ | escalated | revision_cap_reached | 1 | 1 | 3 | 4 |
 | db-04-connection-pooling | ✅ | approved | approved | 1 | 1 | 6 | 5 |
@@ -70,7 +71,7 @@
 | ir-05-honeypot-deploy | ✅ | approved | approved | 1 | 1 | 5 | 6 |
 | ir-06-cis-remediation | ✅ | approved | approved | 1 | 1 | 4 | 4 |
 | ir-07-adversarial-billing | ❌ | escalated | replan_aborted | 1 | 1 | 1 | 6 |
-| k8s-01-canary-deploy | ❌ | escalated | revision_cap_reached | 1 | 1 | 5 | 7 |
+| k8s-01-canary-deploy | ❌ | escalated | converged_stalled | 3 | 3 | 9 | 7 |
 | k8s-02-cluster-upgrade | ❌ | escalated | revision_cap_reached | 1 | 1 | 5 | 5 |
 | k8s-03-pod-security | ✅ | approved | approved | 1 | 1 | 5 | 5 |
 | k8s-04-hpa-tuning | ✅ | approved | approved | 1 | 1 | 4 | 6 |
