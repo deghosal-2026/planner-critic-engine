@@ -1,26 +1,26 @@
 # Field Test Report
 
-**Date:** 2026-08-20 02:21:54 UTC
+**Date:** 2026-08-20 02:39:33 UTC
 **Config:** plancritic.toml
-**Loop:** {'mode': 'deterministic-first', 'revision_cap': 4}
+**Loop:** {'mode': 'deterministic-first', 'revision_cap': 1}
 **Total executions:** 3
-**Passed:** 0
-**Failed:** 3
-**Pass rate:** 0%
+**Passed:** 2
+**Failed:** 1
+**Pass rate:** 67%
 
 ## Dimensions
 
 | Dimension | Total | Passed | Failed |
 |-----------|-------|--------|--------|
-| core-api | 3 | 0 | 3 |
+| viz | 1 | 0 | 1 |
+| complexity | 1 | 1 | 0 |
+| adapters | 1 | 1 | 0 |
 
 ## Failures
 
 | Dimension | Goal | Error |
 |-----------|------|-------|
-| core-api | ci-02-hotfix-rollback | None |
-| core-api | db-01-schema-migration | None |
-| core-api | k8s-01-canary-deploy | None |
+| viz | db-01-schema-migration | check failure |
 
 ## Per-Goal Results (core-api dimension)
 
@@ -75,7 +75,7 @@
 | k8s-02-cluster-upgrade | ❌ | escalated | revision_cap_reached | 1 | 1 | 5 | 5 |
 | k8s-03-pod-security | ✅ | approved | approved | 1 | 1 | 5 | 5 |
 | k8s-04-hpa-tuning | ✅ | approved | approved | 1 | 1 | 4 | 6 |
-| k8s-05-registry-migration | ❌ | error | planning_unavailable | None | None | 0 | 0 |
+| k8s-05-registry-migration | ❌ | escalated | revision_cap_reached | 1 | 1 | 6 | 6 |
 | k8s-06-service-mesh | ❌ | escalated | revision_cap_reached | 1 | 1 | 8 | 7 |
 | k8s-07-blue-green | ❌ | escalated | revision_cap_reached | 1 | 0 | 5 | 1 |
 | k8s-08-active-active | ❌ | escalated | revision_cap_reached | 1 | 1 | 6 | 5 |

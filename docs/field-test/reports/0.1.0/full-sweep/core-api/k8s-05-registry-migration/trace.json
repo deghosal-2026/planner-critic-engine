@@ -1,28 +1,269 @@
 {
   "dimension": "core-api",
   "goal_id": "k8s-05-registry-migration",
-  "duration_seconds": 30.55,
+  "duration_seconds": 15.36,
   "result": {
-    "status": "error",
-    "reason_code": "planning_unavailable",
-    "revision_count": null,
-    "llm_calls": null
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 1,
+    "llm_calls": 1
   },
-  "plan": null,
-  "findings": [],
-  "escalation": null,
+  "plan": {
+    "id": "k8s-05-registry-migration-plan",
+    "goal_id": "k8s-05-registry-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T02:27:34.691826Z",
+    "tasks": [
+      {
+        "id": "pull_images",
+        "description": "Pull current images from Docker Hub",
+        "action": "pull",
+        "target": "docker_hub",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "pull status",
+          "how": "check logs",
+          "expected": "images pulled successfully"
+        },
+        "rollback": {
+          "trigger": "failure in pulling images",
+          "action": "no rollback required",
+          "safety_guard": ""
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "retag_images",
+        "description": "Retag images with ECR repository URI",
+        "action": "retag",
+        "target": "ecr",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "retag status",
+          "how": "check tags",
+          "expected": "images retagged successfully"
+        },
+        "rollback": {
+          "trigger": "failure in retagging",
+          "action": "no rollback required",
+          "safety_guard": ""
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "push_images",
+        "description": "Push images to private ECR registry",
+        "action": "push",
+        "target": "ecr",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "push status",
+          "how": "check logs",
+          "expected": "images pushed successfully"
+        },
+        "rollback": {
+          "trigger": "failure in pushing images",
+          "action": "no rollback required",
+          "safety_guard": ""
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update_manifests",
+        "description": "Update Deployment and StatefulSet manifests",
+        "action": "update",
+        "target": "k8s",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "manifest update status",
+          "how": "check manifests",
+          "expected": "manifests updated to use ECR"
+        },
+        "rollback": {
+          "trigger": "failure in updating manifests",
+          "action": "revert to old manifests",
+          "safety_guard": "verify manifest integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rolling_restart",
+        "description": "Trigger rolling restart of services",
+        "action": "restart",
+        "target": "k8s",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "pod readiness",
+          "how": "check pod status",
+          "expected": "all pods running and ready"
+        },
+        "rollback": {
+          "trigger": "failure in rolling restart",
+          "action": "trigger rollback to old registry",
+          "safety_guard": "verify pods health"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_services",
+        "description": "Verify services pull from ECR and serve traffic",
+        "action": "verify",
+        "target": "k8s",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service traffic",
+          "how": "monitor requests",
+          "expected": "services functioning normally"
+        },
+        "rollback": {
+          "trigger": "service failure",
+          "action": "trigger rollback to old registry",
+          "safety_guard": "verify previous state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "pull_images",
+        "to_task": "retag_images",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "retag_images",
+        "to_task": "push_images",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "push_images",
+        "to_task": "update_manifests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_manifests",
+        "to_task": "rolling_restart",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rolling_restart",
+        "to_task": "verify_services",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": [
+      {
+        "id": "rollback_branch",
+        "kind": "fan_out",
+        "tasks": [
+          "pull_images",
+          "retag_images",
+          "push_images",
+          "update_manifests",
+          "rolling_restart",
+          "verify_services"
+        ],
+        "join": "any"
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:pull_images",
+      "task_id": "pull_images",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "No rollback strategy is defined for the failure in pulling images, which is critical for production.",
+      "suggested_fix": "Implement a rollback action or alternative strategy to ensure system integrity in case of failure."
+    },
+    {
+      "id": "crit:1:feasibility:retag_images",
+      "task_id": "retag_images",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "No rollback strategy is defined for the failure in retagging images, which poses a risk.",
+      "suggested_fix": "Implement a rollback action or alternative strategy to ensure successful completion."
+    },
+    {
+      "id": "crit:1:feasibility:push_images",
+      "task_id": "push_images",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "No rollback strategy is defined for the failure in pushing images, which is essential for the continuity of service.",
+      "suggested_fix": "Implement a rollback action or alternative strategy to manage push failures."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:update_manifests",
+      "task_id": "update_manifests",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "warning",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'update_manifests' depends on 'push_images', but there is no confirmation of successful push before proceeding.",
+      "suggested_fix": "Add a precondition check for successful image push before updating manifests."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:rolling_restart",
+      "task_id": "rolling_restart",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "warning",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'rolling_restart' depends on 'update_manifests', but should confirm manifest update success prior to initiation.",
+      "suggested_fix": "Ensure that the rolling restart is executed only after confirmation of successful manifest updates."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:verify_services",
+      "task_id": "verify_services",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "info",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'verify_services' relies on successful execution of all prior tasks without confirmation mechanisms.",
+      "suggested_fix": "Include verifications confirming successful pulls, retags, pushes, and manifest updates before calling this task."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-05-registry-migration:1:1",
+    "plan_id": "k8s-05-registry-migration-plan",
+    "version": 1,
+    "blocker_finding_id": "crit:1:feasibility:pull_images",
+    "question": "Plan for goal 'k8s-05-registry-migration' cannot be approved: blockers remain (llm_feasibility). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
   "checks": [
     {
       "name": "approve_expected",
       "pass": false,
-      "message": "status=error"
-    },
-    {
-      "name": "min_tasks",
-      "pass": false,
-      "message": "tasks=0"
+      "message": "expected approve but escalated"
     }
   ],
-  "error": "planner role failed to decompose: provider 'local' failed to return valid PlanVersion after 3 attempts: 3 validation errors for PlanVersion\nbranches.0.kind\n  Input should be 'fan_out' or 'fan_in' [type=enum, input_value='rollback', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/enum\nbranches.0.tasks.0\n  Input should be a valid string [type=string_type, input_value={'id': 'rollback-manifest... 'risk_class': 'medium'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/string_type\nbranches.0.join\n  Input should be 'all', 'any' or 'quorum' [type=enum, input_value='verify-traffic', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/enum",
+  "error": null,
   "pass": false
 }
