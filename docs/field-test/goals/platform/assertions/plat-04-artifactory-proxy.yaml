@@ -1,42 +1,10 @@
-id: plat-04-artifactory-proxy
-goal_id: plat-04-artifactory-proxy
-phase: post-execution
-category: functional
-severity: major
-description: >
-  Artifactory remote repositories for Docker Hub, PyPI, and npm are configured,
-  cache population succeeds, and build nodes route through Artifactory.
-check:
-  - type: command_output
-    command: >
-      curl -s -u {user}:{token} "https://artifactory.{org}.com/artifactory/api/repositories/"
-      | jq -r '.[] | select(.repoType == "REMOTE") | .key' | sort
-    expected: |-
-      docker-hub-remote
-      pypi-remote
-      npm-remote
-    description: "All three remote repositories exist in Artifactory"
-  - type: command_output
-    command: >
-      docker pull {artifactory_host}/docker-hub-remote/library/alpine:latest
-      && curl -s -u {user}:{token}
-      "https://artifactory.{org}.com/artifactory/api/storage/docker-hub-remote/library/alpine/latest"
-      | jq -r '.uri'
-    expected: ".+"
-    description: "Docker image pull populates the cache"
-  - type: command_output
-    command: >
-      docker info 2>/dev/null | grep -i "Registry Mirrors:" | grep -c "{artifactory_host}"
-    expected: "1"
-    per_node: true
-    description: "All build nodes have Artifactory configured as Docker registry mirror"
-  - type: command_output
-    command: "pip config list 2>/dev/null | grep -c 'index-url.*{artifactory_host}'"
-    expected: "1"
-    per_node: true
-    description: "Build nodes route PyPI through Artifactory"
-  - type: command_output
-    command: "npm config get registry 2>/dev/null | grep -c '{artifactory_host}'"
-    expected: "1"
-    per_node: true
-    description: "Build nodes route npm through Artifactory"
+invariants:
+  profile: balanced
+  approve_expected: true
+  max_revisions: 4
+  min_tasks: 3
+  mandatory_elements: []
+  forbidden_blockers: []
+  acceptable_escalation_reasons:
+    - revision_cap_reached
+    - replan_aborted

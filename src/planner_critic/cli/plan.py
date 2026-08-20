@@ -42,8 +42,13 @@ _PLANNER_SYSTEM_PROMPT = (
     "optional preconditions (array of {description, fact, established_by}), "
     "optional parallel_group, optional blast_radius. "
     "preconditions MUST be objects with description, fact, established_by fields — NEVER strings. "
+    "established_by MUST be the id of an earlier task in the plan that establishes the fact, "
+    "or 'env' if it is an environment fact (not a task output). "
+    "Do NOT use fact names or descriptions as established_by — use the task id. "
     "Each dependency uses: from_task, to_task, kind, optional reason. "
-    "Each branch uses: id, kind, tasks, join. High/critical risk tasks MUST have rollback. "
+    "Each branch uses: id, kind, tasks, join. High/critical risk tasks MUST have rollback "
+    "AND verification. All tasks with risk_class high or critical MUST include both "
+    "rollback and verification objects. "
     f"Example shape: {_PLAN_EXAMPLE}"
 )
 

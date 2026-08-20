@@ -1,35 +1,11 @@
-assertions:
-  - action: identify-offending-commit
-    must_execute: true
-    postcondition: "SHA of the commit causing the incident is identified via alert or manual report"
-    failure_action: "Fall back to last-known-good deployment tag"
-
-  - action: git-revert
-    must_execute: true
-    depends_on: ["identify-offending-commit"]
-    postcondition: "Revert commit created on a hotfix branch; no merge conflicts"
-    failure_action: "Create revert manually; pause pipeline"
-
-  - action: rebuild
-    must_execute: true
-    depends_on: ["revert-confirmed"]
-    postcondition: "Docker image built from reverted code; tag includes hotfix suffix"
-    failure_action: "Retry build; escalate if second failure"
-
-  - action: redeploy
-    must_execute: true
-    depends_on: ["build-pass"]
-    postcondition: "Hotfix image deployed to production; /health returns 200 within 2 minutes"
-    failure_action: "Rollback to previous stable image immediately"
-
-  - action: verify-dependents
-    must_execute: true
-    depends_on: ["deploy-pass"]
-    postcondition: "All downstream services pass health checks against reverted API"
-    failure_action: "Rollback; page on-call engineer"
-
-  - action: notify
-    must_execute: true
-    final: true
-    postcondition: "Slack notification sent to #incidents with summary, duration, and affected users"
-    failure_action: "Send email fallback; log missed notification"
+invariants:
+  approve_expected: true
+  max_revisions: 4
+  min_tasks: 3
+  mandatory_elements:
+    - verification
+    - rollback
+  forbidden_blockers: []
+  acceptable_escalation_reasons:
+    - revision_cap_reached
+    - replan_aborted

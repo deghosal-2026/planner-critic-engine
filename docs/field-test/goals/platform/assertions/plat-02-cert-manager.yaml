@@ -1,30 +1,12 @@
-id: plat-02-cert-manager
-goal_id: plat-02-cert-manager
-phase: post-execution
-category: functional
-severity: critical
-description: >
-  cert-manager is deployed, ClusterIssuers are configured, Certificate
-  resources are ready, and TLS handshakes succeed from external endpoints.
-check:
-  - type: command_output
-    command: "kubectl get pods -n cert-manager -o jsonpath='{.items[*].status.phase}'"
-    expected: "Running Running Running"
-    description: "All cert-manager pods are Running"
-  - type: command_output
-    command: "kubectl get clusterissuer letsencrypt-prod -o jsonpath='{.status.conditions[0].status}'"
-    expected: "True"
-  - type: command_output
-    command: "kubectl get clusterissuer letsencrypt-staging -o jsonpath='{.status.conditions[0].status}'"
-    expected: "True"
-  - type: command_output
-    command: "kubectl get certificates --all-namespaces -o jsonpath='{range .items[*]}{.status.conditions[?(@.type==\"Ready\")].status}{\"\\n\"}{end}' | sort -u"
-    expected: "True"
-    description: "All Certificate resources report Ready=True"
-  - type: command_output
-    command: >
-      echo | openssl s_client -connect {ingress_host}:443 -servername {ingress_host}
-      2>/dev/null | openssl x509 -noout -issuer -subject -dates
-    expected: ".*issuer=.*Let's Encrypt.*"
-    per_ingress: true
-    description: "TLS certificate presented at external endpoints is issued by Let's Encrypt"
+invariants:
+  profile: strict
+  approve_expected: true
+  max_revisions: 4
+  min_tasks: 3
+  mandatory_elements:
+    - verification
+    - rollback
+  forbidden_blockers: []
+  acceptable_escalation_reasons:
+    - revision_cap_reached
+    - replan_aborted

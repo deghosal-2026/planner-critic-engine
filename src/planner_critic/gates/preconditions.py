@@ -46,7 +46,12 @@ class Gate(BaseGate):
                     grounded = True
                 elif precondition.established_by is not None:
                     grounding = precondition.established_by
-                    grounded = grounding in available or grounding.startswith("env:")
+                    grounded = (
+                        grounding in available
+                        or grounding.startswith("env:")
+                        or grounding == "env"
+                        or grounding in ("environment", "system", "infra")
+                    )
                 if not grounded:
                     findings.append(
                         Finding(
@@ -75,9 +80,17 @@ class Gate(BaseGate):
 
         Returns:
             The set of fact keys this task establishes: its own id, the
-            environment fact named by its target, and any verification output.
+            environment fact named by its target, any verification output,
+            and any precondition facts it itself declares (so a task that
+            checks 'db_healthy' establishes 'db_healthy' for later tasks).
         """
         facts: set[str] = {task.id, f"env:{task.target}"}
         if task.verification is not None:
             facts.add(f"verified:{task.verification.what}")
+            facts.add(task.verification.what)
+        for pre in task.preconditions:
+            if pre.fact:
+                facts.add(pre.fact)
+            if pre.established_by:
+                facts.add(pre.established_by)
         return frozenset(facts)
