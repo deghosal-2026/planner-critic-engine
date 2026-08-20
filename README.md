@@ -76,16 +76,33 @@ The plan is a persisted, versioned artifact — you can diff revisions, see whic
 
 ```
 planner_critic_engine/
-docs/             Documentation (see below)
-docs/architecture/    System architecture and spec
-docs/design/          PRD, design spec, design decisions
+docs/             Documentation
+docs/architecture/   System architecture and spec
+docs/design/         PRD, design spec, design decisions
+docs/field-test/     Field test plan + results
+  field-test-plan.md          Field test plan (65 goals, 10 domains, 30 capabilities)
+  field-test-results-0.1.0.md Field test results v0.1.0 (BLUF, conclusions, data)
+  goals/                      65 real-world goal scenarios across 10 domains
+  reports/0.1.0/full-sweep/   Full sweep traces, LLM logs, per-goal evidence
+docs/wbs/             Work breakdown structure (M1–M10)
 docs/reference/       API reference, quickstart
-docs/wbs/             Work breakdown structure
-docs/test/            Test plans and reports
-docs/field-test/      Field test plans and reports
 tests/            Test suite
 examples/         Sample goal: draft → critique → revise trace
 ```
+
+---
+
+## Documentation
+
+| Doc | Path | Contents |
+|-----|------|----------|
+| **Field Test Plan** | `docs/field-test/field-test-plan.md` | 65-goal corpus, 30 capabilities, invariant assertions, execution design |
+| **Field Test Results v0.1.0** | `docs/field-test/field-test-results-0.1.0.md` | BLUF, conclusions, observations, surprises, learnings, per-goal data, evidence |
+| **Docker Integration** | `docs/field-test/docker-integration.md` | Containerized engine + CLI/HTTP/MCP vs local LLM |
+| **Architecture v0.1.0** | `docs/architecture/architecture-v0.1.0.md` | Component diagram, module map, data flow |
+| **WBS Index** | `docs/wbs/v0.1.0/wbs-v0.1.0-index.md` | Milestone overview, dependency graph, issue ranges |
+| **Design Decisions** | `docs/design/design-decisions.md` | DD-01..N decision records |
+| **API Reference** | `docs/reference/api.md` | CLI cheat-sheet, HTTP endpoints, MCP tools |
 
 ---
 
