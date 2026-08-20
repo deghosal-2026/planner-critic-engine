@@ -1,0 +1,183 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-03-index-backfill",
+  "duration_seconds": 13.68,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-db-03-index-backfill-r2",
+    "goal_id": "db-03-index-backfill",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "db-03-index-backfill-plan",
+    "created_at": "2026-08-20T23:40:45.111780Z",
+    "tasks": [
+      {
+        "id": "check_database_health",
+        "description": "Check the health of the database before starting the index creation",
+        "action": "check",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "db is reachable",
+            "fact": "db_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "database health metrics",
+          "how": "check autovacuum status and current WAL generation rates",
+          "expected": "autovacuum is running and WAL generation is within acceptable limits"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create_index",
+        "description": "Create B-tree index on orders(customer_id, created_at)",
+        "action": "create_index",
+        "target": "orders",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "index creation success",
+          "how": "query pg_stat_user_indexes",
+          "expected": "index should be listed"
+        },
+        "rollback": {
+          "trigger": "index creation fails",
+          "action": "DROP INDEX CONCURRENTLY orders_customer_created_at_idx; release locks",
+          "safety_guard": "verify index is removed and no locks remain"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "check_index_usage",
+        "description": "Verify index usage after index creation",
+        "action": "check",
+        "target": "pg_stat_user_indexes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "index creation succeeded",
+            "fact": "index_created",
+            "established_by": "create_index",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "index usage statistics",
+          "how": "query pg_stat_user_indexes",
+          "expected": "index should be actively used"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_database_health",
+        "to_task": "create_index",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_index",
+        "to_task": "check_index_usage",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:create_index",
+      "task_id": "create_index",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The create_index task has no preconditions verified beforehand, leading to potential failures if the database health is not adequate.",
+      "suggested_fix": "Add a precondition to the create_index task that checks for successful execution of check_database_health."
+    },
+    {
+      "id": "crit:2:weak_rollback:create_index",
+      "task_id": "create_index",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for create_index does not include verification steps to ensure index removal and that no locks remain, leaving potential risks if a rollback is initiated.",
+      "suggested_fix": "Enhance the rollback plan to include checks that confirm the index has been dropped and no locks are held."
+    },
+    {
+      "id": "crit:2:missing_steps:check_database_health",
+      "task_id": "check_database_health",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The check_database_health task could also check for query performance metrics to anticipate potential issues during index creation.",
+      "suggested_fix": "Include verification of query performance metrics alongside autovacuum status in the check_database_health task."
+    },
+    {
+      "id": "crit:2:risk:create_index",
+      "task_id": "create_index",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Risk of deadlocks during concurrent index build should be explicitly acknowledged in the create_index task's risk assessment.",
+      "suggested_fix": "Add a specific note regarding the risk of deadlocks in the create_index task."
+    },
+    {
+      "id": "crit:2:risk:check_index_usage",
+      "task_id": "check_index_usage",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "While verifying index usage is important, consider assessing actual query performance improvements as an additional metric.",
+      "suggested_fix": "Include a check for query performance improvements after checking index usage."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-03-index-backfill:2:2",
+    "plan_id": "plan-db-03-index-backfill-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unverified_dependencies:create_index",
+    "question": "Plan for goal 'db-03-index-backfill' cannot be approved: blockers remain (llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

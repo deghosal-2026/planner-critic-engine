@@ -1,0 +1,244 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-02-streaming-replication",
+  "duration_seconds": 12.0,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "db-02-streaming-replication-plan",
+    "goal_id": "db-02-streaming-replication",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T23:51:58.565855Z",
+    "tasks": [
+      {
+        "id": "provision_primary",
+        "description": "Provision the primary PostgreSQL instance",
+        "action": "provision",
+        "target": "primary_db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "primary instance status",
+          "how": "check db connection",
+          "expected": "reachable"
+        },
+        "rollback": {
+          "trigger": "provisioning fails",
+          "action": "deprovision primary instance",
+          "safety_guard": "check provisioning logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "provision_standby",
+        "description": "Provision the standby PostgreSQL instance in a separate availability zone",
+        "action": "provision",
+        "target": "standby_db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "standby instance status",
+          "how": "check db connection",
+          "expected": "reachable"
+        },
+        "rollback": {
+          "trigger": "provisioning fails",
+          "action": "deprovision standby instance",
+          "safety_guard": "check provisioning logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_replication",
+        "description": "Configure streaming replication between primary and standby",
+        "action": "configure",
+        "target": "replication",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replication status",
+          "how": "run pg_stat_replication query",
+          "expected": "standby is catching up"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "reset replication settings",
+          "safety_guard": "backup replication config"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "set_replication_slots",
+        "description": "Set up replication slots to manage WAL accumulation",
+        "action": "manage",
+        "target": "wal_slots",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "primary instance must be reachable",
+            "fact": "primary_db_ready",
+            "established_by": "provision_primary",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_failover",
+        "description": "Configure Patroni or repmgr for automated failover detection and promotion",
+        "action": "configure",
+        "target": "failover",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "failover functionality",
+          "how": "simulate failover",
+          "expected": "standby promotes successfully"
+        },
+        "rollback": {
+          "trigger": "failover fails",
+          "action": "restore previous failover configuration",
+          "safety_guard": "ensure previous settings are intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_replicate_lag",
+        "description": "Verify replication lag stays under 100ms at P99",
+        "action": "monitor",
+        "target": "replication_lag",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "replication must be configured",
+            "fact": "replication_configured",
+            "established_by": "configure_replication",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "provision_primary",
+        "to_task": "provision_standby",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provision_standby",
+        "to_task": "configure_replication",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provision_primary",
+        "to_task": "set_replication_slots",
+        "kind": "soft",
+        "reason": ""
+      },
+      {
+        "from_task": "provision_standby",
+        "to_task": "configure_failover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_replication",
+        "to_task": "verify_replicate_lag",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:provision_standby",
+      "task_id": "provision_standby",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The standby instance provisioning is dependent on the primary instance being provisioned first, ensure proper sequencing.",
+      "suggested_fix": "Change order to provision_primary before provision_standby."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:set_replication_slots",
+      "task_id": "set_replication_slots",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Setting up replication slots depends on the primary instance being reachable, which is not verified before this task.",
+      "suggested_fix": "Add a prerequisite verification for primary instance readiness before setting replication slots."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:verify_replicate_lag",
+      "task_id": "verify_replicate_lag",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Verifying replication lag depends on replication being configured, which is not verified before this task.",
+      "suggested_fix": "Ensure the prior task configure_replication confirms its success before enabling verify_replicate_lag."
+    },
+    {
+      "id": "crit:1:missing_steps:configure_replication",
+      "task_id": "configure_replication",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding steps to verify the network settings and access permissions before configuring replication.",
+      "suggested_fix": "Include a pre-check for network and permissions configuration."
+    },
+    {
+      "id": "crit:1:weak_rollback:configure_replication",
+      "task_id": "configure_replication",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action for this task (reset replication settings) may not fully restore the previous state in case of failure.",
+      "suggested_fix": "Ensure a backup of the entire replication config is taken before any configuration changes."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

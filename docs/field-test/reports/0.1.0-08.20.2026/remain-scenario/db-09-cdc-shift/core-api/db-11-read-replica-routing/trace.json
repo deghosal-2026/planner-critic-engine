@@ -1,0 +1,259 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-11-read-replica-routing",
+  "duration_seconds": 12.22,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "db-11-read-replica-routing",
+    "goal_id": "db-11-read-replica-routing",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T23:44:23.794186Z",
+    "tasks": [
+      {
+        "id": "provision_replicas",
+        "description": "Provision 2 read replicas in different AZs",
+        "action": "provision",
+        "target": "read_replicas",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replica availability",
+          "how": "check instances",
+          "expected": "2 replicas running"
+        },
+        "rollback": {
+          "trigger": "provisioning fails",
+          "action": "deprovision replicas",
+          "safety_guard": "verify no data loss"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_connection_pooling",
+        "description": "Configure PgBouncer connection pooling with read/write split rules",
+        "action": "configure",
+        "target": "PgBouncer",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "replicas are provisioned",
+            "fact": "replica_available",
+            "established_by": "provision_replicas",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_replica_lag",
+        "description": "Verify replica lag is less than 100ms",
+        "action": "check",
+        "target": "replicas",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replica lag",
+          "how": "check lag metrics",
+          "expected": "<100ms"
+        },
+        "rollback": {
+          "trigger": "lag exceeds threshold",
+          "action": "reconfigure application to point to primary",
+          "safety_guard": "monitor for changes in traffic"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "drain_read_traffic",
+        "description": "Slowly drain read traffic from primary to replicas",
+        "action": "drain",
+        "target": "primary",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "read traffic distribution",
+          "how": "analyze traffic logs",
+          "expected": "100% traffic to replicas after 4 hours"
+        },
+        "rollback": {
+          "trigger": "failure to drain",
+          "action": "restore full traffic to primary",
+          "safety_guard": "monitor after rollback"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_stale_reads",
+        "description": "Monitor for stale-read issues",
+        "action": "monitor",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "drain read traffic is underway",
+            "fact": "drain_in_progress",
+            "established_by": "drain_read_traffic",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_failover_behavior",
+        "description": "Verify failover behavior if a replica goes down",
+        "action": "test",
+        "target": "replica",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "failover success",
+          "how": "test failover scenario",
+          "expected": "application continues to function correctly"
+        },
+        "rollback": {
+          "trigger": "failover test fails",
+          "action": "revert to previous replica configuration",
+          "safety_guard": "ensure primary is functioning properly"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "final_verification",
+        "description": "Complete verification of all changes and performance",
+        "action": "check",
+        "target": "system",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "all tasks completed successfully",
+            "fact": "tasks_complete",
+            "established_by": "drain_read_traffic",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "provision_replicas",
+        "to_task": "configure_connection_pooling",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_connection_pooling",
+        "to_task": "verify_replica_lag",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_replica_lag",
+        "to_task": "drain_read_traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "drain_read_traffic",
+        "to_task": "monitor_stale_reads",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "drain_read_traffic",
+        "to_task": "verify_failover_behavior",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "drain_read_traffic",
+        "to_task": "final_verification",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:configure_connection_pooling",
+      "task_id": "configure_connection_pooling",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "configure_connection_pooling is scheduled before verifying the availability of replicas.",
+      "suggested_fix": "Ensure 'provision_replicas' is completed and 'replica_available' is verified before proceeding to 'configure_connection_pooling'."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:drain_read_traffic",
+      "task_id": "drain_read_traffic",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "drain_read_traffic depends on the outcome of the verify_replica_lag task, which is unverified.",
+      "suggested_fix": "Add verification that confirms replica lag is valid before proceeding to 'drain_read_traffic'."
+    },
+    {
+      "id": "crit:1:missing_steps:monitor_stale_reads",
+      "task_id": "monitor_stale_reads",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider including steps to handle outages during monitoring for stale reads.",
+      "suggested_fix": "Plan for contingency measures if stale reads are detected during monitoring."
+    },
+    {
+      "id": "crit:1:weak_rollback:drain_read_traffic",
+      "task_id": "drain_read_traffic",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "'restore full traffic to primary' rollback may not guarantee system consistency if issues arise during draining.",
+      "suggested_fix": "Implement checks to ensure that all traffic is accurately restored to the primary before finalizing the rollback."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

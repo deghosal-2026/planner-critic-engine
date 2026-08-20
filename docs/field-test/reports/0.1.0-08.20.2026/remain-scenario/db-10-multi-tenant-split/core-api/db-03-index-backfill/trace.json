@@ -1,0 +1,231 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-03-index-backfill",
+  "duration_seconds": 26.86,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-db-03-index-backfill-r2",
+    "goal_id": "db-03-index-backfill",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "db-03-index-backfill-plan",
+    "created_at": "2026-08-20T23:46:01.916448Z",
+    "tasks": [
+      {
+        "id": "check_autovacuum",
+        "description": "Check autovacuum settings and status",
+        "action": "query",
+        "target": "pg_stat_activity",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "pg_stat_activity is accessible",
+            "fact": "pg_stat_activity_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "autovacuum status",
+          "how": "query pg_autovacuum",
+          "expected": "no conflicting locks"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "check_index_usage",
+        "description": "Check index usage before index creation",
+        "action": "query",
+        "target": "pg_stat_user_indexes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "pg_stat_user_indexes is accessible",
+            "fact": "pg_stat_user_indexes_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "index usage metrics",
+          "how": "query pg_stat_user_indexes",
+          "expected": "no excessive usage of existing indexes"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create_index",
+        "description": "Create B-tree index on orders",
+        "action": "create_index",
+        "target": "orders",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "No conflicting locks on orders table",
+            "fact": "no_conflicting_locks",
+            "established_by": "check_autovacuum",
+            "probe": null
+          },
+          {
+            "description": "Index usage metrics verified",
+            "fact": "index_usage_verified",
+            "established_by": "check_index_usage",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "index existence and usage",
+          "how": "query pg_stat_user_indexes",
+          "expected": "index is present and used"
+        },
+        "rollback": {
+          "trigger": "index creation fails",
+          "action": "DROP INDEX CONCURRENTLY orders_customer_created_at_idx",
+          "safety_guard": "check index exists"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_index_usage",
+        "description": "Verify index usage after index creation",
+        "action": "query",
+        "target": "pg_stat_user_indexes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "pg_stat_user_indexes is accessible",
+            "fact": "pg_stat_user_indexes_accessible_after",
+            "established_by": "create_index",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_autovacuum",
+        "to_task": "create_index",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check_index_usage",
+        "to_task": "create_index",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_index",
+        "to_task": "verify_index_usage",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:create_index",
+      "task_id": "create_index",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Creating an index on a table with 200 million rows using CREATE INDEX CONCURRENTLY may exceed the available resources given the high write load, leading to possible failures.",
+      "suggested_fix": "Consider reducing the load on the orders table or scheduling the index creation during off-peak hours."
+    },
+    {
+      "id": "crit:2:weak_rollback:create_index",
+      "task_id": "create_index",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for index creation does not account for scenarios where the index might exist but is not valid, potentially leaving the table in an inconsistent state.",
+      "suggested_fix": "Enhance the rollback plan to check if the index exists and is valid before attempting to drop it."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:create_index",
+      "task_id": "create_index",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'create_index' relies on verifications from 'check_autovacuum' and 'check_index_usage', but there are no guarantees these tasks will succeed under all conditions, leading to potential execution issues.",
+      "suggested_fix": "Add more robust error handling for the dependencies to ensure they meet conditions for creating the index."
+    },
+    {
+      "id": "crit:2:risk:check_autovacuum",
+      "task_id": "check_autovacuum",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Potential risks from autovacuum settings should be monitored closely due to the high write load which may lead to deadlocks during index creation.",
+      "suggested_fix": "Implement additional checks for lock contention in the preconditions."
+    },
+    {
+      "id": "crit:2:risk:check_index_usage",
+      "task_id": "check_index_usage",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Verifying index usage before creating the new index is crucial, but the verification process may miss edge cases of excessive usage leading to failures.",
+      "suggested_fix": "Include checks for all queries that could impact the old index's performance."
+    },
+    {
+      "id": "crit:2:missing_steps:verify_index_usage",
+      "task_id": "verify_index_usage",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Verification step after index creation should include validating no performance regressions compared to the previous usage metrics.",
+      "suggested_fix": "Add comparative analysis of query performance metrics before and after the index creation."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-03-index-backfill:2:2",
+    "plan_id": "plan-db-03-index-backfill-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:feasibility:create_index",
+    "question": "Plan for goal 'db-03-index-backfill' cannot be approved: blockers remain (llm_feasibility; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

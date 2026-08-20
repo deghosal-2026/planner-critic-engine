@@ -1,0 +1,262 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-06-service-mesh",
+  "duration_seconds": 45.35,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-k8s-06-service-mesh-r3",
+    "goal_id": "k8s-06-service-mesh",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-k8s-06-service-mesh-r2",
+    "created_at": "2026-08-20T23:46:21.341596Z",
+    "tasks": [
+      {
+        "id": "label_namespace",
+        "description": "Enable automatic sidecar injection by labeling the namespace",
+        "action": "label",
+        "target": "namespace",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "namespace exists",
+            "fact": "namespace_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "namespace labels",
+          "how": "check labels with kubectl",
+          "expected": "sidecar-injection=enabled"
+        },
+        "rollback": {
+          "trigger": "labeling fails or needs rollback",
+          "action": "remove label from namespace",
+          "safety_guard": "verify namespace does not have sidecar injection"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "route_1_percent",
+        "description": "Create a VirtualService to route 1% of traffic through the mesh",
+        "action": "create",
+        "target": "VirtualService",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Istio control plane is installed",
+            "fact": "istio_installed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "VirtualService routing configuration",
+          "how": "run istioctl to validate configuration",
+          "expected": "1% traffic routed"
+        },
+        "rollback": {
+          "trigger": "traffic routing fails or needs rollback",
+          "action": "remove VirtualService or update to route 0%",
+          "safety_guard": "verify no traffic routed through the mesh"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "observe_traffic",
+        "description": "Observe latency and error rate for one hour with 1% traffic",
+        "action": "observe",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "VirtualService is created",
+            "fact": "virtual_service_created",
+            "established_by": "route_1_percent",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "ramp_to_50_percent",
+        "description": "Update VirtualService to route 50% of traffic through the mesh",
+        "action": "update",
+        "target": "VirtualService",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "VirtualService routing configuration",
+          "how": "run istioctl to validate configuration",
+          "expected": "50% traffic routed"
+        },
+        "rollback": {
+          "trigger": "ramp fails or needs rollback",
+          "action": "update VirtualService to route 1%",
+          "safety_guard": "verify 1% traffic routing"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "observe_traffic_ramped",
+        "description": "Observe latency and error rate for one hour with 50% traffic",
+        "action": "observe",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "VirtualService is updated to route 50%",
+            "fact": "virtual_service_routed_50",
+            "established_by": "ramp_to_50_percent",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "check_metrics",
+        "description": "Check p99 latency and error rates to decide on rollback",
+        "action": "check",
+        "target": "metrics",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "latency and error rate metrics",
+          "how": "run Kiali and check metrics",
+          "expected": "latency not >200ms and error rate not above baseline"
+        },
+        "rollback": {
+          "trigger": "p99 latency increases by more than 200ms or error rate rises above baseline",
+          "action": "remove namespace label and patch Deployments",
+          "safety_guard": "verify traffic is routed back to legacy Deployments before modifying namespace"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "decommission_legacy",
+        "description": "Decommission legacy deployments after successful routing of 100% traffic",
+        "action": "remove",
+        "target": "legacy Deployments",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "All traffic routed through the mesh",
+            "fact": "traffic_routed_100",
+            "established_by": "check_metrics",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "label_namespace",
+        "to_task": "route_1_percent",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "route_1_percent",
+        "to_task": "observe_traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "observe_traffic",
+        "to_task": "ramp_to_50_percent",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "ramp_to_50_percent",
+        "to_task": "observe_traffic_ramped",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "observe_traffic_ramped",
+        "to_task": "check_metrics",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check_metrics",
+        "to_task": "decommission_legacy",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unverified_dependencies:check_metrics",
+      "task_id": "check_metrics",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task depends on 'traffic_routed_100' to verify rollback but this dependency is not established within the task sequence.",
+      "suggested_fix": "Ensure 'traffic_routed_100' is verified before executing 'check_metrics'."
+    },
+    {
+      "id": "crit:3:weak_rollback:decommission_legacy",
+      "task_id": "decommission_legacy",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Decommissioning legacy deployments lacks a rollback plan in case it needs to be reversed after execution.",
+      "suggested_fix": "Add a rollback plan to restore legacy deployments if decommissioning fails."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-06-service-mesh:3:3",
+    "plan_id": "plan-k8s-06-service-mesh-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unverified_dependencies:check_metrics",
+    "question": "Plan for goal 'k8s-06-service-mesh' cannot be approved: blockers remain (llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

@@ -1,0 +1,165 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-04-hpa-tuning",
+  "duration_seconds": 7.75,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "k8s-04-hpa-tuning-plan",
+    "goal_id": "k8s-04-hpa-tuning",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T23:50:37.969117Z",
+    "tasks": [
+      {
+        "id": "analyze_metrics",
+        "description": "Analyze CPU and memory utilization patterns",
+        "action": "analyze",
+        "target": "metrics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Prometheus metrics available for analysis",
+            "fact": "prometheus_metrics_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "adjust_hpa_parameters",
+        "description": "Adjust target utilization thresholds and replica counts",
+        "action": "adjust",
+        "target": "HPA",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "HPA configuration",
+          "how": "compare with previous config",
+          "expected": "matches expected thresholds and counts"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "restore previous HPA configuration",
+          "safety_guard": "rollback verified by monitoring tool"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "load_test",
+        "description": "Validate the new configuration under synthetic load",
+        "action": "load_test",
+        "target": "API",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "API response times",
+          "how": "benchmarking with hey",
+          "expected": "within acceptable threshold"
+        },
+        "rollback": {
+          "trigger": "load test fails",
+          "action": "revert to previous HPA parameters",
+          "safety_guard": "verify service stability"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_stability",
+        "description": "Monitor for stability post-adjustment",
+        "action": "monitor",
+        "target": "API",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "analyze_metrics",
+        "to_task": "adjust_hpa_parameters",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "adjust_hpa_parameters",
+        "to_task": "load_test",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "load_test",
+        "to_task": "monitor_stability",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unverified_dependencies:adjust_hpa_parameters",
+      "task_id": "adjust_hpa_parameters",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'adjust_hpa_parameters' does not have any preconditions, leading to potential issues if 'analyze_metrics' is not completed successfully.",
+      "suggested_fix": "Add a hard prerequisite check to ensure 'analyze_metrics' is complete and its metrics are valid before proceeding."
+    },
+    {
+      "id": "crit:1:weak_rollback:load_test",
+      "task_id": "load_test",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback process for 'load_test' does not guarantee that the previous HPA parameters will correctly restore service stability.",
+      "suggested_fix": "Ensure that the rollback includes verification that the previous parameters indeed revert the service to a stable state."
+    },
+    {
+      "id": "crit:1:missing_steps:monitor_stability",
+      "task_id": "monitor_stability",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The plan does not include a verification step or specific metrics to monitor in the 'monitor_stability' task.",
+      "suggested_fix": "Define specific metrics to monitor (e.g., CPU usage, response times) during the stability phase."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

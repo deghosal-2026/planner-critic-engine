@@ -1,0 +1,208 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-02-streaming-replication",
+  "duration_seconds": 8.79,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "db-02-streaming-replication-plan",
+    "goal_id": "db-02-streaming-replication",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T23:45:36.650399Z",
+    "tasks": [
+      {
+        "id": "provision_primary",
+        "description": "Provision primary PostgreSQL instance",
+        "action": "provision",
+        "target": "primary_db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "primary instance status",
+          "how": "check instance health",
+          "expected": "running"
+        },
+        "rollback": {
+          "trigger": "provisioning fails",
+          "action": "cleanup primary resources",
+          "safety_guard": "ensure no partial resources exist"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "provision_standby",
+        "description": "Provision standby PostgreSQL instance in a separate availability zone",
+        "action": "provision",
+        "target": "standby_db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "standby instance status",
+          "how": "check instance health",
+          "expected": "running"
+        },
+        "rollback": {
+          "trigger": "provisioning fails",
+          "action": "cleanup standby resources",
+          "safety_guard": "ensure no partial resources exist"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_replication_slots",
+        "description": "Configure replication slots to manage WAL accumulation",
+        "action": "configure",
+        "target": "primary_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "primary database is running",
+            "fact": "primary_instance_running",
+            "established_by": "provision_primary",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_patroni",
+        "description": "Set up Patroni for automated failover",
+        "action": "configure",
+        "target": "primary_db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "patroni service status",
+          "how": "check patroni logs",
+          "expected": "running"
+        },
+        "rollback": {
+          "trigger": "setup fails",
+          "action": "remove patroni configuration",
+          "safety_guard": "ensure database is still accessible"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_replication_lag",
+        "description": "Verify replication lag stays under 100ms",
+        "action": "monitor",
+        "target": "pg_stat_replication",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "standby is configured and running",
+            "fact": "standby_instance_running",
+            "established_by": "provision_standby",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "provision_primary",
+        "to_task": "provision_standby",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provision_primary",
+        "to_task": "configure_replication_slots",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provision_primary",
+        "to_task": "setup_patroni",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provision_standby",
+        "to_task": "verify_replication_lag",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:provision_standby",
+      "task_id": "provision_standby",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'provision_standby' is dependent on 'provision_primary' but does not verify that 'provision_primary' succeeded before executing.",
+      "suggested_fix": "Add a hard dependency from 'provision_standby' to 'provision_primary'."
+    },
+    {
+      "id": "crit:1:missing_steps:configure_replication_slots",
+      "task_id": "configure_replication_slots",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The task 'configure_replication_slots' does not specify rollback steps, which are essential for managing failures during configuration.",
+      "suggested_fix": "Define a rollback action for 'configure_replication_slots'."
+    },
+    {
+      "id": "crit:1:missing_steps:setup_patroni",
+      "task_id": "setup_patroni",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The task 'setup_patroni' lacks a verification step to confirm successful Patroni setup, which is crucial for reliability.",
+      "suggested_fix": "Add a verification step to ensure Patroni is set up correctly."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:verify_replication_lag",
+      "task_id": "verify_replication_lag",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'verify_replication_lag' has a hard dependency on 'provision_standby' but does not verify that 'provision_standby' has completed successfully.",
+      "suggested_fix": "Ensure 'provision_standby' is verified before executing 'verify_replication_lag'."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

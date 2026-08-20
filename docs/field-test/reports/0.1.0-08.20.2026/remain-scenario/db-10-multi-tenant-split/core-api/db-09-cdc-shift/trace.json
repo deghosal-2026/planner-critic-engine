@@ -1,0 +1,263 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-09-cdc-shift",
+  "duration_seconds": 43.91,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-db-09-cdc-shift-r3",
+    "goal_id": "db-09-cdc-shift",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-db-09-cdc-shift-r2",
+    "created_at": "2026-08-20T23:48:56.981242Z",
+    "tasks": [
+      {
+        "id": "setup_replication_slot",
+        "description": "Set up logical replication slot on production PostgreSQL 14",
+        "action": "create_slot",
+        "target": "PostgreSQL",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PostgreSQL is reachable",
+            "fact": "db_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replication slot exists",
+          "how": "query postgres",
+          "expected": "slot_name is present"
+        },
+        "rollback": {
+          "trigger": "slot setup fails",
+          "action": "remove slot",
+          "safety_guard": "confirm slot is unused"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "capture_wal_changes",
+        "description": "Capture WAL changes for replication",
+        "action": "start_log_replication",
+        "target": "PostgreSQL",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "replication slot is set up",
+            "fact": "slot_created",
+            "established_by": "setup_replication_slot",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "WAL changes are being captured",
+          "how": "check replication status",
+          "expected": "replication is active"
+        },
+        "rollback": {
+          "trigger": "change capture fails",
+          "action": "stop replication",
+          "safety_guard": "ensure no lag"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "replicate_to_warehouse",
+        "description": "Replicate captured changes to Snowflake",
+        "action": "sync_changes",
+        "target": "Snowflake",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "WAL capture is active",
+            "fact": "wal_capturing",
+            "established_by": "capture_wal_changes",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data is in Snowflake",
+          "how": "query Snowflake",
+          "expected": "latest changes appear"
+        },
+        "rollback": {
+          "trigger": "replication fails",
+          "action": "pause ingestion",
+          "safety_guard": "validate data integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "backfill_historical_data",
+        "description": "Backfill historical data via snapshot",
+        "action": "backfill_data",
+        "target": "Snowflake",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "replication to warehouse is active",
+            "fact": "data_replicating",
+            "established_by": "replicate_to_warehouse",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "historical data present",
+          "how": "validate Snowflake records",
+          "expected": "records match source"
+        },
+        "rollback": {
+          "trigger": "backfill fails",
+          "action": "revert Snowflake tables",
+          "safety_guard": "ensure all records checked for completeness and integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "check_lag",
+        "description": "Check that lag is below 5 seconds",
+        "action": "verify_lag",
+        "target": "PostgreSQL",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "backfill is complete and verified",
+            "fact": "backfill_verified",
+            "established_by": "backfill_historical_data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "lag time",
+          "how": "check lag metric",
+          "expected": "lag is < 5s"
+        },
+        "rollback": null,
+        "risk_class": "low",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover_consumers",
+        "description": "Cutover analytics consumers from batch ETL to CDC stream",
+        "action": "cutover",
+        "target": "analytics consumers",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "lag is verified",
+            "fact": "lag_verified",
+            "established_by": "check_lag",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "analytics consumers using stream",
+          "how": "monitor consumer logs",
+          "expected": "no lag > 5s"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "switch back to batch ETL",
+          "safety_guard": "ensure consumer state is consistent and no data loss occurs during cutover verification"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup_replication_slot",
+        "to_task": "capture_wal_changes",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "capture_wal_changes",
+        "to_task": "replicate_to_warehouse",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "replicate_to_warehouse",
+        "to_task": "backfill_historical_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "backfill_historical_data",
+        "to_task": "check_lag",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check_lag",
+        "to_task": "cutover_consumers",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:check_lag",
+      "task_id": "check_lag",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'check_lag' depends on 'backfill_historical_data' being verified, but verification of lag should occur only after backfill is complete.",
+      "suggested_fix": "Ensure that 'check_lag' is executed after the successful completion of the 'backfill_historical_data' task."
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:cutover_consumers",
+      "task_id": "cutover_consumers",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'cutover_consumers' may be executed before 'check_lag' confirms lag is below 5 seconds, risking data loss.",
+      "suggested_fix": "Ensure that 'cutover_consumers' task is only executed after 'check_lag' task has successfully validated that lag is under the specified limit."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-09-cdc-shift:3:3",
+    "plan_id": "plan-db-09-cdc-shift-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:check_lag",
+    "question": "Plan for goal 'db-09-cdc-shift' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

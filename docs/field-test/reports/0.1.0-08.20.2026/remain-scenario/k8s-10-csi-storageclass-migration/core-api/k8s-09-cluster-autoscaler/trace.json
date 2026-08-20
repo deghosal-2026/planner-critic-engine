@@ -1,0 +1,309 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-09-cluster-autoscaler",
+  "duration_seconds": 21.49,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "k8s-09-cluster-autoscaler-plan",
+    "goal_id": "k8s-09-cluster-autoscaler",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T23:47:39.204554Z",
+    "tasks": [
+      {
+        "id": "install-helm-chart",
+        "description": "Install cluster-autoscaler via Helm",
+        "action": "install",
+        "target": "cluster-autoscaler",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "kubectl is configured",
+            "fact": "kubectl_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "helm release status",
+          "how": "check helm output",
+          "expected": "active"
+        },
+        "rollback": {
+          "trigger": "installation fails",
+          "action": "uninstall helm chart",
+          "safety_guard": "ensure no resources left behind"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-discovery",
+        "description": "Configure node group auto-discovery",
+        "action": "configure",
+        "target": "node-group-discovery",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cluster-autoscaler is installed",
+            "fact": "cluster_autoscaler_installed",
+            "established_by": "install-helm-chart",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "set-min-max-nodes",
+        "description": "Set min/max node counts per group",
+        "action": "configure",
+        "target": "node-counts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "node groups are configured",
+            "fact": "node_groups_configured",
+            "established_by": "configure-discovery",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "tune-scale-down-delay",
+        "description": "Tune scale-down delay to 10 minutes",
+        "action": "configure",
+        "target": "scale-down-delay",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "min/max nodes are set",
+            "fact": "min_max_nodes_set",
+            "established_by": "set-min-max-nodes",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-scale-up-triggers",
+        "description": "Verify scale-up triggers on pending pods",
+        "action": "verify",
+        "target": "scale-up-triggers",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "autoscaler is tuning scale-up settings",
+            "fact": "scale_up_settings_tuned",
+            "established_by": "tune-scale-down-delay",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "pending pods count",
+          "how": "query kubectl for pending pods",
+          "expected": "scale-up action taken"
+        },
+        "rollback": {
+          "trigger": "scale-up fails",
+          "action": "restore previous configuration",
+          "safety_guard": "check pod conditions"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-scale-down-drain",
+        "description": "Verify scale-down drains nodes gracefully",
+        "action": "verify",
+        "target": "scale-down-drain",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "scale-down delay is tuned",
+            "fact": "scale_down_delay_tuned",
+            "established_by": "tune-scale-down-delay",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "pod disruption budget",
+          "how": "check PDB enforcement",
+          "expected": "no PDB violations"
+        },
+        "rollback": {
+          "trigger": "drain fails",
+          "action": "cancel scale-down operation",
+          "safety_guard": "ensure no disruption"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor-disruption",
+        "description": "Monitor for pod disruption using Prometheus and Grafana",
+        "action": "monitor",
+        "target": "disruption-metrics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "scale-down drain verification complete",
+            "fact": "scale_down_drain_verified",
+            "established_by": "verify-scale-down-drain",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "install-helm-chart",
+        "to_task": "configure-discovery",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-discovery",
+        "to_task": "set-min-max-nodes",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set-min-max-nodes",
+        "to_task": "tune-scale-down-delay",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "tune-scale-down-delay",
+        "to_task": "verify-scale-up-triggers",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "tune-scale-down-delay",
+        "to_task": "verify-scale-down-drain",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-scale-down-drain",
+        "to_task": "monitor-disruption",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:install-helm-chart",
+      "task_id": "install-helm-chart",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The task requires a working Kubernetes context to install the Helm chart, which must be verified to be configured properly before proceeding.",
+      "suggested_fix": "Ensure that the Kubernetes context is correctly set and functional before executing this task."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:configure-discovery",
+      "task_id": "configure-discovery",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "This task depends on the successful installation of cluster-autoscaler which needs to be verified before proceeding.",
+      "suggested_fix": "Add a verification step to confirm that the cluster-autoscaler is installed successfully before configuring node group auto-discovery."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:set-min-max-nodes",
+      "task_id": "set-min-max-nodes",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "This task depends on node groups being configured, which must be confirmed before task execution.",
+      "suggested_fix": "Incorporate a verification step to check that node groups are properly configured prior to setting min/max node counts."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:tune-scale-down-delay",
+      "task_id": "tune-scale-down-delay",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "This task requires that the min/max node counts are established, which needs verification before proceeding.",
+      "suggested_fix": "Add a verification step to ensure min/max node counts are set before tuning the scale-down delay."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:verify-scale-up-triggers",
+      "task_id": "verify-scale-up-triggers",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "This task requires that scale-up settings are tuned, which must be confirmed prior to verification of scale-up triggers.",
+      "suggested_fix": "Include a verification step for ensuring scale-up settings are correctly tuned before verifying scale-up triggers."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:verify-scale-down-drain",
+      "task_id": "verify-scale-down-drain",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "This task relies on the scale-down delay being tuned, which must be verified first.",
+      "suggested_fix": "Add a verification step to ensure that the scale-down delay has been properly tuned before this task is executed."
+    },
+    {
+      "id": "crit:1:missing_steps:monitor-disruption",
+      "task_id": "monitor-disruption",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Monitoring for pod disruption could benefit from more specific steps regarding Prometheus and Grafana integration.",
+      "suggested_fix": "Detail the monitoring process with specific metrics to be tracked to ensure meaningful pod disruption monitoring."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

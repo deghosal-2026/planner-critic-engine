@@ -1,0 +1,251 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-03-pod-security",
+  "duration_seconds": 8.71,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "k8s-03-pod-security-plan",
+    "goal_id": "k8s-03-pod-security",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T23:44:52.308842Z",
+    "tasks": [
+      {
+        "id": "enable_audit",
+        "description": "Enable audit mode across all namespaces",
+        "action": "enable",
+        "target": "audit mode",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "kubectl is configured",
+            "fact": "kubectl_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_audit",
+        "description": "Monitor audit logs for 72 hours",
+        "action": "monitor",
+        "target": "audit logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "audit mode is enabled",
+            "fact": "audit_mode_enabled",
+            "established_by": "enable_audit",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "low",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "switch_warn_mode",
+        "description": "Switch to warn mode for pod creation logs",
+        "action": "switch",
+        "target": "warn mode",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "audit monitoring is complete",
+            "fact": "audit_monitoring_complete",
+            "established_by": "monitor_audit",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_warnings",
+        "description": "Monitor warnings in logs for 48 hours",
+        "action": "monitor",
+        "target": "warnings logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "warn mode is active",
+            "fact": "warn_mode_active",
+            "established_by": "switch_warn_mode",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "low",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "enforce_baseline",
+        "description": "Enforce the baseline profile across all namespaces",
+        "action": "enforce",
+        "target": "baseline profile",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "compliance report",
+          "how": "generate report",
+          "expected": "compliance audit results"
+        },
+        "rollback": {
+          "trigger": "enforcement fails",
+          "action": "disable enforcement",
+          "safety_guard": "verify baseline compliance"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "generate_audit_report",
+        "description": "Generate a compliance audit report for stakeholders",
+        "action": "generate",
+        "target": "audit report",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "warning monitoring is complete",
+            "fact": "warning_monitoring_complete",
+            "established_by": "monitor_warnings",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "enable_audit",
+        "to_task": "monitor_audit",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_audit",
+        "to_task": "switch_warn_mode",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "switch_warn_mode",
+        "to_task": "monitor_warnings",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_warnings",
+        "to_task": "enforce_baseline",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_warnings",
+        "to_task": "generate_audit_report",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:enforce_baseline",
+      "task_id": "enforce_baseline",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Enforcing the baseline profile lacks necessary preconditions before execution.",
+      "suggested_fix": "Add preconditions to ensure compliance before enforcing the baseline."
+    },
+    {
+      "id": "crit:1:weak_rollback:enforce_baseline",
+      "task_id": "enforce_baseline",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback action for enforcing baseline is insufficient to cover potential failures.",
+      "suggested_fix": "Implement a more comprehensive rollback plan that addresses various failure scenarios."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:enforce_baseline",
+      "task_id": "enforce_baseline",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Baseline enforcement depends on verification of compliance that may not be established beforehand.",
+      "suggested_fix": "Ensure that compliance is verified prior to the enforcement phase."
+    },
+    {
+      "id": "crit:1:missing_steps:enable_audit",
+      "task_id": "enable_audit",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding a step to validate that audit mode is functioning correctly after it is enabled.",
+      "suggested_fix": "Introduce a verification step to confirm audit mode is active."
+    },
+    {
+      "id": "crit:1:missing_steps:switch_warn_mode",
+      "task_id": "switch_warn_mode",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider monitoring the impact of transitioning to warn mode on existing workloads.",
+      "suggested_fix": "Add a step to evaluate workload stability during the transition."
+    },
+    {
+      "id": "crit:1:risk:monitor_audit",
+      "task_id": "monitor_audit",
+      "version": 1,
+      "heuristic_family": "risk",
+      "severity": "info",
+      "reason_code": "llm_risk",
+      "message": "Monitoring audit logs for 72 hours may be insufficient for thorough compliance assessment.",
+      "suggested_fix": null
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,182 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-04-hpa-tuning",
+  "duration_seconds": 7.87,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "k8s-04-hpa-tuning-v1",
+    "goal_id": "k8s-04-hpa-tuning",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T23:44:59.567563Z",
+    "tasks": [
+      {
+        "id": "analyze_metrics",
+        "description": "Analyze 30 days of historical Prometheus metrics for CPU and memory utilization patterns.",
+        "action": "analyze",
+        "target": "prometheus",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Prometheus data is available",
+            "fact": "prometheus_data_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "adjust_hpa_config",
+        "description": "Adjust HPA parameters including target utilization thresholds, replica counts, and cooldown periods based on analysis.",
+        "action": "adjust",
+        "target": "hpa",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "HPA configuration",
+          "how": "check current HPA settings",
+          "expected": "settings reflect adjustments"
+        },
+        "rollback": {
+          "trigger": "adjustment fails",
+          "action": "revert to previous HPA settings",
+          "safety_guard": "confirm stable previous settings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "load_test",
+        "description": "Run a synthetic load test using the HTTP benchmarking tool to validate the new HPA configuration.",
+        "action": "run",
+        "target": "load_test",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service response under load",
+          "how": "check response times and error rates",
+          "expected": "response times within acceptable limits"
+        },
+        "rollback": {
+          "trigger": "load test fails",
+          "action": "revert to previous HPA settings",
+          "safety_guard": "confirm stable previous settings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_stability",
+        "description": "Monitor the service for 72 hours post-adjustment to confirm stability without thrashing.",
+        "action": "monitor",
+        "target": "service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Load test completed successfully",
+            "fact": "load_test_success",
+            "established_by": "load_test",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "analyze_metrics",
+        "to_task": "adjust_hpa_config",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "adjust_hpa_config",
+        "to_task": "load_test",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "load_test",
+        "to_task": "monitor_stability",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unverified_dependencies:adjust_hpa_config",
+      "task_id": "adjust_hpa_config",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'adjust_hpa_config' is dependent on the completion of 'analyze_metrics' which establishes 'prometheus_data_available', yet the dependency verification is not confirmed before proceeding.",
+      "suggested_fix": "Add a precondition to 'adjust_hpa_config' that checks for 'prometheus_data_available' to ensure that metric analysis is complete."
+    },
+    {
+      "id": "crit:1:weak_rollback:adjust_hpa_config",
+      "task_id": "adjust_hpa_config",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The task 'adjust_hpa_config' lacks a sound rollback strategy that ensures safe reversion to HPA settings if adjustments fail without confirming the previous settings.",
+      "suggested_fix": "Enhance the rollback strategy to include a verification step confirming the stability of previous settings before reverting."
+    },
+    {
+      "id": "crit:1:weak_rollback:load_test",
+      "task_id": "load_test",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The task 'load_test' also lacks a sound rollback mechanism, as reverting to previous HPA settings does not guarantee stability post-load test failure.",
+      "suggested_fix": "Ensure that the rollback for 'load_test' includes a verification of the service's state after reverting to previous settings."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:monitor_stability",
+      "task_id": "monitor_stability",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'monitor_stability' depends on successful completion of 'load_test', but there is no confirmation that this prerequisite has been met before monitoring begins.",
+      "suggested_fix": "Add a precondition to 'monitor_stability' that checks for 'load_test_success' to confirm that the load test passed before monitoring."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}
