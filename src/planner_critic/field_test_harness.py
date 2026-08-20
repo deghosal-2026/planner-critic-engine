@@ -93,11 +93,19 @@ def _check_invariants(status: str, findings: list[Finding], tasks: list[dict], r
 # Dimension runners
 # ---------------------------------------------------------------------------
 
+def _wrap_with_logging(registry, goal_id, role, out_dir):
+    """Wrap a registry provider with LoggingProvider for prompt/response capture."""
+    from .llm.logging_provider import LoggingProvider
+    raw = registry.get_provider(role)
+    return LoggingProvider(raw, log_dir=out_dir / "llm-logs", goal_id=goal_id, role=role)
+
 def run_core_api(goal, assertions, planner, registry, lc, out):
     from .cli.plan import _CLIPlanner
     from .critique.critic import LLMCritic
-    p = planner or _CLIPlanner(registry.get_provider("planner"))
-    c = LLMCritic(goal, registry.get_provider("critic"))
+    log_provider = _wrap_with_logging(registry, goal.id, "planner", out)
+    log_critic = _wrap_with_logging(registry, goal.id, "critic", out)
+    p = planner or _CLIPlanner(log_provider)
+    c = LLMCritic(goal, log_critic)
     eng = Engine(p, c, config=lc)
     start = time.monotonic()
     error = None; status = "error"; reason = None; revs = None; calls = None; plan = None; findings = []; esc = None
@@ -120,11 +128,13 @@ def run_core_api(goal, assertions, planner, registry, lc, out):
 def run_critique_modes(goal, assertions, planner, registry, out):
     from .cli.plan import _CLIPlanner
     from .critique.critic import LLMCritic
-    p = planner or _CLIPlanner(registry.get_provider("planner"))
     all_pass = True
     for mode in ["heuristic-only", "deterministic-first", "llm-every-revision"]:
+        log_provider = _wrap_with_logging(registry, goal.id, "planner", out / mode)
+        log_critic = _wrap_with_logging(registry, goal.id, "critic", out / mode)
+        p = planner or _CLIPlanner(log_provider)
         lc = LoopConfig(mode=mode, revision_cap=3)
-        c = LLMCritic(goal, registry.get_provider("critic"))
+        c = LLMCritic(goal, log_critic)
         eng = Engine(p, c, config=lc)
         start = time.monotonic()
         try:
@@ -256,7 +266,9 @@ def run_probes(goal, out):
 def run_budget(goal, planner, registry, out):
     from .cli.plan import _CLIPlanner
     from .critique.critic import LLMCritic
-    p = planner or _CLIPlanner(registry.get_provider("planner"))
+    log_p = _wrap_with_logging(registry, goal.id, "planner", out)
+    log_c = _wrap_with_logging(registry, goal.id, "critic", out)
+    p = planner or _CLIPlanner(log_p)
     c = LLMCritic(goal, registry.get_provider("critic"))
     restricted = Goal(id=goal.id, description=goal.description, constraints=type(goal.constraints)(budget=Budget(max_revisions=1), environment=goal.constraints.environment, tools=goal.constraints.tools), risk_tolerance=goal.risk_tolerance, replan_policy=ReplanPolicy.ABORT)
     eng = Engine(p, c, config=LoopConfig(revision_cap=1))
@@ -273,7 +285,8 @@ def run_budget(goal, planner, registry, out):
 def run_replan(goal, planner, registry, out):
     from .cli.plan import _CLIPlanner
     from .critique.critic import LLMCritic
-    p = planner or _CLIPlanner(registry.get_provider("planner"))
+    log_p = _wrap_with_logging(registry, goal.id, "planner", out)
+    p = planner or _CLIPlanner(log_p)
     results = {}
     for policy in ["patch","restart","abort"]:
         g = Goal(id=goal.id, description=goal.description, constraints=goal.constraints, risk_tolerance=goal.risk_tolerance, replan_policy=ReplanPolicy(policy))

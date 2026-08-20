@@ -13,6 +13,7 @@ from __future__ import annotations
 from .critique import build_critique_parser, run_critique
 from .demo import build_demo_parser, run_demo
 from .escalate import build_escalate_parser, run_escalate
+from .field_test import build_field_test_parser, run_field_test
 from .init import build_init_parser, run_init
 from .migrate import build_migrate_parser, run_migrate
 from .plan import build_plan_parser, run_plan
