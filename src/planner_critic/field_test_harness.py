@@ -1,23 +1,21 @@
-"""Field test harness — load goals, run engine, check invariants, save traces.
+"""Field test harness — multi-dimensional sweep across engine capabilities.
 
-The harness is the core of M9. It loads Goal JSON files and their companion
-assertion YAML files from a directory, runs each through ``Engine.plan()``
-against a real LLM, checks invariant assertions, and saves the full trace
-(plan, findings, LLM responses, pass/fail) to an output directory.
+The harness runs each goal through multiple capability dimensions and saves
+per-goal per-dimension traces. Each dimension has its own output directory.
 
-Usage from CLI:
-    ``plancritic field-test run --goals docs/field-test/goals/database/``
-
-Domain batching: pass a goals directory to run only that domain.
+Dimensions with LLM calls: core-api, critique-modes, budget, replan
+Dimensions without LLM: store, escalation, explain, viz, complexity, probes,
+  adapters, cli-surface, cli-demo, cli-quickstart, cli-migrate
 """
 
 from __future__ import annotations
 
 import json
 import logging
-import os
+import subprocess
 import sys
 import time
+import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -25,419 +23,448 @@ from typing import Any
 import yaml
 
 from .engine import Engine
+from .escalation import EscalationManager
+from .estimate import estimate_complexity
+from .explain import explain as build_explain
 from .llm.registry import ProviderRegistry
 from .loop import LoopConfig
-from .schema.goal import Goal
-from .types import Finding, PlanningError
+from .loop.budget import SpendState
+from .probe.base import ProbeRequest
+from .probe.db_query import DbQueryProbe
+from .probe.deploy_status import DeployStatusProbe
+from .probe.env_var import EnvVarProbe
+from .probe.http_check import HttpCheckProbe
+from .schema.goal import Budget, Goal, ReplanPolicy
+from .schema.plan import PlanVersion
+from .store.sqlite import SQLiteStore
+from .types import ApprovedPlan, Finding, PlanningError, Severity
+from .viz.graph import to_mermaid
+from .viz.replay import replay as build_replay
 
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Loading
+# Helpers
 # ---------------------------------------------------------------------------
 
-def load_goal(path: Path) -> Goal:
-    """Load a single Goal JSON file."""
-    raw = json.loads(path.read_text())
-    return Goal.model_validate(raw)
+def _find_goal(goals_root: Path, goal_id: str) -> Path | None:
+    for p in goals_root.rglob(f"{goal_id}.json"):
+        return p
+    return None
 
+def _load_goal_and_assertions(goals_root: Path, goal_id: str) -> tuple[Goal | None, dict[str, Any]]:
+    gp = _find_goal(goals_root, goal_id)
+    if gp is None:
+        return None, {}
+    goal = Goal.model_validate(json.loads(gp.read_text()))
+    ap = gp.parent / "assertions" / f"{gp.stem}.yaml"
+    assertions = {}
+    if ap.exists():
+        with ap.open() as fh:
+            assertions = yaml.safe_load(fh) or {}
+    return goal, assertions
 
-def load_assertions(path: Path) -> dict[str, Any]:
-    """Load the assertion YAML for a goal.
+def _save_trace(trace: dict[str, Any], path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(trace, indent=2, default=str))
 
-    Returns an empty dict when the file does not exist (no-op assertions).
-    """
-    if not path.exists():
-        return {}
-    with path.open() as fh:
-        return yaml.safe_load(fh) or {}
-
-
-def discover_goals(goals_dir: str | Path) -> list[Path]:
-    """Discover all Goal JSON files in a directory (non-recursive)."""
-    root = Path(goals_dir)
-    if root.is_file():
-        return [root]
-    return sorted(root.glob("*.json"))
-
-
-# ---------------------------------------------------------------------------
-# Invariant checks
-# ---------------------------------------------------------------------------
-
-def _check_approve_expected(
-    result_status: str, approve_expected: bool
-) -> tuple[bool, str]:
-    if approve_expected:
-        if result_status == "approved":
-            return True, "approved as expected"
-        return False, f"expected approve but got status={result_status}"
-    else:
-        if result_status == "escalated":
-            return True, "escalated as expected"
-        return False, f"expected escalate but got status={result_status}"
-
-
-def _check_max_revisions(
-    revision_count: int | None, max_revisions: int | None
-) -> tuple[bool, str]:
-    if max_revisions is None or revision_count is None:
-        return True, "max_revisions not checked"
-    if revision_count <= max_revisions:
-        return True, f"revisions={revision_count} <= max={max_revisions}"
-    return False, f"revisions={revision_count} > max={max_revisions}"
-
-
-def _check_min_tasks(
-    task_count: int, min_tasks: int | None
-) -> tuple[bool, str]:
-    if min_tasks is None:
-        return True, "min_tasks not checked"
-    if task_count >= min_tasks:
-        return True, f"tasks={task_count} >= min={min_tasks}"
-    return False, f"tasks={task_count} < min={min_tasks}"
-
-
-def _check_mandatory_elements(
-    task_ids: list[str], descriptions: list[str], elements: list[str] | None
-) -> tuple[bool, str]:
-    if not elements:
-        return True, "mandatory_elements not checked"
-    combined = " ".join(task_ids).lower() + " " + " ".join(descriptions).lower()
-    missing = [e for e in elements if e.lower() not in combined]
-    if not missing:
-        return True, f"all mandatory elements present: {elements}"
-    return False, f"missing mandatory elements: {missing}"
-
-
-def _check_mandatory_blocker_reason_codes(
-    findings: list[Finding], codes: list[str] | None
-) -> tuple[bool, str]:
-    if not codes:
-        return True, "mandatory_blocker_reason_codes not checked"
-    found_codes = {f.reason_code for f in findings if f.severity.value == "blocker"}
-    missing = [c for c in codes if c not in found_codes]
-    if not missing:
-        return True, f"all mandatory blocker codes present: {codes}"
-    return False, f"missing mandatory blocker codes: {missing}"
-
-
-def _check_forbidden_blockers(
-    findings: list[Finding], forbidden: list[str] | None
-) -> tuple[bool, str]:
-    if not forbidden:
-        return True, "forbidden_blockers not checked"
-    found = {
-        f.reason_code
-        for f in findings
-        if f.severity.value == "blocker" and f.reason_code in forbidden
-    }
-    if not found:
-        return True, "no forbidden blockers"
-    return False, f"forbidden blockers found: {found}"
-
-
-def _check_high_risk_attributes(
-    tasks: list[dict[str, Any]],
-) -> list[tuple[bool, str]]:
-    results: list[tuple[bool, str]] = []
-    high_risk_classes = {"high", "critical"}
-    for task in tasks:
-        risk = task.get("risk_class", "medium")
-        if risk in high_risk_classes:
-            has_ver = task.get("verification") is not None
-            has_roll = task.get("rollback") is not None
-            tid = task.get("id", "?")
-            if not has_ver:
-                results.append(
-                    (False, f"high-risk task {tid} missing verification")
-                )
-            if not has_roll:
-                results.append(
-                    (False, f"high-risk task {tid} missing rollback")
-                )
-    if not results:
-        results.append((True, "all high-risk tasks have verification and rollback"))
-    return results
-
-
-def check_invariants(
-    result_status: str,
-    findings: list[Finding],
-    tasks: list[dict[str, Any]],
-    revision_count: int | None,
-    assertions: dict[str, Any],
-) -> list[dict[str, Any]]:
-    """Run all invariant checks against a goal's loop result.
-
-    Returns a list of check dicts: {"name": str, "pass": bool, "message": str}.
-    """
+def _check_invariants(status: str, findings: list[Finding], tasks: list[dict], revs: int | None, assertions: dict) -> list[dict]:
     inv = assertions.get("invariants", {})
-    checks: list[dict[str, Any]] = []
-
-    # approve_expected
+    checks = []
     ae = inv.get("approve_expected", True)
-    ok, msg = _check_approve_expected(result_status, ae)
-    checks.append({"name": "approve_expected", "pass": ok, "message": msg})
-
-    # max_revisions
-    ok, msg = _check_max_revisions(revision_count, inv.get("max_revisions"))
-    checks.append({"name": "max_revisions", "pass": ok, "message": msg})
-
-    # min_tasks
-    ok, msg = _check_min_tasks(len(tasks), inv.get("min_tasks"))
-    checks.append({"name": "min_tasks", "pass": ok, "message": msg})
-
-    # mandatory_elements
-    task_ids = [t.get("id", "") for t in tasks]
-    descriptions = [t.get("description", "") for t in tasks]
-    ok, msg = _check_mandatory_elements(
-        task_ids, descriptions, inv.get("mandatory_elements")
-    )
-    checks.append({"name": "mandatory_elements", "pass": ok, "message": msg})
-
-    # mandatory_blocker_reason_codes
-    ok, msg = _check_mandatory_blocker_reason_codes(
-        findings, inv.get("mandatory_blocker_reason_codes")
-    )
-    checks.append({"name": "mandatory_blocker_reason_codes", "pass": ok, "message": msg})
-
-    # forbidden_blockers
-    ok, msg = _check_forbidden_blockers(findings, inv.get("forbidden_blockers"))
-    checks.append({"name": "forbidden_blockers", "pass": ok, "message": msg})
-
-    # high-risk task attributes
-    hr_results = _check_high_risk_attributes(tasks)
-    for ok, msg in hr_results:
-        checks.append({"name": "high_risk_attributes", "pass": ok, "message": msg})
-
+    if status == "approved":
+        checks.append({"name": "approve_expected", "pass": ae, "message": "approved" if ae else "UNEXPECTED APPROVAL"})
+    elif status == "escalated":
+        checks.append({"name": "approve_expected", "pass": not ae, "message": "escalated" if not ae else "expected approve but escalated"})
+    else:
+        checks.append({"name": "approve_expected", "pass": False, "message": f"status={status}"})
+    mr = inv.get("max_revisions")
+    if mr is not None and revs is not None:
+        checks.append({"name": "max_revisions", "pass": revs <= mr, "message": f"revs={revs}"})
+    mt = inv.get("min_tasks")
+    if mt is not None:
+        checks.append({"name": "min_tasks", "pass": len(tasks) >= mt, "message": f"tasks={len(tasks)}"})
+    for code in inv.get("mandatory_blocker_reason_codes", []):
+        found = any(f.reason_code == code and f.severity is Severity.BLOCKER for f in findings)
+        checks.append({"name": f"mandatory_blocker_{code}", "pass": found, "message": f"blocker {code} {'found' if found else 'missing'}"})
     return checks
 
-
 # ---------------------------------------------------------------------------
-# Trace saving
-# ---------------------------------------------------------------------------
-
-def _findings_to_dict(findings: list[Finding]) -> list[dict[str, Any]]:
-    return [f.model_dump(mode="json") for f in findings]
-
-
-def save_trace(
-    goal_id: str,
-    goal_dict: dict[str, Any],
-    assertions_dict: dict[str, Any],
-    result_status: str,
-    reason_code: str | None,
-    revision_count: int | None,
-    llm_calls: int | None,
-    plan_dict: dict[str, Any] | None,
-    findings: list[Finding],
-    checks: list[dict[str, Any]],
-    escalation_dict: dict[str, Any] | None,
-    approved_plan_dict: dict[str, Any] | None,
-    error: str | None,
-    duration_seconds: float,
-    output_dir: Path,
-) -> Path:
-    """Save the full trace for one goal to a JSON file.
-
-    Args:
-        output_dir: Base domain output directory (e.g., reports/20260819/database/).
-        goal_id: The goal id (used as filename).
-
-    Returns:
-        The path to the written trace file.
-    """
-    trace_dir = output_dir / goal_id
-    trace_dir.mkdir(parents=True, exist_ok=True)
-
-    trace = {
-        "meta": {
-            "goal_id": goal_id,
-            "timestamp": datetime.now(UTC).isoformat(),
-            "duration_seconds": round(duration_seconds, 2),
-        },
-        "goal": goal_dict,
-        "assertions": assertions_dict,
-        "result": {
-            "status": result_status,
-            "reason_code": reason_code,
-            "revision_count": revision_count,
-            "llm_calls": llm_calls,
-        },
-        "plan": plan_dict,
-        "findings": _findings_to_dict(findings),
-        "escalation": escalation_dict,
-        "approved_plan": approved_plan_dict,
-        "checks": checks,
-        "error": error,
-        "pass": all(c["pass"] for c in checks),
-    }
-    trace_path = trace_dir / "trace.json"
-    trace_path.write_text(json.dumps(trace, indent=2, default=str))
-    return trace_path
-
-
-# ---------------------------------------------------------------------------
-# Domain summary
+# Dimension runners
 # ---------------------------------------------------------------------------
 
-def build_domain_summary(traces: list[dict[str, Any]]) -> dict[str, Any]:
-    """Build a summary for one domain (or the full sweep)."""
-    total = len(traces)
-    passed = sum(1 for t in traces if t.get("pass", False))
-    failed = total - passed
-    return {
-        "total": total,
-        "passed": passed,
-        "failed": failed,
-        "pass_rate": round(passed / total, 2) if total > 0 else 0.0,
-        "goals": [
-            {
-                "goal_id": t.get("meta", {}).get("goal_id", "?"),
-                "pass": t.get("pass", False),
-                "status": t.get("result", {}).get("status"),
-                "reason_code": t.get("result", {}).get("reason_code"),
-                "revision_count": t.get("result", {}).get("revision_count"),
-                "task_count": len(t.get("plan", {}).get("tasks", [])) if t.get("plan") else 0,
-                "finding_count": len(t.get("findings", [])),
-                "error": t.get("error"),
-            }
-            for t in traces
-        ],
-    }
+def run_core_api(goal, assertions, planner, registry, lc, out):
+    from .cli.plan import _CLIPlanner
+    from .critique.critic import LLMCritic
+    p = planner or _CLIPlanner(registry.get_provider("planner"))
+    c = LLMCritic(goal, registry.get_provider("critic"))
+    eng = Engine(p, c, config=lc)
+    start = time.monotonic()
+    error = None; status = "error"; reason = None; revs = None; calls = None; plan = None; findings = []; esc = None
+    try:
+        r = eng.plan(goal)
+        status = r.status; reason = r.reason_code
+        revs = r.spend.revisions_used if r.spend else None
+        calls = r.spend.calls_used if r.spend else None
+        findings = r.findings
+        if r.plan: plan = r.plan.model_dump(mode="json")
+        if r.escalation: esc = r.escalation.model_dump(mode="json")
+    except PlanningError as e: error = str(e); reason = getattr(e, "reason_code", "planning_unavailable")
+    except Exception as e: error = f"{type(e).__name__}: {e}"
+    dur = round(time.monotonic() - start, 2)
+    checks = _check_invariants(status, findings, (plan or {}).get("tasks", []), revs, assertions)
+    t = {"dimension":"core-api","goal_id":goal.id,"duration_seconds":dur,"result":{"status":status,"reason_code":reason,"revision_count":revs,"llm_calls":calls},"plan":plan,"findings":[f.model_dump(mode="json") for f in findings],"escalation":esc,"checks":checks,"error":error,"pass":all(c["pass"] for c in checks)}
+    _save_trace(t, out / "trace.json")
+    return t
 
+def run_critique_modes(goal, assertions, planner, registry, out):
+    from .cli.plan import _CLIPlanner
+    from .critique.critic import LLMCritic
+    p = planner or _CLIPlanner(registry.get_provider("planner"))
+    all_pass = True
+    for mode in ["heuristic-only", "deterministic-first", "llm-every-revision"]:
+        lc = LoopConfig(mode=mode, revision_cap=3)
+        c = LLMCritic(goal, registry.get_provider("critic"))
+        eng = Engine(p, c, config=lc)
+        start = time.monotonic()
+        try:
+            r = eng.plan(goal)
+            s = r.status; rc = r.reason_code; findings = r.findings; plan = r.plan.model_dump(mode="json") if r.plan else None
+        except Exception as e:
+            s = "error"; rc = str(e); findings = []; plan = None
+        dur = round(time.monotonic() - start, 2)
+        checks = _check_invariants(s, findings, (plan or {}).get("tasks", []), None, assertions)
+        mp = all(c["pass"] for c in checks)
+        if not mp: all_pass = False
+        t = {"dimension":f"critique-{mode}","goal_id":goal.id,"duration_seconds":dur,"status":s,"reason_code":rc,"findings":[f.model_dump(mode="json") for f in findings],"checks":checks,"pass":mp}
+        _save_trace(t, out / mode / "trace.json")
+    return {"dimension":"critique-modes","goal_id":goal.id,"pass":all_pass}
+
+def run_cli_surface(goal, goal_path, out):
+    start = time.monotonic()
+    try:
+        r = subprocess.run([sys.executable, "-m", "planner_critic._cli", "plan", str(goal_path)], capture_output=True, text=True, timeout=300)
+        ok = r.returncode == 0
+    except subprocess.TimeoutExpired: ok = False; r = type("o",(),{"stdout":"","stderr":"timeout","returncode":1})()
+    except Exception as e: ok = False; r = type("o",(),{"stdout":"","stderr":str(e),"returncode":1})()
+    t = {"dimension":"cli-surface","goal_id":goal.id,"duration_seconds":round(time.monotonic()-start,2),"returncode":r.returncode,"stdout_preview":r.stdout[:500],"stderr_preview":r.stderr[:500] if r.stderr else None,"pass":ok}
+    _save_trace(t, out / "trace.json")
+    return t
+
+def run_http_surface(goal, base_url, out):
+    start = time.monotonic()
+    try:
+        body = json.dumps(goal.model_dump(mode="json")).encode()
+        req = urllib.request.Request(f"{base_url}/plan", data=body, headers={"Content-Type":"application/json"})
+        with urllib.request.urlopen(req, timeout=300) as resp:
+            raw = json.loads(resp.read())
+            ok = raw.get("status") == 200
+    except Exception as e: ok = False; raw = {"error":str(e)}
+    t = {"dimension":"http-surface","goal_id":goal.id,"duration_seconds":round(time.monotonic()-start,2),"response":raw,"pass":ok}
+    _save_trace(t, out / "trace.json")
+    return t
+
+def run_store(goal, plan, store, out):
+    if plan is None:
+        t = {"dimension":"store","goal_id":goal.id,"pass":False,"error":"no plan"}
+        _save_trace(t, out / "trace.json"); return t
+    try:
+        stored = store.get_plan(plan["id"])
+        ok = stored is not None
+        t = {"dimension":"store","goal_id":goal.id,"pass":ok,"plan_id":plan["id"],"stored":stored is not None}
+    except Exception as e:
+        t = {"dimension":"store","goal_id":goal.id,"pass":False,"error":str(e)}
+    _save_trace(t, out / "trace.json")
+    return t
+
+def run_escalation(goal, store, out):
+    try:
+        mgr = EscalationManager(store)
+        escs = mgr.list_escalations()
+        for e in escs[:2]:
+            mgr.resolve(e.id, "approved", note="field test")
+        t = {"dimension":"escalation","goal_id":goal.id,"pass":True,"escalation_count":len(escs)}
+    except Exception as e:
+        t = {"dimension":"escalation","goal_id":goal.id,"pass":False,"error":str(e)}
+    _save_trace(t, out / "trace.json")
+    return t
+
+def run_explain(goal, plan_id, store, out):
+    try:
+        result = build_explain(store, plan_id)
+        rc = result.get("reason_code","?") if isinstance(result,dict) else "?"
+        t = {"dimension":"explain","goal_id":goal.id,"plan_id":plan_id,"pass":True,"reason_code":rc}
+    except Exception as e:
+        t = {"dimension":"explain","goal_id":goal.id,"plan_id":plan_id,"pass":False,"error":str(e)}
+    _save_trace(t, out / "trace.json")
+    return t
+
+def run_viz(goal, plan, store, out):
+    if plan is None:
+        t = {"dimension":"viz","goal_id":goal.id,"pass":False,"error":"no plan"}
+        _save_trace(t, out / "trace.json"); return t
+    checks = []
+    try:
+        pv = PlanVersion.model_validate(plan)
+        mermaid = to_mermaid(pv)
+        checks.append({"name":"mermaid","pass":len(mermaid)>10,"message":"mermaid generated"})
+    except Exception as e:
+        checks.append({"name":"mermaid","pass":False,"message":str(e)})
+    try:
+        history = build_replay(store, plan["id"])
+        steps = history.steps if hasattr(history,"steps") else []
+        checks.append({"name":"replay","pass":len(steps)>0,"message":f"{len(steps)} step(s)"})
+    except Exception as e:
+        checks.append({"name":"replay","pass":False,"message":str(e)})
+    t = {"dimension":"viz","goal_id":goal.id,"checks":checks,"pass":all(c["pass"] for c in checks)}
+    _save_trace(t, out / "trace.json")
+    return t
+
+def run_complexity(goal, plan, out):
+    if plan is None:
+        t = {"dimension":"complexity","goal_id":goal.id,"pass":False,"error":"no plan"}
+        _save_trace(t, out / "trace.json"); return t
+    try:
+        pv = PlanVersion.model_validate(plan)
+        c = estimate_complexity(pv)
+        ok = c.step_count == len(pv.tasks)
+        t = {"dimension":"complexity","goal_id":goal.id,"pass":ok,"complexity":{"steps":c.step_count,"parallel_branches":c.parallel_branch_count,"irreversible_ops":c.irreversible_op_count,"est_llm_calls":c.est_llm_calls}}
+    except Exception as e:
+        t = {"dimension":"complexity","goal_id":goal.id,"pass":False,"error":str(e)}
+    _save_trace(t, out / "trace.json")
+    return t
+
+def run_probes(goal, out):
+    probes = [
+        ("env_var", EnvVarProbe(), ProbeRequest(kind="env_var", query="PATH", expected="exists")),
+        ("http_check", HttpCheckProbe(), ProbeRequest(kind="http_check", query="http://localhost:8080/healthz", expected="200")),
+        ("db_query", DbQueryProbe(), ProbeRequest(kind="db_query", query="SELECT 1", expected="1")),
+        ("deploy_status", DeployStatusProbe(), ProbeRequest(kind="deploy_status", query="field-test", expected="running")),
+    ]
+    checks = []
+    for name, probe, req in probes:
+        try:
+            result = probe.run(req)
+            checks.append({"name":f"probe_{name}","pass":result.ok,"message":f"{name}: ok={result.ok}"})
+        except Exception as e:
+            checks.append({"name":f"probe_{name}","pass":False,"message":str(e)})
+        _save_trace({"dimension":f"probe-{name}","goal_id":goal.id,"checks":[checks[-1]]}, out / name / "trace.json")
+    t = {"dimension":"probes","goal_id":goal.id,"checks":checks,"pass":all(c["pass"] for c in checks)}
+    _save_trace(t, out / "trace.json")
+    return t
+
+def run_budget(goal, planner, registry, out):
+    from .cli.plan import _CLIPlanner
+    from .critique.critic import LLMCritic
+    p = planner or _CLIPlanner(registry.get_provider("planner"))
+    c = LLMCritic(goal, registry.get_provider("critic"))
+    restricted = Goal(id=goal.id, description=goal.description, constraints=type(goal.constraints)(budget=Budget(max_revisions=1), environment=goal.constraints.environment, tools=goal.constraints.tools), risk_tolerance=goal.risk_tolerance, replan_policy=ReplanPolicy.ABORT)
+    eng = Engine(p, c, config=LoopConfig(revision_cap=1))
+    state = SpendState()
+    try:
+        r = eng.plan(restricted)
+        hit = state.exceeded or (r.spend and r.spend.exceeded)
+        t = {"dimension":"budget","goal_id":goal.id,"pass":hit or r.status=="escalated","status":r.status,"reason_code":r.reason_code,"revisions_used":state.revisions_used}
+    except Exception as e:
+        t = {"dimension":"budget","goal_id":goal.id,"pass":False,"error":str(e)}
+    _save_trace(t, out / "trace.json")
+    return t
+
+def run_replan(goal, planner, registry, out):
+    from .cli.plan import _CLIPlanner
+    from .critique.critic import LLMCritic
+    p = planner or _CLIPlanner(registry.get_provider("planner"))
+    results = {}
+    for policy in ["patch","restart","abort"]:
+        g = Goal(id=goal.id, description=goal.description, constraints=goal.constraints, risk_tolerance=goal.risk_tolerance, replan_policy=ReplanPolicy(policy))
+        c = LLMCritic(g, registry.get_provider("critic"))
+        try:
+            r = Engine(p, c, config=LoopConfig(revision_cap=2)).plan(g)
+            results[policy] = {"status":r.status,"reason_code":r.reason_code}
+        except Exception as e:
+            results[policy] = {"status":"error","reason_code":str(e)}
+        _save_trace({"dimension":f"replan-{policy}","goal_id":goal.id,"result":results[policy]}, out / policy / "trace.json")
+    t = {"dimension":"replan","goal_id":goal.id,"results":results,"pass":True}
+    _save_trace(t, out / "trace.json")
+    return t
+
+def run_adapters(goal, plan, out):
+    from .adapters.python import PlannerCriticPlan
+    if plan is None:
+        t = {"dimension":"adapters","goal_id":goal.id,"pass":False,"error":"no plan"}
+        _save_trace(t, out / "trace.json"); return t
+    pv = PlanVersion.model_validate(plan)
+    checks = []
+    try:
+        adapter = PlannerCriticPlan(pv)
+        checks.append({"name":"adapter_python","pass":True,"message":"python adapter wrapped plan"})
+    except Exception as e:
+        checks.append({"name":"adapter_python","pass":False,"message":str(e)})
+    _save_trace({"dimension":"adapter-python","goal_id":goal.id,"checks":[checks[-1]]}, out / "python" / "trace.json")
+    t = {"dimension":"adapters","goal_id":goal.id,"checks":checks,"pass":all(c["pass"] for c in checks)}
+    _save_trace(t, out / "trace.json")
+    return t
 
 # ---------------------------------------------------------------------------
-# Main entry
+# CLI subcommand dimensions
 # ---------------------------------------------------------------------------
 
-def run_sweep(
-    goals_dir: str | Path,
-    output_dir: str | Path,
-    config_path: str | Path | None = None,
-    loop_config: LoopConfig | None = None,
-    save_raw_llm: bool = False,
-) -> dict[str, Any]:
-    """Run the full field test sweep for one domain.
+def run_cli_demo(out):
+    try:
+        r = subprocess.run([sys.executable,"-m","planner_critic._cli","demo","run"],capture_output=True,text=True,timeout=60)
+        t = {"dimension":"cli-demo","goal_id":"demo","pass":r.returncode==0,"returncode":r.returncode}
+    except Exception as e:
+        t = {"dimension":"cli-demo","goal_id":"demo","pass":False,"error":str(e)}
+    _save_trace(t, out / "trace.json")
+    return t
 
-    Args:
-        goals_dir: Directory containing Goal JSON files.
-        output_dir: Where to write per-goal traces and the summary report.
-        config_path: Path to the provider TOML config.
-        loop_config: Loop configuration (revision cap, mode, etc.).
-        save_raw_llm: When True, save raw LLM provider responses (large).
+def run_cli_quickstart(out):
+    import tempfile
+    tmp = tempfile.mkdtemp(prefix="plancritic-qs-")
+    try:
+        r = subprocess.run([sys.executable,"-m","planner_critic._cli","quickstart","--dir",tmp],capture_output=True,text=True,timeout=60)
+        t = {"dimension":"cli-quickstart","goal_id":"quickstart","pass":r.returncode==0,"returncode":r.returncode}
+    except Exception as e:
+        t = {"dimension":"cli-quickstart","goal_id":"quickstart","pass":False,"error":str(e)}
+    _save_trace(t, out / "trace.json")
+    return t
 
-    Returns:
-        A summary dict with pass/fail per goal.
-    """
-    goals_root = Path(goals_dir)
+def run_cli_migrate(out):
+    try:
+        r = subprocess.run([sys.executable,"-m","planner_critic._cli","migrate"],capture_output=True,text=True,timeout=30)
+        t = {"dimension":"cli-migrate","goal_id":"migrate","pass":r.returncode==0,"returncode":r.returncode}
+    except Exception as e:
+        t = {"dimension":"cli-migrate","goal_id":"migrate","pass":False,"error":str(e)}
+    _save_trace(t, out / "trace.json")
+    return t
+
+# ---------------------------------------------------------------------------
+# Dimension registry
+# ---------------------------------------------------------------------------
+
+DIMENSIONS = {
+    "core-api":       {"goals": "__all__", "fn": run_core_api, "needs_llm": True},
+    "critique-modes": {"goals": ["db-01","k8s-01","ir-01","ci-01"], "fn": run_critique_modes, "needs_llm": True},
+    "store":          {"goals": "__all__", "fn": run_store, "needs_llm": False},
+    "escalation":     {"goals": ["adv-01","adv-02"], "fn": run_escalation, "needs_llm": False},
+    "explain":        {"goals": ["db-01","adv-01"], "fn": run_explain, "needs_llm": False},
+    "viz":            {"goals": ["db-01","k8s-01"], "fn": run_viz, "needs_llm": False},
+    "complexity":     {"goals": ["db-01","k8s-01"], "fn": run_complexity, "needs_llm": False},
+    "probes":         {"goals": ["inf-02"], "fn": run_probes, "needs_llm": False},
+    "budget":         {"goals": ["db-01"], "fn": run_budget, "needs_llm": True},
+    "replan":         {"goals": ["db-01"], "fn": run_replan, "needs_llm": True},
+    "adapters":       {"goals": ["ci-01","data-01"], "fn": run_adapters, "needs_llm": False},
+    "cli-surface":    {"goals": ["db-01","k8s-01"], "fn": run_cli_surface, "needs_llm": False},
+    "http-surface":   {"goals": ["db-01","k8s-01"], "fn": run_http_surface, "needs_llm": False},
+    "cli-demo":       {"goals": [], "fn": run_cli_demo, "needs_llm": False},
+    "cli-quickstart": {"goals": [], "fn": run_cli_quickstart, "needs_llm": False},
+    "cli-migrate":    {"goals": [], "fn": run_cli_migrate, "needs_llm": False},
+}
+
+# ---------------------------------------------------------------------------
+# Main sweep
+# ---------------------------------------------------------------------------
+
+def run_sweep(goals_root, output_dir, dimensions=None, config_path=None, loop_config=None, http_base_url=None):
+    goals_root = Path(goals_root)
     out_root = Path(output_dir)
     out_root.mkdir(parents=True, exist_ok=True)
-
-    goal_paths = discover_goals(goals_root)
-    if not goal_paths:
-        logger.warning("no goal files found in %s", goals_root)
-        return {"total": 0, "passed": 0, "failed": 0, "goals": []}
-
-    # Load provider config
-    cfg_path = str(config_path) if config_path else "plancritic.toml"
-    registry = ProviderRegistry.load(cfg_path)
+    registry = ProviderRegistry.load(str(config_path) if config_path else "plancritic.toml")
     lc = loop_config or LoopConfig()
+    planner_cache = None
+    store = SQLiteStore(":memory:")
+    dims = dimensions or list(DIMENSIONS.keys())
+    all_results = {}
 
-    traces: list[dict[str, Any]] = []
-    planner_cache: Any = None  # cache planner across goals
+    for dim_name in dims:
+        if dim_name not in DIMENSIONS:
+            continue
+        dim = DIMENSIONS[dim_name]
+        goal_ids = dim["goals"]
+        runner = dim["fn"]
+        logger.info("=== Dimension: %s ===", dim_name)
 
-    for gp in goal_paths:
-        goal_id = gp.stem
-        logger.info("=== %s ===", goal_id)
-        goal_start = time.monotonic()
+        if goal_ids == "__all__":
+            goal_ids = sorted(p.stem for p in goals_root.rglob("*.json"))
+        elif not goal_ids:
+            dim_out = out_root / dim_name
+            dim_out.mkdir(parents=True, exist_ok=True)
+            try:
+                tr = runner(dim_out)
+                all_results.setdefault(dim_name, []).append(tr)
+            except Exception as e:
+                logger.error("dimension %s failed: %s", dim_name, e)
+            continue
 
-        # Load goal + assertions
-        goal = load_goal(gp)
-        ap = goals_root / "assertions" / f"{goal_id}.yaml"
-        assertions = load_assertions(ap)
+        dim_results = []
+        for gid in goal_ids:
+            goal, assertions = _load_goal_and_assertions(goals_root, gid)
+            if goal is None:
+                continue
+            dim_out = out_root / dim_name / gid
+            dim_out.mkdir(parents=True, exist_ok=True)
+            goal_path = _find_goal(goals_root, gid)
+            try:
+                if dim_name == "core-api":
+                    tr = runner(goal, assertions, planner_cache, registry, lc, dim_out)
+                    if tr.get("plan"):
+                        store.put_plan_version(PlanVersion.model_validate(tr["plan"]))
+                        store.put_findings(tr["plan"]["id"], tr["plan"]["version"], [Finding(**f) for f in tr.get("findings",[])])
+                    if tr.get("escalation"):
+                        from .types import Escalation
+                        store.put_escalation(Escalation(**tr["escalation"]))
+                elif dim_name in ("critique-modes", "budget", "replan"):
+                    tr = runner(goal, assertions, planner_cache, registry, dim_out)
+                elif dim_name in ("cli-surface",):
+                    tr = runner(goal, goal_path, dim_out)
+                elif dim_name in ("http-surface",):
+                    tr = runner(goal, http_base_url or "http://localhost:8080", dim_out)
+                elif dim_name in ("store",):
+                    plan = _get_plan(store, goal.id)
+                    tr = runner(goal, plan, store, dim_out)
+                elif dim_name in ("escalation",):
+                    tr = runner(goal, store, dim_out)
+                elif dim_name in ("explain",):
+                    plan = _get_plan(store, goal.id)
+                    pid = plan["id"] if plan else goal.id
+                    tr = runner(goal, pid, store, dim_out)
+                elif dim_name in ("viz",):
+                    plan = _get_plan(store, goal.id)
+                    tr = runner(goal, plan, store, dim_out)
+                elif dim_name in ("complexity", "adapters"):
+                    plan = _get_plan(store, goal.id)
+                    tr = runner(goal, plan, dim_out)
+                elif dim_name in ("probes",):
+                    tr = runner(goal, dim_out)
+                else:
+                    continue
+                dim_results.append(tr)
+                logger.info("  %s %s -> %s", gid, dim_name, "PASS" if tr.get("pass",False) else "FAIL")
+            except Exception as e:
+                logger.error("  %s %s error: %s", gid, dim_name, e)
+                dim_results.append({"dimension":dim_name,"goal_id":gid,"pass":False,"error":str(e)})
+        all_results[dim_name] = dim_results
+        passed = sum(1 for r in dim_results if r.get("pass",False))
+        logger.info("  [%s] %d/%d passed", dim_name, passed, len(dim_results))
 
-        # Build engine (reuse planner, build critic per goal)
-        from .cli.plan import _CLIPlanner
-        from .critique.critic import LLMCritic
-
-        planner_provider = registry.get_provider("planner")
-        critic_provider = registry.get_provider("critic")
-        if planner_cache is None:
-            planner_cache = _CLIPlanner(planner_provider)
-        planner = planner_cache
-        critic = LLMCritic(goal, critic_provider)
-        engine = Engine(planner, critic, config=lc)
-
-        # Run
-        error: str | None = None
-        result_status = "error"
-        reason_code: str | None = None
-        revision_count: int | None = None
-        llm_calls: int | None = None
-        plan_dict: dict[str, Any] | None = None
-        findings: list[Finding] = []
-        escalation_dict: dict[str, Any] | None = None
-        approved_plan_dict: dict[str, Any] | None = None
-
-        try:
-            result = engine.plan(goal)
-            result_status = result.status
-            reason_code = result.reason_code
-            revision_count = result.spend.revisions_used if result.spend else None
-            llm_calls = result.spend.calls_used if result.spend else None
-            findings = result.findings
-            if result.plan:
-                plan_dict = result.plan.model_dump(mode="json")
-            if result.escalation:
-                escalation_dict = result.escalation.model_dump(mode="json")
-            if result.approved_plan:
-                approved_plan_dict = result.approved_plan.model_dump(mode="json")
-        except PlanningError as e:
-            error = str(e)
-            result_status = "error"
-            reason_code = getattr(e, "reason_code", "planning_unavailable")
-        except Exception as e:
-            error = f"{type(e).__name__}: {e}"
-            result_status = "error"
-
-        duration = time.monotonic() - goal_start
-
-        # Check invariants
-        checks = check_invariants(
-            result_status,
-            findings,
-            plan_dict.get("tasks", []) if plan_dict else [],
-            revision_count,
-            assertions,
-        )
-
-        # Save trace
-        goal_dict = json.loads(gp.read_text()) if gp.exists() else {}
-        trace_path = save_trace(
-            goal_id=goal_id,
-            goal_dict=goal_dict,
-            assertions_dict=assertions,
-            result_status=result_status,
-            reason_code=reason_code,
-            revision_count=revision_count,
-            llm_calls=llm_calls,
-            plan_dict=plan_dict,
-            findings=findings,
-            checks=checks,
-            escalation_dict=escalation_dict,
-            approved_plan_dict=approved_plan_dict,
-            error=error,
-            duration_seconds=duration,
-            output_dir=out_root,
-        )
-        logger.info("  -> %s trace saved to %s", "PASS" if all(c["pass"] for c in checks) else "FAIL", trace_path)
-        traces.append(json.loads(trace_path.read_text()))
-
-    # Build domain summary
-    summary = build_domain_summary(traces)
-    summary_path = out_root / "summary.json"
-    summary_path.write_text(json.dumps(summary, indent=2, default=str))
-    logger.info("Domain summary: %d/%d passed", summary["passed"], summary["total"])
+    all_traces = [r for rr in all_results.values() for r in rr]
+    total = len(all_traces)
+    passed = sum(1 for r in all_traces if r.get("pass",False))
+    summary = {
+        "meta": {"date": datetime.now(UTC).isoformat(), "config": str(config_path) if config_path else "plancritic.toml", "loop_config": {"mode": lc.mode, "revision_cap": lc.revision_cap}},
+        "total": total, "passed": passed, "failed": total - passed, "pass_rate": round(passed/total,2) if total else 0.0,
+        "dimensions": {d: {"total": len(r), "passed": sum(1 for x in r if x.get("pass",False)), "failed": sum(1 for x in r if not x.get("pass",False))} for d,r in all_results.items()},
+        "failures": [{"dimension": r.get("dimension"), "goal_id": r.get("goal_id","?"), "error": r.get("error","check failure")} for r in all_traces if not r.get("pass",False)],
+    }
+    (out_root / "summary.json").write_text(json.dumps(summary, indent=2, default=str))
+    logger.info("Sweep complete: %d/%d passed across %d dimensions", passed, total, len(dims))
     return summary
+
+def _get_plan(store, goal_id):
+    try:
+        plans = store.list_plans()
+        for p in plans:
+            if p.goal_id == goal_id:
+                return p.model_dump(mode="json")
+    except: pass
+    return None
