@@ -1,0 +1,256 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-02-cluster-upgrade",
+  "duration_seconds": 14.7,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "k8s-02-cluster-upgrade-plan",
+    "goal_id": "k8s-02-cluster-upgrade",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T02:05:06.012884Z",
+    "tasks": [
+      {
+        "id": "backup-etcd",
+        "description": "Take a full etcd snapshot backup",
+        "action": "backup",
+        "target": "etcd",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "etcd cluster is healthy",
+            "fact": "etcd_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "etcd snapshot status",
+          "how": "run etcdctl snapshot status",
+          "expected": "snapshot is available"
+        },
+        "rollback": {
+          "trigger": "backup fails",
+          "action": "retry backup",
+          "safety_guard": "check backup storage availability"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cordon-drain-node1",
+        "description": "Cordon and drain worker node1",
+        "action": "cordon_and_drain",
+        "target": "node1",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "node1 is Ready",
+            "fact": "node1_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "upgrade-control-plane",
+        "description": "Upgrade control plane components via kubeadm",
+        "action": "upgrade",
+        "target": "control-plane",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "etcd backup is completed",
+            "fact": "etcd_backup_completed",
+            "established_by": "backup-etcd",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "control plane version",
+          "how": "check kube-apiserver version",
+          "expected": "v1.28"
+        },
+        "rollback": {
+          "trigger": "upgrade fails",
+          "action": "rollback to previous version",
+          "safety_guard": "verify current state"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "upgrade-node1-kubelet-proxy",
+        "description": "Upgrade kubelet and kube-proxy on node1",
+        "action": "upgrade",
+        "target": "node1",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "control plane upgrade is successful",
+            "fact": "control_plane_upgraded",
+            "established_by": "upgrade-control-plane",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "kubelet and kube-proxy versions",
+          "how": "check versions with kubectl",
+          "expected": "kubelet is v1.28 and kube-proxy is v1.28"
+        },
+        "rollback": {
+          "trigger": "upgrade fails",
+          "action": "restore kubelet and proxy",
+          "safety_guard": "check node readiness"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-workloads-node1",
+        "description": "Verify workloads on node1 are healthy",
+        "action": "verify",
+        "target": "node1",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "node1 kubelet and kube-proxy upgraded",
+            "fact": "node1_upgraded",
+            "established_by": "upgrade-node1-kubelet-proxy",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "workload health status",
+          "how": "check pod statuses with kubectl",
+          "expected": "all pods are Running"
+        },
+        "rollback": {
+          "trigger": "workloads not healthy",
+          "action": "revert upgrade",
+          "safety_guard": "backup workloads state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "backup-etcd",
+        "to_task": "cordon-drain-node1",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cordon-drain-node1",
+        "to_task": "upgrade-control-plane",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "upgrade-control-plane",
+        "to_task": "upgrade-node1-kubelet-proxy",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "upgrade-node1-kubelet-proxy",
+        "to_task": "verify-workloads-node1",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:backup-etcd",
+      "task_id": "backup-etcd",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Backup cannot proceed if etcd cluster is unhealthy.",
+      "suggested_fix": "Ensure etcd cluster health check is performed before initiating backup."
+    },
+    {
+      "id": "crit:1:risk:cordon-drain-node1",
+      "task_id": "cordon-drain-node1",
+      "version": 1,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Lower risk mitigation if node1 is not ready before cordon and drain.",
+      "suggested_fix": "Consider implementing additional checks or contingencies if node1 readiness is not confirmed."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:upgrade-control-plane",
+      "task_id": "upgrade-control-plane",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Upgrade control plane cannot start without a completed etcd backup.",
+      "suggested_fix": "Ensure task 'backup-etcd' is completed before proceeding with 'upgrade-control-plane'."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:upgrade-node1-kubelet-proxy",
+      "task_id": "upgrade-node1-kubelet-proxy",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Dependency on control plane upgrade success is not verifiable until after upgrade completion.",
+      "suggested_fix": "Add a verification step prior to the upgrade of kubelet and kube-proxy."
+    },
+    {
+      "id": "crit:1:weak_rollback:verify-workloads-node1",
+      "task_id": "verify-workloads-node1",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback action to revert upgrade lacks detail on state preservation.",
+      "suggested_fix": "Define a clear strategy for restoring workloads in case health checks fail."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-02-cluster-upgrade:1:1",
+    "plan_id": "k8s-02-cluster-upgrade-plan",
+    "version": 1,
+    "blocker_finding_id": "crit:1:feasibility:backup-etcd",
+    "question": "Plan for goal 'k8s-02-cluster-upgrade' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

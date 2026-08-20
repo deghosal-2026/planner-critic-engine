@@ -1,0 +1,196 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-03-precommit-rollout",
+  "duration_seconds": 13.15,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plat-03-precommit-rollout",
+    "goal_id": "plat-03-precommit-rollout",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T02:09:42.042145Z",
+    "tasks": [
+      {
+        "id": "define-config",
+        "description": "Define shared .pre-commit-config.yaml with hooks for linting, secrets scanning, and formatting",
+        "action": "create",
+        "target": ".pre-commit-config.yaml",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Required tools are installed",
+            "fact": "tools_installed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "install-pre-commit",
+        "description": "Install pre-commit CI on all repositories",
+        "action": "install",
+        "target": "all_repos",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "pre-commit config is defined",
+            "fact": "config_defined",
+            "established_by": "define-config",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "pre-commit installation status",
+          "how": "check installation logs",
+          "expected": "installation successful"
+        },
+        "rollback": {
+          "trigger": "installation fails",
+          "action": "remove pre-commit CI from repos",
+          "safety_guard": "ensure all repos are in original state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "enforce-hooks",
+        "description": "Enforce hook passing in CI pipelines via branch protection rules",
+        "action": "enforce",
+        "target": "CI_pipelines",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "pre-commit installed on all repos",
+            "fact": "pre_commit_installed",
+            "established_by": "install-pre-commit",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "branch protection rule status",
+          "how": "check CI configuration",
+          "expected": "rules applied successfully"
+        },
+        "rollback": {
+          "trigger": "rule enforcement fails",
+          "action": "remove branch protection rules",
+          "safety_guard": "ensure no repos are affected unintentionally"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "generate-report",
+        "description": "Generate adoption report showing compliance per team",
+        "action": "generate",
+        "target": "adoption_report",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "hook enforcement is in place",
+            "fact": "hooks_enforced",
+            "established_by": "enforce-hooks",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define-config",
+        "to_task": "install-pre-commit",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "install-pre-commit",
+        "to_task": "enforce-hooks",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "enforce-hooks",
+        "to_task": "generate-report",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:risk:install-pre-commit",
+      "task_id": "install-pre-commit",
+      "version": 1,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Installation on all repositories carries a high risk of failure.",
+      "suggested_fix": "Ensure robust error handling and rollback procedures are tested and documented."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:enforce-hooks",
+      "task_id": "enforce-hooks",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Enforcing hooks in CI before confirming their installation may disrupt CI pipelines.",
+      "suggested_fix": "Ensure pre-commit is fully installed and verified before proceeding with hook enforcement."
+    },
+    {
+      "id": "crit:1:missing_steps:generate-report",
+      "task_id": "generate-report",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No verification or rollback strategy is defined for the report generation.",
+      "suggested_fix": "Add a verification step to confirm report generation success and a rollback plan in case of failure."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:install-pre-commit",
+      "task_id": "install-pre-commit",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "info",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Dependency on pre-commit configuration being defined needs verification.",
+      "suggested_fix": "Establish a formal verification step to ensure configuration is correctly defined before installation."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

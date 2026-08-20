@@ -1,0 +1,200 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-05-ci-runner-scaling",
+  "duration_seconds": 14.0,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "ci-05-ci-runner-scaling-v1",
+    "goal_id": "ci-05-ci-runner-scaling",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T01:53:56.220732Z",
+    "tasks": [
+      {
+        "id": "setup_infrastructure",
+        "description": "Set up EC2 auto-scaling group for runners",
+        "action": "create",
+        "target": "ec2_auto_scaling_group",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AWS credentials are configured",
+            "fact": "aws_credentials_set",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "auto-scaling group status",
+          "how": "check AWS console",
+          "expected": "active"
+        },
+        "rollback": {
+          "trigger": "infrastructure setup fails",
+          "action": "delete auto-scaling group",
+          "safety_guard": "ensure no active instances"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_runner_registration",
+        "description": "Register self-hosted runners with GitHub",
+        "action": "register",
+        "target": "github_actions_runners",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "runner registration status",
+          "how": "query GitHub API",
+          "expected": "runners registered"
+        },
+        "rollback": {
+          "trigger": "registration fails",
+          "action": "deregister runners",
+          "safety_guard": "ensure no lingering runners"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "scale_up_on_demand",
+        "description": "Implement scale-up logic for high demand",
+        "action": "implement",
+        "target": "scaling_logic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Auto-scaling group is active",
+            "fact": "asg_active",
+            "established_by": "setup_infrastructure",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "scale_down_on_idle",
+        "description": "Implement scale-down logic to reduce costs",
+        "action": "implement",
+        "target": "scaling_logic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Auto-scaling group is active",
+            "fact": "asg_active",
+            "established_by": "setup_infrastructure",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_job_queue",
+        "description": "Monitor job queue to ensure zero backlog",
+        "action": "monitor",
+        "target": "job_queue",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "job queue length",
+          "how": "query GitHub API",
+          "expected": "0 queued jobs"
+        },
+        "rollback": {
+          "trigger": "backlog detected",
+          "action": "scale up runners",
+          "safety_guard": "verify scale-up logic triggered"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:setup_infrastructure",
+      "task_id": "setup_infrastructure",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "AWS credentials configuration is required but not verified.",
+      "suggested_fix": "Add a verification step to ensure AWS credentials are properly configured."
+    },
+    {
+      "id": "crit:1:missing_steps:scale_up_on_demand",
+      "task_id": "scale_up_on_demand",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No verification or rollback steps are defined for scale-up logic implementation.",
+      "suggested_fix": "Include a verification step to check that scale-up logic is functioning correctly, and define a rollback action in case of failure."
+    },
+    {
+      "id": "crit:1:missing_steps:scale_down_on_idle",
+      "task_id": "scale_down_on_idle",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No verification or rollback steps are defined for scale-down logic implementation.",
+      "suggested_fix": "Include a verification step to check that scale-down logic is functioning correctly, and define a rollback action in case of failure."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:monitor_job_queue",
+      "task_id": "monitor_job_queue",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Job queue monitoring occurs without preconditions verifying if runners are active.",
+      "suggested_fix": "Add a precondition to ensure that runner registration is completed successfully before monitoring the job queue."
+    },
+    {
+      "id": "crit:1:weak_rollback:monitor_job_queue",
+      "task_id": "monitor_job_queue",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback action for job queue monitoring doesn't specify how to verify the scale-up logic triggered.",
+      "suggested_fix": "Enhance rollback action to include a verification step to ensure that scale-up logic was successfully triggered."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

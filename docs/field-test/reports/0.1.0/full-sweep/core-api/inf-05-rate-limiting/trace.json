@@ -1,0 +1,196 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-05-rate-limiting",
+  "duration_seconds": 10.69,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "inf-05-rate-limiting-v1",
+    "goal_id": "inf-05-rate-limiting",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T01:58:29.292963Z",
+    "tasks": [
+      {
+        "id": "define_limits",
+        "description": "Define rate limits for API gateway",
+        "action": "define",
+        "target": "rate_limits",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "API gateway is operational",
+            "fact": "api_gateway_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_limits",
+        "description": "Deploy rate limiting configuration",
+        "action": "deploy",
+        "target": "api_gateway",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "rate limits are defined",
+            "fact": "limits_defined",
+            "established_by": "define_limits",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment status",
+          "how": "check api_gateway logs",
+          "expected": "success"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "revert configuration",
+          "safety_guard": "ensure previous configuration is intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "test_limits",
+        "description": "Test rate limiting functionality",
+        "action": "test",
+        "target": "api_gateway",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "rate limits deployed",
+            "fact": "limits_deployed",
+            "established_by": "deploy_limits",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "rate limiting behavior",
+          "how": "run curl and jmeter tests",
+          "expected": "limits enforced correctly"
+        },
+        "rollback": {
+          "trigger": "test fails",
+          "action": "remove rate limiting",
+          "safety_guard": "validate API responsiveness"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "tune_limits",
+        "description": "Tune rate limiting for optimal throughput",
+        "action": "tune",
+        "target": "api_gateway",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "rate limiting tested",
+            "fact": "limits_tested",
+            "established_by": "test_limits",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define_limits",
+        "to_task": "deploy_limits",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_limits",
+        "to_task": "test_limits",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test_limits",
+        "to_task": "tune_limits",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:missing_steps:define_limits",
+      "task_id": "define_limits",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "blocker",
+      "reason_code": "llm_missing_steps",
+      "message": "No verification step defined for the task to ensure rate limits are accurately defined.",
+      "suggested_fix": "Add a verification step to check the accuracy of the defined rate limits."
+    },
+    {
+      "id": "crit:1:weak_rollback:deploy_limits",
+      "task_id": "deploy_limits",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback lacks a detailed process for reverting to a stable configuration after deployment failure.",
+      "suggested_fix": "Include a detailed rollback procedure that encompasses backup configurations."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:tune_limits",
+      "task_id": "tune_limits",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "warning",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Tuning occurs without explicit verification that previous testing was conclusive.",
+      "suggested_fix": "Ensure a verification step is confirmed after testing before proceeding to tuning."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:tune_limits",
+      "task_id": "tune_limits",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The dependency on 'limits_tested' is not verified prior to tuning phase.",
+      "suggested_fix": "Verify that the rate limiting functionality has been correctly enforced before starting the tuning process."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

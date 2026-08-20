@@ -1,0 +1,299 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-02-cert-manager",
+  "duration_seconds": 20.02,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plat-02-cert-manager-plan",
+    "goal_id": "plat-02-cert-manager",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T02:09:26.323089Z",
+    "tasks": [
+      {
+        "id": "install-helm",
+        "description": "Install Helm in the Kubernetes cluster",
+        "action": "install",
+        "target": "helm",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kubernetes cluster is accessible",
+            "fact": "k8s_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy-cert-manager",
+        "description": "Deploy cert-manager Helm chart",
+        "action": "deploy",
+        "target": "cert-manager",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Helm is installed",
+            "fact": "helm_installed",
+            "established_by": "install-helm",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "cert-manager is deployed",
+          "how": "check pods status",
+          "expected": "cert-manager pods are running"
+        },
+        "rollback": {
+          "trigger": "cert-manager deployment fails",
+          "action": "uninstall cert-manager",
+          "safety_guard": "verify cert-manager is not running"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-issuers",
+        "description": "Configure ClusterIssuers for Let's Encrypt",
+        "action": "configure",
+        "target": "ClusterIssuers",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cert-manager is deployed",
+            "fact": "cert-manager_deployed",
+            "established_by": "deploy-cert-manager",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "ClusterIssuers configuration",
+          "how": "validate issuer resources",
+          "expected": "issuers are valid and functional"
+        },
+        "rollback": {
+          "trigger": "issuer configuration fails",
+          "action": "remove ClusterIssuers",
+          "safety_guard": "ensure no invalid issuers remain"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create-certificates",
+        "description": "Create Certificate resources for ingress services",
+        "action": "create",
+        "target": "Certificates",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ClusterIssuers are configured",
+            "fact": "issuers_configured",
+            "established_by": "configure-issuers",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Certificates existence",
+          "how": "check certificate resources status",
+          "expected": "Certificates are present and valid"
+        },
+        "rollback": {
+          "trigger": "certificate creation fails",
+          "action": "delete Certificates",
+          "safety_guard": "confirm deletion of failed certificates"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "validate-auto-renewal",
+        "description": "Validate auto-renewal of Certificates",
+        "action": "validate",
+        "target": "automatic renewal",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Certificates are created",
+            "fact": "certificates_created",
+            "established_by": "create-certificates",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "certificate renewal events",
+          "how": "monitor logs and events",
+          "expected": "successful renewal events logged"
+        },
+        "rollback": {
+          "trigger": "auto-renewal check fails",
+          "action": "alert team for issues",
+          "safety_guard": "ensure certificates are monitored"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-tls-handshake",
+        "description": "Verify end-to-end TLS handshake from external endpoints",
+        "action": "verify",
+        "target": "TLS handshake",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Auto-renewal validation is complete",
+            "fact": "auto_renewal_validated",
+            "established_by": "validate-auto-renewal",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "TLS handshake successful",
+          "how": "use curl and openssl to test",
+          "expected": "successful connection with valid certificates"
+        },
+        "rollback": {
+          "trigger": "TLS handshake fails",
+          "action": "review and resolve certificate issues",
+          "safety_guard": "ensure backups are intact"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "install-helm",
+        "to_task": "deploy-cert-manager",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-cert-manager",
+        "to_task": "configure-issuers",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-issuers",
+        "to_task": "create-certificates",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create-certificates",
+        "to_task": "validate-auto-renewal",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "validate-auto-renewal",
+        "to_task": "verify-tls-handshake",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:install-helm",
+      "task_id": "install-helm",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Ensure that Kubernetes cluster accessibility is verified before proceeding.",
+      "suggested_fix": "Add a verification step for 'k8s_accessible' to confirm connectivity."
+    },
+    {
+      "id": "crit:1:missing_steps:deploy-cert-manager",
+      "task_id": "deploy-cert-manager",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No verification for the Helm installation step.",
+      "suggested_fix": "Include a verification step to confirm that Helm was successfully installed."
+    },
+    {
+      "id": "crit:1:missing_steps:configure-issuers",
+      "task_id": "configure-issuers",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No precondition verification for the configuration of ClusterIssuers.",
+      "suggested_fix": "Add a verification step to ensure that ClusterIssuers are correctly configured."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:validate-auto-renewal",
+      "task_id": "validate-auto-renewal",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Validation of auto-renewal occurs before ensuring that Certificates are present.",
+      "suggested_fix": "Reorder the tasks to ensure Certificates are validated before testing auto-renewal."
+    },
+    {
+      "id": "crit:1:missing_steps:verify-tls-handshake",
+      "task_id": "verify-tls-handshake",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No precondition verification for the completion of TLS handshakes.",
+      "suggested_fix": "Add a step to confirm that the certificates are valid and deployed before performing the TLS handshake."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:verify-tls-handshake",
+      "task_id": "verify-tls-handshake",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "info",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Dependencies for successful TLS handshake are not confirmed before execution.",
+      "suggested_fix": "Ensure verification of all preconditions for prior tasks before executing the TLS handshake."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:plat-02-cert-manager:1:1",
+    "plan_id": "plat-02-cert-manager-plan",
+    "version": 1,
+    "blocker_finding_id": "crit:1:feasibility:install-helm",
+    "question": "Plan for goal 'plat-02-cert-manager' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

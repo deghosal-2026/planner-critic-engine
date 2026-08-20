@@ -1,0 +1,259 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-06-cross-region-replication",
+  "duration_seconds": 17.28,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-db-06-cross-region-replication",
+    "goal_id": "db-06-cross-region-replication",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T01:57:00.424890Z",
+    "tasks": [
+      {
+        "id": "backup-primary",
+        "description": "Create a backup of the primary database",
+        "action": "backup",
+        "target": "us-east-1-db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Primary database is reachable",
+            "fact": "us-east-1-db_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "backup integrity",
+          "how": "check backup logs",
+          "expected": "backup successful"
+        },
+        "rollback": {
+          "trigger": "backup fails",
+          "action": "alert and halt execution",
+          "safety_guard": "verify backup process"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup-replication-slot",
+        "description": "Set up logical replication slot on primary",
+        "action": "setup_slot",
+        "target": "us-east-1-db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replication slot status",
+          "how": "query pg_replication_slots",
+          "expected": "slot exists and active"
+        },
+        "rollback": {
+          "trigger": "slot setup fails",
+          "action": "remove slot",
+          "safety_guard": "ensure slot is unused"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "filter-critical-databases",
+        "description": "Filter the critical databases for replication",
+        "action": "filter_databases",
+        "target": "us-east-1-db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Replication slot is set up",
+            "fact": "replication_slot_active",
+            "established_by": "setup-replication-slot",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup-dms",
+        "description": "Configure AWS DMS for cross-region replication",
+        "action": "configure_dms",
+        "target": "aws-dms-eu-west-1",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "DMS replication status",
+          "how": "check DMS console",
+          "expected": "replication task running"
+        },
+        "rollback": {
+          "trigger": "DMS configuration fails",
+          "action": "revert DMS settings",
+          "safety_guard": "ensure previous DMS config is backed up"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor-latency",
+        "description": "Set up monitoring for replication lag",
+        "action": "monitor_lag",
+        "target": "monitoring-service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DMS is configured",
+            "fact": "dms_configured",
+            "established_by": "setup-dms",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup-failback-procedure",
+        "description": "Implement automated failback procedure",
+        "action": "configure_failback",
+        "target": "aws-dns",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "failback functionality",
+          "how": "simulate failover",
+          "expected": "automatic failback without data loss"
+        },
+        "rollback": {
+          "trigger": "failback setup fails",
+          "action": "revert DNS settings",
+          "safety_guard": "ensure DNS points to primary"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "dr-drill",
+        "description": "Automate disaster recovery drill",
+        "action": "conduct_drill",
+        "target": "dr-script",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "drill outcome",
+          "how": "review drill logs",
+          "expected": "drill successful with no issues"
+        },
+        "rollback": {
+          "trigger": "drill fails",
+          "action": "report error and stop",
+          "safety_guard": "audit log review"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:missing_steps:filter-critical-databases",
+      "task_id": "filter-critical-databases",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Filtering of critical databases needs a verification step to ensure only the specified subset is replicated.",
+      "suggested_fix": "Add a verification step to confirm that the filtering process was successful and only the critical databases are included."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:setup-failback-procedure",
+      "task_id": "setup-failback-procedure",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The failback procedure lacks verification of dependencies on the primary database's health before executing automated failback.",
+      "suggested_fix": "Implement a check to verify that the primary database is healthy before initiating the failback procedure."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:setup-failback-procedure",
+      "task_id": "setup-failback-procedure",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Failback procedure should not be set up until monitoring for replication lag is fully functional to avoid data loss during failback.",
+      "suggested_fix": "Ensure that the monitoring for replication lag task is successfully completed before proceeding to implement the failback procedure."
+    },
+    {
+      "id": "crit:1:missing_steps:setup-dms",
+      "task_id": "setup-dms",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "info",
+      "reason_code": "llm_missing_steps",
+      "message": "DMS setup should include detailed steps for configuring the replication task and necessary IAM roles.",
+      "suggested_fix": "Include explicit steps for DMS task configuration and policy attachment for IAM roles to allow cross-region access."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:monitor-latency",
+      "task_id": "monitor-latency",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The monitoring setup does not check the successful completion of DMS task configuration, which is critical for effective monitoring.",
+      "suggested_fix": "Add a precondition to monitor-latency that confirms DMS configuration is successfully completed before setup."
+    },
+    {
+      "id": "crit:1:weak_rollback:backup-primary",
+      "task_id": "backup-primary",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Backup rollback only alerts on failure; needs a more robust action in case of issues after backup.",
+      "suggested_fix": "Implement a full restoration procedure as part of the rollback plan for the backup task if it fails."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-06-cross-region-replication:1:1",
+    "plan_id": "plan-db-06-cross-region-replication",
+    "version": 1,
+    "blocker_finding_id": "crit:1:unsafe_sequencing:setup-failback-procedure",
+    "question": "Plan for goal 'db-06-cross-region-replication' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

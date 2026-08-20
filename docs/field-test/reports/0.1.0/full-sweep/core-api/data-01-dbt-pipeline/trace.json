@@ -1,0 +1,216 @@
+{
+  "dimension": "core-api",
+  "goal_id": "data-01-dbt-pipeline",
+  "duration_seconds": 9.9,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "data-01-dbt-pipeline",
+    "goal_id": "data-01-dbt-pipeline",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T01:54:49.896366Z",
+    "tasks": [
+      {
+        "id": "extract_data",
+        "description": "Extract data from S3 to staging area",
+        "action": "extract",
+        "target": "staging_area",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "S3 bucket is accessible",
+            "fact": "s3_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "transform_data",
+        "description": "Transform the extracted data",
+        "action": "transform",
+        "target": "transformed_data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "extracted data is available",
+            "fact": "extracted_data_ready",
+            "established_by": "extract_data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "transformation output",
+          "how": "run validation checks",
+          "expected": "data in expected format"
+        },
+        "rollback": {
+          "trigger": "transformation fails",
+          "action": "revert to raw data",
+          "safety_guard": "check data integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "load_data",
+        "description": "Load transformed data into the target database",
+        "action": "load",
+        "target": "target_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "transformed data is ready",
+            "fact": "transformed_data_ready",
+            "established_by": "transform_data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data load status",
+          "how": "check load logs",
+          "expected": "all records loaded successfully"
+        },
+        "rollback": {
+          "trigger": "loading fails",
+          "action": "restore previous data snapshot",
+          "safety_guard": "verify snapshot integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_data",
+        "description": "Verify the loaded data integrity",
+        "action": "verify",
+        "target": "loaded_data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "data has been loaded",
+            "fact": "data_loaded",
+            "established_by": "load_data",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "extract_data",
+        "to_task": "transform_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "transform_data",
+        "to_task": "load_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "load_data",
+        "to_task": "verify_data",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:extract_data",
+      "task_id": "extract_data",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "S3 bucket accessibility must be confirmed before extraction starts.",
+      "suggested_fix": "Implement a check for S3 bucket accessibility before executing the extract task."
+    },
+    {
+      "id": "crit:1:missing_steps:verify_data",
+      "task_id": "verify_data",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Verification steps for data integrity are missing.",
+      "suggested_fix": "Add verification criteria for the verify_data task."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:transform_data",
+      "task_id": "transform_data",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Transform data task should not proceed without confirming that extracted data is available.",
+      "suggested_fix": "Ensure that the transform_data task only starts after successful completion of the extract_data task."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:transform_data",
+      "task_id": "transform_data",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Dependency on 'extracted_data_ready' has not been verified as a prerequisite for starting transformation.",
+      "suggested_fix": "Ensure 'extracted_data_ready' is validated before moving to the transform step."
+    },
+    {
+      "id": "crit:1:weak_rollback:transform_data",
+      "task_id": "transform_data",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback strategy relies on data integrity checks which may not guarantee recovery if it fails.",
+      "suggested_fix": "Consider adding more robust rollback strategies that ensure full recovery in case of transformation failure."
+    },
+    {
+      "id": "crit:1:weak_rollback:load_data",
+      "task_id": "load_data",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback strategy is dependent on verifying snapshot integrity which may not be guaranteed.",
+      "suggested_fix": "Enhance rollback procedure to include a comprehensive check of loaded data against the expected data schema."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

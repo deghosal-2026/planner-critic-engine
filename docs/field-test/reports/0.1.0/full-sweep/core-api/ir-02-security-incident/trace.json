@@ -1,0 +1,213 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-02-security-incident",
+  "duration_seconds": 13.61,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "ir-02-security-incident-plan",
+    "goal_id": "ir-02-security-incident",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T01:59:19.690387Z",
+    "tasks": [
+      {
+        "id": "isolate_instance",
+        "description": "Revoke security group ingress for the compromised EC2 instance",
+        "action": "revoke_ingress",
+        "target": "ec2_security_group",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "anomalous API call detected",
+            "fact": "api_anomaly_detected",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "security group ingress rules",
+          "how": "describe security group",
+          "expected": "only authorized rules remain"
+        },
+        "rollback": {
+          "trigger": "ingress revoke fails",
+          "action": "restore previous ingress rules",
+          "safety_guard": "confirm previous rules from backup"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rotate_iam_keys",
+        "description": "Rotate all IAM keys associated with the compromised user",
+        "action": "rotate_keys",
+        "target": "iam_user",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "user keys linked to anomaly",
+            "fact": "user_keys_compromised",
+            "established_by": "isolate_instance",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "IAM key status",
+          "how": "list IAM keys",
+          "expected": "no old keys remain"
+        },
+        "rollback": {
+          "trigger": "key rotation fails",
+          "action": "re-enable previous keys",
+          "safety_guard": "confirm previous keys are valid"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "forensic_snapshot",
+        "description": "Take a forensic EBS snapshot of every attached volume",
+        "action": "create_snapshot",
+        "target": "ebs_volumes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EC2 instance is isolated",
+            "fact": "instance_is_isolated",
+            "established_by": "isolate_instance",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "snapshot creation status",
+          "how": "describe snapshots",
+          "expected": "all expected volumes have snapshots"
+        },
+        "rollback": {
+          "trigger": "snapshot creation fails",
+          "action": "restore from previous snapshot",
+          "safety_guard": "verify previous snapshot integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_cloudtrail",
+        "description": "Verify no further anomalous API calls appear in the next 5 minutes of CloudTrail",
+        "action": "monitor_cloudtrail",
+        "target": "cloudtrail_logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "snapshot taken successfully",
+            "fact": "snapshot_created",
+            "established_by": "forensic_snapshot",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "isolate_instance",
+        "to_task": "rotate_iam_keys",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rotate_iam_keys",
+        "to_task": "forensic_snapshot",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "forensic_snapshot",
+        "to_task": "monitor_cloudtrail",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:isolate_instance",
+      "task_id": "isolate_instance",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "warning",
+      "reason_code": "llm_feasibility",
+      "message": "The success of revoking security group ingress depends on the current state of security group rules, which may not be guaranteed.",
+      "suggested_fix": "Ensure a valid backup of existing security group rules before attempting to revoke ingress."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:rotate_iam_keys",
+      "task_id": "rotate_iam_keys",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Rotating IAM keys should wait until the security group has been successfully updated to avoid further permission issues.",
+      "suggested_fix": "Change execution order so 'rotate_iam_keys' only runs after successful completion of 'isolate_instance'."
+    },
+    {
+      "id": "crit:1:missing_steps:forensic_snapshot",
+      "task_id": "forensic_snapshot",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "There may be a need to verify if the EBS volumes are indeed attached to the isolated EC2 instance before taking snapshots.",
+      "suggested_fix": "Add a verification step to check EBS volume attachments before proceeding with snapshot creation."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:monitor_cloudtrail",
+      "task_id": "monitor_cloudtrail",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Monitoring CloudTrail should include checks for other anomalous behaviors and not just depend on the successful creation of a snapshot.",
+      "suggested_fix": "Expand the precondition to verify not only the snapshot but also that the security posture of the EC2 instance and IAM keys is secure."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-02-security-incident:1:1",
+    "plan_id": "ir-02-security-incident-plan",
+    "version": 1,
+    "blocker_finding_id": "crit:1:unsafe_sequencing:rotate_iam_keys",
+    "question": "Plan for goal 'ir-02-security-incident' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

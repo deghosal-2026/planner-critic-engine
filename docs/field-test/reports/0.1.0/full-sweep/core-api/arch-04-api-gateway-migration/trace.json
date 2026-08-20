@@ -1,0 +1,229 @@
+{
+  "dimension": "core-api",
+  "goal_id": "arch-04-api-gateway-migration",
+  "duration_seconds": 12.64,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "arch-04-api-gateway-migration-plan",
+    "goal_id": "arch-04-api-gateway-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T01:52:39.915646Z",
+    "tasks": [
+      {
+        "id": "export-nginx-config",
+        "description": "Export NGINX configuration including routes, upstreams, and SSL certs",
+        "action": "export",
+        "target": "nginx_config",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "exported config integrity",
+          "how": "compare against previous version",
+          "expected": "config matches properly"
+        },
+        "rollback": {
+          "trigger": "export fails",
+          "action": "revert to last known configuration",
+          "safety_guard": "confirm NGINX is running ok"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "translate-to-kong-config",
+        "description": "Translate NGINX config to Kong declarative configuration",
+        "action": "translate",
+        "target": "kong_config",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Kong config validity",
+          "how": "run Kong's config test",
+          "expected": "no errors returned"
+        },
+        "rollback": {
+          "trigger": "translation errors",
+          "action": "restore NGINX config",
+          "safety_guard": "ensure fallback is in place"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy-kong",
+        "description": "Deploy Kong API gateway alongside NGINX",
+        "action": "deploy",
+        "target": "kong",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Kong deployment status",
+          "how": "check deployment logs",
+          "expected": "Kong is running successfully"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "remove Kong deployment",
+          "safety_guard": "ensure NGINX is unaffected"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "route-shadow-traffic",
+        "description": "Route shadow traffic to Kong for validation",
+        "action": "route",
+        "target": "shadow_traffic",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "traffic routing accuracy",
+          "how": "observe traffic flow",
+          "expected": "no disruptions in service"
+        },
+        "rollback": {
+          "trigger": "shadow traffic issues",
+          "action": "redirect traffic back to NGINX",
+          "safety_guard": "monitor traffic performance"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover-dns-to-kong",
+        "description": "Cutover DNS to point to Kong API gateway",
+        "action": "cutover",
+        "target": "dns_records",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "DNS propagation",
+          "how": "check DNS resolution",
+          "expected": "DNS points to Kong IP"
+        },
+        "rollback": {
+          "trigger": "DNS cutover issues",
+          "action": "revert DNS settings to NGINX",
+          "safety_guard": "hold recent backup of DNS settings"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "export-nginx-config",
+        "to_task": "translate-to-kong-config",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "translate-to-kong-config",
+        "to_task": "deploy-kong",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-kong",
+        "to_task": "route-shadow-traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "route-shadow-traffic",
+        "to_task": "cutover-dns-to-kong",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:export-nginx-config",
+      "task_id": "export-nginx-config",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The process of exporting NGINX configuration may encounter issues if the NGINX server is not operational or if the configuration structure has changed significantly.",
+      "suggested_fix": "Ensure NGINX is running and consider creating a backup before export."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:cutover-dns-to-kong",
+      "task_id": "cutover-dns-to-kong",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "warning",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Cutover DNS to Kong should not occur until shadow traffic validation is confirmed to be successful to avoid service disruption.",
+      "suggested_fix": "Reorder tasks to ensure that the DNS cutover only happens after successful validation of shadow traffic."
+    },
+    {
+      "id": "crit:1:missing_steps:deploy-kong",
+      "task_id": "deploy-kong",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No steps are defined to verify the integration between Kong and NGINX post-deployment.",
+      "suggested_fix": "Add a verification step to validate that Kong is integrated and working alongside NGINX as expected."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:translate-to-kong-config",
+      "task_id": "translate-to-kong-config",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The translation dependency from NGINX to Kong configuration may not account for all features or settings, leading to potential oversights.",
+      "suggested_fix": "Include a review step to ensure all critical settings from NGINX are captured in the Kong configuration."
+    },
+    {
+      "id": "crit:1:weak_rollback:cutover-dns-to-kong",
+      "task_id": "cutover-dns-to-kong",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "info",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action for DNS cutover does not specify a clear method to verify the previous DNS settings.",
+      "suggested_fix": "Ensure backup DNS settings are verified before executing the rollback."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:arch-04-api-gateway-migration:1:1",
+    "plan_id": "arch-04-api-gateway-migration-plan",
+    "version": 1,
+    "blocker_finding_id": "crit:1:feasibility:export-nginx-config",
+    "question": "Plan for goal 'arch-04-api-gateway-migration' cannot be approved: blockers remain (llm_feasibility). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

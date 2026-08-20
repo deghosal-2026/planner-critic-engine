@@ -1,0 +1,190 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-06-cis-remediation",
+  "duration_seconds": 7.92,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-ir-06-cis-remediation",
+    "goal_id": "ir-06-cis-remediation",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T02:00:02.272909Z",
+    "tasks": [
+      {
+        "id": "scan",
+        "description": "Run kube-bench scan against EKS cluster",
+        "action": "scan",
+        "target": "eks-cluster",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "scan results",
+          "how": "analyze report",
+          "expected": "categories of findings"
+        },
+        "rollback": {
+          "trigger": "scan fails",
+          "action": "revert to last known working state",
+          "safety_guard": "ensure cluster availability"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "categorize",
+        "description": "Categorize findings into HIGH/MEDIUM/LOW severity",
+        "action": "categorize",
+        "target": "findings",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "scan results are available",
+            "fact": "scan_completed",
+            "established_by": "scan",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "remediate_high",
+        "description": "Remediate all HIGH findings",
+        "action": "remediate",
+        "target": "cluster",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "HIGH findings identified",
+            "fact": "high_findings_identified",
+            "established_by": "categorize",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "remediation success",
+          "how": "check cluster settings",
+          "expected": "all HIGH findings addressed"
+        },
+        "rollback": {
+          "trigger": "remediation fails",
+          "action": "revert changes",
+          "safety_guard": "ensure cluster operations continuity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rescan",
+        "description": "Re-scan to confirm all HIGH findings are resolved",
+        "action": "scan",
+        "target": "eks-cluster",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "final scan results",
+          "how": "analyze report",
+          "expected": "no HIGH findings"
+        },
+        "rollback": {
+          "trigger": "rescan fails",
+          "action": "restore previous settings",
+          "safety_guard": "confirm backup availability"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "scan",
+        "to_task": "categorize",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "categorize",
+        "to_task": "remediate_high",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "remediate_high",
+        "to_task": "rescan",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:remediate_high",
+      "task_id": "remediate_high",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The task to remediate HIGH findings depends on the identification of those findings, which may not be practical to guarantee in every case.",
+      "suggested_fix": "Ensure that remediation actions are based on a verified list of HIGH findings rather than assuming they can always be identified."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:rescan",
+      "task_id": "rescan",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "warning",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Rescanning should only occur if the remediation step is guaranteed to succeed; failure in remediation could yield misleading results.",
+      "suggested_fix": "Add a verification step after remediation to confirm that all HIGH findings were adequately addressed before proceeding to the rescan."
+    },
+    {
+      "id": "crit:1:missing_steps:categorize",
+      "task_id": "categorize",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No verification step is included to ensure that the categorization of findings has been done correctly before moving to remediation.",
+      "suggested_fix": "Incorporate a verification process for the categorization of findings to ensure accuracy before proceeding to remediation."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:scan",
+      "task_id": "scan",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The categorization task assumes that scan results will always be available, but this dependency is not verified.",
+      "suggested_fix": "Add a verification step to ensure that scan results are ready and valid before categorization begins."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,208 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-06-monitoring-canary",
+  "duration_seconds": 10.71,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "obs-06-monitoring-canary",
+    "goal_id": "obs-06-monitoring-canary",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T02:08:40.954559Z",
+    "tasks": [
+      {
+        "id": "create_check_pod",
+        "description": "Deploy synthetic check pod that hits /health and /api/checkout endpoints",
+        "action": "deploy",
+        "target": "check_pod",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "all required tools are available",
+            "fact": "tools_installed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_metrics",
+        "description": "Expose canary metrics to Prometheus",
+        "action": "expose",
+        "target": "canary_metrics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "check pod deployed successfully",
+            "fact": "check_pod_deployed",
+            "established_by": "create_check_pod",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create_dashboard",
+        "description": "Create Grafana dashboard for canary health",
+        "action": "create",
+        "target": "grafana_dashboard",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary metrics configured in Prometheus",
+            "fact": "metrics_configured",
+            "established_by": "configure_metrics",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_alert",
+        "description": "Configure alert for 5xx rate exceeding 1%",
+        "action": "configure",
+        "target": "alert_configuration",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Grafana dashboard created",
+            "fact": "dashboard_created",
+            "established_by": "create_dashboard",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "alert status",
+          "how": "check alert configuration in Grafana",
+          "expected": "alert is configured correctly"
+        },
+        "rollback": {
+          "trigger": "alert misconfiguration",
+          "action": "reset to default alert settings",
+          "safety_guard": "verify alert functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "create_check_pod",
+        "to_task": "configure_metrics",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_metrics",
+        "to_task": "create_dashboard",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_dashboard",
+        "to_task": "configure_alert",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:missing_steps:create_check_pod",
+      "task_id": "create_check_pod",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "blocker",
+      "reason_code": "llm_missing_steps",
+      "message": "Missing rollback procedure for check pod deployment.",
+      "suggested_fix": "Define a rollback strategy for the check pod deployment."
+    },
+    {
+      "id": "crit:1:missing_steps:configure_metrics",
+      "task_id": "configure_metrics",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "blocker",
+      "reason_code": "llm_missing_steps",
+      "message": "Missing verification for canary metrics exposure to Prometheus.",
+      "suggested_fix": "Add a verification step to confirm metrics are correctly exposed to Prometheus."
+    },
+    {
+      "id": "crit:1:missing_steps:create_dashboard",
+      "task_id": "create_dashboard",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "blocker",
+      "reason_code": "llm_missing_steps",
+      "message": "Missing rollback procedure for Grafana dashboard creation.",
+      "suggested_fix": "Define a rollback strategy for the Grafana dashboard creation."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:configure_alert",
+      "task_id": "configure_alert",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'configure_alert' depends on 'create_dashboard', but 'create_dashboard' lacks verification, leading to potential misconfigurations.",
+      "suggested_fix": "Ensure 'create_dashboard' has a verification step before proceeding to 'configure_alert'."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:configure_metrics",
+      "task_id": "configure_metrics",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Dependency on 'check pod deployed successfully' is not verified after deployment.",
+      "suggested_fix": "Verify successful deployment of the check pod before proceeding to configure metrics."
+    },
+    {
+      "id": "crit:1:weak_rollback:configure_alert",
+      "task_id": "configure_alert",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for alert configuration relies on default settings, which might not restore previous state adequately.",
+      "suggested_fix": "Enhance rollback strategy to restore previous alert settings more securely."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

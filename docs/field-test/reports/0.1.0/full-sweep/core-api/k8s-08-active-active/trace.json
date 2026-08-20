@@ -1,0 +1,216 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-08-active-active",
+  "duration_seconds": 16.29,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "k8s-08-active-active-plan",
+    "goal_id": "k8s-08-active-active",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T02:07:00.557206Z",
+    "tasks": [
+      {
+        "id": "setup-k8s-us-east-1",
+        "description": "Set up Kubernetes cluster in us-east-1",
+        "action": "create_cluster",
+        "target": "k8s_us_east_1",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "cluster status",
+          "how": "kubectl get nodes",
+          "expected": "Ready"
+        },
+        "rollback": {
+          "trigger": "cluster setup fails",
+          "action": "delete cluster",
+          "safety_guard": "ensure user data is backed up"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup-k8s-eu-west-1",
+        "description": "Set up Kubernetes cluster in eu-west-1",
+        "action": "create_cluster",
+        "target": "k8s_eu_west_1",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "cluster status",
+          "how": "kubectl get nodes",
+          "expected": "Ready"
+        },
+        "rollback": {
+          "trigger": "cluster setup fails",
+          "action": "delete cluster",
+          "safety_guard": "ensure user data is backed up"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-pg-replication",
+        "description": "Configure PostgreSQL streaming replication between us-east-1 and eu-west-1",
+        "action": "setup_replication",
+        "target": "pg_replication",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replication status",
+          "how": "check pg_stat_replication",
+          "expected": "active"
+        },
+        "rollback": {
+          "trigger": "replication setup fails",
+          "action": "restore db from snapshot",
+          "safety_guard": "verify snapshot integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup-global-routing",
+        "description": "Set up Global Traffic Routing with AWS Global Accelerator",
+        "action": "configure_routing",
+        "target": "global_routing",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "routing configuration",
+          "how": "test traffic distribution",
+          "expected": "50% traffic to each region"
+        },
+        "rollback": {
+          "trigger": "routing configuration fails",
+          "action": "revert routing settings",
+          "safety_guard": "check health checks"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "validate-traffic-distribution",
+        "description": "Validate traffic distribution across regions",
+        "action": "test_traffic",
+        "target": "traffic_test",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "simulate-region-failure",
+        "description": "Simulate region-level failure by taking us-east-1 offline",
+        "action": "take_offline",
+        "target": "k8s_us_east_1",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "traffic absorption",
+          "how": "monitor traffic",
+          "expected": "100% to eu-west-1 within 60 seconds"
+        },
+        "rollback": {
+          "trigger": "offline test fails",
+          "action": "bring us-east-1 back online",
+          "safety_guard": "ensure routing is restored"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:missing_steps:validate-traffic-distribution",
+      "task_id": "validate-traffic-distribution",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Validation lacks predefined success criteria.",
+      "suggested_fix": "Define specific metrics for successful traffic distribution validation."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:simulate-region-failure",
+      "task_id": "simulate-region-failure",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Assumes all dependencies are fully operational before simulating failure.",
+      "suggested_fix": "Incorporate a verification step to check that both regions are fully operational before the simulation."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:simulate-region-failure",
+      "task_id": "simulate-region-failure",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "warning",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Simulating region-level failure should occur after validating traffic distribution.",
+      "suggested_fix": "Reorder tasks to complete traffic validation before simulating failure to ensure reliability."
+    },
+    {
+      "id": "crit:1:weak_rollback:configure-pg-replication",
+      "task_id": "configure-pg-replication",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback action involves restoring from a snapshot without verifying the fallback success.",
+      "suggested_fix": "Add verification of the restoration process to ensure data integrity after rollback."
+    },
+    {
+      "id": "crit:1:weak_rollback:setup-global-routing",
+      "task_id": "setup-global-routing",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback does not detail steps to ensure a full revert if the configuration fails.",
+      "suggested_fix": "Expand rollback plan to include confirmation of previous configurations being restored accurately."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-08-active-active:1:1",
+    "plan_id": "k8s-08-active-active-plan",
+    "version": 1,
+    "blocker_finding_id": null,
+    "question": "Plan for goal 'k8s-08-active-active' did not converge (revision_cap_reached). Decide next step.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

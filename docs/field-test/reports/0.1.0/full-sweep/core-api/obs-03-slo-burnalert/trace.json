@@ -1,0 +1,216 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-03-slo-burnalert",
+  "duration_seconds": 12.29,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "obs-03-slo-burnalert",
+    "goal_id": "obs-03-slo-burnalert",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T02:07:59.292898Z",
+    "tasks": [
+      {
+        "id": "define_sli",
+        "description": "Define p99 request latency as SLI",
+        "action": "define",
+        "target": "sli",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "service metrics are available",
+            "fact": "service_metrics_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "set_target",
+        "description": "Set SLO target to 99.9% monthly",
+        "action": "set",
+        "target": "slo_target",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "p99 latency is defined",
+            "fact": "sli_defined",
+            "established_by": "define_sli",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_alerts",
+        "description": "Configure multi-window burn-rate alerts in Prometheus",
+        "action": "configure",
+        "target": "prometheus_alerts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "SLO target is set",
+            "fact": "slo_target_set",
+            "established_by": "set_target",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "alert rules",
+          "how": "check prometheus configuration",
+          "expected": "rules apply correctly"
+        },
+        "rollback": {
+          "trigger": "alert configuration fails",
+          "action": "revert alert configuration",
+          "safety_guard": "ensure previous alerts are intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "validate_alerts",
+        "description": "Validate alert fires when error budget burn exceeds threshold",
+        "action": "validate",
+        "target": "alert_fires",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "alerts are configured",
+            "fact": "alerts_configured",
+            "established_by": "configure_alerts",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "alert fires",
+          "how": "simulate error budget burn",
+          "expected": "alerts triggered as expected"
+        },
+        "rollback": {
+          "trigger": "validation fails",
+          "action": "reconfigure alerts",
+          "safety_guard": "restore previous validation state"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define_sli",
+        "to_task": "set_target",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set_target",
+        "to_task": "configure_alerts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_alerts",
+        "to_task": "validate_alerts",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:define_sli",
+      "task_id": "define_sli",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Service metrics must be available before defining SLI, verify availability.",
+      "suggested_fix": "Ensure that service metrics are available prior to executing this task."
+    },
+    {
+      "id": "crit:1:missing_steps:set_target",
+      "task_id": "set_target",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No rollback defined for setting SLO target.",
+      "suggested_fix": "Add a rollback procedure to revert the SLO target to a previous state if necessary."
+    },
+    {
+      "id": "crit:1:missing_steps:configure_alerts",
+      "task_id": "configure_alerts",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Verification is present, but ensure rollback procedures are tested regularly.",
+      "suggested_fix": "Document and implement regular tests for rollback procedure to ensure reliability."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:validate_alerts",
+      "task_id": "validate_alerts",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Validation should occur after a successful configuration of alerts.",
+      "suggested_fix": "Ensure that validation is only executed if 'configure_alerts' succeeds."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:validate_alerts",
+      "task_id": "validate_alerts",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Validation of alerts depends on configuration step which should be verified.",
+      "suggested_fix": "Include an explicit check to confirm alerts were successfully configured before validation."
+    },
+    {
+      "id": "crit:1:weak_rollback:validate_alerts",
+      "task_id": "validate_alerts",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for validation lacks detail regarding the restoration process.",
+      "suggested_fix": "Define a detailed rollback strategy for restoring the state prior to validation in case of failure."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

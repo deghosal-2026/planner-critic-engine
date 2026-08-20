@@ -1,0 +1,270 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-04-capacity-test",
+  "duration_seconds": 16.39,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "obs-04-capacity-test-plan",
+    "goal_id": "obs-04-capacity-test",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T02:08:16.583585Z",
+    "tasks": [
+      {
+        "id": "define_slo",
+        "description": "Define SLO targets for capacity test",
+        "action": "document",
+        "target": "SLO_targets",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Test objectives are outlined",
+            "fact": "objectives_defined",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "low",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run_k6_test",
+        "description": "Run k6 ramp-up test",
+        "action": "execute",
+        "target": "k6",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "k6 is properly configured",
+            "fact": "k6_configured",
+            "established_by": "define_slo",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "test results",
+          "how": "analyze k6 output",
+          "expected": "p99 latency <500ms, error rate <0.1%"
+        },
+        "rollback": {
+          "trigger": "test fails",
+          "action": "stop test and restore configuration",
+          "safety_guard": "verify test environment is unchanged"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "collect_metrics",
+        "description": "Collect Prometheus metrics during the test",
+        "action": "gather",
+        "target": "prometheus",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Prometheus is up and running",
+            "fact": "prometheus_running",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "Metrics endpoints are configured",
+            "fact": "metrics_configured",
+            "established_by": "run_k6_test",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "analyze_bottlenecks",
+        "description": "Analyze bottlenecks from test results and metrics",
+        "action": "review",
+        "target": "analysis",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Test results and metrics are available",
+            "fact": "results_collected",
+            "established_by": "collect_metrics",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "right_size_hpa",
+        "description": "Right-size HPA limits based on analysis",
+        "action": "adjust",
+        "target": "HPA_limits",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Bottlenecks have been identified",
+            "fact": "bottlenecks_analyzed",
+            "established_by": "analyze_bottlenecks",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "HPA limits",
+          "how": "check HPA status",
+          "expected": "HPA limits reflect new analysis"
+        },
+        "rollback": {
+          "trigger": "incorrect limits set",
+          "action": "revert to previous HPA limits",
+          "safety_guard": "check application stability after rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "retest_slos",
+        "description": "Re-test to confirm SLOs hold at target load",
+        "action": "execute",
+        "target": "redo_k6",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "HPA limits have been adjusted",
+            "fact": "hpa_adjusted",
+            "established_by": "right_size_hpa",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "final test results",
+          "how": "analyze k6 output again",
+          "expected": "p99 latency <500ms, error rate <0.1%"
+        },
+        "rollback": {
+          "trigger": "SLOs do not hold",
+          "action": "review previous configuration and metrics",
+          "safety_guard": "document all outcomes for future reference"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define_slo",
+        "to_task": "run_k6_test",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_k6_test",
+        "to_task": "collect_metrics",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "collect_metrics",
+        "to_task": "analyze_bottlenecks",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "analyze_bottlenecks",
+        "to_task": "right_size_hpa",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "right_size_hpa",
+        "to_task": "retest_slos",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:missing_steps:define_slo",
+      "task_id": "define_slo",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "blocker",
+      "reason_code": "llm_missing_steps",
+      "message": "No verification step defined for SLO targets after defining them.",
+      "suggested_fix": "Add a verification step to confirm the defined SLO targets."
+    },
+    {
+      "id": "crit:1:missing_steps:run_k6_test",
+      "task_id": "run_k6_test",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "blocker",
+      "reason_code": "llm_missing_steps",
+      "message": "Lack of a rollback mechanism for the K6 test execution task.",
+      "suggested_fix": "Implement a rollback plan for the K6 test in case of failure."
+    },
+    {
+      "id": "crit:1:missing_steps:collect_metrics",
+      "task_id": "collect_metrics",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "blocker",
+      "reason_code": "llm_missing_steps",
+      "message": "No verification step defined for the collected metrics.",
+      "suggested_fix": "Add a verification step to confirm that metrics were successfully collected."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:right_size_hpa",
+      "task_id": "right_size_hpa",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "warning",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Right-sizing HPA limits should be verified before being adjusted based on analysis.",
+      "suggested_fix": "Ensure HPA limits are verified before making adjustments based on analysis."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:retest_slos",
+      "task_id": "retest_slos",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "HPA limits being adjusted does not guarantee that the limits are set correctly without verification.",
+      "suggested_fix": "Include a verification of the new HPA limits before proceeding to retest SLOs."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

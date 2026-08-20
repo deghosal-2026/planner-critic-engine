@@ -1,0 +1,233 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-05-honeypot-deploy",
+  "duration_seconds": 14.92,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-ir-05-honeypot-deploy",
+    "goal_id": "ir-05-honeypot-deploy",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T01:59:52.562024Z",
+    "tasks": [
+      {
+        "id": "setup_aws_key",
+        "description": "Deploy a fake AWS access key in a public repo",
+        "action": "deploy",
+        "target": "aws_repo",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AWS CLI is configured",
+            "fact": "aws_cli_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_db_string",
+        "description": "Deploy a fake database connection string in a CI env var",
+        "action": "deploy",
+        "target": "ci_env",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CI environment is accessible",
+            "fact": "ci_env_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_api_key",
+        "description": "Deploy a fake API key in a config file",
+        "action": "deploy",
+        "target": "config_file",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Config file location is determined",
+            "fact": "config_file_location_defined",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_alerts",
+        "description": "Configure alerting webhook to PagerDuty for all tokens",
+        "action": "configure",
+        "target": "pagerduty",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PagerDuty account is accessible",
+            "fact": "pagerduty_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "PagerDuty alert configuration status",
+          "how": "check PagerDuty integration",
+          "expected": "active"
+        },
+        "rollback": {
+          "trigger": "alert configuration fails",
+          "action": "revert PagerDuty configuration",
+          "safety_guard": "verify previous alert configuration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "write_response_playbook",
+        "description": "Write a 3-step response playbook for token alerts",
+        "action": "write",
+        "target": "response_playbook",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Alerting strategy is defined",
+            "fact": "alert_strategy_defined",
+            "established_by": "configure_alerts",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "low",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup_aws_key",
+        "to_task": "configure_alerts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_db_string",
+        "to_task": "configure_alerts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_api_key",
+        "to_task": "configure_alerts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_alerts",
+        "to_task": "write_response_playbook",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:configure_alerts",
+      "task_id": "configure_alerts",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "PagerDuty account accessibility must be confirmed before configuring alerts.",
+      "suggested_fix": "Add a precondition to verify PagerDuty account accessibility before executing the configuration."
+    },
+    {
+      "id": "crit:1:missing_steps:setup_aws_key",
+      "task_id": "setup_aws_key",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No rollback strategy defined for AWS key deployment.",
+      "suggested_fix": "Include a rollback plan to revert the AWS key deployment if it fails."
+    },
+    {
+      "id": "crit:1:missing_steps:setup_db_string",
+      "task_id": "setup_db_string",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No rollback strategy defined for database connection string deployment.",
+      "suggested_fix": "Include a rollback plan to revert the database connection string deployment if it fails."
+    },
+    {
+      "id": "crit:1:missing_steps:setup_api_key",
+      "task_id": "setup_api_key",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No rollback strategy defined for API key deployment.",
+      "suggested_fix": "Include a rollback plan to revert the API key deployment if it fails."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:write_response_playbook",
+      "task_id": "write_response_playbook",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "warning",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Writing the response playbook should occur after verifying alerting configuration.",
+      "suggested_fix": "Change the sequence to ensure response playbook writing occurs only after successful alert configuration."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:configure_alerts",
+      "task_id": "configure_alerts",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Dependencies on the successful configuration of the AWS key, database string, and API key deployments are not verified.",
+      "suggested_fix": "Add verification steps to ensure each preceding task completed successfully before proceeding to alerts configuration."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}
