@@ -1,0 +1,213 @@
+{
+  "dimension": "core-api",
+  "goal_id": "data-05-warehouse-model",
+  "duration_seconds": 10.57,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "data-05-warehouse-model-v1",
+    "goal_id": "data-05-warehouse-model",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T01:55:37.858706Z",
+    "tasks": [
+      {
+        "id": "backup_current_model",
+        "description": "Back up the existing dimensional model",
+        "action": "backup",
+        "target": "current_model",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "current model is ready for backup",
+            "fact": "model_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "backup integrity",
+          "how": "run checksum",
+          "expected": "backup matches source"
+        },
+        "rollback": {
+          "trigger": "backup fails",
+          "action": "abort migration",
+          "safety_guard": "check backup logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "migrate_model",
+        "description": "Migrate to star schema with SCD",
+        "action": "migrate",
+        "target": "star_schema",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "backup successfully completed",
+            "fact": "backup_completed",
+            "established_by": "backup_current_model",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "model structure",
+          "how": "schema validation",
+          "expected": "schema matches star format"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore original model",
+          "safety_guard": "ensure original model is intact"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "backfill_data",
+        "description": "Backfill historical data into the star schema",
+        "action": "backfill",
+        "target": "star_schema",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "migration successful",
+            "fact": "migration_success",
+            "established_by": "migrate_model",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_data",
+        "description": "Verify data in the star schema",
+        "action": "verify",
+        "target": "star_schema",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "backfill completed",
+            "fact": "backfill_completed",
+            "established_by": "backfill_data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data consistency",
+          "how": "run integrity checks",
+          "expected": "data matches expected results"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "recheck data integrity",
+          "safety_guard": "double-check data sources"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "backup_current_model",
+        "to_task": "migrate_model",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate_model",
+        "to_task": "backfill_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "backfill_data",
+        "to_task": "verify_data",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:missing_steps:backfill_data",
+      "task_id": "backfill_data",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No rollback step defined for 'backfill_data' task which could lead to unrecoverable states in case of failure.",
+      "suggested_fix": "Define a rollback action to restore the state before backfill in case it fails."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:backfill_data",
+      "task_id": "backfill_data",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "warning",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "'backfill_data' task should only proceed if 'migrate_model' is verified for success, not just assumed based on a flag.",
+      "suggested_fix": "Add verification of successful migration before allowing 'backfill_data' to execute."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:migrate_model",
+      "task_id": "migrate_model",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "info",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Dependencies should include verification of backup integrity before proceeding with migration.",
+      "suggested_fix": "Ensure verification step is explicitly acknowledged as a prerequisite before migration begins."
+    },
+    {
+      "id": "crit:1:weak_rollback:migrate_model",
+      "task_id": "migrate_model",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'migrate_model' only checks if the original model is intact; it should also verify the integrity of the model after restoration.",
+      "suggested_fix": "Enhance rollback safety by including an integrity check of the restored model after rollback."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:data-05-warehouse-model:1:1",
+    "plan_id": "data-05-warehouse-model-v1",
+    "version": 1,
+    "blocker_finding_id": null,
+    "question": "Plan for goal 'data-05-warehouse-model' did not converge (revision_cap_reached). Decide next step.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

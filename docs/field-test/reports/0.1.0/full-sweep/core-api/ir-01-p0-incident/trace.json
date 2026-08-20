@@ -1,0 +1,205 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-01-p0-incident",
+  "duration_seconds": 11.45,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "ir-01-p0-incident-plan",
+    "goal_id": "ir-01-p0-incident",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T01:59:07.319640Z",
+    "tasks": [
+      {
+        "id": "notify_oncall",
+        "description": "Notify on-call engineer via PagerDuty",
+        "action": "notify",
+        "target": "pagerduty",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PagerDuty is accessible",
+            "fact": "pagerduty_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "diagnose",
+        "description": "Diagnose the cause of degradation",
+        "action": "diagnose",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "on-call engineer notified",
+            "fact": "oncall_notified",
+            "established_by": "notify_oncall",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "diagnosis confirmation",
+          "how": "cross-check logs",
+          "expected": "cause identified"
+        },
+        "rollback": {
+          "trigger": "diagnosis fails",
+          "action": "revert to prior state",
+          "safety_guard": "confirm diagnosis intent"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "mitigate",
+        "description": "Enlarge volume and restart replica",
+        "action": "enlarge_and_restart",
+        "target": "db_replica",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cause of degradation diagnosed",
+            "fact": "degradation_cause",
+            "established_by": "diagnose",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replication lag",
+          "how": "check replication metrics",
+          "expected": "lag returns to zero"
+        },
+        "rollback": {
+          "trigger": "mitigation fails",
+          "action": "restore original volume",
+          "safety_guard": "confirm volume state"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "write_postmortem",
+        "description": "Write postmortem for the incident",
+        "action": "write",
+        "target": "postmortem",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "incident mitigated",
+            "fact": "mitigation_complete",
+            "established_by": "mitigate",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "notify_oncall",
+        "to_task": "diagnose",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "diagnose",
+        "to_task": "mitigate",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "mitigate",
+        "to_task": "write_postmortem",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:missing_steps:mitigate",
+      "task_id": "mitigate",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "blocker",
+      "reason_code": "llm_missing_steps",
+      "message": "The plan does not explicitly confirm the need for a confirmation step before any destructive operation is carried out despite the strict risk tolerance.",
+      "suggested_fix": "Add a step to confirm enlargement of volume and restarting of the replica with the responsible engineer before proceeding."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:mitigate",
+      "task_id": "mitigate",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The mitigation task should not proceed until the diagnosis has been confirmed, which could create a situation where changes are made without proper verification.",
+      "suggested_fix": "Ensure that the mitigation step cannot start until a confirmation of diagnosis is received."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:write_postmortem",
+      "task_id": "write_postmortem",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The completion of the mitigation task does not provide verification before proceeding to write the postmortem.",
+      "suggested_fix": "Add a verification step to ensure that replication lag returns to zero before beginning the postmortem."
+    },
+    {
+      "id": "crit:1:weak_rollback:mitigate",
+      "task_id": "mitigate",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback action for the mitigate step needs additional clarity on what 'restore original volume' entails and the steps involved.",
+      "suggested_fix": "Detail the steps and verification required to safely restore the original volume during rollback."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-01-p0-incident:1:1",
+    "plan_id": "ir-01-p0-incident-plan",
+    "version": 1,
+    "blocker_finding_id": "crit:1:missing_steps:mitigate",
+    "question": "Plan for goal 'ir-01-p0-incident' cannot be approved: blockers remain (llm_missing_steps; llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

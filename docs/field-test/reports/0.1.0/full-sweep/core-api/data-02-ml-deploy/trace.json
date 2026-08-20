@@ -1,0 +1,263 @@
+{
+  "dimension": "core-api",
+  "goal_id": "data-02-ml-deploy",
+  "duration_seconds": 11.03,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "data-02-ml-deploy",
+    "goal_id": "data-02-ml-deploy",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T01:54:59.692417Z",
+    "tasks": [
+      {
+        "id": "train-model",
+        "description": "Train the ML model using the training dataset",
+        "action": "train",
+        "target": "ML model",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "training loss",
+          "how": "check logs",
+          "expected": "loss below threshold"
+        },
+        "rollback": {
+          "trigger": "training fails",
+          "action": "cancel training",
+          "safety_guard": "ensure no partial model is saved"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "validate-model",
+        "description": "Validate the trained model using validation dataset",
+        "action": "validate",
+        "target": "ML model",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "validation metrics",
+          "how": "evaluate performance",
+          "expected": "metrics meet criteria"
+        },
+        "rollback": {
+          "trigger": "validation fails",
+          "action": "retrain model",
+          "safety_guard": "use best training model"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "package-model",
+        "description": "Package the validated model for deployment",
+        "action": "package",
+        "target": "ML model",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "model is validated",
+            "fact": "validation_success",
+            "established_by": "validate-model",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "ab-test",
+        "description": "Conduct A/B testing for the packaged model",
+        "action": "deploy",
+        "target": "ML model",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "A/B test results",
+          "how": "analyze metrics",
+          "expected": "statistical significance meets requirements"
+        },
+        "rollback": {
+          "trigger": "A/B test fails",
+          "action": "revert to previous version",
+          "safety_guard": "monitor user feedback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "promote-to-production",
+        "description": "Promote the model to production after successful A/B testing",
+        "action": "promote",
+        "target": "ML model",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "production monitoring",
+          "how": "check system logs",
+          "expected": "no errors in logs"
+        },
+        "rollback": {
+          "trigger": "promotion fails",
+          "action": "rollback to last stable version",
+          "safety_guard": "verify previous version stability"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor-production",
+        "description": "Monitor model performance in production",
+        "action": "monitor",
+        "target": "ML model",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "model is in production",
+            "fact": "model_production",
+            "established_by": "promote-to-production",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "train-model",
+        "to_task": "validate-model",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "validate-model",
+        "to_task": "package-model",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "package-model",
+        "to_task": "ab-test",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "ab-test",
+        "to_task": "promote-to-production",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote-to-production",
+        "to_task": "monitor-production",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:missing_steps:package-model",
+      "task_id": "package-model",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "blocker",
+      "reason_code": "llm_missing_steps",
+      "message": "Task 'package-model' lacks a verification step.",
+      "suggested_fix": "Add a verification step to confirm the model packaging was successful."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:ab-test",
+      "task_id": "ab-test",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'ab-test' should not be executed without preconditions confirming 'package-model' is complete.",
+      "suggested_fix": "Ensure 'ab-test' has a precondition that verifies successful completion of 'package-model'."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:validate-model",
+      "task_id": "validate-model",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'validate-model' does not provide a method for verification.",
+      "suggested_fix": "Ensure that 'validate-model' includes a specific verification method for validating model performance metrics."
+    },
+    {
+      "id": "crit:1:weak_rollback:package-model",
+      "task_id": "package-model",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "info",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'package-model' lacks defined rollback actions.",
+      "suggested_fix": "Add rollback strategies in case packaging fails."
+    },
+    {
+      "id": "crit:1:feasibility:promote-to-production",
+      "task_id": "promote-to-production",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "warning",
+      "reason_code": "llm_feasibility",
+      "message": "Task 'promote-to-production' assumes prior tasks have succeeded without robust checks.",
+      "suggested_fix": "Incorporate checks for each upstream task to ensure they have completed successfully before promotion."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:monitor-production",
+      "task_id": "monitor-production",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'monitor-production' should not execute unless 'promote-to-production' is confirmed successful.",
+      "suggested_fix": "Add a precondition for 'monitor-production' to only execute if 'promote-to-production' succeeds."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:data-02-ml-deploy:1:1",
+    "plan_id": "data-02-ml-deploy",
+    "version": 1,
+    "blocker_finding_id": "crit:1:missing_steps:package-model",
+    "question": "Plan for goal 'data-02-ml-deploy' cannot be approved: blockers remain (llm_missing_steps; llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

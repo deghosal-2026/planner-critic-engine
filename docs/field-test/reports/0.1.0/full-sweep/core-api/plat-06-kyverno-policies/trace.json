@@ -1,0 +1,231 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-06-kyverno-policies",
+  "duration_seconds": 13.56,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plat-06-kyverno-policies-plan",
+    "goal_id": "plat-06-kyverno-policies",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T02:10:19.263757Z",
+    "tasks": [
+      {
+        "id": "define-policies",
+        "description": "Define ClusterPolicy resources enforcing Pod Security Standards",
+        "action": "create",
+        "target": "kyverno-policies",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "all policy requirements are gathered",
+            "fact": "requirements_collected",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy-audit-mode",
+        "description": "Deploy Kyverno policies in audit mode",
+        "action": "deploy",
+        "target": "kyverno-audit",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "policies are defined",
+            "fact": "policies_defined",
+            "established_by": "define-policies",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "audit mode status",
+          "how": "check deployment logs",
+          "expected": "Kyverno policies in audit mode"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "remove policies from audit mode",
+          "safety_guard": "ensure previous state is saved"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor-violations",
+        "description": "Monitor ongoing violations via custom metrics in Prometheus",
+        "action": "setup",
+        "target": "prometheus",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "audit mode deployment is successful",
+            "fact": "audit_deployment_success",
+            "established_by": "deploy-audit-mode",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "review-violations",
+        "description": "Review violation reports and work with teams to remediate",
+        "action": "review",
+        "target": "violation-reports",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "monitoring in place",
+            "fact": "monitoring_successful",
+            "established_by": "monitor-violations",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "switch-enforce-mode",
+        "description": "Switch to enforce mode after sign-off",
+        "action": "switch",
+        "target": "kyverno-enforce",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "all violations remediated",
+            "fact": "remediation_complete",
+            "established_by": "review-violations",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "enforce mode status",
+          "how": "check deployment logs",
+          "expected": "Kyverno policies in enforce mode"
+        },
+        "rollback": {
+          "trigger": "sign-off rejected",
+          "action": "revert to audit mode",
+          "safety_guard": "ensure backups of audit logs"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define-policies",
+        "to_task": "deploy-audit-mode",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-audit-mode",
+        "to_task": "monitor-violations",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor-violations",
+        "to_task": "review-violations",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "review-violations",
+        "to_task": "switch-enforce-mode",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:define-policies",
+      "task_id": "define-policies",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "warning",
+      "reason_code": "llm_feasibility",
+      "message": "Verify that all policy requirements can be realistically gathered before defining policies.",
+      "suggested_fix": "Conduct a pre-assessment of available requirements."
+    },
+    {
+      "id": "crit:1:missing_steps:deploy-audit-mode",
+      "task_id": "deploy-audit-mode",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Lack of a verification step for 'policies are defined' may lead to issues during deployment.",
+      "suggested_fix": "Include a verification check to confirm policies are fully defined."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:switch-enforce-mode",
+      "task_id": "switch-enforce-mode",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "warning",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task depends on 'review-violations', but it should also ensure that remediation is verified.",
+      "suggested_fix": "Add an additional verification check for remediation."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:monitor-violations",
+      "task_id": "monitor-violations",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Monitor-violations task lacks a verification process to confirm successful deployment.",
+      "suggested_fix": "Incorporate a verification step to check monitoring system status."
+    },
+    {
+      "id": "crit:1:weak_rollback:switch-enforce-mode",
+      "task_id": "switch-enforce-mode",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback plan for reverting to audit mode lacks detailed safety guards beyond backups.",
+      "suggested_fix": "Enhance rollback plan with detailed procedures to ensure complete state restoration."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

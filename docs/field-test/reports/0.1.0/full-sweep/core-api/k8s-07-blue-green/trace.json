@@ -1,0 +1,185 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-07-blue-green",
+  "duration_seconds": 6.19,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 1,
+    "llm_calls": 0
+  },
+  "plan": {
+    "id": "k8s-07-blue-green-plan",
+    "goal_id": "k8s-07-blue-green",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T02:06:48.908983Z",
+    "tasks": [
+      {
+        "id": "spin-up-green-stack",
+        "description": "Spin up the green deployment stack",
+        "action": "deploy",
+        "target": "green-stack",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "green stack health",
+          "how": "run kubectl get pods",
+          "expected": "all pods running"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "redeploy blue stack",
+          "safety_guard": "ensure blue is operational"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run-smoke-tests",
+        "description": "Run smoke tests against the green service",
+        "action": "test",
+        "target": "green-service",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "smoke test results",
+          "how": "analyze test logs",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "smoke tests fail",
+          "action": "revert DNS to blue service",
+          "safety_guard": "ensure blue service is responsive"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run-comprehensive-health-checks",
+        "description": "Run comprehensive health checks against the green service",
+        "action": "check",
+        "target": "green-service",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "health check results",
+          "how": "query health endpoint",
+          "expected": "service healthy"
+        },
+        "rollback": {
+          "trigger": "health checks fail",
+          "action": "revert DNS to blue service",
+          "safety_guard": "ensure blue service is responsive"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "switch-ingress",
+        "description": "Switch the production Ingress to point to the green service",
+        "action": "update",
+        "target": "ingress",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "current Ingress configuration",
+          "how": "kubectl get ingress",
+          "expected": "points to green service"
+        },
+        "rollback": {
+          "trigger": "switch fails",
+          "action": "restore ingress to blue service",
+          "safety_guard": "ensure blue ingress is reachable"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor-green-stack",
+        "description": "Monitor the green stack for 30 minutes",
+        "action": "monitor",
+        "target": "green-stack",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": null,
+        "rollback": {
+          "trigger": "issues detected",
+          "action": "rollback to blue stack",
+          "safety_guard": "ensure blue stack is healthy"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "spin-up-green-stack",
+        "to_task": "run-smoke-tests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run-smoke-tests",
+        "to_task": "run-comprehensive-health-checks",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run-comprehensive-health-checks",
+        "to_task": "switch-ingress",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "switch-ingress",
+        "to_task": "monitor-green-stack",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "verification_present:k8s-07-blue-green-plan:1:monitor-green-stack",
+      "task_id": "monitor-green-stack",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "blocker",
+      "reason_code": "missing_verification",
+      "message": "high-risk task 'monitor-green-stack' has no verification step",
+      "suggested_fix": "Add a VerificationStep to task 'monitor-green-stack'"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-07-blue-green:1:1",
+    "plan_id": "k8s-07-blue-green-plan",
+    "version": 1,
+    "blocker_finding_id": "verification_present:k8s-07-blue-green-plan:1:monitor-green-stack",
+    "question": "Plan for goal 'k8s-07-blue-green' cannot be approved: blockers remain (missing_verification). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

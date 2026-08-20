@@ -1,0 +1,213 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-02-hotfix-rollback",
+  "duration_seconds": 11.81,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-ci-02-hotfix-rollback",
+    "goal_id": "ci-02-hotfix-rollback",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T01:53:19.109221Z",
+    "tasks": [
+      {
+        "id": "revert_commit",
+        "description": "Revert offending commit in Git",
+        "action": "git revert",
+        "target": "repository",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "repository is accessible",
+            "fact": "repo_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "repository state",
+          "how": "check commit history",
+          "expected": "last stable commit is checked out"
+        },
+        "rollback": {
+          "trigger": "revert fails",
+          "action": "reset to last stable commit",
+          "safety_guard": "ensure repository state is consistent"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "build_image",
+        "description": "Build Docker image",
+        "action": "docker build",
+        "target": "docker_image",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dockerfile is present",
+            "fact": "dockerfile_exists",
+            "established_by": "revert_commit",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_image",
+        "description": "Deploy Docker image to production with kubectl",
+        "action": "kubectl apply",
+        "target": "k8s_deployment",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Docker image is built",
+            "fact": "image_built",
+            "established_by": "build_image",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment status",
+          "how": "kubectl rollout status",
+          "expected": "deployment is complete and healthy"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to previous deployment",
+          "safety_guard": "check prior deployment health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_downstream",
+        "description": "Verify downstream services are functional",
+        "action": "check services",
+        "target": "downstream_services",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kubernetes deployment is completed",
+            "fact": "deployment_successful",
+            "established_by": "deploy_image",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service health checks",
+          "how": "execute health check endpoints",
+          "expected": "all services return healthy status"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "revert deployment",
+          "safety_guard": "ensure backups are valid"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "revert_commit",
+        "to_task": "build_image",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "build_image",
+        "to_task": "deploy_image",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_image",
+        "to_task": "verify_downstream",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:build_image",
+      "task_id": "build_image",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Task cannot proceed without the successful execution of revert_commit, which has no verification step.",
+      "suggested_fix": "Add a verification step for revert_commit to ensure the state of the repository is valid before proceeding."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:deploy_image",
+      "task_id": "deploy_image",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "deploy_image task is dependent on build_image which fails to verify the successful build of the Docker image.",
+      "suggested_fix": "Include a verification step after the build_image task to confirm the Docker image is built successfully before deploying."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:verify_downstream",
+      "task_id": "verify_downstream",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "verify_downstream task relies on the successful completion of deploy_image, but deploy_image has no rollback or verification of the deployment state.",
+      "suggested_fix": "Ensure deploy_image includes a rollback mechanism if the deployment fails and verify the deployment status before proceeding to verify_downstream."
+    },
+    {
+      "id": "crit:1:weak_rollback:revert_commit",
+      "task_id": "revert_commit",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for revert_commit only resets to the last stable commit without validating the state of the repository afterward.",
+      "suggested_fix": "Ensure that after a rollback, the repository state is validated to be consistent and functional before any further actions."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ci-02-hotfix-rollback:1:1",
+    "plan_id": "plan-ci-02-hotfix-rollback",
+    "version": 1,
+    "blocker_finding_id": "crit:1:feasibility:build_image",
+    "question": "Plan for goal 'ci-02-hotfix-rollback' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

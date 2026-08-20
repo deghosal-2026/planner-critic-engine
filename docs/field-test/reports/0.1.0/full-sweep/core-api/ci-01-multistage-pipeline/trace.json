@@ -1,0 +1,272 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-01-multistage-pipeline",
+  "duration_seconds": 15.1,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "ci-01-multistage-pipeline-v1",
+    "goal_id": "ci-01-multistage-pipeline",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T01:53:08.870459Z",
+    "tasks": [
+      {
+        "id": "lint",
+        "description": "Run lint checks on the codebase",
+        "action": "lint",
+        "target": "code",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Code is checked out",
+            "fact": "code_checked_out",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "test",
+        "description": "Run unit tests",
+        "action": "test",
+        "target": "code",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Linting is successful",
+            "fact": "lint_success",
+            "established_by": "lint",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "test results",
+          "how": "check output logs",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "tests fail",
+          "action": "revert code to last known good state",
+          "safety_guard": "ensure last state is stable"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "build",
+        "description": "Build the application Docker image",
+        "action": "build",
+        "target": "docker_image",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "All unit tests are passing",
+            "fact": "test_success",
+            "established_by": "test",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "image digest",
+          "how": "check build logs",
+          "expected": "image built successfully"
+        },
+        "rollback": {
+          "trigger": "build fails",
+          "action": "clean up and revert Docker environment",
+          "safety_guard": "verify environment consistency"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "staging",
+        "description": "Deploy the application to the staging environment",
+        "action": "deploy",
+        "target": "staging_env",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Docker image is built",
+            "fact": "image_built",
+            "established_by": "build",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "integration",
+        "description": "Run integration tests in the staging environment",
+        "action": "integration_test",
+        "target": "staging_env",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Application is deployed in staging",
+            "fact": "app_deployed_staging",
+            "established_by": "staging",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "integration test results",
+          "how": "analyze output logs",
+          "expected": "all integration tests pass"
+        },
+        "rollback": {
+          "trigger": "integration tests fail",
+          "action": "rollback to previous stable version",
+          "safety_guard": "ensure previous version is functional"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "prod_promote",
+        "description": "Promote the application to production",
+        "action": "promote",
+        "target": "production_env",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "All integration tests are passing",
+            "fact": "integration_test_success",
+            "established_by": "integration",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "production state",
+          "how": "monitor production logs",
+          "expected": "production running as expected"
+        },
+        "rollback": {
+          "trigger": "production deployment fails",
+          "action": "rollback production to previous version",
+          "safety_guard": "verify rollback success"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "lint",
+        "to_task": "test",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test",
+        "to_task": "build",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "build",
+        "to_task": "staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "staging",
+        "to_task": "integration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "integration",
+        "to_task": "prod_promote",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:staging",
+      "task_id": "staging",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "warning",
+      "reason_code": "llm_feasibility",
+      "message": "Deployment to staging lacks verification steps, creating uncertainty in the deployment process.",
+      "suggested_fix": "Add verification steps to ensure the application behaves as expected post-deployment."
+    },
+    {
+      "id": "crit:1:missing_steps:staging",
+      "task_id": "staging",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Staging deployment does not include a rollback procedure, increasing risk in case of a failure.",
+      "suggested_fix": "Implement a rollback procedure for the staging environment."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:prod_promote",
+      "task_id": "prod_promote",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "warning",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Production promotion task is dependent on integration tests but lacks a direct failure condition handling which could lead to promoting a broken build.",
+      "suggested_fix": "Ensure robust checks and condition handling prior to promoting to production to prevent deploying untested code."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:prod_promote",
+      "task_id": "prod_promote",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Production promotion directly depends on a successful integration test but doesn't address what happens if integration tests exist but results are not verified.",
+      "suggested_fix": "Add verification steps for integration results prior to allowing production promotion."
+    },
+    {
+      "id": "crit:1:weak_rollback:prod_promote",
+      "task_id": "prod_promote",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback mechanism on production deployment fails but needs additional safety checks beyond verifying rollback success.",
+      "suggested_fix": "Enhance rollback safety guards to ensure production stability after a rollback."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

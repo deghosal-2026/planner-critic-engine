@@ -1,0 +1,249 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-07-s3-redshift-load",
+  "duration_seconds": 13.18,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "db-07-s3-redshift-load-plan",
+    "goal_id": "db-07-s3-redshift-load",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T01:57:14.786798Z",
+    "tasks": [
+      {
+        "id": "fetch_manifest",
+        "description": "Fetch the manifest file from S3",
+        "action": "fetch",
+        "target": "s3://my-bucket/manifest.json",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "S3 bucket is accessible",
+            "fact": "s3_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "load_to_staging",
+        "description": "Load data from S3 to Redshift staging table",
+        "action": "copy",
+        "target": "redshift_staging_table",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Manifest file is fetched",
+            "fact": "manifest_fetched",
+            "established_by": "fetch_manifest",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "row count in staging table",
+          "how": "SELECT COUNT(*) FROM redshift_staging_table",
+          "expected": "matches count in manifest file"
+        },
+        "rollback": {
+          "trigger": "COPY command fails",
+          "action": "empty staging table",
+          "safety_guard": "ensure staging table is empty"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "data_validation",
+        "description": "Validate data in the staging table",
+        "action": "validate",
+        "target": "redshift_staging_table",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data is loaded to staging",
+            "fact": "data_loaded",
+            "established_by": "load_to_staging",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data consistency",
+          "how": "run validation checks",
+          "expected": "data passes all validation checks"
+        },
+        "rollback": {
+          "trigger": "data validation fails",
+          "action": "notify failure",
+          "safety_guard": "log details of validation failure"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "swap_partitions",
+        "description": "Swap the new partition with the current partition",
+        "action": "swap",
+        "target": "redshift_table",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data validation is successful",
+            "fact": "data_validated",
+            "established_by": "data_validation",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "row count in target table",
+          "how": "SELECT COUNT(*) FROM redshift_table",
+          "expected": "matches count in staging table"
+        },
+        "rollback": {
+          "trigger": "partition swap fails",
+          "action": "rollback to previous partition",
+          "safety_guard": "ensure previous partition is intact"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "vacuum_analyze",
+        "description": "Vacuum and analyze the target Redshift table",
+        "action": "vacuum",
+        "target": "redshift_table",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Partition swap is complete",
+            "fact": "partition_swapped",
+            "established_by": "swap_partitions",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "fetch_manifest",
+        "to_task": "load_to_staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "load_to_staging",
+        "to_task": "data_validation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "data_validation",
+        "to_task": "swap_partitions",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "swap_partitions",
+        "to_task": "vacuum_analyze",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:missing_steps:vacuum_analyze",
+      "task_id": "vacuum_analyze",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Vacuum and analyze step is present but lacks validation and rollback steps, which increases risk of data integrity issues.",
+      "suggested_fix": "Add verification of vacuum completion and a rollback mechanism if vacuum fails."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:swap_partitions",
+      "task_id": "swap_partitions",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Partition swap should be followed by a vacuum and analyze step to ensure data integrity but is sequenced incorrectly in the plan.",
+      "suggested_fix": "Reorder tasks to ensure vacuum and analyze is executed immediately after the partition swap."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:load_to_staging",
+      "task_id": "load_to_staging",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "info",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Dependency on manifest file fetched is established, but its availability should be verified prior to load to prevent failure.",
+      "suggested_fix": "Add a verification step to check the integrity of the manifest file before proceeding with the load."
+    },
+    {
+      "id": "crit:1:weak_rollback:load_to_staging",
+      "task_id": "load_to_staging",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback mechanism for the staging load is present but lacks a detailed log or confirmation check for safety.",
+      "suggested_fix": "Enhance rollback actions to include a verification that ensures the staging table is in a good state before removal."
+    },
+    {
+      "id": "crit:1:risk:data_validation",
+      "task_id": "data_validation",
+      "version": 1,
+      "heuristic_family": "risk",
+      "severity": "blocker",
+      "reason_code": "llm_risk",
+      "message": "Data validation step critical without a robust rollback mechanism in case of validation failures, increasing risk of proceeding with faulty data.",
+      "suggested_fix": "Implement a rollback plan that restores the previous good state of the data if validation fails."
+    },
+    {
+      "id": "crit:1:risk:plan",
+      "task_id": null,
+      "version": 1,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Overall risk factors indicate potential COPY failure, insufficient WLM slots, and data skew which could severely impact the ETL process.",
+      "suggested_fix": "Review cluster capacity and apply load balancing techniques to manage potential skews before execution."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

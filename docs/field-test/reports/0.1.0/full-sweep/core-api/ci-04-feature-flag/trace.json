@@ -1,0 +1,243 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-04-feature-flag",
+  "duration_seconds": 11.56,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "ci-04-feature-flag-plan",
+    "goal_id": "ci-04-feature-flag",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T01:53:42.589876Z",
+    "tasks": [
+      {
+        "id": "add-feature-flag",
+        "description": "Add feature flag to codebase",
+        "action": "add",
+        "target": "feature-flag",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "codebase is ready for changes",
+            "fact": "code_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy-with-flag-off",
+        "description": "Deploy code with feature flag off",
+        "action": "deploy",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "feature flag state",
+          "how": "check configuration",
+          "expected": "flag is off"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to previous version",
+          "safety_guard": "ensure rollback state is stable"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "test-in-staging",
+        "description": "Test feature in staging environment",
+        "action": "test",
+        "target": "staging",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "staging environment is up",
+            "fact": "staging_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "enable-for-beta",
+        "description": "Enable feature for beta users",
+        "action": "enable",
+        "target": "feature-flag",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "beta user feedback",
+          "how": "collect and analyze feedback",
+          "expected": "no critical issues reported"
+        },
+        "rollback": {
+          "trigger": "issues reported",
+          "action": "disable feature flag",
+          "safety_guard": "monitor feedback loop"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "ramp-to-100",
+        "description": "Ramp feature to 100% usage",
+        "action": "ramp",
+        "target": "feature-flag",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "system performance",
+          "how": "analyze metrics",
+          "expected": "performance is stable"
+        },
+        "rollback": {
+          "trigger": "monitoring alerts",
+          "action": "reverse ramp",
+          "safety_guard": "ensure system stability"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "remove-flag-cleanup-PR",
+        "description": "Create cleanup PR to remove feature flag",
+        "action": "create",
+        "target": "PR",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "feature is verified stable",
+            "fact": "feature_verified",
+            "established_by": "enable-for-beta",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "add-feature-flag",
+        "to_task": "deploy-with-flag-off",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-with-flag-off",
+        "to_task": "test-in-staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test-in-staging",
+        "to_task": "enable-for-beta",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "enable-for-beta",
+        "to_task": "ramp-to-100",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "ramp-to-100",
+        "to_task": "remove-flag-cleanup-PR",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:remove-flag-cleanup-PR",
+      "task_id": "remove-flag-cleanup-PR",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The task 'Create cleanup PR to remove feature flag' has a precondition that may not be fulfilled if the feature is not verified stable.",
+      "suggested_fix": "Ensure that there is a proper verification step for the feature stability before allowing this task."
+    },
+    {
+      "id": "crit:1:missing_steps:deploy-with-flag-off",
+      "task_id": "deploy-with-flag-off",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "There is no verification step after deploying the code with the feature flag turned off to confirm successful deployment.",
+      "suggested_fix": "Add a verification step to ensure the deployment was successful before proceeding."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:ramp-to-100",
+      "task_id": "ramp-to-100",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "warning",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Ramping to 100% usage occurs before verifying that all beta users' feedback has been adequately addressed.",
+      "suggested_fix": "Add a step to ensure all critical beta user issues are resolved before ramping to full rollout."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:enable-for-beta",
+      "task_id": "enable-for-beta",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "info",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'Enable feature for beta users' assumes that testing in staging was successful, but lacks an explicit dependency verification.",
+      "suggested_fix": "Confirm that the results of 'test-in-staging' are satisfactory before enabling for beta users."
+    },
+    {
+      "id": "crit:1:weak_rollback:enable-for-beta",
+      "task_id": "enable-for-beta",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'Enable feature for beta users' is dependent on monitoring feedback, which may not protect against unreported issues in the live environment.",
+      "suggested_fix": "Implement additional rollback criteria based on monitoring during the beta period."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

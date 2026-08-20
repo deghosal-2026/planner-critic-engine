@@ -1,0 +1,359 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-06-service-mesh",
+  "duration_seconds": 34.65,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "k8s-06-service-mesh-plan",
+    "goal_id": "k8s-06-service-mesh",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T02:06:35.105832Z",
+    "tasks": [
+      {
+        "id": "label-namespace",
+        "description": "Label the existing namespace for automatic sidecar injection",
+        "action": "kubectl label namespace",
+        "target": "namespace",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "kubectl is configured correctly",
+            "fact": "kubectl_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "namespace labels",
+          "how": "kubectl get namespace -o jsonpath='{.metadata.labels}'",
+          "expected": "istio-injection=enabled"
+        },
+        "rollback": {
+          "trigger": "labeling fails",
+          "action": "remove namespace label",
+          "safety_guard": "verify namespace configurations"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "route-1-percent",
+        "description": "Create VirtualService to route 1% of traffic through the mesh",
+        "action": "istioctl apply",
+        "target": "VirtualService",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "service mesh is operational",
+            "fact": "istio_ready",
+            "established_by": "label-namespace",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic distribution",
+          "how": "monitor traffic through Kiali",
+          "expected": "1% through the mesh"
+        },
+        "rollback": {
+          "trigger": "routing fails",
+          "action": "remove VirtualService",
+          "safety_guard": "check service availability"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "observe-1-percent",
+        "description": "Observe latency, error rate, and resource overhead for one hour",
+        "action": "monitor",
+        "target": "Kiali",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "VirtualService is successfully applied",
+            "fact": "virtual_service_active",
+            "established_by": "route-1-percent",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "check-roll",
+        "description": "Check metrics to determine if a rollback is needed",
+        "action": "evaluate",
+        "target": "metrics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "observations for 1% traffic completed",
+            "fact": "observation_complete",
+            "established_by": "observe-1-percent",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "p99 latency and error rates",
+          "how": "query metrics",
+          "expected": "within acceptable limits"
+        },
+        "rollback": {
+          "trigger": "p99 latency exceeds threshold or error rate rises",
+          "action": "remove namespace label and patch Deployments",
+          "safety_guard": "verify all Deployments are patched"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "route-50-percent",
+        "description": "Create VirtualService to route 50% of traffic through the mesh",
+        "action": "istioctl apply",
+        "target": "VirtualService",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "rollback check completed",
+            "fact": "rollback_check_passed",
+            "established_by": "check-roll",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic distribution",
+          "how": "monitor through Kiali",
+          "expected": "50% through the mesh"
+        },
+        "rollback": {
+          "trigger": "routing fails for 50%",
+          "action": "remove VirtualService for 50%",
+          "safety_guard": "check service availability"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "observe-50-percent",
+        "description": "Observe latency, error rate, and resource overhead for one hour at 50%",
+        "action": "monitor",
+        "target": "Kiali",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "VirtualService for 50% is applied",
+            "fact": "virtual_service_50_active",
+            "established_by": "route-50-percent",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "final-check",
+        "description": "Final check of metrics to determine if a rollback is needed",
+        "action": "evaluate",
+        "target": "metrics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "observations for 50% traffic completed",
+            "fact": "observation_50_complete",
+            "established_by": "observe-50-percent",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "p99 latency and error rates",
+          "how": "query metrics",
+          "expected": "within acceptable limits"
+        },
+        "rollback": {
+          "trigger": "p99 latency exceeds threshold or error rate rises",
+          "action": "remove namespace label and patch Deployments",
+          "safety_guard": "verify all Deployments are patched"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "decommission-legacy",
+        "description": "Decommission the legacy sidecar-free Deployments after successful rollout",
+        "action": "kubectl delete",
+        "target": "Deployments",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "all traffic is successfully routed through the mesh",
+            "fact": "all_traffic_mesh",
+            "established_by": "final-check",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "label-namespace",
+        "to_task": "route-1-percent",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "route-1-percent",
+        "to_task": "observe-1-percent",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "observe-1-percent",
+        "to_task": "check-roll",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check-roll",
+        "to_task": "route-50-percent",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "route-50-percent",
+        "to_task": "observe-50-percent",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "observe-50-percent",
+        "to_task": "final-check",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "final-check",
+        "to_task": "decommission-legacy",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:label-namespace",
+      "task_id": "label-namespace",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The precondition 'kubectl is configured correctly' must be verified before applying a namespace label.",
+      "suggested_fix": "Add a task to validate kubectl configuration before this task."
+    },
+    {
+      "id": "crit:1:missing_steps:observe-1-percent",
+      "task_id": "observe-1-percent",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Observations for latency, error rate, and resource overhead should include specific metrics to monitor.",
+      "suggested_fix": "Specify which metrics will be tracked during the observation phase."
+    },
+    {
+      "id": "crit:1:missing_steps:observe-50-percent",
+      "task_id": "observe-50-percent",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Similar to the previous observation task, it lacks specified metrics for monitoring.",
+      "suggested_fix": "Add explicit metrics to monitor for resource overhead during this observation phase."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:check-roll",
+      "task_id": "check-roll",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Risk checks should be conducted before subsequent tasks. The rollback mechanism could be triggered later on.",
+      "suggested_fix": "Ensure the workflow guarantees checks are executed before actions that could lead to problems."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:route-50-percent",
+      "task_id": "route-50-percent",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Precondition 'rollback_check_passed' depends on the previous task without a verification step.",
+      "suggested_fix": "Add a verification to ensure rollback checks completed successfully before routing 50%."
+    },
+    {
+      "id": "crit:1:weak_rollback:final-check",
+      "task_id": "final-check",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback procedure does not ensure that all deployments are correctly patched if required.",
+      "suggested_fix": "Strengthen the rollback process to ensure all deployments are validated post-rollback."
+    },
+    {
+      "id": "crit:1:feasibility:decommission-legacy",
+      "task_id": "decommission-legacy",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "info",
+      "reason_code": "llm_feasibility",
+      "message": "Ensure that all prerequisites for decommissioning the legacy deployments are clearly defined and validated.",
+      "suggested_fix": "List any additional validation steps required before decommissioning the legacy sidecar-free Deployments."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-06-service-mesh:1:1",
+    "plan_id": "k8s-06-service-mesh-plan",
+    "version": 1,
+    "blocker_finding_id": "crit:1:feasibility:label-namespace",
+    "question": "Plan for goal 'k8s-06-service-mesh' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

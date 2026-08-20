@@ -1,0 +1,211 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-02-loki-stack",
+  "duration_seconds": 14.69,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-obs-02-loki-stack",
+    "goal_id": "obs-02-loki-stack",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T02:07:49.318563Z",
+    "tasks": [
+      {
+        "id": "setup-helm",
+        "description": "Set up Helm for managing Kubernetes applications",
+        "action": "init",
+        "target": "helm",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kubernetes cluster is accessible",
+            "fact": "k8s_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy-loki",
+        "description": "Deploy Loki using Helm",
+        "action": "deploy",
+        "target": "loki",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Helm is set up",
+            "fact": "helm_initialized",
+            "established_by": "setup-helm",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Loki service availability",
+          "how": "check service status",
+          "expected": "Loki is running"
+        },
+        "rollback": {
+          "trigger": "Loki deploy fails",
+          "action": "uninstall loki",
+          "safety_guard": "verify Loki Helm release is removed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy-promtail",
+        "description": "Deploy Promtail to ship logs to Loki",
+        "action": "deploy",
+        "target": "promtail",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Loki is successfully deployed",
+            "fact": "loki_deployed",
+            "established_by": "deploy-loki",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Promtail service availability",
+          "how": "check service logs",
+          "expected": "Promtail is shipping logs"
+        },
+        "rollback": {
+          "trigger": "Promtail deploy fails",
+          "action": "uninstall promtail",
+          "safety_guard": "verify Promtail Helm release is removed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-grafana",
+        "description": "Configure Grafana to visualize logs from Loki",
+        "action": "configure",
+        "target": "grafana",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Promtail is running and shipping logs",
+            "fact": "promtail_running",
+            "established_by": "deploy-promtail",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "set-log-retention",
+        "description": "Set up 7-day log retention in S3 bucket",
+        "action": "configure",
+        "target": "s3_bucket",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Grafana is configured",
+            "fact": "grafana_configured",
+            "established_by": "configure-grafana",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup-helm",
+        "to_task": "deploy-loki",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-loki",
+        "to_task": "deploy-promtail",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-promtail",
+        "to_task": "configure-grafana",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-grafana",
+        "to_task": "set-log-retention",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:missing_steps:configure-grafana",
+      "task_id": "configure-grafana",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The task does not specify verification steps for Grafana configuration, which could lead to potential misconfigurations.",
+      "suggested_fix": "Add verification steps to ensure Grafana is correctly configured to visualize logs from Loki."
+    },
+    {
+      "id": "crit:1:missing_steps:set-log-retention",
+      "task_id": "set-log-retention",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The task lacks verification and rollback strategies, increasing the risk of incorrect log retention settings.",
+      "suggested_fix": "Implement verification steps to confirm the log retention is correctly set and add rollback procedures in case of failure."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:set-log-retention",
+      "task_id": "set-log-retention",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task depends on Grafana being configured but lacks verification to ensure this task completed successfully.",
+      "suggested_fix": "Add a verification step to confirm that Grafana has been properly configured before executing log retention setup."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

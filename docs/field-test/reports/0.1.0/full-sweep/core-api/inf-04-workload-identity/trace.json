@@ -1,0 +1,202 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-04-workload-identity",
+  "duration_seconds": 11.16,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "inf-04-workload-identity-plan",
+    "goal_id": "inf-04-workload-identity",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T01:58:15.631224Z",
+    "tasks": [
+      {
+        "id": "create_service_account",
+        "description": "Create a new service account in GCP for workload identity",
+        "action": "create",
+        "target": "service_account",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service account existence",
+          "how": "check gcloud for service account",
+          "expected": "service account created successfully"
+        },
+        "rollback": {
+          "trigger": "creation fails",
+          "action": "notify admin",
+          "safety_guard": "verify service account permissions"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "migrate_pods",
+        "description": "Migrate existing pods to use the new service account",
+        "action": "migrate",
+        "target": "pods",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "pod service account",
+          "how": "describe pods and check service account",
+          "expected": "pods using new service account"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "revert pods to old service account",
+          "safety_guard": "verify old service account is intact"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_changes",
+        "description": "Verify that all pods are functioning correctly with the new service account",
+        "action": "verify",
+        "target": "pods",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "pod functionality",
+          "how": "test important endpoints",
+          "expected": "all pods respond appropriately"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "restore previous configuration",
+          "safety_guard": "ensure all previous settings are saved before changes"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "remove_old_credentials",
+        "description": "Remove old workload identity credentials and service account",
+        "action": "delete",
+        "target": "old_credentials",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "no pods are using old credentials",
+            "fact": "pods_verification_complete",
+            "established_by": "verify_changes",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "create_service_account",
+        "to_task": "migrate_pods",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate_pods",
+        "to_task": "verify_changes",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_changes",
+        "to_task": "remove_old_credentials",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:create_service_account",
+      "task_id": "create_service_account",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Service account creation might fail due to insufficient permissions.",
+      "suggested_fix": "Ensure the executing user has sufficient IAM permissions to create service accounts."
+    },
+    {
+      "id": "crit:1:missing_steps:migrate_pods",
+      "task_id": "migrate_pods",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No pre-check for pod readiness before migration is defined.",
+      "suggested_fix": "Add a verification step to check if the pods are ready before attempting the migration."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:remove_old_credentials",
+      "task_id": "remove_old_credentials",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Removing old credentials before confirming all pods function correctly with new service account poses a risk.",
+      "suggested_fix": "Ensure that the removal of old credentials is only executed after successful verification of changes."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:remove_old_credentials",
+      "task_id": "remove_old_credentials",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Dependency on task 'verify_changes' lacks confirmation of its completion status.",
+      "suggested_fix": "Implement a check to ensure that 'verify_changes' has been successfully completed before proceeding to 'remove_old_credentials'."
+    },
+    {
+      "id": "crit:1:weak_rollback:remove_old_credentials",
+      "task_id": "remove_old_credentials",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "No defined rollback steps if removal of old credentials fails.",
+      "suggested_fix": "Establish a rollback procedure to restore old credentials if the deletion fails."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:inf-04-workload-identity:1:1",
+    "plan_id": "inf-04-workload-identity-plan",
+    "version": 1,
+    "blocker_finding_id": "crit:1:feasibility:create_service_account",
+    "question": "Plan for goal 'inf-04-workload-identity' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

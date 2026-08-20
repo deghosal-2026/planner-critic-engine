@@ -1,0 +1,171 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-03-index-backfill",
+  "duration_seconds": 7.92,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "db-03-index-backfill-plan",
+    "goal_id": "db-03-index-backfill",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T01:56:15.675925Z",
+    "tasks": [
+      {
+        "id": "check_orders_table",
+        "description": "Check the health of orders table before index creation",
+        "action": "check",
+        "target": "orders",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Database is reachable",
+            "fact": "db_healthy",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "Orders table exists",
+            "fact": "orders_table_exists",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create_index",
+        "description": "Create B-tree index on orders(customer_id, created_at) concurrently",
+        "action": "create_index",
+        "target": "orders",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "index usage statistics",
+          "how": "check pg_stat_user_indexes",
+          "expected": "index should be present and active"
+        },
+        "rollback": {
+          "trigger": "index creation fails",
+          "action": "DROP INDEX CONCURRENTLY orders_customer_created_at_idx",
+          "safety_guard": "verify index does not exist"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_index_usage",
+        "description": "Verify index usage after creation",
+        "action": "verify",
+        "target": "pg_stat_user_indexes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Index has been created successfully",
+            "fact": "index_created",
+            "established_by": "create_index",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_orders_table",
+        "to_task": "create_index",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_index",
+        "to_task": "verify_index_usage",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:create_index",
+      "task_id": "create_index",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "warning",
+      "reason_code": "llm_feasibility",
+      "message": "Creating the index concurrently may not be feasible due to the high write load on the orders table.",
+      "suggested_fix": "Monitor write activity closely during index creation and consider scheduling at a lower traffic time."
+    },
+    {
+      "id": "crit:1:missing_steps:create_index",
+      "task_id": "create_index",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Preconditions for creating the index are missing, which could lead to an undefined state.",
+      "suggested_fix": "Add checks for index creation prerequisites such as ensuring no active transactions are holding locks."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:verify_index_usage",
+      "task_id": "verify_index_usage",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Verification of index usage should occur only after confirming the index is created successfully, but the current order does not guarantee that.",
+      "suggested_fix": "Ensure the 'verify_index_usage' task only runs after successful completion of 'create_index'."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:check_orders_table",
+      "task_id": "check_orders_table",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The health of the database and the existence of the orders table should be explicitly verified before proceeding with index creation.",
+      "suggested_fix": "Include verification steps ensuring both the database is healthy and the orders table exists before moving to the 'create_index' task."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-03-index-backfill:1:1",
+    "plan_id": "db-03-index-backfill-plan",
+    "version": 1,
+    "blocker_finding_id": "crit:1:unsafe_sequencing:verify_index_usage",
+    "question": "Plan for goal 'db-03-index-backfill' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

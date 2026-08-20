@@ -1,0 +1,198 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-04-vault-rotation",
+  "duration_seconds": 7.74,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "ir-04-vault-rotation",
+    "goal_id": "ir-04-vault-rotation",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T01:59:39.973938Z",
+    "tasks": [
+      {
+        "id": "generate_password",
+        "description": "Generate a new password via Vault's dynamic secrets engine",
+        "action": "generate",
+        "target": "vault",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "new password validity",
+          "how": "attempt to retrieve password",
+          "expected": "password exists"
+        },
+        "rollback": {
+          "trigger": "generation fails",
+          "action": "notification of failure",
+          "safety_guard": "check Vault status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update_consuming_services",
+        "description": "Update all consuming services to use the new lease",
+        "action": "update",
+        "target": "services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service connection",
+          "how": "execute health checks",
+          "expected": "services are operational"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "revert to old password",
+          "safety_guard": "ensure old password is still valid"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_application",
+        "description": "Verify the application can execute a simple SELECT against the database with the new credential",
+        "action": "execute",
+        "target": "database",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "SELECT query",
+          "how": "run query against database",
+          "expected": "query returns expected result"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "restore old configuration",
+          "safety_guard": "ensure application is not disrupted"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "revoke_old_lease",
+        "description": "Revoke the old Vault lease",
+        "action": "revoke",
+        "target": "vault",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "new password has been generated",
+            "fact": "new_password_valid",
+            "established_by": "generate_password",
+            "probe": null
+          },
+          {
+            "description": "all services have been updated",
+            "fact": "services_updated",
+            "established_by": "update_consuming_services",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "generate_password",
+        "to_task": "update_consuming_services",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_consuming_services",
+        "to_task": "verify_application",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_application",
+        "to_task": "revoke_old_lease",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:missing_steps:generate_password",
+      "task_id": "generate_password",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "blocker",
+      "reason_code": "llm_missing_steps",
+      "message": "No step to handle case where the Vault server is down during password generation.",
+      "suggested_fix": "Include a contingency plan for Vault server unavailability."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:update_consuming_services",
+      "task_id": "update_consuming_services",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Updating consuming services should not occur before successful password generation verification.",
+      "suggested_fix": "Add a step to verify the new password before updating services."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:revoke_old_lease",
+      "task_id": "revoke_old_lease",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "No verification step to ensure that the old lease can be revoked safely after updating services and verifying application functionality.",
+      "suggested_fix": "Add verification to check if all services are operational and the application can query the database before revoking the old lease."
+    },
+    {
+      "id": "crit:1:weak_rollback:update_consuming_services",
+      "task_id": "update_consuming_services",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback action to revert to the old password does not verify the old password's validity before executing.",
+      "suggested_fix": "Ensure the old password's validity is confirmed before proceeding with rollback."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-04-vault-rotation:1:1",
+    "plan_id": "ir-04-vault-rotation",
+    "version": 1,
+    "blocker_finding_id": "crit:1:missing_steps:generate_password",
+    "question": "Plan for goal 'ir-04-vault-rotation' cannot be approved: blockers remain (llm_missing_steps; llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

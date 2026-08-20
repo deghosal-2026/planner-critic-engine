@@ -1,0 +1,198 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-03-tls-rotation",
+  "duration_seconds": 10.98,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "ir-03-tls-rotation-plan",
+    "goal_id": "ir-03-tls-rotation",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T01:59:31.239032Z",
+    "tasks": [
+      {
+        "id": "generate-cert",
+        "description": "Generate new TLS certificate via ACM",
+        "action": "generate",
+        "target": "acm-cert",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ACM service is available",
+            "fact": "acm_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "new certificate ARN",
+          "how": "check ACM list",
+          "expected": "new cert appears in the list"
+        },
+        "rollback": {
+          "trigger": "cert generation fails",
+          "action": "use existing certificate",
+          "safety_guard": "verify old certificate is valid"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update-albs",
+        "description": "Update each ALB listener to use the new certificate",
+        "action": "update",
+        "target": "albs",
+        "parallel_group": "update-group",
+        "preconditions": [
+          {
+            "description": "new certificate has been generated",
+            "fact": "new_cert_generated",
+            "established_by": "generate-cert",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "ALB listener certificate",
+          "how": "describe ALB listener",
+          "expected": "listener uses new certificate"
+        },
+        "rollback": {
+          "trigger": "ALB update fails",
+          "action": "re-associate old certificate",
+          "safety_guard": "ensure old cert is still valid"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-https",
+        "description": "Verify HTTPS connectivity on each ALB endpoint",
+        "action": "verify",
+        "target": "albs",
+        "parallel_group": "verify-group",
+        "preconditions": [
+          {
+            "description": "ALBs have been updated with the new certificate",
+            "fact": "albs_updated",
+            "established_by": "update-albs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "HTTPS response",
+          "how": "curl -v to ALB endpoint",
+          "expected": "valid chain with new serial"
+        },
+        "rollback": {
+          "trigger": "HTTPS verification fails",
+          "action": "re-associate old certificate",
+          "safety_guard": "ensure old cert is still valid"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "generate-cert",
+        "to_task": "update-albs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-albs",
+        "to_task": "verify-https",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:generate-cert",
+      "task_id": "generate-cert",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The certificate generation must be completed successfully within a strict time limit of 48 hours.",
+      "suggested_fix": "Ensure resources are available and ACM service is confirmed as operational before proceeding."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:update-albs",
+      "task_id": "update-albs",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Updating ALBs should not proceed until the new certificate has been successfully generated and verified.",
+      "suggested_fix": "Add a dependency to ensure the 'generate-cert' task completes successfully before starting the 'update-albs'."
+    },
+    {
+      "id": "crit:1:missing_steps:verify-https",
+      "task_id": "verify-https",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The verification process does not specify how to handle the scenario if the HTTPS connectivity fails.",
+      "suggested_fix": "Include steps to troubleshoot or log issues if verification fails to improve recovery options."
+    },
+    {
+      "id": "crit:1:weak_rollback:update-albs",
+      "task_id": "update-albs",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback actions for ALB updates rely solely on the old certificate's validity check; there's no contingency for an invalid old certificate.",
+      "suggested_fix": "Introduce an additional step to validate the pre-existing certificate before rollback."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:verify-https",
+      "task_id": "verify-https",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "info",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The dependencies between tasks are not validated in the verification of HTTPS connectivity.",
+      "suggested_fix": "Confirm that the outcomes of prior tasks are correctly reflected and verify the effective state before running the HTTPS verification."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-03-tls-rotation:1:1",
+    "plan_id": "ir-03-tls-rotation-plan",
+    "version": 1,
+    "blocker_finding_id": "crit:1:feasibility:generate-cert",
+    "question": "Plan for goal 'ir-03-tls-rotation' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

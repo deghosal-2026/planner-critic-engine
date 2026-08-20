@@ -1,0 +1,219 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-05-chaos-experiment",
+  "duration_seconds": 12.35,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "obs-05-chaos-experiment-plan",
+    "goal_id": "obs-05-chaos-experiment",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T02:08:30.376332Z",
+    "tasks": [
+      {
+        "id": "inject-chaos",
+        "description": "Inject pod-kill chaos into the inventory service",
+        "action": "inject_chaos",
+        "target": "inventory-service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "chaos-mesh is installed",
+            "fact": "chaos_mesh_installed",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "inventory service is running",
+            "fact": "inventory_service_running",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "chaos injection status",
+          "how": "check chaos-mesh dashboard",
+          "expected": "chaos injected successfully"
+        },
+        "rollback": {
+          "trigger": "chaos injection fails",
+          "action": "stop chaos injection",
+          "safety_guard": "verify chaos injection status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "observe-recovery",
+        "description": "Observe recovery time via Prometheus metrics",
+        "action": "observe_metrics",
+        "target": "prometheus",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "chaos has been injected",
+            "fact": "chaos_injection_success",
+            "established_by": "inject-chaos",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "recovery time",
+          "how": "query Prometheus metrics",
+          "expected": "<= 30 seconds"
+        },
+        "rollback": {
+          "trigger": "failed metrics observation",
+          "action": "reset prometheus metrics",
+          "safety_guard": "ensure metrics are in default state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rollback-replicas",
+        "description": "Rollback to original replica count after observation",
+        "action": "scale_deployment",
+        "target": "inventory-service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "recovery observation completed",
+            "fact": "recovery_observed",
+            "established_by": "observe-recovery",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replica count",
+          "how": "check deployment configuration",
+          "expected": "original replica count restored"
+        },
+        "rollback": {
+          "trigger": "scaling fails",
+          "action": "verify current replicas",
+          "safety_guard": "ensure service remains stable"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "generate-report",
+        "description": "Generate a chaos report with time-to-recover measurement",
+        "action": "create_report",
+        "target": "chaos-report",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "rollback completed",
+            "fact": "rollback_successful",
+            "established_by": "rollback-replicas",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "inject-chaos",
+        "to_task": "observe-recovery",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "observe-recovery",
+        "to_task": "rollback-replicas",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rollback-replicas",
+        "to_task": "generate-report",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:inject-chaos",
+      "task_id": "inject-chaos",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "No clear method is defined to verify after chaos injection besides checking the dashboard, limiting assertive verification of success.",
+      "suggested_fix": "Include a direct probe or step for validating the chaos injection outcome."
+    },
+    {
+      "id": "crit:1:missing_steps:rollback-replicas",
+      "task_id": "rollback-replicas",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "There is no defined rollback action if verifying the current replica count fails.",
+      "suggested_fix": "Add a rollback action for situations where verifying the current replica count fails."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:generate-report",
+      "task_id": "generate-report",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Report generation can be executed even if the rollback is not successful, which may lead to incorrect data.",
+      "suggested_fix": "Add a precondition to ensure rollback was successful before report generation."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:observe-recovery",
+      "task_id": "observe-recovery",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The dependency on 'chaos_injection_success' is based on the output of the previous task, but its verification step is not directly validated.",
+      "suggested_fix": "Ensure that the outcome of the chaos injection is explicitly verified before proceeding."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:obs-05-chaos-experiment:1:1",
+    "plan_id": "obs-05-chaos-experiment-plan",
+    "version": 1,
+    "blocker_finding_id": "crit:1:feasibility:inject-chaos",
+    "question": "Plan for goal 'obs-05-chaos-experiment' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

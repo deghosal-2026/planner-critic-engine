@@ -1,0 +1,264 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-01-schema-migration",
+  "duration_seconds": 14.77,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "db-01-schema-migration-plan",
+    "goal_id": "db-01-schema-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T01:55:51.406110Z",
+    "tasks": [
+      {
+        "id": "backup",
+        "description": "Back up the entire database",
+        "action": "backup",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Database is reachable for backup",
+            "fact": "db_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "backup integrity",
+          "how": "checksum comparison",
+          "expected": "backup matches database state"
+        },
+        "rollback": {
+          "trigger": "backup fails",
+          "action": "stop deployment",
+          "safety_guard": "check backup logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "check_disk_space",
+        "description": "Check available disk space for WAL during backfill",
+        "action": "check",
+        "target": "disk",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Backup completed successfully",
+            "fact": "backup_successful",
+            "established_by": "backup",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "disk space availability",
+          "how": "query disk usage",
+          "expected": "sufficient space for WAL"
+        },
+        "rollback": {
+          "trigger": "insufficient disk space",
+          "action": "abort migration",
+          "safety_guard": "alert on disk space issues"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "backfill_nulls",
+        "description": "Backfill existing NULLs in last_login_ip column",
+        "action": "update",
+        "target": "users",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Disk space checked and is sufficient",
+            "fact": "disk_space_ok",
+            "established_by": "check_disk_space",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "NULLs count in last_login_ip column",
+          "how": "run count query",
+          "expected": "0 NULLs in last_login_ip"
+        },
+        "rollback": {
+          "trigger": "backfill fails",
+          "action": "restore from backup",
+          "safety_guard": "verify backup integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "alter_table",
+        "description": "Alter the users table to add NOT NULL constraint",
+        "action": "alter",
+        "target": "users",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Backfill of NULLs completed successfully",
+            "fact": "backfill_successful",
+            "established_by": "backfill_nulls",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "NOT NULL constraint applied",
+          "how": "run table schema check",
+          "expected": "last_login_ip NOT NULL"
+        },
+        "rollback": {
+          "trigger": "ALTER TABLE fails",
+          "action": "restore from backup",
+          "safety_guard": "verify backup integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_code",
+        "description": "Deploy application code that references the last_login_ip column",
+        "action": "deploy",
+        "target": "app",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Table alteration completed successfully",
+            "fact": "table_altered",
+            "established_by": "alter_table",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application functionality",
+          "how": "run application tests",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to previous version",
+          "safety_guard": "feature flag disable"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "backup",
+        "to_task": "check_disk_space",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check_disk_space",
+        "to_task": "backfill_nulls",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "backfill_nulls",
+        "to_task": "alter_table",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "alter_table",
+        "to_task": "deploy_code",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:missing_steps:backfill_nulls",
+      "task_id": "backfill_nulls",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No mechanism for handling failed backfills if space unexpectedly runs out during the operation.",
+      "suggested_fix": "Implement a step to monitor disk space during the backfill process and abort if disk space falls below a threshold."
+    },
+    {
+      "id": "crit:1:risk:alter_table",
+      "task_id": "alter_table",
+      "version": 1,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Risk of table lock during ALTER TABLE process could lead to downtime beyond maintenance window.",
+      "suggested_fix": "Consider using pt-online-schema-change for non-blocking operations when altering the table."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:deploy_code",
+      "task_id": "deploy_code",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Deploying code that references the new column should occur after verifying the ALTER TABLE operation has been fully completed and validated.",
+      "suggested_fix": "Ensure deployment of application code only occurs after successful verification of the NOT NULL constraint."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:check_disk_space",
+      "task_id": "check_disk_space",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Dependence on successful backup should also verify backup completion to avoid false positives during disk space checks.",
+      "suggested_fix": "Add a verification step to ensure the backup is not just successful but fully completed before checking disk space."
+    },
+    {
+      "id": "crit:1:weak_rollback:backfill_nulls",
+      "task_id": "backfill_nulls",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback action should specify the scenario for restoring from backup in the case of backfill failure, ensuring clarity in the recovery process.",
+      "suggested_fix": "Enhance the rollback procedure with explicit criteria and actions for backfill failure scenarios."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-01-schema-migration:1:1",
+    "plan_id": "db-01-schema-migration-plan",
+    "version": 1,
+    "blocker_finding_id": "crit:1:unsafe_sequencing:deploy_code",
+    "question": "Plan for goal 'db-01-schema-migration' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

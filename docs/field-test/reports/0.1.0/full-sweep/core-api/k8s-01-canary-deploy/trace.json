@@ -1,0 +1,290 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-01-canary-deploy",
+  "duration_seconds": 16.76,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "k8s-01-canary-deploy",
+    "goal_id": "k8s-01-canary-deploy",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T02:04:50.243197Z",
+    "tasks": [
+      {
+        "id": "deploy_canary",
+        "description": "Deploy canary version of the service",
+        "action": "kubectl apply",
+        "target": "canary-deployment.yaml",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "previous version is running successfully",
+            "fact": "stable_version_running",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment status",
+          "how": "check kubectl get deployments",
+          "expected": "canary deployment should be available"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "delete canary deployment",
+          "safety_guard": "ensure stable version is running"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_traffic",
+        "description": "Monitor 5xx error rates",
+        "action": "setup monitoring",
+        "target": "Istio dashboards",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary version deployed",
+            "fact": "canary_deployed",
+            "established_by": "deploy_canary",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "error rates",
+          "how": "query Istio metrics",
+          "expected": "5xx error rates below 1%"
+        },
+        "rollback": {
+          "trigger": "monitoring setup fails",
+          "action": "remove monitoring configurations",
+          "safety_guard": "backup existing monitoring setup"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "ramp_traffic_5",
+        "description": "Ramp traffic to canary to 5%",
+        "action": "update VirtualService",
+        "target": "VirtualService configuration",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "5xx error rates are within limits",
+            "fact": "error_rate_below_1",
+            "established_by": "monitor_traffic",
+            "probe": null
+          },
+          {
+            "description": "health checks passed",
+            "fact": "health_checks_passed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "ramp_traffic_50",
+        "description": "Ramp traffic to canary to 50%",
+        "action": "update VirtualService",
+        "target": "VirtualService configuration",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "previous ramp to 5% successful",
+            "fact": "traffic_ramped_to_5",
+            "established_by": "ramp_traffic_5",
+            "probe": null
+          },
+          {
+            "description": "5xx error rates are within limits",
+            "fact": "error_rate_below_1",
+            "established_by": "monitor_traffic",
+            "probe": null
+          },
+          {
+            "description": "health checks passed",
+            "fact": "health_checks_passed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "ramp_traffic_100",
+        "description": "Ramp traffic to canary to 100%",
+        "action": "update VirtualService",
+        "target": "VirtualService configuration",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "previous ramp to 50% successful",
+            "fact": "traffic_ramped_to_50",
+            "established_by": "ramp_traffic_50",
+            "probe": null
+          },
+          {
+            "description": "5xx error rates are within limits",
+            "fact": "error_rate_below_1",
+            "established_by": "monitor_traffic",
+            "probe": null
+          },
+          {
+            "description": "health checks passed",
+            "fact": "health_checks_passed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_canary",
+        "to_task": "monitor_traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_traffic",
+        "to_task": "ramp_traffic_5",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "ramp_traffic_5",
+        "to_task": "ramp_traffic_50",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "ramp_traffic_50",
+        "to_task": "ramp_traffic_100",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:missing_steps:ramp_traffic_5",
+      "task_id": "ramp_traffic_5",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "blocker",
+      "reason_code": "llm_missing_steps",
+      "message": "No rollback strategy defined for ramping traffic to 5%.",
+      "suggested_fix": "Define a rollback action that reverts traffic back to previous levels if the ramping fails."
+    },
+    {
+      "id": "crit:1:missing_steps:ramp_traffic_50",
+      "task_id": "ramp_traffic_50",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "blocker",
+      "reason_code": "llm_missing_steps",
+      "message": "No rollback strategy defined for ramping traffic to 50%.",
+      "suggested_fix": "Define a rollback action that reverts traffic back to previous levels if the ramping fails."
+    },
+    {
+      "id": "crit:1:missing_steps:ramp_traffic_100",
+      "task_id": "ramp_traffic_100",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "blocker",
+      "reason_code": "llm_missing_steps",
+      "message": "No rollback strategy defined for ramping traffic to 100%.",
+      "suggested_fix": "Define a rollback action that reverts traffic back to previous levels if the ramping fails."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:ramp_traffic_5",
+      "task_id": "ramp_traffic_5",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "warning",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The ramping to 5% occurs before health checks for the canary are verified as successful.",
+      "suggested_fix": "Add a verification step for health checks before ramping traffic to 5%."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:monitor_traffic",
+      "task_id": "monitor_traffic",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Dependency on 'canary_deployed' is not verified through a formal check after deployment.",
+      "suggested_fix": "Implement a verification step to confirm that the canary version was successfully deployed before monitoring starts."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:ramp_traffic_50",
+      "task_id": "ramp_traffic_50",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Dependency on 'traffic_ramped_to_5' is not verified through a formal check after ramping to 5%.",
+      "suggested_fix": "Implement a verification step to confirm that traffic is successfully ramped to 5% before proceeding."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:ramp_traffic_100",
+      "task_id": "ramp_traffic_100",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Dependency on 'traffic_ramped_to_50' is not verified through a formal check after ramping to 50%.",
+      "suggested_fix": "Implement a verification step to confirm that traffic is successfully ramped to 50% before proceeding."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-01-canary-deploy:1:1",
+    "plan_id": "k8s-01-canary-deploy",
+    "version": 1,
+    "blocker_finding_id": "crit:1:missing_steps:ramp_traffic_5",
+    "question": "Plan for goal 'k8s-01-canary-deploy' cannot be approved: blockers remain (llm_missing_steps). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}
