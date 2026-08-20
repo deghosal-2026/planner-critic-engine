@@ -1,0 +1,39 @@
+{
+  "id": "inf-02-terraform-migration",
+  "title": "Terraform State Migration",
+  "description": "Migrate Terraform state from local backend to S3 with DynamoDB locking: plan, apply, verify, rollback on failure",
+  "constraints": {
+    "environment": "production",
+    "tools": ["terraform", "aws-cli"],
+    "services": ["s3", "dynamodb", "cloudtrail"]
+  },
+  "risk_tolerance": "strict",
+  "replan_policy": "patch",
+  "steps": [
+    {"id": "backup", "description": "Take snapshot of current local state file and upload to secure backup bucket", "mandatory": true},
+    {"id": "plan", "description": "Run terraform plan with new backend config; verify 0 resources to change (state-only migration)", "mandatory": true},
+    {"id": "apply", "description": "Run terraform init -migrate-state to move state to S3 backend", "mandatory": true},
+    {"id": "verify", "description": "Confirm state file exists in S3, DynamoDB lock table is operational, terraform plan shows no drift", "mandatory": true},
+    {"id": "lock-test", "description": "Acquire and release DynamoDB lock; confirm concurrent apply is blocked", "mandatory": false},
+    {"id": "rollback-condition", "description": "If any verification step fails, restore local state from backup and revert backend config", "mandatory": true}
+  ],
+  "verification": {
+    "checks": [
+      "terraform plan produces 0 changes",
+      "S3 bucket contains state file with correct key",
+      "DynamoDB table has LockID with state file entry",
+      "terraform apply acquires lock successfully",
+      "CloudTrail shows PutObject to S3 state bucket"
+    ],
+    "success_criteria": "All checks pass and terraform plan shows 0 drift"
+  },
+  "rollback_plan": {
+    "trigger_condition": "terraform plan shows unexpected changes OR lock table is inaccessible OR state file checksum mismatch",
+    "steps": [
+      "Run terraform state push from local backup",
+      "Revert backend.hcl to previous configuration",
+      "Run terraform init to reconnect to local backend",
+      "Verify terraform plan matches pre-migration state"
+    ]
+  }
+}

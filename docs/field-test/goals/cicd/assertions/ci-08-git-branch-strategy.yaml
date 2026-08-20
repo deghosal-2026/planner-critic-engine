@@ -1,0 +1,40 @@
+assertions:
+  - action: configure-branch-protection
+    must_execute: true
+    postcondition: "Branch protection rules applied to 'main' on all repos: 1 review required, stale dismissed, status checks required"
+    failure_action: "Retry GitHub API call; verify admin token permissions"
+
+  - action: feature-branch-created
+    must_execute: true
+    postcondition: "Feature branch created from latest main; naming convention 'feature/issue-number-description'"
+    failure_action: "Enforce naming via GitHub action; reject non-conformant branches"
+
+  - action: pull-request-opened
+    must_execute: true
+    depends_on: ["feature-branch-created"]
+    postcondition: "PR targets main; template includes description, screenshots, and test plan"
+    failure_action: "Block PR creation; require template fields"
+
+  - action: status-checks-pass
+    must_execute: true
+    depends_on: ["pull-request-opened"]
+    postcondition: "ci/lint, ci/test, ci/build all green; no merge conflicts"
+    failure_action: "Block merge button; report failing checks to PR author"
+
+  - action: code-review-complete
+    must_execute: true
+    depends_on: ["status-checks-pass"]
+    postcondition: "At least 1 approval; no requested changes outstanding; all threads resolved"
+    failure_action: "Re-request review; set autorefresh comment"
+
+  - action: squash-merge
+    must_execute: true
+    depends_on: ["code-review-complete"]
+    postcondition: "PR squash-merged to main; commit message follows conventional commits format"
+    failure_action: "Rebase and retry; do not create merge commit"
+
+  - action: delete-source-branch
+    must_execute: true
+    depends_on: ["squash-merge"]
+    postcondition: "Source branch deleted automatically; no stale branches older than 30 days"
+    failure_action: "Run stale-branch cleanup workflow; notify authors of orphan branches"

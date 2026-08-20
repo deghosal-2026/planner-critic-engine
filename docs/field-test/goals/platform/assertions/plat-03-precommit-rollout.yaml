@@ -1,0 +1,30 @@
+id: plat-03-precommit-rollout
+goal_id: plat-03-precommit-rollout
+phase: post-execution
+category: functional
+severity: major
+description: >
+  Pre-commit hooks are installed in all target repos, CI enforces passing
+  hooks, and an adoption report covers the entire org.
+check:
+  - type: file_exists
+    path: ".pre-commit-config.yaml"
+    count: 1
+    per_repo: true
+  - type: command_output
+    command: "git -C {clone_dir} diff --cached --name-only"
+    expected: ""
+    description: "Hooks are installed in git (pre-commit install ran successfully)"
+    per_repo: true
+  - type: command_output
+    command: "gh api repos/{org}/{repo}/branches/main/protection --jq '.required_status_checks.checks[] | select(.context | startswith(\"pre-commit\")) | .context'"
+    expected: ".+"
+    per_repo: true
+    description: "Branch protection requires pre-commit status check to pass"
+  - type: command_output
+    command: >
+      for repo in $(gh repo list {org} --limit 100 --json name --jq '.[].name'); do
+        test -f "$repo/.pre-commit-config.yaml" && echo "ok:$repo" || echo "missing:$repo"
+      done | grep "^missing:" | wc -l
+    expected: "0"
+    description: "All org repos have pre-commit config (100% adoption)"

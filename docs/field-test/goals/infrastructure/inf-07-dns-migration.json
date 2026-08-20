@@ -1,0 +1,41 @@
+{
+  "id": "inf-07-dns-migration",
+  "title": "Cross-Region DNS Migration",
+  "description": "Migrate primary DNS records from us-east-1 to eu-west-1: lower TTL, update records, monitor traffic shift, verify failover",
+  "constraints": {
+    "environment": "production",
+    "tools": ["aws-cli", "terraform", "curl", "dig", "python"],
+    "services": ["route53", "elbv2", "cloudwatch", "sns"]
+  },
+  "risk_tolerance": "strict",
+  "replan_policy": "restart",
+  "steps": [
+    {"id": "prep", "description": "Provision eu-west-1 infrastructure (ALB, target groups) mirroring us-east-1; validate health checks pass", "mandatory": true},
+    {"id": "lower-ttl", "description": "Reduce Route53 TTL from 300s to 60s for all migrating records; wait for full propagation", "mandatory": true},
+    {"id": "update-records", "description": "Add eu-west-1 ALB DNS as primary record; keep us-east-1 as secondary (failover routing)", "mandatory": true},
+    {"id": "monitor", "description": "Monitor traffic shift: DNS queries resolving to eu-west-1, request counts ramping up, error rates stable", "mandatory": true},
+    {"id": "failover-test", "description": "Simulate us-east-1 health check failure; verify traffic automatically shifts to eu-west-1 within DNS TTL window", "mandatory": true},
+    {"id": "verify", "description": "Run end-to-end tests from multiple regions; confirm latency reduction, zero errors, DNS consistency", "mandatory": true},
+    {"id": "rollback", "description": "Restore us-east-1 as primary, remove eu-west-1 from Route53, restore TTL to original value", "mandatory": true}
+  ],
+  "verification": {
+    "checks": [
+      "All DNS queries resolve to eu-west-1 ALB from 3+ geographic regions",
+      "Health checks for both regions pass",
+      "Failover test completes in < 120s (2x TTL window)",
+      "P99 latency from eu-west-1 is lower than us-east-1 for EU clients",
+      "Zero 5xx errors during and after migration"
+    ],
+    "success_criteria": "100% traffic served from eu-west-1 with automated failover working and latency SLA met"
+  },
+  "rollback_plan": {
+    "trigger_condition": "Error rate increases > 0.5% OR failover test fails OR latency regression > 10%",
+    "steps": [
+      "Update Route53 records: us-east-1 primary, eu-west-1 secondary",
+      "Restore TTL to original 300s",
+      "Disable health checks for eu-west-1",
+      "Confirm DNS resolves to us-east-1 globally",
+      "Verify error rate returns to baseline"
+    ]
+  }
+}

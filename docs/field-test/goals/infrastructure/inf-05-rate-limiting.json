@@ -1,0 +1,30 @@
+{
+  "id": "inf-05-rate-limiting",
+  "title": "API Gateway Rate Limiting",
+  "description": "Add rate limiting to API gateway: define limits, deploy, test, tune for optimal throughput",
+  "constraints": {
+    "environment": "production",
+    "tools": ["terraform", "aws-cli", "curl", "jmeter", "python"],
+    "services": ["api-gateway", "lambda", "cloudwatch", "waf", "sns"]
+  },
+  "risk_tolerance": "balanced",
+  "replan_policy": "patch",
+  "steps": [
+    {"id": "analyze", "description": "Analyze current traffic patterns: peak TPS, 99th percentile burst, client distribution by API key", "mandatory": true},
+    {"id": "define-limits", "description": "Set rate limits per route and per client (standard: 1000 req/s per route, 100 req/s per key)", "mandatory": true},
+    {"id": "deploy", "description": "Apply rate limiting rules via Terraform to API Gateway usage plans and WAF rate-based rules", "mandatory": true},
+    {"id": "canary-test", "description": "Deploy to canary stage first; verify legitimate traffic passes and throttled clients get 429 correctly", "mandatory": true},
+    {"id": "load-test", "description": "Run load test at 80%, 100%, and 120% of defined limits; confirm throttling behavior", "mandatory": true},
+    {"id": "tune", "description": "Adjust limits based on load test results and false-positive 429 rate; retest", "mandatory": false},
+    {"id": "promote", "description": "Promote rate limiting to production stage with monitoring dashboards and alarms", "mandatory": true}
+  ],
+  "verification": {
+    "metrics": ["throttled_request_count", "429_error_rate", "legitimate_request_success_rate", "p99_latency_under_limit", "false_positive_429_count"],
+    "success_criteria": {
+      "legitimate_traffic_success": "> 99.9%",
+      "throttled_clients_get_429": "100%",
+      "false_positive_429": "< 0.1% of total traffic",
+      "p99_latency_under_limit": "no regression vs baseline"
+    }
+  }
+}
