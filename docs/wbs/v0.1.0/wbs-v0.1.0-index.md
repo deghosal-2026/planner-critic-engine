@@ -1,6 +1,6 @@
 # WBS — PlannerCritic Engine v0.1.0 (Index)
 
-> The work breakdown for the **feature-rich first release** (see [PRD 09 — Roadmap](../../design/prd/09-roadmap.md)). Ten milestones (M1–M10) across seven part files. **Author:** Debashish Ghosal · **Date:** 2026-08-16 · **Status:** In Progress — M1–M8 **COMPLETE** (merged), M9 next
+> The work breakdown for the **feature-rich first release** (see [PRD 09 — Roadmap](../../design/prd/09-roadmap.md)). Ten milestones (M1–M10) across seven part files. **Author:** Debashish Ghosal · **Date:** 2026-08-16 · **Status:** In Progress — M1–M9 **COMPLETE** (merged), M10 next
 >
 > PRDs: [01-why](../../design/prd/01-why.md) · [02-architecture](../../design/prd/02-architecture.md) · [04-users-and-cujs](../../design/prd/04-users-and-cujs.md) · [05-features](../../design/prd/05-features.md) · [06-security](../../design/prd/06-security-baseline.md) · [07-success-metrics](../../design/prd/07-success-metrics.md) · [08-risks](../../design/prd/08-risks.md)
 
@@ -18,7 +18,7 @@
 | **M6** | **CLI + HTTP Service + Explain + Init** | F-61, F-62, F-80, F-85 | CUJ 1, CUJ 15 | [#48–#54](https://github.com/deghosal-2026/planner-critic-engine/issues/48) | [part3](wbs-v0.1.0-part3-adapters-surfaces.md) | **DONE** (commit `5663f16`) |
 | M7 | Demo Corpus + Demo Runner | F-65, F-66, F-86 | CUJ 14 | [#55–#58](https://github.com/deghosal-2026/planner-critic-engine/issues/55) | [part4](wbs-v0.1.0-part4-demo.md) | **IMPLEMENTED** (gate open: review/coverage/init→plan) |
 | M8 | Docker Integration Tests — containerized engine + surfaces vs local LLM | F-60, F-61, F-62, F-45, F-67 | CUJ 1, CUJ 15 | [#77–#84](https://github.com/deghosal-2026/planner-critic-engine/issues/77) | [part5](wbs-v0.1.0-part5-docker-integration.md) | **COMPLETE** (#77–#81 done, #82–#84 skipped) |
-| M9 | Field Test — hermetic CI + local-model sweep | F-67, F-68 | CUJ 11 | [#59–#64](https://github.com/deghosal-2026/planner-critic-engine/issues/59) | [part6](wbs-v0.1.0-part6-field-test.md) |
+| M9 | Field Test — hermetic CI + local-model sweep | F-67, F-68 | CUJ 11 | [#59–#64](https://github.com/deghosal-2026/planner-critic-engine/issues/59) | [part6](wbs-v0.1.0-part6-field-test.md) | **COMPLETE** — 65 goals across 10 domains vs real LLM; 29 approved, 36 pass\*, 0 true failures |
 | M10 | Pre-Release + Release + Security + Docs | F-60, OWASP 6/10, OpenSSF Passing, Essential | all P0 | [#65–#71](https://github.com/deghosal-2026/planner-critic-engine/issues/65) | [part7](wbs-v0.1.0-part7-prerelease-release.md) |
 
 **Deferred to v0.2.0 (P1):** web UI (F-33), Postgres store (F-64), Anthropic/Gemini transports (F-25), multi-critic (F-37), plan templates (F-87), export F-47/F-81, OTel (F-82), heuristic packs (F-79), property-based fuzzing. See [PRD 09 §9.2](../../design/prd/09-roadmap.md#92-v020-p1).
@@ -61,7 +61,7 @@ M10 (Pre-release + release)   ← needs all preceding
 
 ## 3. GitHub Issue Ranges
 
-> **Status: IN PROGRESS** — all issues are attached to the [**0.1.0 release**](https://github.com/deghosal-2026/planner-critic-engine/milestone/1) milestone. Each task row in the part files has a live issue link + checkbox — flip the checkbox when the issue is closed; milestone progress is visible in the GitHub milestone view. **Closed so far: M1 #1–10 (commit `c1473bb`), M2 #11–19 (commit `a4cfe38`), M3 #20–29 (commit `bc1156a`), M4 #30–39 (commit `e0495df`), M5 #40–47 (commit `5663f16`), M6 #48–54 (commit `5663f16`), M7 #55–58 (gate passed, re-scoped hermetic), M8 #77–84 (gate passed — #82–84 skipped, not required). Open: Field M9 #59–64 + #74–76, Release M10 #65–71.**
+> **Status: IN PROGRESS** — all issues are attached to the [**0.1.0 release**](https://github.com/deghosal-2026/planner-critic-engine/milestone/1) milestone. Each task row in the part files has a live issue link + checkbox — flip the checkbox when the issue is closed; milestone progress is visible in the GitHub milestone view. **Closed so far: M1 #1–10 (commit `c1473bb`), M2 #11–19 (commit `a4cfe38`), M3 #20–29 (commit `bc1156a`), M4 #30–39 (commit `e0495df`), M5 #40–47 (commit `5663f16`), M6 #48–54 (commit `5663f16`), M7 #55–58 (gate passed, re-scoped hermetic), M8 #77–84 (gate passed), M9 #59–64 + #74–76 (field test complete). Open: Release M10 #65–71.**
 
 | Milestone | Issue range | API scope |
 |-----------|-------------|-----------|
