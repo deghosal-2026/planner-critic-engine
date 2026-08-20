@@ -1,0 +1,211 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mob-02-forced-upgrade",
+  "duration_seconds": 41.42,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-mob-02-forced-upgrade-r4",
+    "goal_id": "mob-02-forced-upgrade",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-mob-02-forced-upgrade-r3",
+    "created_at": "2026-08-20T22:51:14.757818Z",
+    "tasks": [
+      {
+        "id": "deploy_api_gate",
+        "description": "Deploy the server API enforcement for old app versions",
+        "action": "deploy",
+        "target": "API gateway",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Feature flags are operational",
+            "fact": "feature_flags_ready",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "Feature flags are properly configured and tested in production",
+            "fact": "feature_flags_tested",
+            "established_by": "trigger_in_app_prompts",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "API response to version checks",
+          "how": "send API calls from old and new app versions",
+          "expected": "426 Upgrade Required for old versions"
+        },
+        "rollback": {
+          "trigger": "deployment fails or immediate issues arise",
+          "action": "disable the API version gate",
+          "safety_guard": "ensure the rollback does not expose old vulnerabilities"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "trigger_in_app_prompts",
+        "description": "Send in-app upgrade prompts to users",
+        "action": "send_notification",
+        "target": "users",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "User segmentation for notifications is ready",
+            "fact": "user_segments_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "user engagement with prompts",
+          "how": "track notification open rates",
+          "expected": "open rate > 50%"
+        },
+        "rollback": {
+          "trigger": "prompt fails",
+          "action": "stop notifications",
+          "safety_guard": "ensure no repeat notifications are sent"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_upgrade_funnel",
+        "description": "Monitor the upgrade conversion funnel and remaining users on old versions",
+        "action": "monitor",
+        "target": "analytics dashboard",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Analytics tracking is set up",
+            "fact": "analytics_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_upgrade_window",
+        "description": "Verify the upgrade window is closed before proceeding",
+        "action": "check",
+        "target": "upgrade timing",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "confirm upgrade window closure",
+          "how": "check system date against upgrade deadline",
+          "expected": "upgrade window is officially closed"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "decommission_old_api_shims",
+        "description": "Remove old API compatibility shims after 7 days",
+        "action": "remove",
+        "target": "old API compatibility code",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "7 days have passed since the upgrade deadline",
+            "fact": "upgrade_window_closed",
+            "established_by": "monitor_upgrade_funnel",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "functionality of the new API",
+          "how": "run integration tests",
+          "expected": "no disruptions in service"
+        },
+        "rollback": {
+          "trigger": "post-sunset issues with users arise",
+          "action": "reintroduce the old API compatibility shims",
+          "safety_guard": "ensure old compatibility does not conflict with new"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_api_gate",
+        "to_task": "trigger_in_app_prompts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "trigger_in_app_prompts",
+        "to_task": "monitor_upgrade_funnel",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_upgrade_funnel",
+        "to_task": "decommission_old_api_shims",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_upgrade_window",
+        "to_task": "decommission_old_api_shims",
+        "kind": "hard",
+        "reason": "ensures precondition for decommissioning old API shims is verified"
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "preconditions_referenced:plan-mob-02-forced-upgrade-r4:4:deploy_api_gate:feature_flags_tested",
+      "task_id": "deploy_api_gate",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "blocker",
+      "reason_code": "unverified_precondition",
+      "message": "precondition 'feature_flags_tested' on task 'deploy_api_gate' references no established fact from an earlier task",
+      "suggested_fix": "Point the precondition at an earlier task that establishes 'feature_flags_tested'"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mob-02-forced-upgrade:4:4",
+    "plan_id": "plan-mob-02-forced-upgrade-r4",
+    "version": 4,
+    "blocker_finding_id": "preconditions_referenced:plan-mob-02-forced-upgrade-r4:4:deploy_api_gate:feature_flags_tested",
+    "question": "Plan for goal 'mob-02-forced-upgrade' cannot be approved: blockers remain (unverified_precondition). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

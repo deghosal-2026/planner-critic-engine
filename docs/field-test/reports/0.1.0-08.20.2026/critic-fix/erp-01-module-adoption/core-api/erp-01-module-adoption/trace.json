@@ -1,0 +1,213 @@
+{
+  "dimension": "core-api",
+  "goal_id": "erp-01-module-adoption",
+  "duration_seconds": 19.56,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-erp-01-module-adoption-r2",
+    "goal_id": "erp-01-module-adoption",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plan-erp-01",
+    "created_at": "2026-08-20T22:56:32.886646Z",
+    "tasks": [
+      {
+        "id": "configure_module",
+        "description": "Configure SAP AR Module",
+        "action": "configure",
+        "target": "SAP AR",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "configuration settings",
+          "how": "run configuration checks",
+          "expected": "all settings valid"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "reset configuration",
+          "safety_guard": "verify configuration integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "migrate_data",
+        "description": "Migrate customer master data and open AR items",
+        "action": "migrate",
+        "target": "legacy to SAP AR",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Legacy data is accessible",
+            "fact": "legacy_db_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "count of migrated items",
+          "how": "compare counts in SAP AR and legacy",
+          "expected": "100K customers and 500K open items"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore from legacy data",
+          "safety_guard": "verify data integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "parallel_run",
+        "description": "Run both systems in parallel for one billing cycle",
+        "action": "run_parallel",
+        "target": "legacy and SAP AR",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "invoice generation and payment postings",
+          "how": "run reports on both systems",
+          "expected": "data matches between systems"
+        },
+        "rollback": {
+          "trigger": "discrepancy found",
+          "action": "stop parallel run and assess",
+          "safety_guard": "compare invoice data"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "finance_reconciliation",
+        "description": "Reconcile AR at period close",
+        "action": "reconcile",
+        "target": "both systems",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "trial balance AR account",
+          "how": "compare AR from both systems",
+          "expected": "accounts match"
+        },
+        "rollback": {
+          "trigger": "reconciliation fails",
+          "action": "restore reconciled data and validate before rollback",
+          "safety_guard": "maintain legacy as read-only"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover",
+        "description": "Cutover to SAP AR as primary",
+        "action": "cutover",
+        "target": "SAP AR",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Finance reconciliation complete",
+            "fact": "reconciliation_successful",
+            "established_by": "finance_reconciliation",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "system functionality post-cutover",
+          "how": "test transaction processes",
+          "expected": "system operates correctly in SAP AR"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "revert to legacy system",
+          "safety_guard": "ensure no new transactions in SAP AR"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "configure_module",
+        "to_task": "migrate_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate_data",
+        "to_task": "parallel_run",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "parallel_run",
+        "to_task": "finance_reconciliation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "finance_reconciliation",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:finance_reconciliation",
+      "task_id": "finance_reconciliation",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'finance_reconciliation' must be completed successfully before proceeding to 'cutover', which is not linked properly in terms of task ordering and conditions.",
+      "suggested_fix": "Ensure 'cutover' is dependent on 'finance_reconciliation' being successful."
+    },
+    {
+      "id": "crit:2:weak_rollback:cutover",
+      "task_id": "cutover",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for 'cutover' lacks specificity regarding verification steps to ensure no new transactions in SAP AR during rollback.",
+      "suggested_fix": "Include detailed verification steps to confirm no new transactions are initiated in SAP AR before executing rollback."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:erp-01-module-adoption:2:2",
+    "plan_id": "plan-erp-01-module-adoption-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:finance_reconciliation",
+    "question": "Plan for goal 'erp-01-module-adoption' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

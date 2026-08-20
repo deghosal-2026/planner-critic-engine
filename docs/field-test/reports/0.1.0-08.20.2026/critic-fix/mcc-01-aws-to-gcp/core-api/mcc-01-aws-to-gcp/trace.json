@@ -1,0 +1,371 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mcc-01-aws-to-gcp",
+  "duration_seconds": 43.87,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-mcc-01-aws-to-gcp-r2",
+    "goal_id": "mcc-01-aws-to-gcp",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "mcc-01-aws-to-gcp",
+    "created_at": "2026-08-20T22:46:57.940544Z",
+    "tasks": [
+      {
+        "id": "provision_infrastructure",
+        "description": "Provision GCP infrastructure (GCE instances, Cloud SQL, Memorystore)",
+        "action": "provision",
+        "target": "GCP_infrastructure",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AWS environment is stable",
+            "fact": "aws_stable",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "GCP infrastructure status",
+          "how": "check resource existence",
+          "expected": "all resources provisioned"
+        },
+        "rollback": {
+          "trigger": "provisioning fails",
+          "action": "rollback infrastructure",
+          "safety_guard": "ensure no resources are in use"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "replicate_postgresql",
+        "description": "Replicate PostgreSQL database via Cloud SQL migration",
+        "action": "migrate",
+        "target": "Cloud_SQL",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "GCP infrastructure is provisioned",
+            "fact": "gcp_infrastructure_provisioned",
+            "established_by": "provision_infrastructure",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "database integrity",
+          "how": "run data validation checks",
+          "expected": "data matches between AWS and GCP"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore AWS RDS",
+          "safety_guard": "verify data consistency"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "replicate_redis",
+        "description": "Replicate Redis cache via replication bridge",
+        "action": "replicate",
+        "target": "Redis_cache",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "GCP infrastructure is provisioned",
+            "fact": "gcp_infrastructure_provisioned",
+            "established_by": "provision_infrastructure",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Redis data consistency",
+          "how": "compare cache data",
+          "expected": "cache data matches"
+        },
+        "rollback": {
+          "trigger": "replication fails",
+          "action": "rollback to AWS Redis",
+          "safety_guard": "check Redis availability"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "establish_connectivity",
+        "description": "Establish cross-cloud network connectivity",
+        "action": "connect",
+        "target": "network",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "GCP infrastructure is up",
+            "fact": "gcp_infrastructure_ready",
+            "established_by": "provision_infrastructure",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": {
+          "trigger": "connectivity issues",
+          "action": "revert network configuration",
+          "safety_guard": "ensure connectivity check passes"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run_dual_run",
+        "description": "Run a dual-run period with traffic to both clouds",
+        "action": "run",
+        "target": "dual_run",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Cross-cloud connectivity established",
+            "fact": "network_ready",
+            "established_by": "establish_connectivity",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic flow stability",
+          "how": "monitor application performance",
+          "expected": "no significant issues"
+        },
+        "rollback": {
+          "trigger": "issues detected in dual run",
+          "action": "redirect traffic to AWS",
+          "safety_guard": "ensure AWS is operational"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "execute_cutover",
+        "description": "Execute cutover by draining AWS and promoting GCP to primary",
+        "action": "cutover",
+        "target": "cutover_process",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dual-run period is stable",
+            "fact": "dual_run_stable",
+            "established_by": "run_dual_run",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service availability",
+          "how": "confirm app functionality on GCP",
+          "expected": "services running without errors"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "fail back to AWS",
+          "safety_guard": "ensure AWS RDS can be promoted"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_in_gcp",
+        "description": "Verify application performance and data integrity in GCP",
+        "action": "verify",
+        "target": "GCP",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Successful cutover execution",
+            "fact": "cutover_success",
+            "established_by": "execute_cutover",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application performance metrics",
+          "how": "run performance tests",
+          "expected": "meets defined SLAs"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "promote AWS RDS to primary",
+          "safety_guard": "ensure that AWS can resume operations"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "teardown_aws",
+        "description": "Teardown AWS resources (terminate EC2, drop RDS, delete ElastiCache)",
+        "action": "teardown",
+        "target": "AWS_resources",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "GCP verification successful",
+            "fact": "gcp_verified",
+            "established_by": "verify_in_gcp",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": {
+          "trigger": "teardown fails",
+          "action": "restore AWS resources",
+          "safety_guard": "ensure all services can be restarted"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "provision_infrastructure",
+        "to_task": "replicate_postgresql",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provision_infrastructure",
+        "to_task": "replicate_redis",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "replicate_postgresql",
+        "to_task": "establish_connectivity",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "replicate_redis",
+        "to_task": "establish_connectivity",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "establish_connectivity",
+        "to_task": "run_dual_run",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_dual_run",
+        "to_task": "execute_cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "execute_cutover",
+        "to_task": "verify_in_gcp",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_in_gcp",
+        "to_task": "teardown_aws",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:replicate_postgresql",
+      "task_id": "replicate_postgresql",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task depends on 'gcp_infrastructure_provisioned' which is not defined by a previous task's state.",
+      "suggested_fix": "Ensure that 'gcp_infrastructure_provisioned' is established properly by the 'provision_infrastructure' task."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:replicate_redis",
+      "task_id": "replicate_redis",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task depends on 'gcp_infrastructure_provisioned' which is not defined by a previous task's state.",
+      "suggested_fix": "Ensure that 'gcp_infrastructure_provisioned' is established properly by the 'provision_infrastructure' task."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:run_dual_run",
+      "task_id": "run_dual_run",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task depends on 'network_ready' which is not established by a previous task.",
+      "suggested_fix": "Ensure that 'network_ready' is verified after establishing connectivity."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:teardown_aws",
+      "task_id": "teardown_aws",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task depends on 'gcp_verified' which is not a verified state established by prior tasks.",
+      "suggested_fix": "Ensure that 'gcp_verified' is properly established by a previous verification step."
+    },
+    {
+      "id": "crit:2:weak_rollback:execute_cutover",
+      "task_id": "execute_cutover",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Failback plan to AWS lacks proper safety guard for promoting AWS RDS under fail conditions.",
+      "suggested_fix": "Add a safety check to ensure RDS can be promoted before executing rollback."
+    },
+    {
+      "id": "crit:2:weak_rollback:teardown_aws",
+      "task_id": "teardown_aws",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Restoration of AWS resources lacks a robust safety guard to verify all services can restart safely.",
+      "suggested_fix": "Ensure a verification process is in place to confirm all AWS services can be reactivated."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mcc-01-aws-to-gcp:2:2",
+    "plan_id": "plan-mcc-01-aws-to-gcp-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unverified_dependencies:replicate_postgresql",
+    "question": "Plan for goal 'mcc-01-aws-to-gcp' cannot be approved: blockers remain (llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

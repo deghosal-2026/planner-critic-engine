@@ -1,0 +1,243 @@
+{
+  "dimension": "core-api",
+  "goal_id": "tel-02-call-routing-migration",
+  "duration_seconds": 11.24,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "tel-02-call-routing-migration-plan",
+    "goal_id": "tel-02-call-routing-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T22:55:25.537278Z",
+    "tasks": [
+      {
+        "id": "dial-plan-rework",
+        "description": "Rework the dial plan to map legacy patterns to the new platform",
+        "action": "rework",
+        "target": "dial_plan",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Legacy patterns documented",
+            "fact": "legacy_patterns_documented",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "dial plan mappings",
+          "how": "run validation tests",
+          "expected": "all legacy patterns covered"
+        },
+        "rollback": {
+          "trigger": "mapping fails",
+          "action": "restore legacy mapping",
+          "safety_guard": "confirm legacy patterns are intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-routing-table",
+        "description": "Configure the new routing table with imported rules and setup",
+        "action": "configure",
+        "target": "routing_table",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dial plan rework completed",
+            "fact": "dial_plan_reworked",
+            "established_by": "dial-plan-rework",
+            "probe": null
+          },
+          {
+            "description": "Routing rules in CSV format",
+            "fact": "routing_rules_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "routing rules",
+          "how": "test calls",
+          "expected": "all routes correct"
+        },
+        "rollback": {
+          "trigger": "configuration errors",
+          "action": "import backup routing table",
+          "safety_guard": "check syntax before import"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "test-routes",
+        "description": "Conduct test calls through each major routing path",
+        "action": "test",
+        "target": "routing_paths",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Routing table configured",
+            "fact": "routing_table_configured",
+            "established_by": "configure-routing-table",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "call success rates",
+          "how": "monitor during tests",
+          "expected": "95% success rate on test paths"
+        },
+        "rollback": {
+          "trigger": "test fails",
+          "action": "revert to previous routing settings",
+          "safety_guard": "document test expectations"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "execute-cutover",
+        "description": "Switch inbound DIDs to the new platform",
+        "action": "cutover",
+        "target": "inbound_DIDs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Routes tested successfully",
+            "fact": "routes_tested",
+            "established_by": "test-routes",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "call routing",
+          "how": "real-time monitoring",
+          "expected": "zero drop in service levels"
+        },
+        "rollback": {
+          "trigger": "cutover issues",
+          "action": "redirect DIDs back to legacy PBX",
+          "safety_guard": "ensure legacy system is operational"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor-services",
+        "description": "Monitor call answer rates, IVR completion rates, and queue wait times",
+        "action": "monitor",
+        "target": "service_metrics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Cutover successfully executed",
+            "fact": "cutover_successful",
+            "established_by": "execute-cutover",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "dial-plan-rework",
+        "to_task": "configure-routing-table",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-routing-table",
+        "to_task": "test-routes",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test-routes",
+        "to_task": "execute-cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "execute-cutover",
+        "to_task": "monitor-services",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:dial-plan-rework",
+      "task_id": "dial-plan-rework",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Precondition 'Legacy patterns documented' has not been verified as established.",
+      "suggested_fix": "Ensure that legacy patterns are documented and the fact is established before proceeding."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:configure-routing-table",
+      "task_id": "configure-routing-table",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Precondition 'Routing rules in CSV format' relies on environment setup that has not been verified.",
+      "suggested_fix": "Confirm that the routing rules in CSV format are ready and the fact is established."
+    },
+    {
+      "id": "crit:1:missing_steps:execute-cutover",
+      "task_id": "execute-cutover",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding a step to validate inbound DID routing before performing the cutover.",
+      "suggested_fix": "Include checks to ensure all paths are correct immediately before executing cutover."
+    },
+    {
+      "id": "crit:1:weak_rollback:execute-cutover",
+      "task_id": "execute-cutover",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback to legacy PBX may not adequately ensure service continuity if testing was insufficient.",
+      "suggested_fix": "Ensure a thorough testing phase is completed prior to cutover and establish additional fallback measures."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

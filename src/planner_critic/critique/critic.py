@@ -79,14 +79,28 @@ _FAMILY_TO_CODE: dict[str, ReasonCode] = {
 }
 
 _SYSTEM_PROMPT = (
-    "/no_think You are an adversarial plan reviewer. Reply with ONLY a JSON "
+    "/no_think You are a plan reviewer. Reply with ONLY a JSON "
     "object (no markdown, no prose, no thinking). Audit the given plan against "
     "six heuristic families: feasibility, risk, missing_steps, "
     "unsafe_sequencing, unverified_dependencies, weak_rollback. For each "
     "problem, return a finding with heuristic_family (one of those six names), "
     "severity (blocker, warning, or info), task_id (the task the problem "
     "affects, or omit for plan-level), message (specific, actionable), and "
-    "suggested_fix (optional). Return JSON with a top-level 'findings' array."
+    "suggested_fix (optional). Return JSON with a top-level 'findings' array.\n\n"
+    "SEVERITY RULES — blocker is reserved ONLY for concrete, plan-local defects "
+    "that make the plan unsafe to execute:\n"
+    "  blocker = unsafe_sequencing (a task ordered before its hard prerequisite), "
+    "weak_rollback (a high-blast-radius step lacks sound rollback), "
+    "unverified_dependencies (a step depends on a fact never established by an "
+    "earlier task), or feasibility (a task is not achievable with the stated "
+    "environment/tools).\n"
+    "  warning = risk (generic risk/blast-radius commentary), missing_steps "
+    "(completeness suggestions, 'could also cover X', edge-case omissions that "
+    "do not make the plan concretely unsafe).\n"
+    "  info = minor observations.\n"
+    "Do NOT escalate completeness or thoroughness concerns to blocker. If the "
+    "plan is structurally sound with correct ordering, verification, and "
+    "rollback, it should produce zero blockers."
 )
 
 
@@ -181,6 +195,15 @@ class LLMCritic:
         return [*findings, *(_to_findings(plan.version, output.findings))]
 
 
+# Families eligible for blocker severity — concrete safety/ordering/rollback/feasibility defects.
+_BLOCKER_ELIGIBLE_FAMILIES: frozenset[str] = frozenset({
+    "unsafe_sequencing",
+    "weak_rollback",
+    "unverified_dependencies",
+    "feasibility",
+})
+
+
 def _to_findings(version: int, items: Sequence[CritiqueItem]) -> list[Finding]:
     """Map structured critique items to typed Findings with reason codes.
 
@@ -190,7 +213,9 @@ def _to_findings(version: int, items: Sequence[CritiqueItem]) -> list[Finding]:
 
     Returns:
         Mapped findings. Unknown heuristic families or severities are skipped
-        rather than trusted.
+        rather than trusted. A severity guardrail downgrades advisory families
+        (risk, missing_steps) from blocker to warning — completeness concerns
+        must not be fatal under strict tolerance.
     """
     result: list[Finding] = []
     for item in items:
@@ -201,6 +226,8 @@ def _to_findings(version: int, items: Sequence[CritiqueItem]) -> list[Finding]:
         severity = _severity_from_name(item.severity)
         if family is None or severity is None:
             continue
+        if severity == Severity.BLOCKER and item.heuristic_family not in _BLOCKER_ELIGIBLE_FAMILIES:
+            severity = Severity.WARNING
         finding_id = f"crit:{version}:{item.heuristic_family}:{item.task_id or 'plan'}"
         result.append(
             Finding(

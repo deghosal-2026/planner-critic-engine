@@ -1,0 +1,505 @@
+{
+  "dimension": "core-api",
+  "goal_id": "flc-01-fleet-config-rollout",
+  "duration_seconds": 101.59,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-flc-01-fleet-config-rollout-r4",
+    "goal_id": "flc-01-fleet-config-rollout",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-flc-01-fleet-config-rollout-r3",
+    "created_at": "2026-08-20T22:50:33.028473Z",
+    "tasks": [
+      {
+        "id": "validate-canary",
+        "description": "Validate configuration in canary hosts (100 hosts)",
+        "action": "validate",
+        "target": "100 hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary hosts are reachable",
+            "fact": "canary_hosts_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "config syntax and health status",
+          "how": "run ansible-playbook --check and monitor health",
+          "expected": "no errors in validation and all services healthy"
+        },
+        "rollback": {
+          "trigger": "validation fails",
+          "action": "revert config",
+          "safety_guard": "ensure config is not applied"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "validate-canary-health",
+        "description": "Ensure health status of canary hosts is validated",
+        "action": "validate",
+        "target": "canary hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary hosts are reachable",
+            "fact": "canary_hosts_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "canary host health status",
+          "how": "check health metrics",
+          "expected": "canary hosts are healthy"
+        },
+        "rollback": {
+          "trigger": "health validation fails",
+          "action": "notify ops",
+          "safety_guard": "escalate issue"
+        },
+        "risk_class": "high",
+        "blast_radius": "low"
+      },
+      {
+        "id": "reconnect-canary",
+        "description": "Re-establish connection with canary hosts if unreachable",
+        "action": "reconnect",
+        "target": "canary hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "validation fails due to unreachable canary hosts",
+            "fact": "canary_hosts_unreachable",
+            "established_by": "validate-canary-health",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "canary hosts connection status",
+          "how": "check connectivity metrics",
+          "expected": "canary hosts are reachable again"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "low"
+      },
+      {
+        "id": "notify-deployment-status-canary",
+        "description": "Notify stakeholders of deployment status after canary deployment",
+        "action": "notify",
+        "target": "stakeholders",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary deployment is complete",
+            "fact": "canary_deployment_success",
+            "established_by": "deploy-canary",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "low"
+      },
+      {
+        "id": "deploy-canary",
+        "description": "Deploy configuration to canary hosts",
+        "action": "deploy",
+        "target": "100 hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary validation is successful",
+            "fact": "canary_validation_success",
+            "established_by": "validate-canary",
+            "probe": null
+          },
+          {
+            "description": "canary health validation is successful",
+            "fact": "canary_health_validation_success",
+            "established_by": "validate-canary-health",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment success and health",
+          "how": "check service status and logs",
+          "expected": "services are running and config is applied"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "revert config and re-apply",
+          "safety_guard": "rollback occurs within 5 minutes"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "validate-ring-1",
+        "description": "Validate configuration in ring 1 hosts (500 hosts)",
+        "action": "validate",
+        "target": "500 hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary deployment is successful",
+            "fact": "canary_deployment_success",
+            "established_by": "deploy-canary",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "config syntax and health status",
+          "how": "run ansible-playbook --check and monitor health",
+          "expected": "no errors in validation and all services healthy"
+        },
+        "rollback": {
+          "trigger": "validation fails",
+          "action": "revert config",
+          "safety_guard": "ensure config is not applied"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "notify-ops-ring-1",
+        "description": "Notify ops if validation fails after deploying ring 1",
+        "action": "notify",
+        "target": "ops team",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "validation fails after ring 1 deployment",
+            "fact": "ring_1_validation_failure",
+            "established_by": "validate-ring-1",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "low"
+      },
+      {
+        "id": "deploy-ring-1",
+        "description": "Deploy configuration to ring 1 hosts",
+        "action": "deploy",
+        "target": "500 hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ring 1 validation is successful",
+            "fact": "ring_1_validation_success",
+            "established_by": "validate-ring-1",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment success and health",
+          "how": "check service status and logs",
+          "expected": "services are running and config is applied"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "revert config and re-apply",
+          "safety_guard": "rollback occurs within 5 minutes"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "validate-ring-2",
+        "description": "Validate configuration in ring 2 hosts (2500 hosts)",
+        "action": "validate",
+        "target": "2500 hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ring 1 deployment is successful",
+            "fact": "ring_1_deployment_success",
+            "established_by": "deploy-ring-1",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "config syntax and health status",
+          "how": "run ansible-playbook --check and monitor health",
+          "expected": "no errors in validation and all services healthy"
+        },
+        "rollback": {
+          "trigger": "validation fails",
+          "action": "revert config",
+          "safety_guard": "ensure config is not applied"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy-ring-2",
+        "description": "Deploy configuration to ring 2 hosts",
+        "action": "deploy",
+        "target": "2500 hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ring 2 validation is successful",
+            "fact": "ring_2_validation_success",
+            "established_by": "validate-ring-2",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment success and health",
+          "how": "check service status and logs",
+          "expected": "services are running and config is applied"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "revert config and re-apply",
+          "safety_guard": "rollback occurs within 5 minutes"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "validate-full-fleet",
+        "description": "Validate configuration in the full fleet (10,000 hosts)",
+        "action": "validate",
+        "target": "10,000 hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ring 2 deployment is successful",
+            "fact": "ring_2_deployment_success",
+            "established_by": "deploy-ring-2",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "config syntax and health status",
+          "how": "run ansible-playbook --check and monitor health",
+          "expected": "no errors in validation and all services healthy"
+        },
+        "rollback": {
+          "trigger": "validation fails",
+          "action": "revert config",
+          "safety_guard": "ensure config is not applied"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "final-health-checks",
+        "description": "Conduct final health checks across all rings before full fleet deployment",
+        "action": "validate",
+        "target": "10,000 hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "all previous deployments are successful",
+            "fact": "all_deployments_success",
+            "established_by": "deploy-full-fleet",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "low"
+      },
+      {
+        "id": "deploy-full-fleet",
+        "description": "Deploy configuration to full fleet",
+        "action": "deploy",
+        "target": "10,000 hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "full fleet validation is successful",
+            "fact": "full_fleet_validation_success",
+            "established_by": "validate-full-fleet",
+            "probe": null
+          },
+          {
+            "description": "final health checks are completed",
+            "fact": "final_health_checks_success",
+            "established_by": "final-health-checks",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment success and health",
+          "how": "check service status and logs",
+          "expected": "services are running and config is applied"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "revert config and re-apply",
+          "safety_guard": "rollback occurs within 5 minutes"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "incident-response-full-fleet",
+        "description": "Handle unexpected issues during full fleet deployment",
+        "action": "document",
+        "target": "deployment team",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "full fleet deployment is starting",
+            "fact": "full_fleet_deployment_initiated",
+            "established_by": "deploy-full-fleet",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "low"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "validate-canary",
+        "to_task": "validate-canary-health",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "validate-canary-health",
+        "to_task": "deploy-canary",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "notify-deployment-status-canary",
+        "to_task": "deploy-canary",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-canary",
+        "to_task": "validate-ring-1",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "validate-ring-1",
+        "to_task": "deploy-ring-1",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "notify-ops-ring-1",
+        "to_task": "validate-ring-1",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-ring-1",
+        "to_task": "validate-ring-2",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "validate-ring-2",
+        "to_task": "deploy-ring-2",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-ring-2",
+        "to_task": "validate-full-fleet",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "validate-full-fleet",
+        "to_task": "deploy-full-fleet",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-full-fleet",
+        "to_task": "incident-response-full-fleet",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "ordering_sane:plan-flc-01-fleet-config-rollout-r4:4:notify-ops-ring-1",
+      "task_id": "validate-ring-1",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "blocker",
+      "reason_code": "unsafe_ordering",
+      "message": "task 'validate-ring-1' is ordered before its hard dependency 'notify-ops-ring-1'",
+      "suggested_fix": "Reorder the plan so task 'validate-ring-1' appears after 'notify-ops-ring-1'"
+    },
+    {
+      "id": "preconditions_referenced:plan-flc-01-fleet-config-rollout-r4:4:notify-deployment-status-canary:canary_deployment_success",
+      "task_id": "notify-deployment-status-canary",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "blocker",
+      "reason_code": "unverified_precondition",
+      "message": "precondition 'canary_deployment_success' on task 'notify-deployment-status-canary' references no established fact from an earlier task",
+      "suggested_fix": "Point the precondition at an earlier task that establishes 'canary_deployment_success'"
+    },
+    {
+      "id": "preconditions_referenced:plan-flc-01-fleet-config-rollout-r4:4:final-health-checks:all_deployments_success",
+      "task_id": "final-health-checks",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "blocker",
+      "reason_code": "unverified_precondition",
+      "message": "precondition 'all_deployments_success' on task 'final-health-checks' references no established fact from an earlier task",
+      "suggested_fix": "Point the precondition at an earlier task that establishes 'all_deployments_success'"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:flc-01-fleet-config-rollout:4:4",
+    "plan_id": "plan-flc-01-fleet-config-rollout-r4",
+    "version": 4,
+    "blocker_finding_id": "ordering_sane:plan-flc-01-fleet-config-rollout-r4:4:notify-ops-ring-1",
+    "question": "Plan for goal 'flc-01-fleet-config-rollout' cannot be approved: blockers remain (unsafe_ordering; unverified_precondition). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=14"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

@@ -1,0 +1,218 @@
+{
+  "dimension": "core-api",
+  "goal_id": "pay-01-processor-switch",
+  "duration_seconds": 22.66,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-pay-01-processor-switch-r2",
+    "goal_id": "pay-01-processor-switch",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "pay-01-processor-switch-v1",
+    "created_at": "2026-08-20T22:55:46.853111Z",
+    "tasks": [
+      {
+        "id": "setup_feature_flag",
+        "description": "Set up feature flag for transaction routing",
+        "action": "configure",
+        "target": "feature-flag",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "feature flag system is operational",
+            "fact": "feature_flag_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "initial_routing",
+        "description": "Route 5% of transactions to Adyen",
+        "action": "route_transactions",
+        "target": "payment_system",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "feature flag operational status",
+          "how": "check feature flag system",
+          "expected": "feature flag operational"
+        },
+        "rollback": {
+          "trigger": "routing error",
+          "action": "route all transactions back to Stripe",
+          "safety_guard": "verify routing functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "incremental_increase",
+        "description": "Gradually increase Adyen transaction percentage to 100%",
+        "action": "update_routing",
+        "target": "payment_system",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "transaction processing logs",
+          "how": "check logs for errors across percentages",
+          "expected": "no errors while ramping up"
+        },
+        "rollback": {
+          "trigger": "error threshold exceeded",
+          "action": "set Adyen routing back to 5%",
+          "safety_guard": "monitor error rates"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "reconciliation_checks",
+        "description": "Check transaction records between Stripe and Adyen",
+        "action": "compare_records",
+        "target": "financial_records",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "reconciliation report",
+          "how": "run reconciliation scripts",
+          "expected": "records match between Stripe and Adyen"
+        },
+        "rollback": {
+          "trigger": "discrepancy found",
+          "action": "revert routing to Stripe",
+          "safety_guard": "ensure all transactions are validated before reverting"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "settlement_cutover",
+        "description": "Switch primary settlement to Adyen",
+        "action": "configure_settlement",
+        "target": "settlement_system",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "daily settlement report",
+          "how": "compare with historical data",
+          "expected": "settlement matches expected timing"
+        },
+        "rollback": {
+          "trigger": "settlement discrepancies",
+          "action": "switch back to Stripe settlement",
+          "safety_guard": "validate settlement reports before cutover"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup_feature_flag",
+        "to_task": "initial_routing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "initial_routing",
+        "to_task": "incremental_increase",
+        "kind": "soft",
+        "reason": ""
+      },
+      {
+        "from_task": "incremental_increase",
+        "to_task": "reconciliation_checks",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "reconciliation_checks",
+        "to_task": "settlement_cutover",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:initial_routing",
+      "task_id": "initial_routing",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The initial_routing task must wait until the setup_feature_flag task is complete to ensure the feature flag system is operational.",
+      "suggested_fix": "Reorder the initial_routing task to be after setup_feature_flag."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:incremental_increase",
+      "task_id": "incremental_increase",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The incremental_increase task does not verify that the initial_routing task has completed successfully before executing.",
+      "suggested_fix": "Add a verification step to ensure that the initial_routing task completed without errors."
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:reconciliation_checks",
+      "task_id": "reconciliation_checks",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The reconciliation_checks task should only start after the incremental_increase task is fully completed to ensure accurate data comparison.",
+      "suggested_fix": "Ensure that reconciliation_checks is sequenced after incremental_increase to guarantee all routing changes are complete."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:settlement_cutover",
+      "task_id": "settlement_cutover",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The settlement_cutover task depends on the successful completion of reconciliation_checks but does not verify this dependency.",
+      "suggested_fix": "Add a verification step for the reconciliation_checks completion before proceeding with the settlement_cutover."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:pay-01-processor-switch:2:2",
+    "plan_id": "plan-pay-01-processor-switch-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:initial_routing",
+    "question": "Plan for goal 'pay-01-processor-switch' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

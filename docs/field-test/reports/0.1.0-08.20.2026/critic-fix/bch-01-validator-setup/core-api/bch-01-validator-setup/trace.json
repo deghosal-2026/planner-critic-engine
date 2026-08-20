@@ -1,0 +1,265 @@
+{
+  "dimension": "core-api",
+  "goal_id": "bch-01-validator-setup",
+  "duration_seconds": 27.0,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-bch-01-validator-setup-r2",
+    "goal_id": "bch-01-validator-setup",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "bch-01-validator-setup-v1",
+    "created_at": "2026-08-20T22:53:41.343308Z",
+    "tasks": [
+      {
+        "id": "generate_keys",
+        "description": "Generate validator signing keys using EIP-2333",
+        "action": "generate",
+        "target": "signing_keys",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "HSM is fully operational",
+            "fact": "hsm_health",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "validator signing keys existence",
+          "how": "check file system for key files",
+          "expected": "keys present"
+        },
+        "rollback": {
+          "trigger": "key generation fails",
+          "action": "re-attempt key generation",
+          "safety_guard": "check HSM health status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "store_keys",
+        "description": "Store signing keys in a hardware security module",
+        "action": "store",
+        "target": "hsm",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "signing keys are generated",
+            "fact": "keys_generated",
+            "established_by": "generate_keys",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "key storage confirmation",
+          "how": "retrieve keys from HSM",
+          "expected": "keys retrievable"
+        },
+        "rollback": {
+          "trigger": "key storage fails",
+          "action": "securely delete keys from HSM",
+          "safety_guard": "verify that no keys are left in HSM"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_client",
+        "description": "Configure the signing client (Prysm/Lighthouse/TEKU) and connect to beacon node",
+        "action": "configure",
+        "target": "signing_client",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "HSM successfully stores keys",
+            "fact": "keys_stored",
+            "established_by": "store_keys",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "register_validator",
+        "description": "Submit deposit transaction of 32 ETH to deposit contract",
+        "action": "submit",
+        "target": "deposit_contract",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "signing client is configured",
+            "fact": "client_configured",
+            "established_by": "configure_client",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "validator registration status",
+          "how": "query blockchain for validator status",
+          "expected": "validator registered"
+        },
+        "rollback": {
+          "trigger": "deposit submission fails",
+          "action": "re-submit deposit transaction",
+          "safety_guard": "confirm transaction status and verify funds recovery"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_monitoring",
+        "description": "Set up monitoring for validator node",
+        "action": "configure",
+        "target": "monitoring_system",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "validator is registered",
+            "fact": "validator_registered",
+            "established_by": "register_validator",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "validator registration status",
+          "how": "query blockchain for validator status",
+          "expected": "validator registered"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "establish_exit_plan",
+        "description": "Establish a voluntary exit plan via beacon chain exit message",
+        "action": "plan",
+        "target": "exit_procedure",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "monitoring system operational",
+            "fact": "monitoring_set_up",
+            "established_by": "setup_monitoring",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "exit plan readiness",
+          "how": "review exit procedures",
+          "expected": "exit procedure valid"
+        },
+        "rollback": {
+          "trigger": "exit plan fails",
+          "action": "initiate re-exit plan",
+          "safety_guard": "confirm exit procedure setup and revert changes"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "generate_keys",
+        "to_task": "store_keys",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "store_keys",
+        "to_task": "configure_client",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_client",
+        "to_task": "register_validator",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "register_validator",
+        "to_task": "setup_monitoring",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_monitoring",
+        "to_task": "establish_exit_plan",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:register_validator",
+      "task_id": "register_validator",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The submission of the deposit transaction depends on the signing client being configured, which is not verified in this task before execution.",
+      "suggested_fix": "Ensure that the configuration of the signing client is verified before allowing the deposit submission."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:setup_monitoring",
+      "task_id": "setup_monitoring",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Setting up monitoring for the validator node depends on the registration of the validator, which is not verified in this task before execution.",
+      "suggested_fix": "Verify that the validator is successfully registered before proceeding with monitoring setup."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:establish_exit_plan",
+      "task_id": "establish_exit_plan",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Establishing a voluntary exit plan depends on the monitoring system being operational, which is not verified in this task before execution.",
+      "suggested_fix": "Verify that the monitoring system is operational before initiating the establishment of the exit plan."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:bch-01-validator-setup:2:2",
+    "plan_id": "plan-bch-01-validator-setup-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unverified_dependencies:register_validator",
+    "question": "Plan for goal 'bch-01-validator-setup' cannot be approved: blockers remain (llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}
