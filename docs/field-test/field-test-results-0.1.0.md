@@ -26,16 +26,17 @@
 
 ## Coverage Status
 
-The field test plan (§3) specifies 156 goals across 35 domains (148 normal + 8 adversarial). This report covers **95 goals across 23 domains** — 61 goals remain pending.
+The field test plan (§3) specifies 156 goals across 35 domains (148 normal + 8 adversarial). This report covers **95 goals across 23 domains** that have been run. The remaining **61 goals across 12 new domains + expanded existing domains** have fixture files created but not yet run.
 
 | Coverage | Goals | Domains |
 |----------|-------|---------|
 | Initial run (2026-08-19) | 65 | 10 (database, kubernetes, cicd, incident-response, infrastructure, observability, architecture, data, platform, adversarial) |
 | Expansion run (2026-08-20) | 30 | 13 (windows, multi-cloud, database-migration, search, job-scheduling, fleet-config, mobile, accessibility, i18n, blockchain, telecom, payment, erp) |
 | **Total completed** | **95** | **23** |
-| Pending (not yet created) | 61 | 12 (greenfield, decommission, DR drills, compliance, identity, serverless, adversarial-policy, networking, finops, AI/GenAI, messaging, mechanism-targeted) + expanded goals in existing domains |
+| Fixtures created, not yet run | 61 | 12 new domains + expanded goals in 9 existing domains (greenfield, decommissioning, disaster-recovery, compliance, identity-access, serverless, adversarial-policy, networking, finops, ai-genai, messaging, mechanism-targeted) |
+| **Total corpus** | **156** | **35** |
 
-The release gate (§7.3) is adjudicated on the 95 goals completed. The 61 pending goals do not block the v0.1.0 release gate but should be completed before v0.2.0.
+The release gate (§7.3) is adjudicated on the 95 goals completed. The 61 pending goals will be run into `docs/field-test/reports/0.1.0-08.20.2026/remain-scenario/`.
 
 ---
 
