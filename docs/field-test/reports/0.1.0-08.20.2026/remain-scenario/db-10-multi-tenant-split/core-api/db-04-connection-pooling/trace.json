@@ -1,0 +1,143 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-04-connection-pooling",
+  "duration_seconds": 7.47,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "db-04-connection-pooling-plan",
+    "goal_id": "db-04-connection-pooling",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T23:46:12.428748Z",
+    "tasks": [
+      {
+        "id": "deploy-pgbouncer",
+        "description": "Deploy PgBouncer in transaction-pooling mode",
+        "action": "deploy",
+        "target": "PgBouncer",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "PgBouncer deployment status",
+          "how": "check deployment logs",
+          "expected": "successful deployment"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to previous state",
+          "safety_guard": "verify existing PgBouncer instance integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-dns",
+        "description": "Configure DNS for cutover to PgBouncer",
+        "action": "configure",
+        "target": "DNS",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "DNS resolution for PgBouncer",
+          "how": "ping test",
+          "expected": "correct PgBouncer IP"
+        },
+        "rollback": {
+          "trigger": "DNS configuration fails",
+          "action": "revert DNS settings",
+          "safety_guard": "ensure original connections are intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor-connection-counts",
+        "description": "Monitor connection counts and query latency",
+        "action": "monitor",
+        "target": "connections and latency",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PgBouncer is deployed",
+            "fact": "deployment_status",
+            "established_by": "deploy-pgbouncer",
+            "probe": null
+          },
+          {
+            "description": "DNS is configured",
+            "fact": "dns_configured",
+            "established_by": "configure-dns",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy-pgbouncer",
+        "to_task": "configure-dns",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-dns",
+        "to_task": "monitor-connection-counts",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:configure-dns",
+      "task_id": "configure-dns",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The DNS cutover (configure-dns) should not occur before PgBouncer is successfully deployed (deploy-pgbouncer).",
+      "suggested_fix": "Ensure configure-dns is dependent on the successful deployment of deploy-pgbouncer."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:monitor-connection-counts",
+      "task_id": "monitor-connection-counts",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The monitoring of connection counts and query latency (monitor-connection-counts) depends on the completion of both deploy-pgbouncer and configure-dns, but it does not explicitly verify these tasks before execution.",
+      "suggested_fix": "Add verification checks for deployment status and DNS configuration in the preconditions of monitor-connection-counts."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

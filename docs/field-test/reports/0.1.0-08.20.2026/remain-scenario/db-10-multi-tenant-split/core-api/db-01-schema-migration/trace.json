@@ -1,0 +1,254 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-01-schema-migration",
+  "duration_seconds": 23.45,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-db-01-schema-migration-r2",
+    "goal_id": "db-01-schema-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "db-01-schema-migration-plan",
+    "created_at": "2026-08-20T23:45:26.658004Z",
+    "tasks": [
+      {
+        "id": "backup",
+        "description": "Back up the database",
+        "action": "backup",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "db is reachable",
+            "fact": "db_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "backup success",
+          "how": "check backup logs",
+          "expected": "backup completed without errors"
+        },
+        "rollback": {
+          "trigger": "backup fails",
+          "action": "restore previous state",
+          "safety_guard": "verify backup integrity"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "check_disk_space",
+        "description": "Check available disk space for WAL during backfill",
+        "action": "check_space",
+        "target": "disk",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Database is backed up",
+            "fact": "backup_completed",
+            "established_by": "backup",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "available disk space",
+          "how": "run df command",
+          "expected": "at least 20GB free"
+        },
+        "rollback": {
+          "trigger": "insufficient disk space",
+          "action": "notify and halt operations",
+          "safety_guard": "ensure no ongoing writes"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "backfill",
+        "description": "Backfill existing NULLs for last_login_ip column in chunks",
+        "action": "backfill",
+        "target": "users",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Disk space check is sufficient",
+            "fact": "disk_space_ok",
+            "established_by": "check_disk_space",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "check backfill completion",
+          "how": "run count query",
+          "expected": "0 NULLs in last_login_ip"
+        },
+        "rollback": {
+          "trigger": "backfill fails",
+          "action": "restore from backup",
+          "safety_guard": "verify backup integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "alter_table",
+        "description": "Alter table to add NOT NULL constraint to last_login_ip",
+        "action": "alter",
+        "target": "users",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Backfill is complete",
+            "fact": "backfill_completed",
+            "established_by": "backfill",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "table migration status",
+          "how": "run migration checks",
+          "expected": "constraint applied successfully"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore previous schema",
+          "safety_guard": "ensure data integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_code",
+        "description": "Deploy application code that references users table",
+        "action": "deploy",
+        "target": "app",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Alter table and backfill are completed",
+            "fact": "migration_verified",
+            "established_by": "alter_table",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "verify application functionality with new schema",
+          "how": "run integration tests",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to previous release",
+          "safety_guard": "verify application stability"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "backup",
+        "to_task": "check_disk_space",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check_disk_space",
+        "to_task": "backfill",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "backfill",
+        "to_task": "alter_table",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "alter_table",
+        "to_task": "deploy_code",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:deploy_code",
+      "task_id": "deploy_code",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Deployment of application code is attempted before the ALTER TABLE step is verified.",
+      "suggested_fix": "Ensure deploy_code task waits for migration_verified status from the alter_table task."
+    },
+    {
+      "id": "crit:2:weak_rollback:alter_table",
+      "task_id": "alter_table",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rolling back the ALTER TABLE action lacks a solid strategy for ensuring data integrity after the migration fails.",
+      "suggested_fix": "Improve rollback strategy to ensure all active transactions are committed or rolled back correctly."
+    },
+    {
+      "id": "crit:2:risk:check_disk_space",
+      "task_id": "check_disk_space",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Risk of running out of disk space during backfill is high due to the size of the database and ongoing write operations.",
+      "suggested_fix": "Consider implementing a more robust disk space monitoring and alerting process ahead of backfill."
+    },
+    {
+      "id": "crit:2:missing_steps:backfill",
+      "task_id": "backfill",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Backfill process should include user notification or logging for transparency and tracking.",
+      "suggested_fix": "Add a logging mechanism to track backfill progress and notify stakeholders."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-01-schema-migration:2:2",
+    "plan_id": "plan-db-01-schema-migration-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:deploy_code",
+    "question": "Plan for goal 'db-01-schema-migration' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

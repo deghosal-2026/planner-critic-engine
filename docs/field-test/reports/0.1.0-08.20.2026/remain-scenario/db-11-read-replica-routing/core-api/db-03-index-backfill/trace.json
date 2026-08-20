@@ -1,0 +1,170 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-03-index-backfill",
+  "duration_seconds": 26.51,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-db-03-index-backfill-r2",
+    "goal_id": "db-03-index-backfill",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "db-03-index-backfill-plan",
+    "created_at": "2026-08-20T23:52:26.690436Z",
+    "tasks": [
+      {
+        "id": "check_autovacuum",
+        "description": "Check if autovacuum is running on the orders table and verify autovacuum settings",
+        "action": "query",
+        "target": "pg_stat_activity",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "pg_stat_activity is reachable",
+            "fact": "pg_stat_activity_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "autovacuum settings",
+          "how": "query pg_settings",
+          "expected": "appropriate settings for large table"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create_index",
+        "description": "Create a B-tree index on orders(customer_id, created_at) concurrently",
+        "action": "create_index",
+        "target": "orders",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "no active blocking transactions",
+            "fact": "no_blocking_tx",
+            "established_by": "check_autovacuum",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "index existence",
+          "how": "query pg_stat_user_indexes",
+          "expected": "orders_customer_created_index"
+        },
+        "rollback": {
+          "trigger": "index creation fails",
+          "action": "DROP INDEX CONCURRENTLY orders_customer_created_index",
+          "safety_guard": "verify index does not exist and confirm with index_exists"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "check_index_usage",
+        "description": "Verify index usage before and after creation and check performance impact",
+        "action": "query",
+        "target": "pg_stat_user_indexes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "orders_customer_created_index index created",
+            "fact": "index_created",
+            "established_by": "create_index",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "performance impact",
+          "how": "run EXPLAIN on key queries",
+          "expected": "improved query performance"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_autovacuum",
+        "to_task": "create_index",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_index",
+        "to_task": "check_index_usage",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:create_index",
+      "task_id": "create_index",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'create_index' depends on 'no_blocking_tx' without verifying if it is established prior to execution.",
+      "suggested_fix": "Add verification for 'no_blocking_tx' before proceeding to 'create_index'."
+    },
+    {
+      "id": "crit:2:weak_rollback:create_index",
+      "task_id": "create_index",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for 'create_index' lacks a check to ensure that the index is completely removed after the drop attempt.",
+      "suggested_fix": "Include a verification step to confirm that 'orders_customer_created_index' no longer exists after the rollback."
+    },
+    {
+      "id": "crit:2:missing_steps:check_index_usage",
+      "task_id": "check_index_usage",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The task 'check_index_usage' should also assess the performance impact based on key queries after index creation, not just before.",
+      "suggested_fix": "Ensure the task checks and compares performance metrics before and after the index creation."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-03-index-backfill:2:2",
+    "plan_id": "plan-db-03-index-backfill-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unverified_dependencies:create_index",
+    "question": "Plan for goal 'db-03-index-backfill' cannot be approved: blockers remain (llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

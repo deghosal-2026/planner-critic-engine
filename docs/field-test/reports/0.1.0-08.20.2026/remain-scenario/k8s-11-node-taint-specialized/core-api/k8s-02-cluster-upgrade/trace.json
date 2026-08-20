@@ -1,0 +1,343 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-02-cluster-upgrade",
+  "duration_seconds": 61.97,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-k8s-02-cluster-upgrade-r2",
+    "goal_id": "k8s-02-cluster-upgrade",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "k8s-02-cluster-upgrade-v1",
+    "created_at": "2026-08-20T23:50:15.942020Z",
+    "tasks": [
+      {
+        "id": "backup-etcd",
+        "description": "Take an etcd snapshot backup",
+        "action": "backup",
+        "target": "etcd",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "etcd is reachable",
+            "fact": "etcd_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "etcd backup exists",
+          "how": "verify snapshot file",
+          "expected": "snapshot is valid"
+        },
+        "rollback": {
+          "trigger": "backup fails",
+          "action": "abort upgrade",
+          "safety_guard": "check previous backup integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cordon-nodes",
+        "description": "Cordon worker nodes one at a time",
+        "action": "cordon",
+        "target": "worker-nodes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "control plane is healthy",
+            "fact": "control_plane_healthy",
+            "established_by": "backup-etcd",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "control plane is healthy",
+          "how": "check control plane health",
+          "expected": "control plane is healthy"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "drain-node",
+        "description": "Drain a worker node",
+        "action": "drain",
+        "target": "worker-node-1",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "node is cordoned",
+            "fact": "node_cordoned_worker-node-1",
+            "established_by": "cordon-nodes",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "node is drained",
+          "how": "check node status",
+          "expected": "node is drained successfully"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "upgrade-control-plane",
+        "description": "Upgrade control plane components via kubeadm",
+        "action": "upgrade",
+        "target": "control_plane",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "all control plane components are healthy",
+            "fact": "control_plane_healthy",
+            "established_by": "drain-node",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "control plane components version",
+          "how": "check versions with kubeadm",
+          "expected": "v1.28"
+        },
+        "rollback": {
+          "trigger": "upgrade fails",
+          "action": "restore previous version",
+          "safety_guard": "ensure previous version is available"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "upgrade-kubelet",
+        "description": "Upgrade kubelet on the drained worker node",
+        "action": "upgrade",
+        "target": "kubelet",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "previous upgrade successful",
+            "fact": "control_plane_upgrade_successful",
+            "established_by": "upgrade-control-plane",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "kubelet version",
+          "how": "check kubelet version",
+          "expected": "v1.28"
+        },
+        "rollback": {
+          "trigger": "kubelet upgrade fails",
+          "action": "restore kubelet from backup",
+          "safety_guard": "verify kubelet is functional"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "upgrade-kube-proxy",
+        "description": "Upgrade kube-proxy on the drained worker node",
+        "action": "upgrade",
+        "target": "kube-proxy",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "kubelet upgrade successful",
+            "fact": "kubelet_upgrade_successful",
+            "established_by": "upgrade-kubelet",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": {
+          "trigger": "upgrade fails",
+          "action": "restore kube-proxy from backup",
+          "safety_guard": "verify kube-proxy is functional"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "unblock-node",
+        "description": "Uncordon the worker node",
+        "action": "uncordon",
+        "target": "worker-node-1",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "kube-proxy upgrade successful",
+            "fact": "kube_proxy_upgrade_successful",
+            "established_by": "upgrade-kube-proxy",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-workloads",
+        "description": "Verify all workloads are healthy and nodes are ready",
+        "action": "verify",
+        "target": "workloads",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "worker node is uncordoned",
+            "fact": "worker_node_ready",
+            "established_by": "unblock-node",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "workload health and node status",
+          "how": "check node status and workload health",
+          "expected": "all nodes Ready and workloads healthy"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "restore workloads to previous state",
+          "safety_guard": "ensure all workloads can be restored"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "backup-etcd",
+        "to_task": "cordon-nodes",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cordon-nodes",
+        "to_task": "drain-node",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "drain-node",
+        "to_task": "upgrade-control-plane",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "upgrade-control-plane",
+        "to_task": "upgrade-kubelet",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "upgrade-kubelet",
+        "to_task": "upgrade-kube-proxy",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "upgrade-kube-proxy",
+        "to_task": "unblock-node",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "unblock-node",
+        "to_task": "verify-workloads",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:cordon-nodes",
+      "task_id": "cordon-nodes",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Cordon nodes task is dependent on the health of the control plane which is verified through backup-etcd, but no backup of etcd was verified before executing this task. This creates a sequencing issue.",
+      "suggested_fix": "Ensure that the etcd backup is taken and verified before executing the cordon-nodes task."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:upgrade-control-plane",
+      "task_id": "upgrade-control-plane",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The upgrade-control-plane task relies on an established fact 'control_plane_healthy' which is dependent on the previous step 'drain-node', but there is no verification step ensuring the control plane is healthy after draining a node before proceeding to this upgrade.",
+      "suggested_fix": "Implement a verification step to check the control plane health after draining a node before proceeding to the upgrade-control-plane task."
+    },
+    {
+      "id": "crit:2:weak_rollback:upgrade-control-plane",
+      "task_id": "upgrade-control-plane",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback mechanism for upgrade-control-plane only ensures the previous version is available, without validating the rollback action itself which may lead to issues if the rollback fails silently.",
+      "suggested_fix": "Add a verification step to ensure the rollback to the previous version is successful before proceeding with any subsequent tasks."
+    },
+    {
+      "id": "crit:2:missing_steps:upgrade-kubelet",
+      "task_id": "upgrade-kubelet",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The kubelet upgrade process could benefit from additional verification steps to ensure that no workloads are affected during the kubelet upgrade, especially since it is critical for node operation.",
+      "suggested_fix": "Include workload verification during kubelet upgrade to ensure workloads remain unaffected."
+    },
+    {
+      "id": "crit:2:missing_steps:verify-workloads",
+      "task_id": "verify-workloads",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "While verifying workloads the plan should also cover edge cases where specific workloads may not be healthy due to dependencies on other components being upgraded such as add-ons and services.",
+      "suggested_fix": "Expand the verification step to include checks for known critical add-ons and their state post-upgrade."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-02-cluster-upgrade:2:2",
+    "plan_id": "plan-k8s-02-cluster-upgrade-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:cordon-nodes",
+    "question": "Plan for goal 'k8s-02-cluster-upgrade' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

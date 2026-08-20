@@ -1,0 +1,264 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-02-streaming-replication",
+  "duration_seconds": 13.56,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "db-02-streaming-replication-plan",
+    "goal_id": "db-02-streaming-replication",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T23:40:31.130361Z",
+    "tasks": [
+      {
+        "id": "provision_primary",
+        "description": "Provision the primary PostgreSQL instance",
+        "action": "provision",
+        "target": "primary-db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "The environment is ready for provisioning",
+            "fact": "env_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "provision_standby",
+        "description": "Provision the standby PostgreSQL instance in a separate availability zone",
+        "action": "provision",
+        "target": "standby-db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Primary instance must be successfully provisioned",
+            "fact": "primary_provisioned",
+            "established_by": "provision_primary",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "standby instance status",
+          "how": "run checks",
+          "expected": "operational"
+        },
+        "rollback": {
+          "trigger": "provisioning fails",
+          "action": "destroy standby instance",
+          "safety_guard": "verify no data loss"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_replication_slots",
+        "description": "Configure replication slots management to prevent WAL accumulation",
+        "action": "configure",
+        "target": "replication-slots",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Both primary and standby instances must be provisioned",
+            "fact": "instances_provisioned",
+            "established_by": "provision_standby",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "install_patroni",
+        "description": "Install and configure Patroni for automated failover",
+        "action": "install",
+        "target": "patroni",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Primary and standby must exist",
+            "fact": "db_instances_exist",
+            "established_by": "configure_replication_slots",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Patroni status",
+          "how": "run Patroni checks",
+          "expected": "healthy"
+        },
+        "rollback": {
+          "trigger": "Patroni setup fails",
+          "action": "uninstall Patroni",
+          "safety_guard": "restore original settings"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_failover",
+        "description": "Configure automated failover detection and promotion",
+        "action": "configure",
+        "target": "failover",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Patroni must be installed and configured",
+            "fact": "patroni_installed",
+            "established_by": "install_patroni",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "failover functionality",
+          "how": "simulate failover test",
+          "expected": "successful failover"
+        },
+        "rollback": {
+          "trigger": "failover configuration fails",
+          "action": "revert failover settings",
+          "safety_guard": "validate configurations"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_replication_lag",
+        "description": "Verify replication lag stays under 100ms at P99",
+        "action": "monitor",
+        "target": "replication_lag",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Failover configuration must be complete",
+            "fact": "failover_configured",
+            "established_by": "configure_failover",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "provision_primary",
+        "to_task": "provision_standby",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provision_standby",
+        "to_task": "configure_replication_slots",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_replication_slots",
+        "to_task": "install_patroni",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "install_patroni",
+        "to_task": "configure_failover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_failover",
+        "to_task": "monitor_replication_lag",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:provision_standby",
+      "task_id": "provision_standby",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Provision standby instance is sequenced before the primary is verified as operational, breaking the prerequisite flow.",
+      "suggested_fix": "Ensure 'provision_standby' only executes after 'provision_primary' has been successfully verified."
+    },
+    {
+      "id": "crit:1:missing_steps:configure_replication_slots",
+      "task_id": "configure_replication_slots",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Replication slots configuration lacks verification and rollback steps.",
+      "suggested_fix": "Add verification to ensure replication slots are properly set up and include a rollback action."
+    },
+    {
+      "id": "crit:1:missing_steps:install_patroni",
+      "task_id": "install_patroni",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Patroni installation should include verification of prerequisite services before installation.",
+      "suggested_fix": "Implement a check to verify that the necessary PostgreSQL services are operational prior to 'install_patroni'."
+    },
+    {
+      "id": "crit:1:missing_steps:configure_failover",
+      "task_id": "configure_failover",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Automated failover configuration lacks comprehensive rollback measures in case of failure.",
+      "suggested_fix": "Enhance rollback to include validation of successful reverts to ensure system integrity."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:monitor_replication_lag",
+      "task_id": "monitor_replication_lag",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Monitoring replication lag depends on failover being configured but there is no prior verification ensuring its success.",
+      "suggested_fix": "Add a verification step to ensure 'configure_failover' was successful before proceeding to 'monitor_replication_lag'."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

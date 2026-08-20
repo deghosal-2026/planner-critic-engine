@@ -1,0 +1,209 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-05-tls-encryption",
+  "duration_seconds": 19.57,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-db-05-tls-encryption-r2",
+    "goal_id": "db-05-tls-encryption",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "db-05-tls-encryption-plan",
+    "created_at": "2026-08-20T23:46:30.248077Z",
+    "tasks": [
+      {
+        "id": "backup-certificates",
+        "description": "Back up existing database certificates",
+        "action": "backup",
+        "target": "certificates",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "certificates are retrievable",
+            "fact": "certificates_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "backup success",
+          "how": "check backup location for certificates",
+          "expected": "certificates exist in backup location"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update-microservice-1",
+        "description": "Update Microservice 1 with new TLS configuration",
+        "action": "update",
+        "target": "microservice-1",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "backup of certificates is completed",
+            "fact": "backup_completed",
+            "established_by": "backup-certificates",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service connection status",
+          "how": "check logs",
+          "expected": "connected with TLS"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "revert to old configuration",
+          "safety_guard": "verify service is reachable"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update-microservice-2",
+        "description": "Update Microservice 2 with new TLS configuration",
+        "action": "update",
+        "target": "microservice-2",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "backup of certificates is completed",
+            "fact": "backup_completed",
+            "established_by": "backup-certificates",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service connection status",
+          "how": "check logs",
+          "expected": "connected with TLS"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "revert to old configuration",
+          "safety_guard": "verify service is reachable"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor-connections",
+        "description": "Monitor TLS connections for failures",
+        "action": "monitor",
+        "target": "pg_stat_ssl",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "previous updates completed without errors",
+            "fact": "updates_successful",
+            "established_by": "update-microservice-2",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "backup-certificates",
+        "to_task": "update-microservice-1",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "backup-certificates",
+        "to_task": "update-microservice-2",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-microservice-2",
+        "to_task": "monitor-connections",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:missing_steps:backup-certificates",
+      "task_id": "backup-certificates",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding a verification step to ensure certificates are retrievable before attempting backup.",
+      "suggested_fix": "Include a pre-check to verify the existence and accessibility of certificates."
+    },
+    {
+      "id": "crit:2:missing_steps:update-microservice-1",
+      "task_id": "update-microservice-1",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Could include additional verification for SSL certificate configuration post-update to ensure mutual TLS is properly set.",
+      "suggested_fix": "Add a step to verify that the new TLS configuration is enforcing mutual certificate validation."
+    },
+    {
+      "id": "crit:2:missing_steps:update-microservice-2",
+      "task_id": "update-microservice-2",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Could include additional verification for SSL certificate configuration post-update to ensure mutual TLS is properly set.",
+      "suggested_fix": "Add a step to verify that the new TLS configuration is enforcing mutual certificate validation."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:monitor-connections",
+      "task_id": "monitor-connections",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The fact 'updates_successful' used as a precondition may not be guaranteed after multiple updates, risking monitoring without valid TLS service status.",
+      "suggested_fix": "Implement a more robust check to ensure at least one successful connection is established before monitoring."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-05-tls-encryption:2:2",
+    "plan_id": "plan-db-05-tls-encryption-r2",
+    "version": 2,
+    "blocker_finding_id": null,
+    "question": "Plan for goal 'db-05-tls-encryption' did not converge (converged_stalled). Decide next step.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

@@ -1,0 +1,219 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-10-csi-storageclass-migration",
+  "duration_seconds": 27.34,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-k8s-10-csi-storageclass-migration-r2",
+    "goal_id": "k8s-10-csi-storageclass-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "k8s-10-csi-storageclass-migration",
+    "created_at": "2026-08-20T23:48:12.003991Z",
+    "tasks": [
+      {
+        "id": "install-driver",
+        "description": "Install EBS CSI driver via Helm",
+        "action": "install",
+        "target": "ebs-csi-driver",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "driver installation status",
+          "how": "check Helm release",
+          "expected": "installed"
+        },
+        "rollback": {
+          "trigger": "installation fails",
+          "action": "uninstall ebs-csi-driver",
+          "safety_guard": "backup current configuration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create-storageclass",
+        "description": "Create new StorageClass pointing to the new driver",
+        "action": "create",
+        "target": "storageclass",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EBS CSI driver is installed",
+            "fact": "driver_installed",
+            "established_by": "install-driver",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "StorageClass creation status",
+          "how": "check StorageClass via kubectl",
+          "expected": "StorageClass created"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "migrate-volumes",
+        "description": "Migrate existing PVs by creating new volumes from snapshots",
+        "action": "migrate",
+        "target": "pvs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "volume migration status",
+          "how": "check volume status on EKS",
+          "expected": "migrated"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore from backup snapshots",
+          "safety_guard": "confirm snapshot integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update-pvcs",
+        "description": "Update PVCs to reference new StorageClass",
+        "action": "update",
+        "target": "pvcs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "PVC status",
+          "how": "check PVC state via kubectl",
+          "expected": "updated to new StorageClass"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "revert PVCs to old StorageClass",
+          "safety_guard": "check current application state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "decommission-old-driver",
+        "description": "Decommission the old in-tree EBS driver",
+        "action": "decommission",
+        "target": "old-driver",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "All PVCs migrated",
+            "fact": "pvcs_migrated",
+            "established_by": "update-pvcs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "old driver decommissioning status",
+          "how": "check if old driver is inactive",
+          "expected": "old driver decommissioned"
+        },
+        "rollback": {
+          "trigger": "decommissioning fails",
+          "action": "reinstall old in-tree driver",
+          "safety_guard": "check current application state"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "install-driver",
+        "to_task": "create-storageclass",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create-storageclass",
+        "to_task": "migrate-volumes",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate-volumes",
+        "to_task": "update-pvcs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-pvcs",
+        "to_task": "decommission-old-driver",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:create-storageclass",
+      "task_id": "create-storageclass",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'create-storageclass' depends on the fact 'driver_installed', but this fact is not verified before its execution.",
+      "suggested_fix": "Ensure that 'driver_installed' is established correctly from the 'install-driver' task before proceeding."
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:update-pvcs",
+      "task_id": "update-pvcs",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'update-pvcs' is sequenced before confirming the successful completion of 'migrate-volumes', which is a hard dependency.",
+      "suggested_fix": "Reorder the tasks to ensure 'migrate-volumes' completes successfully before 'update-pvcs' is executed."
+    },
+    {
+      "id": "crit:2:weak_rollback:decommission-old-driver",
+      "task_id": "decommission-old-driver",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'decommission-old-driver' involves reinstalling the old driver, which may not revert the system to a fully functional state in all scenarios.",
+      "suggested_fix": "Consider adding steps to ensure a complete and reliable rollback process that guarantees system integrity."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-10-csi-storageclass-migration:2:2",
+    "plan_id": "plan-k8s-10-csi-storageclass-migration-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unverified_dependencies:create-storageclass",
+    "question": "Plan for goal 'k8s-10-csi-storageclass-migration' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}
