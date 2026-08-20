@@ -1,0 +1,217 @@
+{
+  "dimension": "core-api",
+  "goal_id": "src-02-ilm-lifecycle",
+  "duration_seconds": 11.57,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "src-02-ilm-lifecycle-plan",
+    "goal_id": "src-02-ilm-lifecycle",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T22:29:58.782586Z",
+    "tasks": [
+      {
+        "id": "define-ilm-policy",
+        "description": "Define Index Lifecycle Management (ILM) policy",
+        "action": "create_policy",
+        "target": "ilm_policy",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "OpenSearch cluster is operational",
+            "fact": "cluster_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "policy exists",
+          "how": "check ILM policies",
+          "expected": "policy is listed"
+        },
+        "rollback": {
+          "trigger": "policy definition fails",
+          "action": "remove policy",
+          "safety_guard": "verify no indices are associated"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-node-attributes",
+        "description": "Configure node attribute-based tier allocation",
+        "action": "configure_allocation",
+        "target": "node_attributes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ILM policy is defined",
+            "fact": "ilm_policy_defined",
+            "established_by": "define-ilm-policy",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "node attributes",
+          "how": "check node settings",
+          "expected": "nodes are assigned correct tiers"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "reset node configuration",
+          "safety_guard": "ensure nodes are in correct roles"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "set-up-index-rollover",
+        "description": "Set up index rollover settings",
+        "action": "set_rollover",
+        "target": "index_settings",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Node attributes are configured",
+            "fact": "node_allocation_configured",
+            "established_by": "configure-node-attributes",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "rollover configuration",
+          "how": "retrieve index settings",
+          "expected": "max_size and max_age are set correctly"
+        },
+        "rollback": {
+          "trigger": "rollover setup fails",
+          "action": "remove rollover settings",
+          "safety_guard": "verify indexes are not affected"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "re-point-aliases",
+        "description": "Re-point aliases to new managed indices",
+        "action": "update_aliases",
+        "target": "index_aliases",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Index rollover settings are applied",
+            "fact": "index_rollover_set",
+            "established_by": "set-up-index-rollover",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "aliases point to correct indices",
+          "how": "check alias configuration",
+          "expected": "aliases are updated"
+        },
+        "rollback": {
+          "trigger": "alias update fails",
+          "action": "restore old aliases",
+          "safety_guard": "verify old indices exist"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-ilm-policy-active",
+        "description": "Verify the ILM policy is active",
+        "action": "check_policy_status",
+        "target": "ilm_policy",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Aliases are updated",
+            "fact": "aliases_re_pointed",
+            "established_by": "re-point-aliases",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define-ilm-policy",
+        "to_task": "configure-node-attributes",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-node-attributes",
+        "to_task": "set-up-index-rollover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set-up-index-rollover",
+        "to_task": "re-point-aliases",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "re-point-aliases",
+        "to_task": "verify-ilm-policy-active",
+        "kind": "soft",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:configure-node-attributes",
+      "task_id": "configure-node-attributes",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'configure-node-attributes' is ordered before its prerequisite 'define-ilm-policy' is completed successfully.",
+      "suggested_fix": "Ensure 'configure-node-attributes' only proceeds after 'define-ilm-policy' has successfully completed."
+    },
+    {
+      "id": "crit:1:weak_rollback:re-point-aliases",
+      "task_id": "re-point-aliases",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 're-point-aliases' lacks a robust rollback plan; failure to update aliases could leave the system in an inconsistent state.",
+      "suggested_fix": "Introduce a rollback mechanism that fully restores the previous alias configuration and includes verification to ensure old aliases exist."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

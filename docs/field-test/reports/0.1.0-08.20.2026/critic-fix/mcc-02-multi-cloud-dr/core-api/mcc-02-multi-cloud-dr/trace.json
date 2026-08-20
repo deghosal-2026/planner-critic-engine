@@ -1,0 +1,190 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mcc-02-multi-cloud-dr",
+  "duration_seconds": 22.48,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-mcc-02-multi-cloud-dr-r2",
+    "goal_id": "mcc-02-multi-cloud-dr",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "mcc-02-multi-cloud-dr",
+    "created_at": "2026-08-20T22:47:21.287941Z",
+    "tasks": [
+      {
+        "id": "establish-replication",
+        "description": "Establish cross-cloud replication for databases and object storage",
+        "action": "configure replication",
+        "target": "AWS to GCP/Azure",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replication status",
+          "how": "check replication logs",
+          "expected": "no errors encountered"
+        },
+        "rollback": {
+          "trigger": "replication setup fails",
+          "action": "remove replication configuration",
+          "safety_guard": "verify no residuals left"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-dns-failover",
+        "description": "Configure global DNS failover using Route 53",
+        "action": "set up failover routing",
+        "target": "Route 53",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Route 53 is accessible",
+            "fact": "route53_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "DNS failover configuration",
+          "how": "check DNS settings",
+          "expected": "failover configured correctly"
+        },
+        "rollback": {
+          "trigger": "DNS failover setup fails",
+          "action": "remove failover configuration",
+          "safety_guard": "verify original routing intact"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run-dr-drill",
+        "description": "Run a disaster recovery drill by promoting GCP to active",
+        "action": "promote GCP",
+        "target": "active workload",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "GCP workload response",
+          "how": "test application endpoints",
+          "expected": "successful response from GCP"
+        },
+        "rollback": {
+          "trigger": "drill fails",
+          "action": "ensure AWS is operational and fail back immediately",
+          "safety_guard": "verify AWS is fully operational before promoting GCP"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "execute-failback",
+        "description": "Re-establish AWS as primary after the drill",
+        "action": "promote AWS back to primary",
+        "target": "AWS",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data consistency",
+          "how": "compare data states",
+          "expected": "no conflicts detected"
+        },
+        "rollback": {
+          "trigger": "failback issues",
+          "action": "restore GCP as primary",
+          "safety_guard": "verify data consistency before restore"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "establish-replication",
+        "to_task": "configure-dns-failover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-dns-failover",
+        "to_task": "run-dr-drill",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run-dr-drill",
+        "to_task": "execute-failback",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:configure-dns-failover",
+      "task_id": "configure-dns-failover",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "DNS failover configuration depends on established cross-cloud replication but is executed before that task completes.",
+      "suggested_fix": "Reorder tasks to ensure 'establish-replication' is completed before 'configure-dns-failover'."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:run-dr-drill",
+      "task_id": "run-dr-drill",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The DR drill execution depends on DNS failover configuration, which has not been verified as complete.",
+      "suggested_fix": "Add a verification step to ensure that 'configure-dns-failover' is successfully completed before 'run-dr-drill'."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:execute-failback",
+      "task_id": "execute-failback",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Failback execution depends on the successful execution of the DR drill, which is not guaranteed to succeed.",
+      "suggested_fix": "Implement verification of 'run-dr-drill' before proceeding to 'execute-failback'."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mcc-02-multi-cloud-dr:2:2",
+    "plan_id": "plan-mcc-02-multi-cloud-dr-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:configure-dns-failover",
+    "question": "Plan for goal 'mcc-02-multi-cloud-dr' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

@@ -1,0 +1,300 @@
+{
+  "dimension": "core-api",
+  "goal_id": "src-01-es-opensearch",
+  "duration_seconds": 29.97,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-src-01-es-opensearch-r2",
+    "goal_id": "src-01-es-opensearch",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "src-01-es-opensearch-plan",
+    "created_at": "2026-08-20T22:29:43.114150Z",
+    "tasks": [
+      {
+        "id": "snapshot",
+        "description": "Take snapshots of the Elasticsearch cluster",
+        "action": "snapshot",
+        "target": "ES cluster",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "snapshot completion",
+          "how": "check snapshot status API",
+          "expected": "success"
+        },
+        "rollback": {
+          "trigger": "snapshot fails",
+          "action": "retry snapshot",
+          "safety_guard": "check snapshot status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "provision",
+        "description": "Provision an OpenSearch cluster",
+        "action": "provision",
+        "target": "OpenSearch",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Snapshots have been successfully taken",
+            "fact": "snapshot_success",
+            "established_by": "snapshot",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "restore",
+        "description": "Restore snapshots into OpenSearch",
+        "action": "restore",
+        "target": "OpenSearch cluster",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Snapshots are available and functional",
+            "fact": "snapshot_functional",
+            "established_by": "snapshot",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "restore success",
+          "how": "check indices in OpenSearch",
+          "expected": "indices match snapshot"
+        },
+        "rollback": {
+          "trigger": "restore fails",
+          "action": "delete OpenSearch and reprovision",
+          "safety_guard": "check OpenSearch health before reprovisioning"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "reindex",
+        "description": "Run reindex for incompatible mappings",
+        "action": "reindex",
+        "target": "OpenSearch",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "mapping compatibility",
+          "how": "check index mappings",
+          "expected": "compatible mappings"
+        },
+        "rollback": {
+          "trigger": "reindex fails",
+          "action": "restore from snapshot",
+          "safety_guard": "ensure no data loss and validate restoration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "dual_query",
+        "description": "Run dual-query period",
+        "action": "compare",
+        "target": "ES and OpenSearch",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "query results",
+          "how": "compare results from both clusters",
+          "expected": "results match"
+        },
+        "rollback": {
+          "trigger": "result mismatch",
+          "action": "switch back to ES for queries",
+          "safety_guard": "validate index query integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover",
+        "description": "Execute cutover to OpenSearch only",
+        "action": "cutover",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application response",
+          "how": "check application logs",
+          "expected": "successful responses from OpenSearch"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "switch back to ES",
+          "safety_guard": "check ES cluster health before rolling back"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "retire",
+        "description": "Retire the old ES cluster",
+        "action": "retire",
+        "target": "ES cluster",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cutover complete",
+            "fact": "cutover_success",
+            "established_by": "cutover",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application stability",
+          "how": "check application functioning",
+          "expected": "application is functioning correctly on OpenSearch"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "snapshot",
+        "to_task": "provision",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provision",
+        "to_task": "restore",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "restore",
+        "to_task": "reindex",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "reindex",
+        "to_task": "dual_query",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dual_query",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover",
+        "to_task": "retire",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:provision",
+      "task_id": "provision",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Provisioning OpenSearch cluster is done before confirming success of snapshot completion.",
+      "suggested_fix": "Ensure 'snapshot' task successfully completes before proceeding to 'provision' task."
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:restore",
+      "task_id": "restore",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Restoring snapshots is attempted without ensuring successful provisioning of the OpenSearch cluster.",
+      "suggested_fix": "Add a precondition in the 'restore' task to confirm that the 'provision' task has successfully completed."
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:reindex",
+      "task_id": "reindex",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Reindexing is performed without confirming successful restoration of snapshots into OpenSearch.",
+      "suggested_fix": "Add a precondition in the 'reindex' task to check for successful restoration in the 'restore' task."
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:dual_query",
+      "task_id": "dual_query",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Dual-query period is initiated without ensuring successful reindexing.",
+      "suggested_fix": "Add a precondition in the 'dual_query' task to ensure 'reindex' task has been completed successfully."
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:cutover",
+      "task_id": "cutover",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Cutover to OpenSearch occurs without confirming results from the dual-query period match.",
+      "suggested_fix": "Add a precondition in the 'cutover' task to verify that 'dual_query' indicates successful matching results."
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:retire",
+      "task_id": "retire",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Retirement of the old ES cluster is initiated without confirming cutover has successfully completed to OpenSearch.",
+      "suggested_fix": "Ensure the 'retire' task has a strong precondition confirming the successful execution of 'cutover'."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:src-01-es-opensearch:2:2",
+    "plan_id": "plan-src-01-es-opensearch-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:provision",
+    "question": "Plan for goal 'src-01-es-opensearch' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

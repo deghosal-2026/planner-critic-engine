@@ -1,0 +1,282 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mob-01-staged-store-release",
+  "duration_seconds": 19.27,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "mob-01-staged-store-release-v1",
+    "goal_id": "mob-01-staged-store-release",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T22:33:22.765001Z",
+    "tasks": [
+      {
+        "id": "deploy_server_api",
+        "description": "Deploy server API to ensure compatibility with the new app version",
+        "action": "deploy",
+        "target": "server API",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "API endpoints",
+          "how": "run integration tests",
+          "expected": "all endpoints return expected data"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "restore previous API version",
+          "safety_guard": "verify API functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "release_beta",
+        "description": "Release the app to the beta ring for testing",
+        "action": "release",
+        "target": "beta users",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "server API is compatible with the app",
+            "fact": "api_compatible",
+            "established_by": "deploy_server_api",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_beta",
+        "description": "Monitor crash and API error rates during beta testing",
+        "action": "monitor",
+        "target": "beta users",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "beta release has occurred",
+            "fact": "beta_released",
+            "established_by": "release_beta",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "staged_rollout_google",
+        "description": "Initiate staged rollout on Google Play - 5%",
+        "action": "rollout",
+        "target": "Google Play 5%",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "beta testing successful",
+            "fact": "beta_success",
+            "established_by": "monitor_beta",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "crash report metrics",
+          "how": "analyze Firebase Crashlytics",
+          "expected": "crash rate below threshold"
+        },
+        "rollback": {
+          "trigger": "high crash rate",
+          "action": "pause rollout and revert to previous version",
+          "safety_guard": "check monitoring metrics"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_google_rollout",
+        "description": "Monitor Google Play rollout for crash and API error rates",
+        "action": "monitor",
+        "target": "Google Play 5%",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "staged rollout initiated",
+            "fact": "google_rollout_initiated",
+            "established_by": "staged_rollout_google",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "staged_rollout_apple",
+        "description": "Initiate phased release on App Store over 7 days",
+        "action": "rollout",
+        "target": "App Store",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Google rollout successful",
+            "fact": "google_rollout_success",
+            "established_by": "monitor_google_rollout",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "App Store approval status",
+          "how": "check App Store Connect",
+          "expected": "release approved and live"
+        },
+        "rollback": {
+          "trigger": "App Store review process delay",
+          "action": "pull release from store",
+          "safety_guard": "verify last approved version in store"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_apple_rollout",
+        "description": "Monitor App Store rollout for crash and API error rates",
+        "action": "monitor",
+        "target": "App Store",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "staged rollout on Apple initiated",
+            "fact": "apple_rollout_initiated",
+            "established_by": "staged_rollout_apple",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_server_api",
+        "to_task": "release_beta",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "release_beta",
+        "to_task": "monitor_beta",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_beta",
+        "to_task": "staged_rollout_google",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "staged_rollout_google",
+        "to_task": "monitor_google_rollout",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_google_rollout",
+        "to_task": "staged_rollout_apple",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "staged_rollout_apple",
+        "to_task": "monitor_apple_rollout",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:release_beta",
+      "task_id": "release_beta",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Release beta version before confirming server API compatibility.",
+      "suggested_fix": "Move the release_beta task to occur after the successful execution of deploy_server_api."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:release_beta",
+      "task_id": "release_beta",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The release_beta task has a hard dependency on api_compatible that is not verified before execution.",
+      "suggested_fix": "Ensure that the verification of API compatibility is completed and confirmed before proceeding with the release_beta task."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:staged_rollout_google",
+      "task_id": "staged_rollout_google",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The staged_rollout_google task depends on beta_success which is never verified.",
+      "suggested_fix": "Add a verification step for beta_success based on monitoring metrics or beta testing results before executing staged_rollout_google."
+    },
+    {
+      "id": "crit:1:weak_rollback:staged_rollout_google",
+      "task_id": "staged_rollout_google",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for the staged_rollout_google task does not adequately safeguard against the potential blast radius.",
+      "suggested_fix": "Implement an additional verification step before the rollback action to ensure it's absolutely necessary to revert to the previous version."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:staged_rollout_apple",
+      "task_id": "staged_rollout_apple",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The staged_rollout_apple task requires google_rollout_success to be established but this is only inferred from monitor_google_rollout which lacks verification.",
+      "suggested_fix": "Ensure that google_rollout_success is explicitly verified before initiating staged_rollout_apple."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

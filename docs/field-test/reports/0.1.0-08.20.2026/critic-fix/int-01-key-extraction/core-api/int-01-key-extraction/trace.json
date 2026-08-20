@@ -1,0 +1,242 @@
+{
+  "dimension": "core-api",
+  "goal_id": "int-01-key-extraction",
+  "duration_seconds": 25.14,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-int-01-key-extraction-r2",
+    "goal_id": "int-01-key-extraction",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "int-01-key-extraction-plan",
+    "created_at": "2026-08-20T22:53:03.943932Z",
+    "tasks": [
+      {
+        "id": "scan_strings",
+        "description": "Automated scan for hardcoded strings",
+        "action": "scan",
+        "target": "source_code",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "scan results",
+          "how": "compare against expected output",
+          "expected": "list of hardcoded strings"
+        },
+        "rollback": {
+          "trigger": "scan fails",
+          "action": "revert to previous scan results",
+          "safety_guard": "ensure previous results are intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "review_strings",
+        "description": "Manual review of scanned hardcoded strings",
+        "action": "review",
+        "target": "scan_results",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "reviewed strings",
+          "how": "cross-check with stakeholders",
+          "expected": "approved list of strings"
+        },
+        "rollback": {
+          "trigger": "review fails",
+          "action": "discard review changes",
+          "safety_guard": "document reviewed strings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "extract_keys",
+        "description": "Extract identified strings to key files (messages.en.json)",
+        "action": "extract",
+        "target": "key_files",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "key file contents",
+          "how": "validate against expected structure",
+          "expected": "messages.en.json file with correct keys"
+        },
+        "rollback": {
+          "trigger": "extraction fails",
+          "action": "restore original key files and document extracted changes",
+          "safety_guard": "version control rollback and backup of key files"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "replace_strings",
+        "description": "Re-point application code to use i18n keys",
+        "action": "refactor",
+        "target": "source_code",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application code",
+          "how": "run ESLint checks",
+          "expected": "no hardcoded strings remain"
+        },
+        "rollback": {
+          "trigger": "refactoring fails",
+          "action": "restore to hardcoded strings",
+          "safety_guard": "code version rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_rendering",
+        "description": "Verify rendering of all components",
+        "action": "test",
+        "target": "components",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "component rendering",
+          "how": "run Jest tests",
+          "expected": "all components render without errors and no missing keys"
+        },
+        "rollback": {
+          "trigger": "rendering fails",
+          "action": "revert to hardcoded strings",
+          "safety_guard": "ensure rendering tests are intact"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "ship",
+        "description": "Ship the changes to production",
+        "action": "deploy",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "all previous steps are successful",
+            "fact": "all_previous_steps_success",
+            "established_by": "verify_rendering",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment status",
+          "how": "check deployment logs",
+          "expected": "successful deployment without errors"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to previous production version",
+          "safety_guard": "verify previous production state"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "scan_strings",
+        "to_task": "review_strings",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "review_strings",
+        "to_task": "extract_keys",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "extract_keys",
+        "to_task": "replace_strings",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "replace_strings",
+        "to_task": "verify_rendering",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_rendering",
+        "to_task": "ship",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:extract_keys",
+      "task_id": "extract_keys",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The extraction of hardcoded strings may fail if there are dynamic strings or strings that cannot be extracted cleanly, especially since these cases are not identified beforehand.",
+      "suggested_fix": "Ensure all dynamic strings are accounted for in a separate step before extraction."
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:replace_strings",
+      "task_id": "replace_strings",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Replacing strings occurs before all keys have been verified to be extracted correctly, creating risk of breaking the application if any keys are missing.",
+      "suggested_fix": "Ensure extraction verification is complete before executing the replace_strings task."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:ship",
+      "task_id": "ship",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Shipping the changes relies on verify_rendering but does not explicitly verify that all previous steps were successful with concrete checks.",
+      "suggested_fix": "Add a concrete check to ensure verify_rendering is successful before proceeding with shipping."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:int-01-key-extraction:2:2",
+    "plan_id": "plan-int-01-key-extraction-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:feasibility:extract_keys",
+    "question": "Plan for goal 'int-01-key-extraction' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

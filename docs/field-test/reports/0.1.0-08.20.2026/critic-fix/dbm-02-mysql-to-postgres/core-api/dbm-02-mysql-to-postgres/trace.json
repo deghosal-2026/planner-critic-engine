@@ -1,0 +1,138 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dbm-02-mysql-to-postgres",
+  "duration_seconds": 5.9,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "dbm-02-mysql-to-postgres",
+    "goal_id": "dbm-02-mysql-to-postgres",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T22:28:57.725147Z",
+    "tasks": [
+      {
+        "id": "setup_replication",
+        "description": "Set up a replication bridge using pgloader or AWS DMS",
+        "action": "setup",
+        "target": "replication bridge",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replication health",
+          "how": "check replication status",
+          "expected": "green"
+        },
+        "rollback": {
+          "trigger": "setup fails",
+          "action": "shutdown and revert changes",
+          "safety_guard": "verify no residual connections remain"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "schema_conversion",
+        "description": "Perform schema diff and conversion for MySQL to PostgreSQL",
+        "action": "convert",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "schema correctness",
+          "how": "run migration tests",
+          "expected": "no errors in schema"
+        },
+        "rollback": {
+          "trigger": "conversion issues",
+          "action": "restore original schema",
+          "safety_guard": "verify schema compatibility"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "dual_write",
+        "description": "Implement dual-write period for application to write to both databases",
+        "action": "enable",
+        "target": "dual writes",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data consistency",
+          "how": "compare latest writes in both databases",
+          "expected": "match in both"
+        },
+        "rollback": {
+          "trigger": "data inconsistency",
+          "action": "switch back to MySQL only",
+          "safety_guard": "verify no lost writes"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup_replication",
+        "to_task": "schema_conversion",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "schema_conversion",
+        "to_task": "dual_write",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:schema_conversion",
+      "task_id": "schema_conversion",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Schema conversion task cannot occur before the replication bridge is fully set up.",
+      "suggested_fix": "Ensure that the 'setup_replication' task is successfully completed before proceeding to 'schema_conversion'."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:dual_write",
+      "task_id": "dual_write",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Dual-write task cannot occur before the schema conversion is completed.",
+      "suggested_fix": "Confirm that the 'schema_conversion' task is completed and verified before starting 'dual_write'."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

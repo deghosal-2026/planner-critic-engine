@@ -1,0 +1,219 @@
+{
+  "dimension": "core-api",
+  "goal_id": "erp-03-data-conversion",
+  "duration_seconds": 13.7,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "erp-03-data-conversion-plan",
+    "goal_id": "erp-03-data-conversion",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T22:57:02.175419Z",
+    "tasks": [
+      {
+        "id": "extract_data",
+        "description": "Export full master data from Oracle EBS and filtered transactional history",
+        "action": "extract",
+        "target": "Oracle EBS",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Oracle EBS is accessible",
+            "fact": "oracle_ebs_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data completeness",
+          "how": "compare record counts with original",
+          "expected": "200K materials, 150K customers, 100K vendors, 5M transactions"
+        },
+        "rollback": {
+          "trigger": "extraction fails",
+          "action": "notify and retry extraction",
+          "safety_guard": "ensure fallback to previous extraction"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "transform_validate",
+        "description": "Transform and validate extracted data",
+        "action": "transform",
+        "target": "transformed data",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data integrity checks",
+          "how": "run validation scripts",
+          "expected": "no mandatory field errors, no duplicates"
+        },
+        "rollback": {
+          "trigger": "transformation errors detected",
+          "action": "revert data to pre-transformation state",
+          "safety_guard": "log transformation errors for review"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "map_migrate",
+        "description": "Load transformed data into SAP using LSMW or Migration Cockpit",
+        "action": "migrate",
+        "target": "SAP S/4HANA",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "successful data load confirmation",
+          "how": "check migration logs and record counts",
+          "expected": "all materials, customers, vendors, transactions loaded"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore pre-conversion state",
+          "safety_guard": "verify SAP data integrity post-rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "reconcile",
+        "description": "Verify record counts, financial totals, and key reports match between Oracle EBS and SAP",
+        "action": "reconcile",
+        "target": "verification reports",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify",
+        "description": "Business users validate sample records and run trial balance",
+        "action": "validate",
+        "target": "business user confirmations",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "user approval for converted data",
+          "how": "sample review and trial balance checks",
+          "expected": "user confirmation of accuracy"
+        },
+        "rollback": {
+          "trigger": "validation fails",
+          "action": "revert to Oracle EBS backup",
+          "safety_guard": "ensure recent backup integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "extract_data",
+        "to_task": "transform_validate",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "transform_validate",
+        "to_task": "map_migrate",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "map_migrate",
+        "to_task": "reconcile",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "reconcile",
+        "to_task": "verify",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:extract_data",
+      "task_id": "extract_data",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The plan requires access to Oracle EBS for extraction, but there's no assurance regarding the accessibility during extraction time. The environment is production, which may introduce accessibility issues.",
+      "suggested_fix": "Include a check for Oracle EBS accessibility before beginning the extraction."
+    },
+    {
+      "id": "crit:1:missing_steps:transform_validate",
+      "task_id": "transform_validate",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The transformation and validation step lacks a process for handling unexpected data types or formats that may arise in legacy data.",
+      "suggested_fix": "Add a step to address unexpected data formats or mapping issues."
+    },
+    {
+      "id": "crit:1:missing_steps:map_migrate",
+      "task_id": "map_migrate",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "There is no contingency for handling partial data loads or successful loads with missing records after data migration into SAP.",
+      "suggested_fix": "Introduce a verification step post-load to ensure all expected data is present and complete."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:reconcile",
+      "task_id": "reconcile",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The reconcile task is listed after the map_migrate task but it should verify that the migration task has successfully completed prior to reconciling.",
+      "suggested_fix": "Ensure reconcile task execution occurs only after successful completion of map_migrate."
+    },
+    {
+      "id": "crit:1:missing_steps:verify",
+      "task_id": "verify",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The verify step does not specify how to handle discrepancies found during user validation or trial balance checks.",
+      "suggested_fix": "Add a defined process for issue resolution in case of discrepancies during the verification step."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

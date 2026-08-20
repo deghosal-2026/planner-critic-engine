@@ -1,0 +1,219 @@
+{
+  "dimension": "core-api",
+  "goal_id": "job-01-cron-to-airflow",
+  "duration_seconds": 10.97,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "job-01-cron-to-airflow",
+    "goal_id": "job-01-cron-to-airflow",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T22:30:07.931506Z",
+    "tasks": [
+      {
+        "id": "discover_jobs",
+        "description": "Discover and inventory all cron jobs",
+        "action": "extract",
+        "target": "crontab",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "list of discovered jobs",
+          "how": "compare with existing inventory",
+          "expected": "all cron jobs listed"
+        },
+        "rollback": {
+          "trigger": "discovery fails",
+          "action": "revert to previous inventory",
+          "safety_guard": "check for existing records"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "author_dags",
+        "description": "Author Airflow DAGs from discovered cron jobs",
+        "action": "create",
+        "target": "DAGs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "DAG structure",
+          "how": "run validation checks",
+          "expected": "all DAGs follow required format"
+        },
+        "rollback": {
+          "trigger": "DAG authoring fails",
+          "action": "restore previous DAGs",
+          "safety_guard": "verify DAG consistency"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run_backfill_check",
+        "description": "Run a backfill parity check between cron and Airflow",
+        "action": "compare",
+        "target": "outputs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "output correctness",
+          "how": "run comparison scripts",
+          "expected": "outputs match between cron and Airflow"
+        },
+        "rollback": {
+          "trigger": "parity check fails",
+          "action": "re-enable cron jobs",
+          "safety_guard": "ensure cron jobs are restored"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "execute_cutover",
+        "description": "Execute cutover to switch from cron to Airflow",
+        "action": "switch",
+        "target": "execution",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "job execution source",
+          "how": "check job execution logs",
+          "expected": "all jobs running in Airflow"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "re-enable cron jobs",
+          "safety_guard": "verify cron execution"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "retire_cron_jobs",
+        "description": "Retire old cron jobs after successful migration",
+        "action": "disable",
+        "target": "cron",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Airflow jobs are running smoothly",
+            "fact": "airflow_running",
+            "established_by": "execute_cutover",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "discover_jobs",
+        "to_task": "author_dags",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "author_dags",
+        "to_task": "run_backfill_check",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_backfill_check",
+        "to_task": "execute_cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "execute_cutover",
+        "to_task": "retire_cron_jobs",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unverified_dependencies:retire_cron_jobs",
+      "task_id": "retire_cron_jobs",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'retire_cron_jobs' depends on 'airflow_running' but this fact is not guaranteed to be established before its execution.",
+      "suggested_fix": "Ensure 'airflow_running' is verified by adding a verification step for Airflow job status before 'retire_cron_jobs'."
+    },
+    {
+      "id": "crit:1:weak_rollback:run_backfill_check",
+      "task_id": "run_backfill_check",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'run_backfill_check' lacks a safety guard that ensures the integrity of previously executed cron jobs during the restoration process.",
+      "suggested_fix": "Add a safety guard to verify that all cron jobs are restored correctly after rollback."
+    },
+    {
+      "id": "crit:1:feasibility:execute_cutover",
+      "task_id": "execute_cutover",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "warning",
+      "reason_code": "llm_feasibility",
+      "message": "Cutover execution relies on the assumption that all jobs can smoothly transition to Airflow without issues; consider outlining potential issues and mitigation strategies.",
+      "suggested_fix": "Consider documenting specific risks and mitigation steps regarding Airflow job execution reliability during the cutover process."
+    },
+    {
+      "id": "crit:1:missing_steps:discover_jobs",
+      "task_id": "discover_jobs",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The plan does not explicitly consider hidden dependencies and shared state between jobs during the discovery process, which could lead to inaccuracies in the inventory.",
+      "suggested_fix": "Include a step for assessing shared resources or state that may impact job execution after migration."
+    },
+    {
+      "id": "crit:1:risk:execute_cutover",
+      "task_id": "execute_cutover",
+      "version": 1,
+      "heuristic_family": "risk",
+      "severity": "info",
+      "reason_code": "llm_risk",
+      "message": "The execution of cutover has a high risk associated with transitioning from cron to Airflow without extensive testing of job dependencies and parameters.",
+      "suggested_fix": null
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

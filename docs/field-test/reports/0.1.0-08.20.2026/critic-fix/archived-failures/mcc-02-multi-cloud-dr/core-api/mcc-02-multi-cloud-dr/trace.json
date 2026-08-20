@@ -1,0 +1,242 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mcc-02-multi-cloud-dr",
+  "duration_seconds": 25.64,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-mcc-02-multi-cloud-dr-r2",
+    "goal_id": "mcc-02-multi-cloud-dr",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "mcc-02-multi-cloud-dr-v1",
+    "created_at": "2026-08-20T22:28:50.541585Z",
+    "tasks": [
+      {
+        "id": "setup-db-replication",
+        "description": "Establish cross-cloud database replication from AWS to GCP",
+        "action": "configure_replication",
+        "target": "db_repl",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AWS database is active",
+            "fact": "aws_db_active",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replication status",
+          "how": "check replication logs",
+          "expected": "no errors"
+        },
+        "rollback": {
+          "trigger": "replication setup fails",
+          "action": "rollback replication configuration",
+          "safety_guard": "validate existing configuration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup-object-storage-replication",
+        "description": "Establish cross-cloud object storage replication",
+        "action": "configure_storage_replication",
+        "target": "object_storage",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AWS object storage is accessible",
+            "fact": "aws_storage_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": {
+          "trigger": "replication setup fails",
+          "action": "rollback storage replication configuration",
+          "safety_guard": "validate existing storage configurations"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-dns-failover",
+        "description": "Configure global DNS failover with Route 53",
+        "action": "setup_dns",
+        "target": "dns_failover",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Route 53 is reachable",
+            "fact": "route53_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "DNS records",
+          "how": "query DNS for expected values",
+          "expected": "correct failover settings"
+        },
+        "rollback": {
+          "trigger": "DNS configuration fails",
+          "action": "restore previous DNS settings",
+          "safety_guard": "check DNS propagation"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "dr-failover-drill",
+        "description": "Run DR failover drill: promote GCP to active",
+        "action": "run_drill",
+        "target": "dr_promote_gcp",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DB replication is functioning",
+            "fact": "replication_active",
+            "established_by": "setup-db-replication",
+            "probe": null
+          },
+          {
+            "description": "DNS failover is configured",
+            "fact": "dns_failover_configured",
+            "established_by": "configure-dns-failover",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service availability",
+          "how": "check service health and traffic",
+          "expected": "GCP active with no errors"
+        },
+        "rollback": {
+          "trigger": "failover drill fails",
+          "action": "immediate failback to AWS",
+          "safety_guard": "monitor health during failover"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "dr-failback",
+        "description": "Execute failback to re-establish AWS as primary",
+        "action": "failback",
+        "target": "failback_aws",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "GCP is active and receiving traffic",
+            "fact": "gcp_active",
+            "established_by": "dr-failover-drill",
+            "probe": null
+          },
+          {
+            "description": "Replication is set up for data sync",
+            "fact": "replication_active",
+            "established_by": "setup-db-replication",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data sync",
+          "how": "compare data states",
+          "expected": "data reconciled without conflicts"
+        },
+        "rollback": {
+          "trigger": "failback fails",
+          "action": "restore GCP as active",
+          "safety_guard": "validate data consistency before re-promoting GCP to active"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup-db-replication",
+        "to_task": "dr-failover-drill",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup-object-storage-replication",
+        "to_task": "dr-failover-drill",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-dns-failover",
+        "to_task": "dr-failover-drill",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dr-failover-drill",
+        "to_task": "dr-failback",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:dr-failover-drill",
+      "task_id": "dr-failover-drill",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "DR failover drill is ordered before verifying if the object storage replication is set up.",
+      "suggested_fix": "Reorder tasks so that 'setup-object-storage-replication' is completed and verified before 'dr-failover-drill'."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:dr-failback",
+      "task_id": "dr-failback",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Failback relies on replication being active but does not verify its status before executing the task.",
+      "suggested_fix": "Add verification step to check that replication is active before proceeding with 'dr-failback'."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mcc-02-multi-cloud-dr:2:2",
+    "plan_id": "plan-mcc-02-multi-cloud-dr-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:dr-failover-drill",
+    "question": "Plan for goal 'mcc-02-multi-cloud-dr' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

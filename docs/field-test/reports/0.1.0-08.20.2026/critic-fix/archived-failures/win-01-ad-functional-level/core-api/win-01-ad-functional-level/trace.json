@@ -1,0 +1,297 @@
+{
+  "dimension": "core-api",
+  "goal_id": "win-01-ad-functional-level",
+  "duration_seconds": 72.69,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-win-01-ad-functional-level-r4",
+    "goal_id": "win-01-ad-functional-level",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-win-01-ad-functional-level-r3",
+    "created_at": "2026-08-20T22:26:29.766810Z",
+    "tasks": [
+      {
+        "id": "adprep_forestprep",
+        "description": "Run adprep /forestprep",
+        "action": "run",
+        "target": "adprep /forestprep",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Backup of the Active Directory is complete",
+            "fact": "ad_backup_complete",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "forest schema updated",
+          "how": "check schema version with PowerShell",
+          "expected": "version 88"
+        },
+        "rollback": {
+          "trigger": "adprep /forestprep fails",
+          "action": "restore previous forest state",
+          "safety_guard": "ensure backup is valid"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "adprep_domainprep",
+        "description": "Run adprep /domainprep",
+        "action": "run",
+        "target": "adprep /domainprep",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "domain schema updated",
+          "how": "check schema version with PowerShell",
+          "expected": "version 88"
+        },
+        "rollback": {
+          "trigger": "adprep /domainprep fails",
+          "action": "restore previous domain state",
+          "safety_guard": "ensure backup is valid"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_replication",
+        "description": "Verify inter-site replication",
+        "action": "check",
+        "target": "replication health",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Domain functional level raised successfully",
+            "fact": "functional_level_raised",
+            "established_by": "raise_functional_level",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replication health is verified",
+          "how": "check replication status with PowerShell",
+          "expected": "no errors or warnings"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "raise_functional_level",
+        "description": "Raise the domain functional level to Server 2019",
+        "action": "raise",
+        "target": "functional level",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Replication verified successfully",
+            "fact": "replication_verified",
+            "established_by": "verify_replication",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "functional level is set to Server 2019",
+          "how": "check functional level using PowerShell",
+          "expected": "Server 2019"
+        },
+        "rollback": {
+          "trigger": "reset functional level fails",
+          "action": "restore backup to revert changes",
+          "safety_guard": "verify AD integrity after restoration"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "upgrade_primary_site",
+        "description": "Upgrade the primary site",
+        "action": "upgrade",
+        "target": "primary site DCs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Functional level raised successfully",
+            "fact": "functional_level_raised",
+            "established_by": "raise_functional_level",
+            "probe": null
+          },
+          {
+            "description": "Replication verified successfully",
+            "fact": "replication_verified",
+            "established_by": "verify_replication",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "primary site upgraded successfully",
+          "how": "check DC health with dcdiag",
+          "expected": "all DCs healthy"
+        },
+        "rollback": {
+          "trigger": "upgrade fails",
+          "action": "rollback primary site to previous state",
+          "safety_guard": "verify primary site functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "upgrade_remote_site_1",
+        "description": "Upgrade the first remote site",
+        "action": "upgrade",
+        "target": "remote site 1 DC",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Primary site upgrade successful",
+            "fact": "primary_site_upgraded",
+            "established_by": "upgrade_primary_site",
+            "probe": null
+          },
+          {
+            "description": "Primary site upgrade verified",
+            "fact": "primary_site_upgraded_verified",
+            "established_by": "upgrade_primary_site",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "remote site 1 upgraded successfully",
+          "how": "check DC health with dcdiag",
+          "expected": "all DCs healthy"
+        },
+        "rollback": {
+          "trigger": "upgrade fails",
+          "action": "rollback remote site 1 to previous state",
+          "safety_guard": "verify remote site 1 functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "upgrade_remote_site_2",
+        "description": "Upgrade the second remote site",
+        "action": "upgrade",
+        "target": "remote site 2 DC",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "First remote site upgrade successful",
+            "fact": "remote_site_1_upgraded",
+            "established_by": "upgrade_remote_site_1",
+            "probe": null
+          },
+          {
+            "description": "First remote site upgrade verified",
+            "fact": "remote_site_1_upgraded_verified",
+            "established_by": "upgrade_remote_site_1",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "remote site 2 upgraded successfully",
+          "how": "check DC health with dcdiag",
+          "expected": "all DCs healthy"
+        },
+        "rollback": {
+          "trigger": "upgrade fails",
+          "action": "rollback remote site 2 to previous state",
+          "safety_guard": "verify remote site 2 functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "adprep_forestprep",
+        "to_task": "adprep_domainprep",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "adprep_domainprep",
+        "to_task": "verify_replication",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_replication",
+        "to_task": "raise_functional_level",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "raise_functional_level",
+        "to_task": "upgrade_primary_site",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "upgrade_primary_site",
+        "to_task": "upgrade_remote_site_1",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "upgrade_remote_site_1",
+        "to_task": "upgrade_remote_site_2",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "preconditions_referenced:plan-win-01-ad-functional-level-r4:4:verify_replication:functional_level_raised",
+      "task_id": "verify_replication",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "blocker",
+      "reason_code": "unverified_precondition",
+      "message": "precondition 'functional_level_raised' on task 'verify_replication' references no established fact from an earlier task",
+      "suggested_fix": "Point the precondition at an earlier task that establishes 'functional_level_raised'"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:win-01-ad-functional-level:4:4",
+    "plan_id": "plan-win-01-ad-functional-level-r4",
+    "version": 4,
+    "blocker_finding_id": "preconditions_referenced:plan-win-01-ad-functional-level-r4:4:verify_replication:functional_level_raised",
+    "question": "Plan for goal 'win-01-ad-functional-level' cannot be approved: blockers remain (unverified_precondition). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

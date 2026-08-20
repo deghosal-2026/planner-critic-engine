@@ -1,0 +1,262 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dbm-03-sqlserver-dialect",
+  "duration_seconds": 18.18,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "dbm-03-sqlserver-dialect-v1",
+    "goal_id": "dbm-03-sqlserver-dialect",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T22:29:13.522597Z",
+    "tasks": [
+      {
+        "id": "backup_db",
+        "description": "Backup SQL Server database",
+        "action": "backup",
+        "target": "sql_server_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "SQL Server is reachable",
+            "fact": "sql_server_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "backup file integrity",
+          "how": "check file size and timestamp",
+          "expected": "recent backup file exists"
+        },
+        "rollback": {
+          "trigger": "backup fails",
+          "action": "stop the migration process",
+          "safety_guard": "verify backup existence"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "migrate_schema",
+        "description": "Migrate database schema to PostgreSQL",
+        "action": "migrate_schema",
+        "target": "postgres_db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "schema correctness",
+          "how": "compare schema definitions",
+          "expected": "match with original SQL Server schema"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore from SQL Server backup",
+          "safety_guard": "verify previous state"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "migrate_data",
+        "description": "Migrate data from SQL Server to PostgreSQL",
+        "action": "migrate_data",
+        "target": "postgres_db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data completeness",
+          "how": "row count and checksum comparison",
+          "expected": "data counts match"
+        },
+        "rollback": {
+          "trigger": "data migration fails",
+          "action": "revert to last successful migration",
+          "safety_guard": "verify data consistency"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "validate_dual_run",
+        "description": "Perform dual-run validation",
+        "action": "validate_dual_run",
+        "target": "both_db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "system performance",
+          "how": "monitor system logs",
+          "expected": "no errors over threshold"
+        },
+        "rollback": {
+          "trigger": "validation fails",
+          "action": "evaluate logs and alerts",
+          "safety_guard": "manual inspection"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover",
+        "description": "Cut over to the new PostgreSQL database",
+        "action": "cutover",
+        "target": "postgres_db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application functionality",
+          "how": "run automated tests",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "redirect traffic back to SQL Server",
+          "safety_guard": "monitor application health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "retire_sql_server",
+        "description": "Retire SQL Server database after successful cutover",
+        "action": "retire",
+        "target": "sql_server_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Cutover completed successfully",
+            "fact": "cutover_success",
+            "established_by": "cutover",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "backup_db",
+        "to_task": "migrate_schema",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate_schema",
+        "to_task": "migrate_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate_data",
+        "to_task": "validate_dual_run",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "validate_dual_run",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover",
+        "to_task": "retire_sql_server",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:backup_db",
+      "task_id": "backup_db",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "SQL Server must be reachable to perform the backup, but no verification of connectivity is enforced before migration tasks.",
+      "suggested_fix": "Add a connectivity check to ensure SQL Server is reachable before proceeding to migration tasks."
+    },
+    {
+      "id": "crit:1:weak_rollback:migrate_schema",
+      "task_id": "migrate_schema",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for schema migration lacks sufficient safety guards as it doesn't account for what happens if restoring from the backup fails.",
+      "suggested_fix": "Enhance rollback action to handle scenarios where restoration from backup may fail, including additional verification steps."
+    },
+    {
+      "id": "crit:1:missing_steps:migrate_data",
+      "task_id": "migrate_data",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The data migration process can potentially miss data integrity checks post-migration beyond row counts and checksums.",
+      "suggested_fix": "Consider implementing additional verification steps for data consistency beyond row counts and checksums."
+    },
+    {
+      "id": "crit:1:missing_steps:validate_dual_run",
+      "task_id": "validate_dual_run",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The dual-run validation could include performance benchmarking to better assess new system efficiency compared to the old database.",
+      "suggested_fix": "Incorporate performance benchmarks in dual-run validation alongside existing log monitoring."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:cutover",
+      "task_id": "cutover",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Cutover is sequenced before the successful validation of the dual run, creating a risk of application downtime if issues arise.",
+      "suggested_fix": "Restructure the task order to ensure that cutover only occurs after successful validation of the dual run."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:retire_sql_server",
+      "task_id": "retire_sql_server",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Retirement of the SQL Server depends on the cutover's success verification, but there is no explicit assurance of cutover success verification prior to this task.",
+      "suggested_fix": "Ensure that there is a clear verification step confirming the success of cutover before proceeding to retire SQL Server."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

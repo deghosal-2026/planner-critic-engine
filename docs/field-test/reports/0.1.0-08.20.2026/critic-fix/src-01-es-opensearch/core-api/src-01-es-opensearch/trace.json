@@ -1,0 +1,304 @@
+{
+  "dimension": "core-api",
+  "goal_id": "src-01-es-opensearch",
+  "duration_seconds": 30.38,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-src-01-es-opensearch-r2",
+    "goal_id": "src-01-es-opensearch",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "src-01-es-opensearch-v1",
+    "created_at": "2026-08-20T22:48:22.211685Z",
+    "tasks": [
+      {
+        "id": "snapshot",
+        "description": "Take snapshots of the Elasticsearch cluster to S3",
+        "action": "snapshot",
+        "target": "elasticsearch cluster",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "snapshot status",
+          "how": "check S3 for snapshot presence",
+          "expected": "snapshot exists"
+        },
+        "rollback": {
+          "trigger": "snapshot fails",
+          "action": "retry snapshot",
+          "safety_guard": "check snapshot logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "provision",
+        "description": "Provision an OpenSearch cluster",
+        "action": "provision",
+        "target": "opensearch cluster",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "S3 snapshots are available",
+            "fact": "snapshot_complete",
+            "established_by": "snapshot",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "provision status",
+          "how": "check OpenSearch cluster health",
+          "expected": "OpenSearch cluster is provisioned successfully"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "restore",
+        "description": "Restore snapshots into the OpenSearch cluster",
+        "action": "restore",
+        "target": "opensearch cluster",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "restore status",
+          "how": "check restoration logs",
+          "expected": "restoration successful"
+        },
+        "rollback": {
+          "trigger": "restore fails",
+          "action": "revert to Elasticsearch",
+          "safety_guard": "check pre-restore cluster state and health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "reindex",
+        "description": "Run a reindex step for incompatible index mappings",
+        "action": "reindex",
+        "target": "openSearch",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "index mapping",
+          "how": "run mapping checks",
+          "expected": "mappings compatible"
+        },
+        "rollback": {
+          "trigger": "reindex fails",
+          "action": "restore previous index",
+          "safety_guard": "check mapping consistency before restoring"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "dual-query",
+        "description": "Run dual-query period",
+        "action": "query",
+        "target": "both clusters",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "query results consistency",
+          "how": "compare responses from both clusters",
+          "expected": "results match"
+        },
+        "rollback": {
+          "trigger": "query discrepancies found",
+          "action": "switch back to Elasticsearch",
+          "safety_guard": "validate query results against predefined criteria"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover",
+        "description": "Execute cutover to OpenSearch only",
+        "action": "cutover",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dual-query period successful",
+            "fact": "dual_query_consistent",
+            "established_by": "dual-query",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application query success",
+          "how": "monitor application logs",
+          "expected": "queries succeed on OpenSearch only"
+        },
+        "rollback": {
+          "trigger": "issues post-cutover",
+          "action": "route back to Elasticsearch",
+          "safety_guard": "monitor application health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "retire",
+        "description": "Retire the old Elasticsearch cluster",
+        "action": "retire",
+        "target": "elasticsearch cluster",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cutover is successful",
+            "fact": "cutover_complete",
+            "established_by": "cutover",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "retirement status",
+          "how": "check cluster status logs",
+          "expected": "old cluster retired successfully"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "snapshot",
+        "to_task": "provision",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provision",
+        "to_task": "restore",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "restore",
+        "to_task": "reindex",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "reindex",
+        "to_task": "dual-query",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dual-query",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover",
+        "to_task": "retire",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:provision",
+      "task_id": "provision",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Provisioning OpenSearch cluster depends on completed snapshots without verification that the snapshot is indeed complete.",
+      "suggested_fix": "Add a dependency check on the 'snapshot' task to confirm successful snapshot before proceeding to provisioning."
+    },
+    {
+      "id": "crit:2:weak_rollback:restore",
+      "task_id": "restore",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback action for 'restore' task lacks sufficient safety measures for reverting to Elasticsearch.",
+      "suggested_fix": "Implement additional checks to ensure the cluster state is verified before restoring."
+    },
+    {
+      "id": "crit:2:weak_rollback:reindex",
+      "task_id": "reindex",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback action for 'reindex' task lacks clear steps to ensure the mapping consistency before restoring previous index.",
+      "suggested_fix": "Define explicit actions to validate and confirm mapping consistency before executing the rollback."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:dual-query",
+      "task_id": "dual-query",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Dual-query task does not verify that the cutover is successful before proceeding, posing a risk to operational integrity.",
+      "suggested_fix": "Add a verification step to confirm that cutover was indeed successful before starting the dual-query."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:cutover",
+      "task_id": "cutover",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Execution of cutover must not proceed until dual-query consistency is verified and confirmed, leading to potential issues if done prematurely.",
+      "suggested_fix": "Ensure that cutover is dependent on a confirmed consistency in the dual-query period."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:retire",
+      "task_id": "retire",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Retiring the old ES cluster depends on successful completion of cutover without verification, which could lead to data inconsistency if cutover fails.",
+      "suggested_fix": "Add a verification step to confirm the application query success post-cutover before allowing the retirement of the old Elasticsearch cluster."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:src-01-es-opensearch:2:2",
+    "plan_id": "plan-src-01-es-opensearch-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unverified_dependencies:provision",
+    "question": "Plan for goal 'src-01-es-opensearch' cannot be approved: blockers remain (llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

@@ -1,0 +1,218 @@
+{
+  "dimension": "core-api",
+  "goal_id": "pay-02-checkout-integration",
+  "duration_seconds": 8.55,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "pay-02-checkout-integration-plan",
+    "goal_id": "pay-02-checkout-integration",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T22:55:57.966738Z",
+    "tasks": [
+      {
+        "id": "sdk_swap",
+        "description": "Replace Stripe Elements with Adyen Web Drop-in component",
+        "action": "swap",
+        "target": "payment form",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "payment form appearance and functionality",
+          "how": "run integration tests",
+          "expected": "payment form functions correctly with Adyen"
+        },
+        "rollback": {
+          "trigger": "swap fails",
+          "action": "revert to Stripe Elements",
+          "safety_guard": "ensure Stripe Elements is intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "tokenization_migration",
+        "description": "Migrate token format from Stripe to Adyen",
+        "action": "migrate",
+        "target": "backend token handling",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "token format acceptance",
+          "how": "run integration tests with both token formats",
+          "expected": "backend accepts Adyen tokens"
+        },
+        "rollback": {
+          "trigger": "token migration fails",
+          "action": "revert to Stripe token handling",
+          "safety_guard": "authenticate legacy tokens"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "screds_setup",
+        "description": "Configure Strong Customer Authentication flow in Adyen",
+        "action": "configure",
+        "target": "3DS2 implementation",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Adyen SDK is integrated",
+            "fact": "sdk_swap",
+            "established_by": "sdk_swap",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "sandbox_testing",
+        "description": "Test all scenarios in Adyen sandbox",
+        "action": "test",
+        "target": "payment integration",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "3DS2 flow is configured",
+            "fact": "screds_setup",
+            "established_by": "screds_setup",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "canary_release",
+        "description": "Deploy to 5% of users via feature flag",
+        "action": "deploy",
+        "target": "production feature flag",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "error rate during canary",
+          "how": "analyze logs",
+          "expected": "error rate below threshold"
+        },
+        "rollback": {
+          "trigger": "canary release fails",
+          "action": "revert feature flag to Stripe Elements",
+          "safety_guard": "monitor errors during canary"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "full_rollout",
+        "description": "Deploy Adyen integration to 100% of users",
+        "action": "deploy",
+        "target": "full_body",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "system stability and user transaction success",
+          "how": "monitor logs and transaction reports",
+          "expected": "system operable with Adyen"
+        },
+        "rollback": {
+          "trigger": "full rollout fails",
+          "action": "revert feature flag to Stripe Elements",
+          "safety_guard": "supervise system performance after rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "sdk_swap",
+        "to_task": "tokenization_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "screds_setup",
+        "to_task": "sandbox_testing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "sandbox_testing",
+        "to_task": "canary_release",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "canary_release",
+        "to_task": "full_rollout",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:tokenization_migration",
+      "task_id": "tokenization_migration",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The tokenization migration task depends on the completion of sdk_swap, but its execution is ordered before verifying the sdk_swap.",
+      "suggested_fix": "Ensure that sdk_swap is successfully verified before executing tokenization_migration."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:canary_release",
+      "task_id": "canary_release",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The canary_release task depends on sandbox_testing, which has not been verified or executed prior.",
+      "suggested_fix": "Add verification to sandbox_testing before executing canary_release."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:full_rollout",
+      "task_id": "full_rollout",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The full_rollout task depends on canary_release, which has not been verified or executed before it.",
+      "suggested_fix": "Ensure canary_release is completed and verified before proceeding with the full_rollout."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

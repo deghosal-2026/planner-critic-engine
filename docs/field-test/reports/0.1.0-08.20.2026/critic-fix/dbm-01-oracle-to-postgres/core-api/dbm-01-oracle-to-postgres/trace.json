@@ -1,0 +1,316 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dbm-01-oracle-to-postgres",
+  "duration_seconds": 30.48,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-dbm-01-oracle-to-postgres-r2",
+    "goal_id": "dbm-01-oracle-to-postgres",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "dbm-01-oracle-to-postgres-v1",
+    "created_at": "2026-08-20T22:47:51.973709Z",
+    "tasks": [
+      {
+        "id": "schema_conversion",
+        "description": "Convert Oracle data types to PostgreSQL",
+        "action": "convert",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "schema conversion success",
+          "how": "run validation scripts",
+          "expected": "no errors"
+        },
+        "rollback": {
+          "trigger": "conversion fails",
+          "action": "restore Oracle schema",
+          "safety_guard": "verify schema completeness"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "type_mapping_validation",
+        "description": "Validate type mappings from Oracle to PostgreSQL",
+        "action": "validate",
+        "target": "data types",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "type mappings correctness",
+          "how": "compare data types",
+          "expected": "correct mapping for all types"
+        },
+        "rollback": {
+          "trigger": "validation fails",
+          "action": "revert type mappings",
+          "safety_guard": "verify original mappings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "data_migration",
+        "description": "Migrate data using AWS DMS or ora2pg",
+        "action": "migrate",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data migration success",
+          "how": "run checksum comparison",
+          "expected": "checksums match"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore from Oracle",
+          "safety_guard": "verify data integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "dual_write_shadow_period",
+        "description": "Implement dual-write shadow period",
+        "action": "enable",
+        "target": "dual-write",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "dual-write functionality",
+          "how": "test application writes",
+          "expected": "writes to both databases"
+        },
+        "rollback": {
+          "trigger": "shadow period fails",
+          "action": "disable dual-write",
+          "safety_guard": "verify application writes"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "reconciliation_check",
+        "description": "Perform reconciliation check on migrated data",
+        "action": "check",
+        "target": "data integrity",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "row count and checksum comparison",
+          "how": "compare counts and checksums",
+          "expected": "counts and checksums match"
+        },
+        "rollback": {
+          "trigger": "reconciliation fails",
+          "action": "revert to Oracle data",
+          "safety_guard": "backup data before check"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover",
+        "description": "Switch reads and writes to PostgreSQL",
+        "action": "cutover",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "cutover success",
+          "how": "monitor application behavior",
+          "expected": "no application errors"
+        },
+        "rollback": {
+          "trigger": "cutover issues",
+          "action": "replay dual-write buffer",
+          "safety_guard": "verify data consistency"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify",
+        "description": "Verify the application functions with PostgreSQL",
+        "action": "validate",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application functionality",
+          "how": "run smoke tests",
+          "expected": "all features working"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "restore Oracle compatibility",
+          "safety_guard": "check application readiness"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "retire_oracle",
+        "description": "Retire the Oracle database",
+        "action": "retire",
+        "target": "Oracle",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Verification successful",
+            "fact": "verification_success",
+            "established_by": "verify",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "schema_conversion",
+        "to_task": "type_mapping_validation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "type_mapping_validation",
+        "to_task": "data_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "data_migration",
+        "to_task": "dual_write_shadow_period",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dual_write_shadow_period",
+        "to_task": "reconciliation_check",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "reconciliation_check",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover",
+        "to_task": "verify",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify",
+        "to_task": "retire_oracle",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:retire_oracle",
+      "task_id": "retire_oracle",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'retire_oracle' depends on 'verify', which has a verification status that must be established before retirement.",
+      "suggested_fix": "Ensure 'verify' is completed and verified successfully before proceeding to 'retire_oracle'."
+    },
+    {
+      "id": "crit:2:weak_rollback:cutover",
+      "task_id": "cutover",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The 'cutover' task lacks a comprehensive rollback plan in case of issues during the cutover process.",
+      "suggested_fix": "Add a rollback procedure for the cutover task that includes reversing any writes made to PostgreSQL."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:retire_oracle",
+      "task_id": "retire_oracle",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'retire_oracle' relies on a verification step ('verify') that hasn't been verified yet.",
+      "suggested_fix": "Implement a verification step before 'retire_oracle' to ensure all application functionalities are confirmed."
+    },
+    {
+      "id": "crit:2:risk:data_migration",
+      "task_id": "data_migration",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Data migration may face critical risks due to potential data integrity issues.",
+      "suggested_fix": "Consider adding additional verification measures to ensure data integrity during migration."
+    },
+    {
+      "id": "crit:2:risk:cutover",
+      "task_id": "cutover",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "The cutover could cause significant application disruption if not monitored closely during the switch.",
+      "suggested_fix": "Ensure robust monitoring is in place during the cutover phase to quickly identify and resolve issues."
+    },
+    {
+      "id": "crit:2:missing_steps:dual_write_shadow_period",
+      "task_id": "dual_write_shadow_period",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider potential edge cases during the dual-write shadow period that aren't explicitly addressed in the current plan.",
+      "suggested_fix": "Include procedures for handling failures in dual-write scenarios."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:dbm-01-oracle-to-postgres:2:2",
+    "plan_id": "plan-dbm-01-oracle-to-postgres-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:retire_oracle",
+    "question": "Plan for goal 'dbm-01-oracle-to-postgres' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

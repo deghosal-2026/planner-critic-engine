@@ -1,0 +1,222 @@
+{
+  "dimension": "core-api",
+  "goal_id": "acc-02-a11y-enforcement",
+  "duration_seconds": 19.15,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-acc-02-a11y-enforcement-r2",
+    "goal_id": "acc-02-a11y-enforcement",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "acc-02-a11y-enforcement-plan",
+    "created_at": "2026-08-20T22:52:35.903888Z",
+    "tasks": [
+      {
+        "id": "integrate-axe-core",
+        "description": "Integrate axe-core lint gates into CI/CD pipeline",
+        "action": "configure",
+        "target": "CI/CD pipeline",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CI/CD pipeline is operational",
+            "fact": "pipeline_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "lint gate functioning",
+          "how": "run CI/CD with violations present",
+          "expected": "build fails"
+        },
+        "rollback": {
+          "trigger": "integration fails",
+          "action": "remove axe-core integration",
+          "safety_guard": "ensure no build failures"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "add-component-guardrails",
+        "description": "Add component-library guardrails using Storybook addon-a11y",
+        "action": "install",
+        "target": "storybook",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Storybook is set up and running",
+            "fact": "storybook_running",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-release-block-policy",
+        "description": "Configure a release-block policy for a11y violations",
+        "action": "set policy",
+        "target": "deployment",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Deployment process is established",
+            "fact": "deployment_process_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "policy enforcement",
+          "how": "attempt a deployment with violations",
+          "expected": "deployment fails"
+        },
+        "rollback": {
+          "trigger": "policy fails",
+          "action": "remove release-block policy",
+          "safety_guard": "verify no violations are present"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "establish-remediation-backlog",
+        "description": "Establish a remediation backlog for pre-existing violations",
+        "action": "create backlog",
+        "target": "issue tracker",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rollback-a11y-gate",
+        "description": "Disable the a11y gate in CI to unblock urgent deploys",
+        "action": "disable",
+        "target": "a11y gate",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "A11y gate is currently enabled",
+            "fact": "a11y_gate_enabled",
+            "established_by": "integrate-axe-core",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "a11y gate status",
+          "how": "check CI settings",
+          "expected": "a11y gate disabled"
+        },
+        "rollback": {
+          "trigger": "rollback executed",
+          "action": "enable a11y gate",
+          "safety_guard": "verify a11y gate is restored"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "integrate-axe-core",
+        "to_task": "add-component-guardrails",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "add-component-guardrails",
+        "to_task": "configure-release-block-policy",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-release-block-policy",
+        "to_task": "establish-remediation-backlog",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-release-block-policy",
+        "to_task": "rollback-a11y-gate",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:add-component-guardrails",
+      "task_id": "add-component-guardrails",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'add-component-guardrails' is dependent on 'integrate-axe-core', but they are not sequenced correctly.",
+      "suggested_fix": "Reorder tasks to execute 'integrate-axe-core' before 'add-component-guardrails'."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:rollback-a11y-gate",
+      "task_id": "rollback-a11y-gate",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'rollback-a11y-gate' depends on 'integrate-axe-core' being executed, which is not verified before its execution.",
+      "suggested_fix": "Ensure 'integrate-axe-core' is verified before allowing 'rollback-a11y-gate' to execute."
+    },
+    {
+      "id": "crit:2:weak_rollback:configure-release-block-policy",
+      "task_id": "configure-release-block-policy",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'configure-release-block-policy' rollback plan may not adequately address confirmed violations after rollbacks.",
+      "suggested_fix": "Include verification of existing violations after rollback in the rollback plan."
+    },
+    {
+      "id": "crit:2:missing_steps:establish-remediation-backlog",
+      "task_id": "establish-remediation-backlog",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Task 'establish-remediation-backlog' lacks preconditions to confirm it can be established properly.",
+      "suggested_fix": "Define preconditions for establishing the backlog, such as confirming access to the issue tracker."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}
