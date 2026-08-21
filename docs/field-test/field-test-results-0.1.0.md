@@ -906,7 +906,7 @@ The original 5 adversarial goals (adv-01..05) all test "no safety" — plans wit
 
 | Dimension | Goal | Result | Notes |
 |-----------|------|--------|-------|
-| **critique-modes** | db-01-schema-migration | pass\* | 3 modes: heuristic-only approved (gates only), deterministic-first escalated (LLM blockers), llm-every-revision escalated (LLM blockers) |
+| **critique-modes** | db-01, k8s-01, ir-01, ci-01 | ✅ PASS | 4 goals x 3 modes = 12/12: heuristic-only 0 LLM, deterministic-first skips LLM on gate-blocker, llm-every-revision always invokes (tests/test_critique_c2_matrix.py) |
 | **escalation** | adv-01-billing-no-safety | ✅ PASS | Escalation created, listed, and resolved via EscalationManager |
 | **explain** | db-01-schema-migration | ✅ PASS | Explain engine produced reason_code trace |
 | **viz** | db-01-schema-migration | pass\* | Mermaid graph generated; replay trace empty (store doesn't have full revision history) |
