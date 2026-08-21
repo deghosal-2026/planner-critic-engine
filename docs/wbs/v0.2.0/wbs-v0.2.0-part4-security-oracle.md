@@ -41,6 +41,18 @@
 - Derive candidate deterministic standing rules from patch file-pattern × CWE class (pattern-mined, auditable, non-LLM); dedup by (CWE × pattern) with coverage count.
 - `promote <id>` writes an F-79 heuristic-pack rule + marks the miss `promoted`; provenance rule→miss→instance→corpus_version reconstructable. High-trust ordered before low-trust.
 
+### M5.6 Label-migration escape harness (#171)
+
+- The blocker allowlist trusts the model-chosen severity family (`missing_steps` vs `unsafe_sequencing`). If a model re-labels a blocked concern into a blocker-eligible family, it slips the gate. This is the classification twin of #97: right verdict for the wrong cause, at the family boundary.
+- Keep **both raw finding text and normalized family** in every eval row — never collapse early.
+- **Boundary-case generator** (differ by exactly one fact):
+  - optional step vs. required dependency
+  - possible latency vs. unsafe ordering
+  - rollback improvement vs. no viable rollback
+- **Confusion matrix** across severity families; a family that silently turns a non-blocker into an allowed blocker is a release-blocking defect.
+- **Deterministic invariant gate** for irreversible steps ("verified predecessor + rollback condition") that outranks any model-chosen blocker label.
+- Hermetic where possible ($0 LLM in CI); feeds the same scorecard surfaces as M5.2–M5.4.
+
 ### M5 Task Checklist
 
 | # | Task | Verify | Issue | Status |
@@ -50,6 +62,7 @@
 | 3 | Injection harness + per-layer attribution | injection-immunity 100%; any approval release-blocking | [#125](https://github.com/deghosal-2026/planner-critic-engine/issues/125) · [ ] |
 | 4 | Gate regression corpus + hermetic assertions | 100% gate accuracy; injection-immune; all 6 reason codes exercised | [#126](https://github.com/deghosal-2026/planner-critic-engine/issues/126) · [ ] |
 | 5 | Standing-rule promotion + trust tiering + dedup | high-trust promoted; one rule per (CWE × pattern); provenance complete | [#127](https://github.com/deghosal-2026/planner-critic-engine/issues/127) · [ ] |
+| 6 | Label-migration harness + boundary cases + invariant | raw+normalized captured; no boundary flips; irreversible invariant holds | [#171](https://github.com/deghosal-2026/planner-critic-engine/issues/171) · [ ] |
 
 ### M5 Success Metrics
 
@@ -60,6 +73,7 @@
 | Injection-immunity | 100% | adversarial report |
 | Gate regression | 100% accuracy; injection-immune | hermetic CI |
 | Standing-rule provenance | rule → miss → instance → corpus reconstructable | store query |
+| Label-migration | 0 verdict flips on boundary cases; invariant blocks irreversible w/o precondition | confusion matrix + invariant tests |
 | Coverage | >95% | `--cov-fail-under=95` |
 | Lint | 0 ruff + 0 mypy strict | `ruff` + `mypy` |
 
@@ -68,6 +82,7 @@
 - [ ] Release-blocking security claim now corpus-backed (not "one hand-written ADV-07")
 - [ ] Baseline security-critic accuracy + blind-spot bucket published
 - [ ] Hermetic gate holds ($0 LLM in CI); checksums CI-asserted
+- [ ] Label-migration harness green: no boundary flips; irreversible invariant blocks regardless of model label
 - [ ] Coverage > 95; lint clean; code review passed
 
 **Dependency:** v0.1.0 base (parallelizable with M2–M4). **Produces for M4/M9/M10:** heuristic-pack rule source for M4 packs, regression evidence for M10 release gate.
