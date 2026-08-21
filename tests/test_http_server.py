@@ -17,7 +17,6 @@ from conftest import EmptyCritic, ScriptedPlanner, make_goal, make_plan, make_ta
 from planner_critic.engine import Engine
 from planner_critic.loop import LoopConfig
 from planner_critic.server.http import PlannerCriticHTTPServer, create_fastapi_app
-from planner_critic.store.base import InMemoryStore
 
 
 @pytest.fixture

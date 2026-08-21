@@ -2,14 +2,13 @@
 
 import pytest
 
+from conftest import ScriptedCritic, ScriptedPlanner, make_goal, make_plan
 from planner_critic.adapters._audit import AuditTrail
 from planner_critic.adapters.pydantic_ai import ApprovalGuard, PlanNotApprovedError
 from planner_critic.engine import Engine
 from planner_critic.loop import LoopConfig
 from planner_critic.schema.goal import RiskTolerance
 from planner_critic.types import Finding, Severity
-
-from conftest import EmptyCritic, ScriptedCritic, ScriptedPlanner, make_goal, make_plan
 
 
 class TestApprovalGuard:

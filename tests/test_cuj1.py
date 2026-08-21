@@ -21,7 +21,6 @@ from conftest import EmptyCritic, ScriptedPlanner, make_goal, make_plan, make_ta
 from planner_critic.engine import Engine
 from planner_critic.explain import explain
 from planner_critic.loop import LoopConfig
-from planner_critic.schema.plan import PlanVersion
 from planner_critic.store.base import InMemoryStore
 from planner_critic.store.sqlite import SQLiteStore
 from planner_critic.viz.replay import replay

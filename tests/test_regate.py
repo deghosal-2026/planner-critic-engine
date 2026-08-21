@@ -5,11 +5,11 @@ from __future__ import annotations
 import pytest
 
 from planner_critic.probe.base import ProbeRequest, ProbeResult
-from planner_critic.regate import ReGateConfig, ReGateResult, check_preconditions
+from planner_critic.regate import ReGateConfig, check_preconditions
+from planner_critic.schema.goal import RiskTolerance
 from planner_critic.schema.plan import EnvProbe, PlanVersion, Precondition, Task
 from planner_critic.store.base import InMemoryStore
 from planner_critic.types import ApprovedPlan
-from planner_critic.schema.goal import RiskTolerance
 
 
 def _make_approved_plan(tasks: list[Task]) -> ApprovedPlan:
