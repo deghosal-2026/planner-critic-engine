@@ -37,7 +37,7 @@ from .probe.http_check import HttpCheckProbe
 from .schema.goal import Budget, Goal, ReplanPolicy
 from .schema.plan import PlanVersion
 from .store.sqlite import SQLiteStore
-from .types import ApprovedPlan, Finding, PlanningError, Severity
+from .types import Finding, PlanningError, Severity
 from .viz.graph import to_mermaid
 from .viz.replay import replay as build_replay
 

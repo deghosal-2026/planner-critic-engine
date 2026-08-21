@@ -2,6 +2,7 @@
 
 import pytest
 
+from conftest import make_plan
 from planner_critic.adapters._audit import AuditTrail
 from planner_critic.adapters.langgraph import (
     ApprovalHook,
@@ -10,8 +11,6 @@ from planner_critic.adapters.langgraph import (
 )
 from planner_critic.approval import ApprovalGate, resolve_threshold
 from planner_critic.schema.goal import RiskTolerance
-
-from conftest import make_plan
 
 
 def _make_approved_plan():

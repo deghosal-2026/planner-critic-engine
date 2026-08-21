@@ -2,13 +2,12 @@
 
 import pytest
 
+from conftest import make_plan
 from planner_critic.adapters._audit import AuditTrail
 from planner_critic.adapters.crewai import PlanAwareTaskInterceptor, TaskNotInPlanError
 from planner_critic.approval import ApprovalGate, resolve_threshold
 from planner_critic.schema.goal import RiskTolerance
 from planner_critic.schema.plan import Task
-
-from conftest import make_plan
 
 
 def _make_approved_plan(*, task_descriptions=None):
