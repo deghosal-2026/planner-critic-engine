@@ -149,8 +149,12 @@ def test_critic_appends_to_existing_findings() -> None:
     from planner_critic.types import Finding
 
     gate_finding = Finding(
-        id="g1", task_id="t1", version=1, severity=Severity.BLOCKER,
-        reason_code="unsafe_ordering", message="gate blocker",
+        id="g1",
+        task_id="t1",
+        version=1,
+        severity=Severity.BLOCKER,
+        reason_code="unsafe_ordering",
+        message="gate blocker",
     )
     provider = CannedCriticProvider(
         _critique_json(
@@ -221,9 +225,7 @@ def test_critic_scopes_audit_to_changed_tasks() -> None:
     """audit_diff limits the prompt to the changed-task closure."""
     plan = make_plan(
         tasks=[make_task("t1"), make_task("t2")],
-        dependencies=[
-            Dependency(from_task="t1", to_task="t2", kind=DependencyKind.HARD)
-        ],
+        dependencies=[Dependency(from_task="t1", to_task="t2", kind=DependencyKind.HARD)],
     )
     provider = CannedCriticProvider(
         _critique_json(
@@ -247,8 +249,14 @@ def test_critic_scopes_audit_to_changed_tasks() -> None:
 
 def _b_finding() -> Finding:
     """A gate-blocker finding."""
-    return Finding(id="b", task_id=None, version=1, severity=Severity.BLOCKER,
-                   reason_code="unsafe_ordering", message="blocked")
+    return Finding(
+        id="b",
+        task_id=None,
+        version=1,
+        severity=Severity.BLOCKER,
+        reason_code="unsafe_ordering",
+        message="blocked",
+    )
 
 
 def test_deterministic_first_skips_llm_on_gate_blocker() -> None:

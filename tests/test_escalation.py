@@ -99,9 +99,7 @@ class TestCreate:
 class TestList:
     """list() returns escalations, optionally filtered by status."""
 
-    def test_list_returns_all(
-        self, store: InMemoryStore, manager: EscalationManager
-    ) -> None:
+    def test_list_returns_all(self, store: InMemoryStore, manager: EscalationManager) -> None:
         """Both escalations across plans are listed."""
         store.put_plan_version(make_plan(plan_id="plan-1", version=1))
         store.put_plan_version(make_plan(plan_id="plan-2", version=1))
@@ -159,9 +157,7 @@ class TestResolve:
         with pytest.raises(ValueError, match="unknown escalation"):
             manager.resolve("esc:missing", "approved")
 
-    def test_resolve_twice_raises(
-        self, store: InMemoryStore, manager: EscalationManager
-    ) -> None:
+    def test_resolve_twice_raises(self, store: InMemoryStore, manager: EscalationManager) -> None:
         """A closed escalation cannot be resolved again."""
         store.put_plan_version(make_plan(plan_id="plan-1", version=1))
         esc = manager.create(make_open_escalation())
@@ -225,9 +221,7 @@ class TestPatchAndRecritique:
             manager.patch_and_recritique("plan-1", patched, critic=BlockingCritic())
 
 
-def test_resolved_at_is_utc(
-    store: InMemoryStore, manager: EscalationManager
-) -> None:
+def test_resolved_at_is_utc(store: InMemoryStore, manager: EscalationManager) -> None:
     """resolution timestamps are timezone-aware UTC."""
     store.put_plan_version(make_plan(plan_id="plan-1", version=1))
     esc = manager.create(make_open_escalation())

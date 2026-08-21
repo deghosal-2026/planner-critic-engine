@@ -138,8 +138,7 @@ class ApprovalGate:
             blockers = [f.reason_code for f in outcome.blockers]
             pending = [f.reason_code for f in outcome.pending_warnings]
             raise PlanningError(
-                "cannot approve: "
-                f"blockers={blockers} pending_warnings={pending}",
+                f"cannot approve: blockers={blockers} pending_warnings={pending}",
                 reason_code=APPROVAL_THRESHOLD_NOT_MET,
             )
         return ApprovedPlan(

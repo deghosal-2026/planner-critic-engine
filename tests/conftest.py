@@ -95,9 +95,7 @@ def make_plan(
 
 def hard_dep(from_task: str, to_task: str) -> Dependency:
     """Build a hard dependency edge."""
-    return Dependency(
-        from_task=from_task, to_task=to_task, kind=DependencyKind.HARD, reason="test"
-    )
+    return Dependency(from_task=from_task, to_task=to_task, kind=DependencyKind.HARD, reason="test")
 
 
 def finding(
@@ -148,9 +146,7 @@ class ScriptedPlanner(PlannerRole):
         index = min(self.calls, len(self.drafts) - 1)
         return self._resolve(index, plan, findings)
 
-    def _resolve(
-        self, index: int, plan: PlanVersion, findings: list[Finding]
-    ) -> PlanVersion:
+    def _resolve(self, index: int, plan: PlanVersion, findings: list[Finding]) -> PlanVersion:
         """Resolve a draft entry to a concrete plan."""
         entry = self.drafts[index]
         if isinstance(entry, PlanVersion):

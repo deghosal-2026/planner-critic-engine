@@ -56,7 +56,10 @@ class TestFinding:
     def test_plan_level_finding_allows_null_task(self) -> None:
         """A structural (plan-level) finding has no task_id."""
         f = Finding(
-            id="x", version=1, severity=Severity.BLOCKER, reason_code="dependency_cycle",
+            id="x",
+            version=1,
+            severity=Severity.BLOCKER,
+            reason_code="dependency_cycle",
             message="cycle",
         )
         assert f.task_id is None
@@ -66,16 +69,22 @@ class TestFinding:
         with pytest.raises(ValidationError):
             Finding.model_validate(
                 {
-                    "id": "x", "version": 1, "severity": "blocker",
-                    "reason_code": "not_a_real_code", "message": "boom",
+                    "id": "x",
+                    "version": 1,
+                    "severity": "blocker",
+                    "reason_code": "not_a_real_code",
+                    "message": "boom",
                 }
             )
 
     def test_str_render(self) -> None:
         """Findings render a stable one-line form."""
         f = Finding(
-            id="x", version=1, severity=Severity.WARNING,
-            reason_code="unsafe_ordering", message="early",
+            id="x",
+            version=1,
+            severity=Severity.WARNING,
+            reason_code="unsafe_ordering",
+            message="early",
         )
         assert "[warning] unsafe_ordering: early" in str(f)
 
@@ -86,8 +95,11 @@ class TestCoreTypes:
     def test_plan_complexity(self) -> None:
         """Complexity fields hold deterministic derived numbers."""
         c = PlanComplexity(
-            step_count=3, parallel_branch_count=1, irreversible_op_count=1,
-            est_llm_calls=4, est_token_cost=12_000.0,
+            step_count=3,
+            parallel_branch_count=1,
+            irreversible_op_count=1,
+            est_llm_calls=4,
+            est_token_cost=12_000.0,
         )
         assert c.step_count == 3
 

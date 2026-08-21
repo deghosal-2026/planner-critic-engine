@@ -315,9 +315,7 @@ def test_protocol_conformance_latest_and_diff(factory) -> None:
     esc = Escalation(id="e", plan_id="p", version=2, question="ok?")
     store.put_escalation(esc)
     assert store.get_escalation("p") == esc
-    store.put_execution_trace(
-        ExecutionTrace(id="t", plan_id="p", task_id="t1", outcome="ok")
-    )
+    store.put_execution_trace(ExecutionTrace(id="t", plan_id="p", task_id="t1", outcome="ok"))
     assert len(store.get_execution_traces("p")) == 1
     store.link("p", 2, "t")
     if isinstance(store, InMemoryStore):
@@ -367,10 +365,7 @@ def test_revert_then_remigrate(tmp_path) -> None:
     assert current_schema_version(conn) == 0
     # tables are gone after full revert
     tables = {
-        r[0]
-        for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type = 'table'"
-        ).fetchall()
+        r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
     }
     assert "plan_versions" not in tables
 

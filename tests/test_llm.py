@@ -139,8 +139,9 @@ def test_registry_round_trip_handles_api_key(tmp_path) -> None:
     """An api-key-bearing provider round-trips with the key intact."""
     path = tmp_path / "plancritic.toml"
     registry = ProviderRegistry.load(path)
-    registry.add("openai", base_url="https://api.openai.com/v1", model="gpt-4o",
-                 api_key="sk-secret")
+    registry.add(
+        "openai", base_url="https://api.openai.com/v1", model="gpt-4o", api_key="sk-secret"
+    )
     registry.save()
     reloaded = ProviderRegistry.load(path)
     assert reloaded.providers["openai"].api_key == "sk-secret"
@@ -194,11 +195,7 @@ def test_transport_returns_completion() -> None:
         base_url="http://localhost:11434/v1",
         model="llama3.2",
         client=_mock_client(
-            {
-                "choices": [
-                    {"message": {"content": '{"plan": "ok"}'}, "finish_reason": "stop"}
-                ]
-            }
+            {"choices": [{"message": {"content": '{"plan": "ok"}'}, "finish_reason": "stop"}]}
         ),
     )
     completion = provider.complete([Message(role="user", content="plan")])
@@ -465,9 +462,7 @@ def test_transport_sends_tool_schemas() -> None:
     )
     provider.complete(
         [Message(role="user", content="hi")],
-        tool_schemas=[
-            ToolSchema(name="lookup", description="find", parameters={"type": "object"})
-        ],
+        tool_schemas=[ToolSchema(name="lookup", description="find", parameters={"type": "object"})],
     )
     body = json.loads(captured[0].content)
     assert body["tools"][0]["function"]["name"] == "lookup"

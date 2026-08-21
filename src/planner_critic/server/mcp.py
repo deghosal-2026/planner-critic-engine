@@ -133,6 +133,7 @@ _TOOL_DEFINITIONS = [
 
 # -- server class -----------------------------------------------------------
 
+
 class PlannerCriticMCPServer:
     """Transport-agnostic MCP server for PlannerCritic tools.
 
@@ -343,6 +344,7 @@ class PlannerCriticMCPServer:
 
 
 # -- helpers ---------------------------------------------------------------
+
 
 def _loop_result_to_dict(result: Any) -> dict[str, Any]:
     """Serialize a LoopResult to a plain dict."""

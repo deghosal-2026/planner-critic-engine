@@ -35,9 +35,7 @@ def plan(
     if audit is not None and result.is_approved:
         ap = result.approved_plan
         if ap is not None:
-            audit.record(
-                AuditEvent("raw", "plan_approved", plan_id=ap.plan.id)
-            )
+            audit.record(AuditEvent("raw", "plan_approved", plan_id=ap.plan.id))
     return result
 
 

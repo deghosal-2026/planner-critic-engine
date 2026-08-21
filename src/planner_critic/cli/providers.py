@@ -22,9 +22,7 @@ def build_providers_parser() -> argparse.ArgumentParser:
         description="Manage LLM provider definitions (F-21)",
         add_help=False,
     )
-    parser.add_argument(
-        "--config", default=DEFAULT_CONFIG_PATH, help="Config file path"
-    )
+    parser.add_argument("--config", default=DEFAULT_CONFIG_PATH, help="Config file path")
     sub = parser.add_subparsers(dest="action", metavar="ACTION")
 
     add = sub.add_parser("add", help="Add or replace a provider")
@@ -33,9 +31,7 @@ def build_providers_parser() -> argparse.ArgumentParser:
     add.add_argument("--model", required=True, help="Model name")
     add.add_argument("--transport", default="openai-compatible")
     add.add_argument("--api-key", default=None)
-    add.add_argument(
-        "--role", choices=list(DEFAULT_ROLES), default=None, help="Bind to a role"
-    )
+    add.add_argument("--role", choices=list(DEFAULT_ROLES), default=None, help="Bind to a role")
 
     sub.add_parser("list", help="List configured providers and role bindings")
     rm = sub.add_parser("rm", help="Remove a provider")

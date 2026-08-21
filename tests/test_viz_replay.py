@@ -23,12 +23,20 @@ def _seed_store() -> InMemoryStore:
     store.put_plan_version(v1)
     store.put_plan_version(v2)
     f1 = Finding(
-        id="f1", task_id="t1", version=1,
-        severity=Severity.BLOCKER, reason_code="missing_rollback", message="no rollback",
+        id="f1",
+        task_id="t1",
+        version=1,
+        severity=Severity.BLOCKER,
+        reason_code="missing_rollback",
+        message="no rollback",
     )
     f2 = Finding(
-        id="f2", task_id="t2", version=2,
-        severity=Severity.WARNING, reason_code="llm_risk", message="risk",
+        id="f2",
+        task_id="t2",
+        version=2,
+        severity=Severity.WARNING,
+        reason_code="llm_risk",
+        message="risk",
     )
     store.put_findings("plan-1", 1, [f1])
     store.put_findings("plan-1", 2, [f2])

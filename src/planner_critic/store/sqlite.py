@@ -92,8 +92,7 @@ class SQLiteStore(PlanStore):
             )
         else:
             row = self._fetchone(
-                "SELECT body FROM plan_versions WHERE plan_id = ? "
-                "ORDER BY version DESC LIMIT 1",
+                "SELECT body FROM plan_versions WHERE plan_id = ? ORDER BY version DESC LIMIT 1",
                 (plan_id,),
             )
         if row is None:
@@ -103,13 +102,10 @@ class SQLiteStore(PlanStore):
     def list_plans(self, goal_id: str | None = None) -> list[PlanVersion]:
         """List stored revisions, newest first, optionally per goal."""
         if goal_id is None:
-            rows = self._fetchall(
-                "SELECT body FROM plan_versions ORDER BY plan_id, version DESC"
-            )
+            rows = self._fetchall("SELECT body FROM plan_versions ORDER BY plan_id, version DESC")
         else:
             rows = self._fetchall(
-                "SELECT body FROM plan_versions WHERE goal_id = ? "
-                "ORDER BY plan_id, version DESC",
+                "SELECT body FROM plan_versions WHERE goal_id = ? ORDER BY plan_id, version DESC",
                 (goal_id,),
             )
         return [PlanVersion.from_dict(json.loads(r["body"])) for r in rows]
@@ -131,9 +127,7 @@ class SQLiteStore(PlanStore):
 
     def get_escalation(self, plan_id: str) -> Escalation | None:
         """Fetch the escalation for a plan, if any."""
-        row = self._fetchone(
-            "SELECT body FROM escalations WHERE plan_id = ?", (plan_id,)
-        )
+        row = self._fetchone("SELECT body FROM escalations WHERE plan_id = ?", (plan_id,))
         if row is None:
             return None
         return Escalation.model_validate(json.loads(row["body"]))
@@ -206,9 +200,7 @@ class SQLiteStore(PlanStore):
 
     def get_missed_critique(self, plan_id: str) -> str | None:
         """Fetch the missed-critique record for a plan, if any."""
-        row = self._fetchone(
-            "SELECT body FROM missed_critiques WHERE plan_id = ?", (plan_id,)
-        )
+        row = self._fetchone("SELECT body FROM missed_critiques WHERE plan_id = ?", (plan_id,))
         if row is None:
             return None
         return str(row["body"])

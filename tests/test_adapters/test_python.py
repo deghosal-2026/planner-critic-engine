@@ -27,8 +27,12 @@ class TestPlanFunction:
     def test_escalated_plan(self):
         planner = ScriptedPlanner([make_plan()])
         blocker = Finding(
-            id="f:1", task_id="t1", version=1, severity=Severity.BLOCKER,
-            reason_code="unsafe_ordering", message="blocker"
+            id="f:1",
+            task_id="t1",
+            version=1,
+            severity=Severity.BLOCKER,
+            reason_code="unsafe_ordering",
+            message="blocker",
         )
         critic = ScriptedCritic([[blocker]])
         engine = Engine(planner, critic, LoopConfig(mode="deterministic-first"))

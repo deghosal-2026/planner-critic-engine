@@ -46,7 +46,7 @@ _PLANNER_SYSTEM_PROMPT = (
     "or 'env' if it is an environment fact (not a task output). "
     "Do NOT use fact names or descriptions as established_by — use the task id. "
     "Each dependency uses: from_task, to_task, kind, optional reason. "
-    "Each branch uses: id, kind (MUST be 'fan_out' or 'fan_in'), tasks (array of task id STRINGS, not objects), "
+    "Each branch uses: id, kind (fan_out|fan_in), tasks (list of task id STRINGS, not objects), "
     "join (MUST be 'all', 'any', or 'quorum'). "
     "branches is OPTIONAL — omit it if the plan has no fan-out/fan-in structure. "
     "Do NOT put rollback or verification inside branches. "

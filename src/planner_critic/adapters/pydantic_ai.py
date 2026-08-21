@@ -58,9 +58,7 @@ class ApprovalGuard:
             return self._result
 
         if self._audit is not None:
-            self._audit.record(
-                AuditEvent("pydantic_ai", "plan_requested", plan_id=self._goal.id)
-            )
+            self._audit.record(AuditEvent("pydantic_ai", "plan_requested", plan_id=self._goal.id))
 
         result = self._engine.plan(self._goal)
         self._result = result
@@ -73,8 +71,6 @@ class ApprovalGuard:
 
         if self._audit is not None:
             plan_id = result.approved_plan.plan.id if result.approved_plan else None
-            self._audit.record(
-                AuditEvent("pydantic_ai", "plan_approved", plan_id=plan_id)
-            )
+            self._audit.record(AuditEvent("pydantic_ai", "plan_approved", plan_id=plan_id))
 
         return result

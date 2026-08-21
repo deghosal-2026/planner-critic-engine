@@ -16,9 +16,17 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 def _run_in_container(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        ["docker", "run", "--rm", "--network", "host",
-         "-v", f"{FIXTURES}:/fixtures:ro",
-         IMAGE, *args],
+        [
+            "docker",
+            "run",
+            "--rm",
+            "--network",
+            "host",
+            "-v",
+            f"{FIXTURES}:/fixtures:ro",
+            IMAGE,
+            *args,
+        ],
         capture_output=True,
         text=True,
         timeout=300,
@@ -33,11 +41,17 @@ def test_cli_version() -> None:
 
 def test_cli_providers_add() -> None:
     proc = _run_in_container(
-        "providers", "--config", "/tmp/plancritic.toml",
-        "add", "local",
-        "--base-url", "http://127.0.0.1:8000/v1",
-        "--model", "Qwen3.5-9B-MLX-4bit",
-        "--role", "planner",
+        "providers",
+        "--config",
+        "/tmp/plancritic.toml",
+        "add",
+        "local",
+        "--base-url",
+        "http://127.0.0.1:8000/v1",
+        "--model",
+        "Qwen3.5-9B-MLX-4bit",
+        "--role",
+        "planner",
     )
     assert proc.returncode == 0, proc.stderr
 

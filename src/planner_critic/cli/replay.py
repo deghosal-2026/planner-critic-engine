@@ -25,9 +25,7 @@ def build_replay_parser() -> argparse.ArgumentParser:
     parser.add_argument("--store", default=DEFAULT_DB_PATH, help="SQLite store path")
     parser.add_argument("plan_id", help="Plan id to replay")
     parser.add_argument("--step", type=int, default=None, help="Max revisions to show")
-    parser.add_argument(
-        "--format", choices=["text", "json"], default="text", help="Output format"
-    )
+    parser.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
     return parser
 
 

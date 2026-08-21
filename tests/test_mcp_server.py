@@ -30,9 +30,7 @@ def _seed_escalation(store_path: str, esc_id: str = "esc:plan-1:1") -> None:
     """Create a plan and an open escalation in the store."""
     store = SQLiteStore(store_path)
     store.put_plan_version(make_plan(plan_id="plan-1", version=1))
-    store.put_escalation(
-        Escalation(id=esc_id, plan_id="plan-1", version=1, question="proceed?")
-    )
+    store.put_escalation(Escalation(id=esc_id, plan_id="plan-1", version=1, question="proceed?"))
     store.close()
 
 
@@ -154,17 +152,13 @@ class TestExplain:
 class TestPlan:
     """plan returns graceful error when no providers configured."""
 
-    def test_plan_errors_without_providers(
-        self, server: PlannerCriticMCPServer
-    ) -> None:
+    def test_plan_errors_without_providers(self, server: PlannerCriticMCPServer) -> None:
         goal_json = json.dumps({"id": "g1", "description": "test goal"})
         result = server.handle_tool("plan", {"goal_json": goal_json})
         assert result["status"] == "error"
         assert "no providers configured" in result["error"]
 
-    def test_plan_errors_on_invalid_goal_json(
-        self, server: PlannerCriticMCPServer
-    ) -> None:
+    def test_plan_errors_on_invalid_goal_json(self, server: PlannerCriticMCPServer) -> None:
         result = server.handle_tool("plan", {"goal_json": "not valid json at all"})
         assert result["status"] == "error"
         assert "invalid goal_json" in result["error"]

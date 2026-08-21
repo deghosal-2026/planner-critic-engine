@@ -102,7 +102,9 @@ def test_escalate_approve(server: PlannerCriticHTTPServer) -> None:
     assert resp["data"]["status"] == "escalated"
     escalation_id: str = resp["data"]["escalation"]["id"]
 
-    resp2 = server.handle_request("POST", f"/escalations/{escalation_id}/approve", {"note": "approved"})
+    resp2 = server.handle_request(
+        "POST", f"/escalations/{escalation_id}/approve", {"note": "approved"}
+    )
     assert resp2["status"] == 200
     assert resp2["data"]["status"] == "approved"
     assert resp2["data"]["resolution"] == "approved"
@@ -165,7 +167,9 @@ def test_escalate_deny(server: PlannerCriticHTTPServer) -> None:
     assert resp["data"]["status"] == "escalated"
     escalation_id: str = resp["data"]["escalation"]["id"]
 
-    resp2 = server.handle_request("POST", f"/escalations/{escalation_id}/deny", {"note": "not ready"})
+    resp2 = server.handle_request(
+        "POST", f"/escalations/{escalation_id}/deny", {"note": "not ready"}
+    )
     assert resp2["status"] == 200
     assert resp2["data"]["status"] == "denied"
 
@@ -205,9 +209,7 @@ def test_post_critique_no_engine(server: PlannerCriticHTTPServer) -> None:
 def test_post_critique_no_engine_gate_dirty(server: PlannerCriticHTTPServer) -> None:
     """POST /critique without engine on a gate-dirty plan returns gate findings."""
     dirty_plan = make_plan(tasks=[make_task("t1", risk_class="critical")])
-    resp = server.handle_request(
-        "POST", "/critique", {"plan": dirty_plan.model_dump(mode="json")}
-    )
+    resp = server.handle_request("POST", "/critique", {"plan": dirty_plan.model_dump(mode="json")})
     assert resp["status"] == 200
     findings = resp["data"]["findings"]
     assert len(findings) > 0
@@ -262,8 +264,10 @@ def test_handle_request_value_error(server: PlannerCriticHTTPServer) -> None:
 def test_handle_request_generic_error(server: PlannerCriticHTTPServer) -> None:
     """handle_request catches generic Exception (line 76-77)."""
     original = server._route
+
     def broken(*args: object) -> dict[str, object]:
         raise RuntimeError("unexpected failure")
+
     server._route = broken  # type: ignore[assignment]
     resp = server.handle_request("GET", "/plans")
     assert resp["status"] == 500

@@ -52,13 +52,9 @@ class ApprovalHook:
         """
         if self._audit is not None:
             plan_id = self._approved.plan.id if self._approved else None
-            self._audit.record(
-                AuditEvent("langgraph", "re_gate_check", plan_id=plan_id)
-            )
+            self._audit.record(AuditEvent("langgraph", "re_gate_check", plan_id=plan_id))
         if self._approved is None:
-            raise PlanNotApprovedError(
-                "no ApprovedPlan set — cannot execute graph step"
-            )
+            raise PlanNotApprovedError("no ApprovedPlan set — cannot execute graph step")
         return self._approved
 
 

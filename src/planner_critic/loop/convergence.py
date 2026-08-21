@@ -30,15 +30,8 @@ def _plan_fingerprint(plan: PlanVersion) -> str:
         A canonical string identifying the plan's structure.
     """
     tasks = ",".join(sorted(task.id for task in plan.tasks))
-    deps = ",".join(
-        sorted(f"{d.from_task}>{d.to_task}" for d in plan.dependencies)
-    )
-    branches = ",".join(
-        sorted(
-            f"{b.id}:{sorted(b.tasks)}:{b.join}"
-            for b in plan.branches
-        )
-    )
+    deps = ",".join(sorted(f"{d.from_task}>{d.to_task}" for d in plan.dependencies))
+    branches = ",".join(sorted(f"{b.id}:{sorted(b.tasks)}:{b.join}" for b in plan.branches))
     return f"{tasks}|{deps}|{branches}"
 
 
@@ -56,6 +49,7 @@ def circling_blockers(prior: list[Finding], current: list[Finding]) -> bool:
         True when both revisions flag the same gate blocker reason-codes on
         the same tasks — the planner is circling.
     """
+
     def gate_blocker_keys(findings: list[Finding]) -> frozenset[tuple[str, str | None]]:
         return frozenset(
             (f.reason_code, f.task_id)
@@ -102,6 +96,4 @@ def stalled(
     Returns:
         True when the loop should escalate for stalled progress.
     """
-    return circling_blockers(prior_findings, current_findings) or near_zero_diff(
-        prior, current
-    )
+    return circling_blockers(prior_findings, current_findings) or near_zero_diff(prior, current)

@@ -64,9 +64,7 @@ class TestApprovePath:
     def test_balanced_acknowledges_warning(self) -> None:
         """Under balanced, an acknowledged warning survives into approval."""
         goal = make_goal(tolerance=RiskTolerance.BALANCED)
-        critic = ScriptedCritic(
-            [[finding("t1", "unsafe_ordering", severity=Severity.WARNING)]]
-        )
+        critic = ScriptedCritic([[finding("t1", "unsafe_ordering", severity=Severity.WARNING)]])
         planner = ScriptedPlanner([_clean_plan()])
         result = run_loop(goal, planner, critic)
         assert result.is_approved
@@ -191,9 +189,7 @@ class TestCriticModes:
         goal = make_goal()
         critic = ScriptedCritic([[finding("t1", "unsafe_ordering")]])
         planner = ScriptedPlanner([_clean_plan()])
-        result = run_loop(
-            goal, planner, critic, config=LoopConfig(mode="llm-every-revision")
-        )
+        result = run_loop(goal, planner, critic, config=LoopConfig(mode="llm-every-revision"))
         assert result.status == "escalated"
 
 
@@ -311,9 +307,7 @@ class TestEscalationQuestion:
             risk_tolerance=RiskTolerance.STRICT,
             constraints=Constraints(budget=Budget(max_revisions=1)),
         )
-        critic = ScriptedCritic(
-            [[finding("t1", "unsafe_ordering", severity=Severity.WARNING)]]
-        )
+        critic = ScriptedCritic([[finding("t1", "unsafe_ordering", severity=Severity.WARNING)]])
         planner = ScriptedPlanner([_clean_plan()])
         result = run_loop(
             goal,
@@ -421,9 +415,7 @@ def test_loop_records_one_llm_call_per_critic_invocation() -> None:
     goal = make_goal()
     planner = ScriptedPlanner([_clean_plan()])
     critic = BudgetCountingCritic()
-    result = run_loop(
-        goal, planner, critic, config=LoopConfig(mode="llm-every-revision")
-    )
+    result = run_loop(goal, planner, critic, config=LoopConfig(mode="llm-every-revision"))
     assert result.is_approved
     assert critic.critiques == 1  # one revision, one audit
     assert result.spend is not None

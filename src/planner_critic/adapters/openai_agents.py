@@ -54,9 +54,7 @@ class PlanGuardrail:
             return self._result
 
         if self._audit is not None:
-            self._audit.record(
-                AuditEvent("openai_agents", "plan_requested", plan_id=self._goal.id)
-            )
+            self._audit.record(AuditEvent("openai_agents", "plan_requested", plan_id=self._goal.id))
 
         result = self._engine.plan(self._goal)
         self._result = result
@@ -69,9 +67,7 @@ class PlanGuardrail:
 
         if self._audit is not None:
             plan_id = result.approved_plan.plan.id if result.approved_plan else None
-            self._audit.record(
-                AuditEvent("openai_agents", "plan_approved", plan_id=plan_id)
-            )
+            self._audit.record(AuditEvent("openai_agents", "plan_approved", plan_id=plan_id))
 
         return result
 

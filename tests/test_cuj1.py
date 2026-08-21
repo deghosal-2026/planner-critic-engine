@@ -47,7 +47,9 @@ def test_cuj1_init_to_first_approved_plan(temp_cuj1_dir: str) -> None:
     goal = make_goal(goal_id="cuj1-goal", description="Migrate auth provider")
 
     # 2. Run plan with scripted roles that produce an immediately approvable plan.
-    planner = ScriptedPlanner([make_plan(plan_id="cuj1-plan", goal_id="cuj1-goal", tasks=[make_task("t1")])])
+    planner = ScriptedPlanner(
+        [make_plan(plan_id="cuj1-plan", goal_id="cuj1-goal", tasks=[make_task("t1")])]
+    )
     engine = Engine(planner=planner, critic=EmptyCritic(), config=LoopConfig(revision_cap=3))
     result = engine.plan(goal)
 
@@ -90,7 +92,9 @@ def test_cuj1_with_in_memory_store() -> None:
     """CUJ 1 using InMemoryStore (no filesystem needed)."""
     store = InMemoryStore()
     goal = make_goal(goal_id="mem-goal", description="Simple task")
-    planner = ScriptedPlanner([make_plan(plan_id="mem-plan", goal_id="mem-goal", tasks=[make_task("t1")])])
+    planner = ScriptedPlanner(
+        [make_plan(plan_id="mem-plan", goal_id="mem-goal", tasks=[make_task("t1")])]
+    )
     engine = Engine(planner=planner, critic=EmptyCritic(), config=LoopConfig(revision_cap=3))
     result = engine.plan(goal)
 
@@ -114,7 +118,13 @@ def test_cuj1_escalates_for_high_risk() -> None:
     store = InMemoryStore()
     goal = make_goal(goal_id="esc-goal", description="Hail mary task")
     planner = ScriptedPlanner(
-        [make_plan(plan_id="esc-plan", goal_id="esc-goal", tasks=[make_task("t1", risk_class="critical")])]
+        [
+            make_plan(
+                plan_id="esc-plan",
+                goal_id="esc-goal",
+                tasks=[make_task("t1", risk_class="critical")],
+            )
+        ]
     )
     engine = Engine(planner=planner, critic=EmptyCritic(), config=LoopConfig(revision_cap=1))
     result = engine.plan(goal)

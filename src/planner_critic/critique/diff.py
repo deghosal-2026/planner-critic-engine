@@ -35,9 +35,7 @@ def changed_tasks(
     return list(diff.added_task_ids) + list(diff.changed_task_ids)
 
 
-def dependent_closure(
-    plan: PlanVersion, changed_task_ids: Sequence[str]
-) -> list[str]:
+def dependent_closure(plan: PlanVersion, changed_task_ids: Sequence[str]) -> list[str]:
     """Expand a changed-task set to include transitive dependents (F-78).
 
     Args:

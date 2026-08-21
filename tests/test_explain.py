@@ -48,11 +48,15 @@ def _seed_revision_cap_escalation() -> InMemoryStore:
     store = InMemoryStore()
     plan1 = make_plan(plan_id="plan-1", version=1, tasks=[make_task("t1")])
     plan2 = make_plan(
-        plan_id="plan-1", version=2, parent="plan-1",
+        plan_id="plan-1",
+        version=2,
+        parent="plan-1",
         tasks=[make_task("t1"), make_task("t2")],
     )
     plan3 = make_plan(
-        plan_id="plan-1", version=3, parent="plan-1",
+        plan_id="plan-1",
+        version=3,
+        parent="plan-1",
         tasks=[make_task("t1"), make_task("t2"), make_task("t3")],
     )
     store.put_plan_version(plan1)
@@ -68,7 +72,7 @@ def _seed_revision_cap_escalation() -> InMemoryStore:
         id="esc:plan-1",
         plan_id="plan-1",
         version=3,
-        question="Plan for goal 'goal-1' did not converge (revision_cap_reached). Decide next step.",
+        question="Plan for goal-1 did not converge (revision_cap_reached). Decide next step.",
     )
     store.put_escalation(escalation)
     return store
@@ -78,7 +82,8 @@ def _seed_blocker_escalation() -> InMemoryStore:
     """A plan escalated because of a specific blocker (missing_verification)."""
     store = InMemoryStore()
     plan = make_plan(
-        plan_id="plan-1", version=1,
+        plan_id="plan-1",
+        version=1,
         tasks=[make_task("t1")],
     )
     store.put_plan_version(plan)
@@ -91,7 +96,7 @@ def _seed_blocker_escalation() -> InMemoryStore:
         plan_id="plan-1",
         version=1,
         blocker_finding_id=blocker.id,
-        question="Plan for goal 'goal-1' cannot be approved: blockers remain (missing_verification). Decide whether to patch, override, or abandon.",
+        question="Goal 'goal-1' cannot be approved: blockers remain. Decide: patch, override, abandon.",  # noqa: E501
     )
     store.put_escalation(escalation)
     return store
@@ -101,11 +106,14 @@ def _seed_multi_revision_approved() -> InMemoryStore:
     """A plan that went through 2 revisions and was approved on the 2nd."""
     store = InMemoryStore()
     plan1 = make_plan(
-        plan_id="plan-1", version=1,
+        plan_id="plan-1",
+        version=1,
         tasks=[make_task("t1")],
     )
     plan2 = make_plan(
-        plan_id="plan-1", version=2, parent="plan-1",
+        plan_id="plan-1",
+        version=2,
+        parent="plan-1",
         tasks=[make_task("t1"), make_task("t2")],
     )
     store.put_plan_version(plan1)
@@ -194,7 +202,9 @@ def test_revised_warnings_only() -> None:
     """Non-last revision with only warnings — _revision_reason warning path (lines 123-126)."""
     store = InMemoryStore()
     plan1 = make_plan(plan_id="plan-1", version=1, tasks=[make_task("t1")])
-    plan2 = make_plan(plan_id="plan-1", version=2, parent="plan-1", tasks=[make_task("t1"), make_task("t2")])
+    plan2 = make_plan(
+        plan_id="plan-1", version=2, parent="plan-1", tasks=[make_task("t1"), make_task("t2")]
+    )
     store.put_plan_version(plan1)
     store.put_plan_version(plan2)
     warning = _finding("t1", "missing_rollback", severity=Severity.WARNING, version=1)
@@ -226,6 +236,7 @@ def test_plan_level_finding() -> None:
 def test_build_summary_empty_decisions() -> None:
     """_build_summary with empty decisions — 'No loop decisions recorded' (line 149)."""
     from planner_critic.explain import _build_summary
+
     summary = _build_summary([], None)
     assert summary == "No loop decisions recorded"
 
@@ -233,6 +244,7 @@ def test_build_summary_empty_decisions() -> None:
 def test_build_summary_in_progress() -> None:
     """_build_summary with 'revised' last action — in-progress path (line 155)."""
     from planner_critic.explain import ExplainDecision, _build_summary
+
     decisions = [
         ExplainDecision(
             version=1,

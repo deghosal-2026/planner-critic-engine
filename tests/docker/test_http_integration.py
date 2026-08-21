@@ -45,13 +45,18 @@ def test_plan_vs_mlx(client: httpx.Client) -> None:
 
 def test_critique_vs_mlx(client: httpx.Client) -> None:
     plan = _load("plan.json")
-    r = client.post("/critique", json={"plan": {
-        "id": plan["id"],
-        "goal_id": plan["goal_id"],
-        "version": plan["version"],
-        "tasks": plan["tasks"],
-        "dependencies": plan["dependencies"],
-    }})
+    r = client.post(
+        "/critique",
+        json={
+            "plan": {
+                "id": plan["id"],
+                "goal_id": plan["goal_id"],
+                "version": plan["version"],
+                "tasks": plan["tasks"],
+                "dependencies": plan["dependencies"],
+            }
+        },
+    )
     assert r.status_code == 200
     assert "findings" in r.json()["data"]
 

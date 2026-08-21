@@ -118,16 +118,14 @@ def _build_messages(goal: Goal, plan: PlanVersion, scope: Sequence[str] | None) 
     """
     if scope is not None:
         scope_tasks = [t for t in plan.tasks if t.id in set(scope)]
-        scope_clause = (
-            "Audit ONLY these tasks: " + ", ".join(t.id for t in scope_tasks) + "."
-        )
+        scope_clause = "Audit ONLY these tasks: " + ", ".join(t.id for t in scope_tasks) + "."
     else:
         scope_clause = "Audit the entire plan."
     user_text = (
         f"GOAL:\n{goal.model_dump(mode='json')}\n\n"
         f"PLAN:\n{plan.model_dump(mode='json')}\n\n"
         f"{scope_clause}\n\n"
-        "Respond with JSON: {\"findings\": [...]}."
+        'Respond with JSON: {"findings": [...]}.'
     )
     return [
         Message(role="system", content=_SYSTEM_PROMPT),
@@ -144,9 +142,7 @@ class LLMCritic:
         max_retries: Bounded structured-output retries before fail-closed.
     """
 
-    def __init__(
-        self, goal: Goal, provider: LLMProvider, max_retries: int = 2
-    ) -> None:
+    def __init__(self, goal: Goal, provider: LLMProvider, max_retries: int = 2) -> None:
         """Bind the goal, the provider, and the retry budget."""
         self.goal = goal
         self.provider = provider
@@ -196,12 +192,14 @@ class LLMCritic:
 
 
 # Families eligible for blocker severity — concrete safety/ordering/rollback/feasibility defects.
-_BLOCKER_ELIGIBLE_FAMILIES: frozenset[str] = frozenset({
-    "unsafe_sequencing",
-    "weak_rollback",
-    "unverified_dependencies",
-    "feasibility",
-})
+_BLOCKER_ELIGIBLE_FAMILIES: frozenset[str] = frozenset(
+    {
+        "unsafe_sequencing",
+        "weak_rollback",
+        "unverified_dependencies",
+        "feasibility",
+    }
+)
 
 
 def _to_findings(version: int, items: Sequence[CritiqueItem]) -> list[Finding]:

@@ -67,8 +67,7 @@ class PlanAwareTaskInterceptor:
 
         if not found:
             raise TaskNotInPlanError(
-                f"task {task_description!r} not found in approved plan "
-                f"'{self._approved.plan.id}'"
+                f"task {task_description!r} not found in approved plan '{self._approved.plan.id}'"
             )
 
         return True

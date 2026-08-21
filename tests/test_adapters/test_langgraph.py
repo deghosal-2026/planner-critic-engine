@@ -15,7 +15,7 @@ from planner_critic.schema.goal import RiskTolerance
 
 def _make_approved_plan():
     gate = ApprovalGate(RiskTolerance.BALANCED)
-    satisfied, outcome = resolve_threshold([], RiskTolerance.BALANCED)
+    _satisfied, outcome = resolve_threshold([], RiskTolerance.BALANCED)
     return gate.approve(make_plan(), outcome)
 
 

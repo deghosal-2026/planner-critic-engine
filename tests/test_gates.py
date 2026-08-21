@@ -32,9 +32,7 @@ class TestSchemaValidGate:
 
     def test_blank_task_id_flagged(self) -> None:
         """A blank task id is a structural flaw."""
-        findings = run_deterministic_gates(
-            make_plan(tasks=[make_task("valid"), make_task(" ")])
-        )
+        findings = run_deterministic_gates(make_plan(tasks=[make_task("valid"), make_task(" ")]))
         assert PLAN_SCHEMA_INVALID in {f.reason_code for f in findings}
 
 
@@ -234,9 +232,7 @@ class TestPreconditionsGate:
             tasks=[
                 make_task(
                     "t1",
-                    preconditions=[
-                        {"description": "p", "fact": "own", "established_by": "t1"}
-                    ],
+                    preconditions=[{"description": "p", "fact": "own", "established_by": "t1"}],
                 )
             ]
         )

@@ -19,7 +19,15 @@ def _seed_replay(store_path: str, plan_id: str = "plan-a") -> None:
             id=plan_id,
             goal_id="goal-1",
             version=1,
-            tasks=[{"id": "t1", "description": "task t1", "action": "do", "target": "t1", "preconditions": []}],
+            tasks=[
+                {
+                    "id": "t1",
+                    "description": "task t1",
+                    "action": "do",
+                    "target": "t1",
+                    "preconditions": [],
+                }
+            ],
             dependencies=[],
             branches=[],
         )
@@ -30,8 +38,20 @@ def _seed_replay(store_path: str, plan_id: str = "plan-a") -> None:
             goal_id="goal-1",
             version=2,
             tasks=[
-                {"id": "t1", "description": "task t1", "action": "do", "target": "t1", "preconditions": []},
-                {"id": "t2", "description": "task t2", "action": "do", "target": "t2", "preconditions": []},
+                {
+                    "id": "t1",
+                    "description": "task t1",
+                    "action": "do",
+                    "target": "t1",
+                    "preconditions": [],
+                },
+                {
+                    "id": "t2",
+                    "description": "task t2",
+                    "action": "do",
+                    "target": "t2",
+                    "preconditions": [],
+                },
             ],
             dependencies=[],
             branches=[],

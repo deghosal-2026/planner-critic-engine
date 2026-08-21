@@ -106,7 +106,9 @@ def test_run_critique_stores_findings(tmp_path: Path) -> None:
     assert store_path.exists()
 
 
-def test_run_critique_plan_validation_failure(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+def test_run_critique_plan_validation_failure(
+    tmp_path: Path, capsys: pytest.CaptureFixture
+) -> None:
     """Invalid plan JSON returns exit code 1 (line 38-40)."""
     plan_file = tmp_path / "plan.json"
     plan_file.write_text(json.dumps({"id": "bad", "version": "notanint"}))

@@ -27,12 +27,12 @@ def _make_config(tmp_path: Path) -> str:
     config = tmp_path / "plancritic.toml"
     config.write_text(
         "[roles]\n"
-        "planner = \"local\"\n"
-        "critic = \"local\"\n\n"
+        'planner = "local"\n'
+        'critic = "local"\n\n'
         "[providers.local]\n"
-        "transport = \"openai-compatible\"\n"
-        "base_url = \"http://localhost:11434/v1\"\n"
-        "model = \"llama3.2\"\n"
+        'transport = "openai-compatible"\n'
+        'base_url = "http://localhost:11434/v1"\n'
+        'model = "llama3.2"\n'
     )
     return str(config)
 
@@ -94,9 +94,7 @@ def test_run_plan_goal_validation_failure(
     assert "goal validation failed" in capsys.readouterr().out
 
 
-def test_run_plan_config_load_failure(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_run_plan_config_load_failure(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """A config file with bad TOML returns exit code 1 (line 115-117)."""
     goal_file = _make_goal_file(tmp_path)
     config_file = tmp_path / "bad.toml"

@@ -60,16 +60,13 @@ class EscalationManager:
         current = self._store.get_plan(escalation.plan_id, escalation.version)
         if current is None:
             raise ValueError(
-                f"cannot escalate unknown plan {escalation.plan_id!r} "
-                f"revision {escalation.version}"
+                f"cannot escalate unknown plan {escalation.plan_id!r} revision {escalation.version}"
             )
         if not escalation.question.strip():
             raise ValueError("escalation question must not be blank (DD-10)")
         existing = self._store.get_escalation(escalation.plan_id)
         if existing is not None and existing.status == "open":
-            raise ValueError(
-                f"plan {escalation.plan_id!r} already has an open escalation"
-            )
+            raise ValueError(f"plan {escalation.plan_id!r} already has an open escalation")
         self._store.put_escalation(escalation)
         return escalation
 

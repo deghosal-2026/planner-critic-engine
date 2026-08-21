@@ -63,9 +63,7 @@ def test_escalate_approve_resolves(db: str, capsys: pytest.CaptureFixture) -> No
     store.put_escalation(_open_escalation(plan))
     store.close()
 
-    assert (
-        main(["escalate", "--store", db, "approve", "esc:plan-1:1", "--note", "go"]) == 0
-    )
+    assert main(["escalate", "--store", db, "approve", "esc:plan-1:1", "--note", "go"]) == 0
     out = capsys.readouterr().out
     assert "approved" in out
 
