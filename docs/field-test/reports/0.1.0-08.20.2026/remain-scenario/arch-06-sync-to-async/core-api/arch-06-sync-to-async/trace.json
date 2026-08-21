@@ -1,0 +1,336 @@
+{
+  "dimension": "core-api",
+  "goal_id": "arch-06-sync-to-async",
+  "duration_seconds": 60.72,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-arch-06-sync-to-async-r3",
+    "goal_id": "arch-06-sync-to-async",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-arch-06-sync-to-async-r2",
+    "created_at": "2026-08-21T00:10:42.631622Z",
+    "tasks": [
+      {
+        "id": "create-kafka-queue",
+        "description": "Create a Kafka queue for async processing",
+        "action": "create",
+        "target": "Kafka queue",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kafka is installed and running",
+            "fact": "kafka_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Kafka queue creation",
+          "how": "check Kafka queue existence",
+          "expected": "Kafka queue is created"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "implement-dual-path",
+        "description": "Implement dual-path architecture with sync and async using a feature flag",
+        "action": "deploy",
+        "target": "service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kafka queue must be created successfully",
+            "fact": "kafka_queue_created",
+            "established_by": "create-kafka-queue",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "feature flag state",
+          "how": "check feature flag configuration",
+          "expected": "dual-path is enabled"
+        },
+        "rollback": {
+          "trigger": "failure to switch paths",
+          "action": "revert to previous deployment",
+          "safety_guard": "verify previous deployment is functional"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "shift-traffic-to-async-10",
+        "description": "Shift 10% of traffic to the async path",
+        "action": "update",
+        "target": "traffic routing",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dual-path implementation must be complete",
+            "fact": "dual_path_implemented",
+            "established_by": "implement-dual-path",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic metrics",
+          "how": "check Prometheus dashboard",
+          "expected": "10% of requests routed to async"
+        },
+        "rollback": {
+          "trigger": "issues detected in async path",
+          "action": "revert traffic back to sync",
+          "safety_guard": "monitor for errors and latencies"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "shift-traffic-to-async-50",
+        "description": "Shift 50% of traffic to the async path",
+        "action": "update",
+        "target": "traffic routing",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "10% traffic shift must be completed successfully",
+            "fact": "traffic_shift_10_completed",
+            "established_by": "shift-traffic-to-async-10",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic metrics",
+          "how": "check Prometheus dashboard",
+          "expected": "50% of requests routed to async"
+        },
+        "rollback": {
+          "trigger": "issues detected in async path",
+          "action": "revert traffic back to sync",
+          "safety_guard": "monitor for errors and latencies"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "shift-traffic-to-async-100",
+        "description": "Shift 100% of traffic to the async path",
+        "action": "update",
+        "target": "traffic routing",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "50% traffic shift must be completed successfully",
+            "fact": "traffic_shift_50_completed",
+            "established_by": "shift-traffic-to-async-50",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic metrics and consumer readiness",
+          "how": "check Prometheus dashboard and consumer logs",
+          "expected": "all requests routed to async without errors"
+        },
+        "rollback": {
+          "trigger": "system failures or issues",
+          "action": "revert all traffic back to sync",
+          "safety_guard": "full system health check"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-event-ordering",
+        "description": "Verify event ordering in the async path",
+        "action": "check",
+        "target": "event stream",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "100% traffic shift must be completed successfully",
+            "fact": "traffic_shift_100_completed",
+            "established_by": "shift-traffic-to-async-100",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "event order",
+          "how": "analyze event logs",
+          "expected": "events are processed in order"
+        },
+        "rollback": {
+          "trigger": "determined ordering issues",
+          "action": "revert to sync processing temporarily",
+          "safety_guard": "ensure consumer state is intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "decommission-sync-path",
+        "description": "Decommission the sync path after verification",
+        "action": "remove",
+        "target": "sync service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Event ordering verification must be successful",
+            "fact": "event_ordering_verified",
+            "established_by": "verify-event-ordering",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "system integrity",
+          "how": "check service status and logs",
+          "expected": "sync path is successfully decommissioned"
+        },
+        "rollback": {
+          "trigger": "failed verification of async path",
+          "action": "restore sync service",
+          "safety_guard": "ensured all data is preserved"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "create-kafka-queue",
+        "to_task": "implement-dual-path",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "implement-dual-path",
+        "to_task": "shift-traffic-to-async-10",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "shift-traffic-to-async-10",
+        "to_task": "shift-traffic-to-async-50",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "shift-traffic-to-async-50",
+        "to_task": "shift-traffic-to-async-100",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "shift-traffic-to-async-100",
+        "to_task": "verify-event-ordering",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-event-ordering",
+        "to_task": "decommission-sync-path",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unverified_dependencies:implement-dual-path",
+      "task_id": "implement-dual-path",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The implementation of the dual-path architecture depends on the successful creation of the Kafka queue, which is required before this task can be executed but is not verified by any earlier task.",
+      "suggested_fix": "Ensure that the task 'create-kafka-queue' is completed and verified before proceeding with 'implement-dual-path'."
+    },
+    {
+      "id": "crit:3:unverified_dependencies:shift-traffic-to-async-10",
+      "task_id": "shift-traffic-to-async-10",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "This task requires the dual-path implementation to be complete, but it relies on the 'implement-dual-path' task which has unverified dependencies.",
+      "suggested_fix": "Verify the completion of the 'implement-dual-path' task by ensuring all its prerequisites have been met."
+    },
+    {
+      "id": "crit:3:unverified_dependencies:shift-traffic-to-async-50",
+      "task_id": "shift-traffic-to-async-50",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "This task is dependent on the successful completion of 'shift-traffic-to-async-10', but the latter has unverified dependencies making it unsafe to execute this task.",
+      "suggested_fix": "Ensure the 'shift-traffic-to-async-10' task is executed without errors and all its validation checks have been confirmed."
+    },
+    {
+      "id": "crit:3:unverified_dependencies:shift-traffic-to-async-100",
+      "task_id": "shift-traffic-to-async-100",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "This task relies on the successful completion of 'shift-traffic-to-async-50', which has unverified dependencies making this task potentially unsafe.",
+      "suggested_fix": "Ensure the 'shift-traffic-to-async-50' task is properly verified to be successful before executing this task."
+    },
+    {
+      "id": "crit:3:unverified_dependencies:verify-event-ordering",
+      "task_id": "verify-event-ordering",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The verification of event ordering is dependent on 'shift-traffic-to-async-100' which has unverified dependencies, making this task unsafe to execute.",
+      "suggested_fix": "Make sure 'shift-traffic-to-async-100' is verified as complete without issues before running this task."
+    },
+    {
+      "id": "crit:3:unverified_dependencies:decommission-sync-path",
+      "task_id": "decommission-sync-path",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "This task requires successful verification of the asynchronous event ordering which relies on earlier tasks with unverified dependencies, making it unsafe to execute.",
+      "suggested_fix": "Confirm that 'verify-event-ordering' was executed successfully and validate its outputs before proceeding with this task."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:arch-06-sync-to-async:3:3",
+    "plan_id": "plan-arch-06-sync-to-async-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unverified_dependencies:implement-dual-path",
+    "question": "Plan for goal 'arch-06-sync-to-async' cannot be approved: blockers remain (llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

@@ -1,0 +1,259 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-09-root-credential-rotation",
+  "duration_seconds": 34.35,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-ir-09-root-credential-rotation-r2",
+    "goal_id": "ir-09-root-credential-rotation",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "ir-09-root-credential-rotation-plan",
+    "created_at": "2026-08-21T00:00:31.376385Z",
+    "tasks": [
+      {
+        "id": "revoke-credentials",
+        "description": "Revoke all compromised credentials immediately",
+        "action": "revoke",
+        "target": "AWS root account and GitHub admin token",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "access to AWS and GitHub",
+            "fact": "credentials_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "credential status",
+          "how": "query AWS and GitHub APIs",
+          "expected": "credentials revoked"
+        },
+        "rollback": {
+          "trigger": "credential revocation fails",
+          "action": "alert team and reassess",
+          "safety_guard": "check for active sessions"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rotate-credentials",
+        "description": "Rotate all dependent credentials (IAM keys, OAuth tokens, service accounts)",
+        "action": "rotate",
+        "target": "dependent credentials",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "previous credentials are known",
+            "fact": "previous_credentials_available",
+            "established_by": "revoke-credentials",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "new credential functionality",
+          "how": "run service tests",
+          "expected": "all services operational"
+        },
+        "rollback": {
+          "trigger": "rotation fails",
+          "action": "restore previous credentials",
+          "safety_guard": "validate services functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "audit-logs",
+        "description": "Audit CloudTrail and GitHub audit logs for unauthorized actions",
+        "action": "audit",
+        "target": "CloudTrail and GitHub logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "logs are accessible",
+            "fact": "logs_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "audit completion status",
+          "how": "check audit log completeness",
+          "expected": "audit logs reviewed"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "identify-unauthorized-changes",
+        "description": "Identify and revert any unauthorized changes",
+        "action": "identify and revert",
+        "target": "infrastructure and code",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "audit logs reviewed",
+            "fact": "unauthorized_actions_identified",
+            "established_by": "audit-logs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "system state",
+          "how": "compare with version control",
+          "expected": "system matches last known good state"
+        },
+        "rollback": {
+          "trigger": "unauthorized changes found",
+          "action": "deploy last known good state",
+          "safety_guard": "snapshot prior to change"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-services",
+        "description": "Verify all dependent services still function with new credentials",
+        "action": "verify",
+        "target": "all services",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "new credentials successfully rotated",
+            "fact": "new_credentials_active",
+            "established_by": "rotate-credentials",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service operational status",
+          "how": "monitor service health",
+          "expected": "all services operational"
+        },
+        "rollback": {
+          "trigger": "service failure detected",
+          "action": "revert to previous credentials",
+          "safety_guard": "rollback operational validation"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "implement-preventive-controls",
+        "description": "Implement preventive controls (MFA enforcement, credential scanning)",
+        "action": "implement",
+        "target": "MFA and scanning tools",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "credentials audits completed",
+            "fact": "audits_completed",
+            "established_by": "identify-unauthorized-changes",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "revoke-credentials",
+        "to_task": "rotate-credentials",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rotate-credentials",
+        "to_task": "verify-services",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "audit-logs",
+        "to_task": "identify-unauthorized-changes",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "identify-unauthorized-changes",
+        "to_task": "implement-preventive-controls",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:audit-logs",
+      "task_id": "audit-logs",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task depends on the assumption that logs will be accessible; verify the accessibility of logs to ensure auditing can be completed successfully.",
+      "suggested_fix": "Include a step to verify log accessibility before proceeding."
+    },
+    {
+      "id": "crit:2:missing_steps:identify-unauthorized-changes",
+      "task_id": "identify-unauthorized-changes",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "This task could also include verification of the changes after they have been reverted to ensure that unauthorized changes are effectively resolved.",
+      "suggested_fix": "Add a verification step post-reversion to confirm the system state."
+    },
+    {
+      "id": "crit:2:missing_steps:implement-preventive-controls",
+      "task_id": "implement-preventive-controls",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "This task should consider specifying criteria for successful implementation of preventive controls to assess effectiveness.",
+      "suggested_fix": "Define expected outcomes or effectiveness measures for the preventive controls to be successfully implemented."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-09-root-credential-rotation:2:2",
+    "plan_id": "plan-ir-09-root-credential-rotation-r2",
+    "version": 2,
+    "blocker_finding_id": null,
+    "question": "Plan for goal 'ir-09-root-credential-rotation' did not converge (converged_stalled). Decide next step.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

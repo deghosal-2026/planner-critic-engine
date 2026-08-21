@@ -1,0 +1,252 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-09-artifact-signing",
+  "duration_seconds": 17.38,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plat-09-artifact-signing-plan",
+    "goal_id": "plat-09-artifact-signing",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-21T00:00:30.764555Z",
+    "tasks": [
+      {
+        "id": "integrate_cosign",
+        "description": "Integrate Cosign for container image signing",
+        "action": "integrate",
+        "target": "Cosign",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Cosign functionality",
+          "how": "run integration tests",
+          "expected": "signing works without errors"
+        },
+        "rollback": {
+          "trigger": "integration fails",
+          "action": "revert to previous signing mechanism",
+          "safety_guard": "ensure rollback does not affect ongoing deployments"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "generate_sbom",
+        "description": "Generate SBOM with Syft for every build",
+        "action": "generate",
+        "target": "SBOM",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Syft is installed",
+            "fact": "syft_installed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "store_signatures",
+        "description": "Store signatures in Rekor transparency log",
+        "action": "store",
+        "target": "Rekor",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Rekor is reachable",
+            "fact": "rekor_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "signature storage success",
+          "how": "check Rekor log for entries",
+          "expected": "entries match signatures"
+        },
+        "rollback": {
+          "trigger": "storage fails",
+          "action": "log error and notify team",
+          "safety_guard": "ensure all signatures are retried"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_kyverno",
+        "description": "Configure Kyverno policy to reject unsigned images in production clusters",
+        "action": "configure",
+        "target": "Kyverno",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "policy enforcement",
+          "how": "attempt deploy with unsigned image",
+          "expected": "deployment fails"
+        },
+        "rollback": {
+          "trigger": "policy causes deploy block",
+          "action": "remove policy",
+          "safety_guard": "confirm with devs before removal"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_images",
+        "description": "Verify all deployed images have valid signatures",
+        "action": "verify",
+        "target": "images",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "deployment status",
+          "how": "audit deployed images",
+          "expected": "all images verified"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "review deployments for unsigned images",
+          "safety_guard": "prioritize production environment"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "set_up_key_rotation",
+        "description": "Set up key rotation procedure",
+        "action": "set up",
+        "target": "key rotation",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "key rotation success",
+          "how": "test new key for signing",
+          "expected": "new key signs images correctly"
+        },
+        "rollback": {
+          "trigger": "key rotation issues",
+          "action": "revert to old signing key",
+          "safety_guard": "validate integrity of old key"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "integrate_cosign",
+        "to_task": "generate_sbom",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "generate_sbom",
+        "to_task": "store_signatures",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "store_signatures",
+        "to_task": "configure_kyverno",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_kyverno",
+        "to_task": "verify_images",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_images",
+        "to_task": "set_up_key_rotation",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:generate_sbom",
+      "task_id": "generate_sbom",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'generate_sbom' must not proceed before verifying that 'integrate_cosign' has been successfully executed and tested, as it relies on Cosign being integrated first.",
+      "suggested_fix": "Reorder tasks to ensure 'integrate_cosign' is completed and verified before 'generate_sbom'."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:store_signatures",
+      "task_id": "store_signatures",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'store_signatures' must not be attempted until 'generate_sbom' is completed, as it depends on the SBOM being generated first.",
+      "suggested_fix": "Reorder tasks to ensure 'generate_sbom' is completed before 'store_signatures'."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:configure_kyverno",
+      "task_id": "configure_kyverno",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'configure_kyverno' should only be performed after 'store_signatures' is completed, as it requires signatures being stored.",
+      "suggested_fix": "Reorder tasks to ensure 'store_signatures' is completed before 'configure_kyverno'."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:verify_images",
+      "task_id": "verify_images",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'verify_images' must not execute before 'configure_kyverno' is implemented, as valid signatures are required for this verification step.",
+      "suggested_fix": "Reorder tasks to ensure 'configure_kyverno' is completed before 'verify_images'."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:set_up_key_rotation",
+      "task_id": "set_up_key_rotation",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'set_up_key_rotation' cannot be performed until 'verify_images' has been completed and all images are verified, as it affects the signing process.",
+      "suggested_fix": "Reorder tasks to ensure 'verify_images' is completed before 'set_up_key_rotation'."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,350 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mch-04-blast-radius",
+  "duration_seconds": 44.94,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-mch-04-blast-radius-r2",
+    "goal_id": "mch-04-blast-radius",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "mch-04-blast-radius-v1",
+    "created_at": "2026-08-21T00:03:49.139769Z",
+    "tasks": [
+      {
+        "id": "check_auth",
+        "description": "Check compatibility of the auth service",
+        "action": "curl",
+        "target": "auth compatibility endpoint",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "auth service is reachable",
+            "fact": "auth_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "auth service response",
+          "how": "check response code",
+          "expected": "200"
+        },
+        "rollback": {
+          "trigger": "check fails",
+          "action": "notify failure",
+          "safety_guard": "alert on lack of compatibility"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "check_billing",
+        "description": "Check compatibility of the billing service",
+        "action": "curl",
+        "target": "billing compatibility endpoint",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "billing service is reachable",
+            "fact": "billing_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "billing service response",
+          "how": "check response code",
+          "expected": "200"
+        },
+        "rollback": {
+          "trigger": "check fails",
+          "action": "notify failure",
+          "safety_guard": "alert on lack of compatibility"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "check_notifications",
+        "description": "Check compatibility of the notifications service",
+        "action": "curl",
+        "target": "notifications compatibility endpoint",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "notifications service is reachable",
+            "fact": "notifications_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "notifications service response",
+          "how": "check response code",
+          "expected": "200"
+        },
+        "rollback": {
+          "trigger": "check fails",
+          "action": "notify failure",
+          "safety_guard": "alert on lack of compatibility"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_primary",
+        "description": "Deploy the primary change to the API gateway",
+        "action": "helm upgrade",
+        "target": "api-gateway",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "all dependent services are compatible",
+            "fact": "dependents_compatible",
+            "established_by": "check_auth",
+            "probe": null
+          },
+          {
+            "description": "all dependent services are compatible",
+            "fact": "dependents_compatible",
+            "established_by": "check_billing",
+            "probe": null
+          },
+          {
+            "description": "all dependent services are compatible",
+            "fact": "dependents_compatible",
+            "established_by": "check_notifications",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "API gateway functionality",
+          "how": "run integration tests",
+          "expected": "tests pass"
+        },
+        "rollback": {
+          "trigger": "deployment fails or checks fail",
+          "action": "helm rollback and notify rollback need",
+          "safety_guard": "verify previous version functionality and alert team for action"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_auth",
+        "description": "Verify auth service operation post-deployment",
+        "action": "curl",
+        "target": "auth health check",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "api-gateway is updated",
+            "fact": "gateway_updated",
+            "established_by": "deploy_primary",
+            "probe": null
+          },
+          {
+            "description": "auth service is compatible",
+            "fact": "auth_compatible",
+            "established_by": "check_auth",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "auth service health",
+          "how": "check response code",
+          "expected": "200"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "notify rollback need",
+          "safety_guard": "alert team for action"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_billing",
+        "description": "Verify billing service operation post-deployment",
+        "action": "curl",
+        "target": "billing health check",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "api-gateway is updated",
+            "fact": "gateway_updated",
+            "established_by": "deploy_primary",
+            "probe": null
+          },
+          {
+            "description": "billing service is compatible",
+            "fact": "billing_compatible",
+            "established_by": "check_billing",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "billing service health",
+          "how": "check response code",
+          "expected": "200"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "notify rollback need",
+          "safety_guard": "alert team for action"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_notifications",
+        "description": "Verify notifications service operation post-deployment",
+        "action": "curl",
+        "target": "notifications health check",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "api-gateway is updated",
+            "fact": "gateway_updated",
+            "established_by": "deploy_primary",
+            "probe": null
+          },
+          {
+            "description": "notifications service is compatible",
+            "fact": "notifications_compatible",
+            "established_by": "check_notifications",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "notifications service health",
+          "how": "check response code",
+          "expected": "200"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "notify rollback need",
+          "safety_guard": "alert team for action"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_auth",
+        "to_task": "deploy_primary",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check_billing",
+        "to_task": "deploy_primary",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check_notifications",
+        "to_task": "deploy_primary",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_primary",
+        "to_task": "verify_auth",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_primary",
+        "to_task": "verify_billing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_primary",
+        "to_task": "verify_notifications",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:deploy_primary",
+      "task_id": "deploy_primary",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The deployment of the primary service is occurring before verifying the compatibility of all dependent services.",
+      "suggested_fix": "Ensure that the deployment only occurs after all dependent services have been verified for compatibility."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:verify_auth",
+      "task_id": "verify_auth",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The verification of the auth service is dependent on the 'gateway_updated' fact which is not established until after 'deploy_primary'.",
+      "suggested_fix": "Create a dependency chain that ensures 'verify_auth' only runs after 'deploy_primary' is successful."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:verify_billing",
+      "task_id": "verify_billing",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The verification of the billing service is dependent on the 'gateway_updated' fact which is not established until after 'deploy_primary'.",
+      "suggested_fix": "Create a dependency chain that ensures 'verify_billing' only runs after 'deploy_primary' is successful."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:verify_notifications",
+      "task_id": "verify_notifications",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The verification of the notifications service is dependent on the 'gateway_updated' fact which is not established until after 'deploy_primary'.",
+      "suggested_fix": "Create a dependency chain that ensures 'verify_notifications' only runs after 'deploy_primary' is successful."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mch-04-blast-radius:2:2",
+    "plan_id": "plan-mch-04-blast-radius-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:deploy_primary",
+    "question": "Plan for goal 'mch-04-blast-radius' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

@@ -1,0 +1,308 @@
+{
+  "dimension": "core-api",
+  "goal_id": "gf-02-eks-bootstrap",
+  "duration_seconds": 63.49,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-gf-02-eks-bootstrap-r3",
+    "goal_id": "gf-02-eks-bootstrap",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-gf-02-eks-bootstrap-r2",
+    "created_at": "2026-08-21T00:01:56.663593Z",
+    "tasks": [
+      {
+        "id": "provision_eks",
+        "description": "Provision EKS cluster via terraform",
+        "action": "apply",
+        "target": "terraform",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AWS credentials are configured",
+            "fact": "aws_credentials_set",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "EKS cluster status",
+          "how": "describe cluster via aws CLI",
+          "expected": "ACTIVE"
+        },
+        "rollback": {
+          "trigger": "EKS provisioning fails",
+          "action": "destroy cluster",
+          "safety_guard": "verify that no resources remain"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "apply_security_baseline",
+        "description": "Apply Pod Security Standards (restricted baseline)",
+        "action": "apply",
+        "target": "kubectl",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Pod Security Policies",
+          "how": "list PSPs via kubectl",
+          "expected": "restricted"
+        },
+        "rollback": {
+          "trigger": "PSP application fails",
+          "action": "remove PSPs",
+          "safety_guard": "ensure that workloads can still run"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "install_cert_manager",
+        "description": "Install cert-manager",
+        "action": "install",
+        "target": "cert-manager",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "cert-manager status",
+          "how": "check cert-manager installation via kubectl",
+          "expected": "cert-manager is installed"
+        },
+        "rollback": {
+          "trigger": "cert-manager installation fails",
+          "action": "uninstall cert-manager",
+          "safety_guard": "validate no residual resources"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "install_cluster_autoscaler",
+        "description": "Install cluster-autoscaler",
+        "action": "install",
+        "target": "cluster-autoscaler",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "cluster-autoscaler status",
+          "how": "check status via kubectl",
+          "expected": "cluster-autoscaler is running"
+        },
+        "rollback": {
+          "trigger": "cluster-autoscaler installation fails",
+          "action": "uninstall cluster-autoscaler",
+          "safety_guard": "validate no residual resources"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_monitoring",
+        "description": "Deploy Prometheus + Grafana",
+        "action": "deploy",
+        "target": "monitoring stack",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "monitoring stack status",
+          "how": "check deployment status via kubectl",
+          "expected": "Prometheus and Grafana are deployed successfully"
+        },
+        "rollback": {
+          "trigger": "monitoring deployment fails",
+          "action": "remove monitoring stack",
+          "safety_guard": "validate monitoring services are not impacting workloads"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "enable_velero_backup",
+        "description": "Enable Velero backup with schedule",
+        "action": "configure",
+        "target": "Velero",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Velero backup status",
+          "how": "check Velero logs",
+          "expected": "backups succeed"
+        },
+        "rollback": {
+          "trigger": "Velero backup fails",
+          "action": "delete Velero configuration",
+          "safety_guard": "validate no backups in progress"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_network_policies",
+        "description": "Configure network policies (default deny + allow-list)",
+        "action": "apply",
+        "target": "network policies",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Network policies",
+          "how": "list network policies via kubectl",
+          "expected": "deny all with allow-list rules"
+        },
+        "rollback": {
+          "trigger": "network policy application fails",
+          "action": "remove network policies",
+          "safety_guard": "ensure pods are reachable"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_components",
+        "description": "Verify all components are healthy",
+        "action": "check",
+        "target": "all services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Health of all components",
+          "how": "run health checks for all services",
+          "expected": "all components are healthy"
+        },
+        "rollback": {
+          "trigger": "component verification fails",
+          "action": "rollback configurations",
+          "safety_guard": "validate receipt of health checks"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "provision_eks",
+        "to_task": "apply_security_baseline",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provision_eks",
+        "to_task": "install_cert_manager",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provision_eks",
+        "to_task": "install_cluster_autoscaler",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provision_eks",
+        "to_task": "deploy_monitoring",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provision_eks",
+        "to_task": "enable_velero_backup",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provision_eks",
+        "to_task": "configure_network_policies",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "install_cert_manager",
+        "to_task": "verify_components",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "install_cluster_autoscaler",
+        "to_task": "verify_components",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_monitoring",
+        "to_task": "verify_components",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "enable_velero_backup",
+        "to_task": "verify_components",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_network_policies",
+        "to_task": "verify_components",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:verify_components",
+      "task_id": "verify_components",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'verify_components' is ordered before its hard prerequisite tasks are completed.",
+      "suggested_fix": "Reorder the task 'verify_components' to execute after all tasks that it depends on (install_cert_manager, install_cluster_autoscaler, deploy_monitoring, enable_velero_backup, configure_network_policies) are successfully completed."
+    },
+    {
+      "id": "crit:3:unverified_dependencies:verify_components",
+      "task_id": "verify_components",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'verify_components' depends on components being successfully installed and verified, but there are no established checks to ensure all dependencies are properly fulfilled before running this task.",
+      "suggested_fix": "Implement checks or validations that confirm the successful installation and health of all dependent components before proceeding to 'verify_components'."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:gf-02-eks-bootstrap:3:3",
+    "plan_id": "plan-gf-02-eks-bootstrap-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:verify_components",
+    "question": "Plan for goal 'gf-02-eks-bootstrap' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

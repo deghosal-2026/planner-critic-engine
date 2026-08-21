@@ -1,0 +1,264 @@
+{
+  "dimension": "core-api",
+  "goal_id": "fin-03-budget-alert-rollout",
+  "duration_seconds": 18.75,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "fin-03-budget-alert-rollout",
+    "goal_id": "fin-03-budget-alert-rollout",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-21T00:02:50.396832Z",
+    "tasks": [
+      {
+        "id": "define_tag_policy",
+        "description": "Define tag policy for AWS resources (owner, environment, cost-center)",
+        "action": "define policy",
+        "target": "AWS Tagging",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AWS environment is configured",
+            "fact": "aws_env_setup",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "tag policy deployment success",
+          "how": "run policy validation script",
+          "expected": "no errors"
+        },
+        "rollback": {
+          "trigger": "policy conflicts arise",
+          "action": "revert to previous policy",
+          "safety_guard": "document findings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "apply_scp",
+        "description": "Apply tag policy via SCP across the organization",
+        "action": "apply scp",
+        "target": "AWS SCP",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Tag policy is defined and validated",
+            "fact": "tag_policy_defined",
+            "established_by": "define_tag_policy",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "SCP application success",
+          "how": "check SCP configuration",
+          "expected": "SCPs match defined policy"
+        },
+        "rollback": {
+          "trigger": "SCP application fails",
+          "action": "remove current SCP",
+          "safety_guard": "audit SCP changes"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_aws_budgets",
+        "description": "Configure AWS Budgets for each account and team",
+        "action": "configure budgets",
+        "target": "AWS Budgets",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "SCP is applied successfully",
+            "fact": "scp_applied",
+            "established_by": "apply_scp",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_sns_alerts",
+        "description": "Set up SNS alerts for 50%/80%/100% budget thresholds",
+        "action": "configure SNS alerts",
+        "target": "SNS",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AWS Budgets are configured",
+            "fact": "budgets_configured",
+            "established_by": "configure_aws_budgets",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create_anomaly_detection_alerts",
+        "description": "Create anomaly detection alerts in AWS",
+        "action": "set up alerts",
+        "target": "AWS Anomaly Detection",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "SNS alerts are set up",
+            "fact": "sns_alerts_setup",
+            "established_by": "setup_sns_alerts",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_alerts",
+        "description": "Verify that alerts fire correctly",
+        "action": "run alert checks",
+        "target": "alert verification",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Anomaly detection alerts are created",
+            "fact": "anomaly_alerts_created",
+            "established_by": "create_anomaly_detection_alerts",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "alert firing status",
+          "how": "trigger test events",
+          "expected": "alerts fire as expected"
+        },
+        "rollback": {
+          "trigger": "alerts do not fire",
+          "action": "reconfigure alert settings",
+          "safety_guard": "maintain backup of original settings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define_tag_policy",
+        "to_task": "apply_scp",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "apply_scp",
+        "to_task": "configure_aws_budgets",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_aws_budgets",
+        "to_task": "setup_sns_alerts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_sns_alerts",
+        "to_task": "create_anomaly_detection_alerts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_anomaly_detection_alerts",
+        "to_task": "verify_alerts",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:define_tag_policy",
+      "task_id": "define_tag_policy",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The AWS environment configuration prerequisite is not confirmed as being established, making the tag policy definition potentially unachievable.",
+      "suggested_fix": "Ensure the AWS environment is correctly configured before defining the tag policy."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:configure_aws_budgets",
+      "task_id": "configure_aws_budgets",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task depends on 'SCP is applied successfully' as a hard dependency, but the verification method for applying the SCP does not guarantee that it has been successfully applied.",
+      "suggested_fix": "Add a verification step for successful application of the SCP before proceeding to configure AWS Budgets."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:setup_sns_alerts",
+      "task_id": "setup_sns_alerts",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task depends on 'AWS Budgets are configured' as a hard dependency; however, there is no verification step to confirm that budgets are indeed configured before setting up SNS alerts.",
+      "suggested_fix": "Implement a verification step for AWS Budgets configuration before moving to set up SNS alerts."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:create_anomaly_detection_alerts",
+      "task_id": "create_anomaly_detection_alerts",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "This task depends on 'SNS alerts are set up', but there is no verification to confirm that SNS alerts were successfully set up prior to creating anomaly detection alerts.",
+      "suggested_fix": "Add a verification step to check the success of SNS alerts setup before creating anomaly detection alerts."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:verify_alerts",
+      "task_id": "verify_alerts",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task is dependent on 'Anomaly detection alerts are created', which lacks verification to confirm the successful creation of the alerts before proceeding to verification.",
+      "suggested_fix": "Ensure a verification step is included to confirm the successful creation of anomaly detection alerts before verification of alerts."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

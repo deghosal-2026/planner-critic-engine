@@ -1,0 +1,294 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-09-cluster-autoscaler",
+  "duration_seconds": 13.23,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "k8s-09-cluster-autoscaler",
+    "goal_id": "k8s-09-cluster-autoscaler",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-21T00:08:13.292399Z",
+    "tasks": [
+      {
+        "id": "install_helm",
+        "description": "Install Helm for package management",
+        "action": "install",
+        "target": "Helm",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Helm is not already installed",
+            "fact": "helm_not_installed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "install_autoscaler",
+        "description": "Install cluster-autoscaler via Helm",
+        "action": "install",
+        "target": "cluster-autoscaler",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "cluster-autoscaler deployment",
+          "how": "check deployment status",
+          "expected": "deployed and running"
+        },
+        "rollback": {
+          "trigger": "installation fails",
+          "action": "uninstall cluster-autoscaler",
+          "safety_guard": "verify no leftover resources"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_autodiscovery",
+        "description": "Configure node group auto-discovery for cluster-autoscaler",
+        "action": "configure",
+        "target": "autoscaler",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "auto-discovery configuration",
+          "how": "validate settings",
+          "expected": "correctly configured for node-groups"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "restore previous configuration",
+          "safety_guard": "verify no disruption to cluster"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "set_min_max_node_counts",
+        "description": "Set min/max node counts per group",
+        "action": "set",
+        "target": "node-group-config",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "auto-discovery is configured",
+            "fact": "autoscaler_configured",
+            "established_by": "configure_autodiscovery",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "tune_scale_down_delay",
+        "description": "Tune scale-down delay to 10 minutes",
+        "action": "configure",
+        "target": "scale-down-delay",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "min/max node counts are set",
+            "fact": "node_counts_set",
+            "established_by": "set_min_max_node_counts",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_scale_up",
+        "description": "Verify scale-up triggers on pending pods",
+        "action": "verify",
+        "target": "scale-up",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "pending pods",
+          "how": "check pod status",
+          "expected": "no pending pods exceed limits"
+        },
+        "rollback": {
+          "trigger": "scale-up verification fails",
+          "action": "investigate pending pods",
+          "safety_guard": "ensure resources are available"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_scale_down",
+        "description": "Verify scale-down drains nodes gracefully",
+        "action": "verify",
+        "target": "scale-down",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "drained nodes",
+          "how": "check node status",
+          "expected": "nodes drained successfully"
+        },
+        "rollback": {
+          "trigger": "graceful drain fails",
+          "action": "restore drained nodes",
+          "safety_guard": "ensure minimal disruption"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_pod_disruption",
+        "description": "Monitor for pod disruption during autoscaling",
+        "action": "monitor",
+        "target": "pod-disruption-budgets",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "scale-up and scale-down verifications are successful",
+            "fact": "scale_verifications_passed",
+            "established_by": "verify_scale_up",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "install_helm",
+        "to_task": "install_autoscaler",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "install_autoscaler",
+        "to_task": "configure_autodiscovery",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_autodiscovery",
+        "to_task": "set_min_max_node_counts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set_min_max_node_counts",
+        "to_task": "tune_scale_down_delay",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "tune_scale_down_delay",
+        "to_task": "verify_scale_up",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_scale_up",
+        "to_task": "verify_scale_down",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_scale_down",
+        "to_task": "monitor_pod_disruption",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:weak_rollback:install_autoscaler",
+      "task_id": "install_autoscaler",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for uninstalling cluster-autoscaler does not ensure proper resource cleanup, potentially leading to leftover resources.",
+      "suggested_fix": "Enhance the rollback action to include verification that all resources are successfully removed."
+    },
+    {
+      "id": "crit:1:weak_rollback:configure_autodiscovery",
+      "task_id": "configure_autodiscovery",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback procedure does not detail how to restore the previous configuration, creating a risk of disruption.",
+      "suggested_fix": "Specify a detailed rollback action that includes restoring all relevant configuration settings."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:set_min_max_node_counts",
+      "task_id": "set_min_max_node_counts",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "This task depends on 'autoscaler_configured' but it is not established by the preceding task due to a missing verification step.",
+      "suggested_fix": "Add a verification step in 'configure_autodiscovery' to validate the successful configuration before proceeding."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:tune_scale_down_delay",
+      "task_id": "tune_scale_down_delay",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "This task relies on 'node_counts_set', which is established by 'set_min_max_node_counts' but lacks verification to ensure it is actually set.",
+      "suggested_fix": "Implement a verification step after 'set_min_max_node_counts' to confirm that the counts have been successfully applied."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:monitor_pod_disruption",
+      "task_id": "monitor_pod_disruption",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "This task requires 'scale_verifications_passed', but the verification conditions for this fact are not clearly provided or established.",
+      "suggested_fix": "Set up a fact verification process in 'verify_scale_up' or 'verify_scale_down' to ensure that all necessary conditions are met before monitoring."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

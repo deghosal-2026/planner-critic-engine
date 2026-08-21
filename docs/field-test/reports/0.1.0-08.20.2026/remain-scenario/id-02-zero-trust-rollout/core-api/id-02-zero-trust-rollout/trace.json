@@ -1,0 +1,501 @@
+{
+  "dimension": "core-api",
+  "goal_id": "id-02-zero-trust-rollout",
+  "duration_seconds": 83.82,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-id-02-zero-trust-rollout-r3",
+    "goal_id": "id-02-zero-trust-rollout",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-id-02-zero-trust-rollout-r2",
+    "created_at": "2026-08-21T00:04:21.947175Z",
+    "tasks": [
+      {
+        "id": "check_k8s_accessibility",
+        "description": "Check if the Kubernetes cluster is accessible",
+        "action": "check",
+        "target": "k8s",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Kubernetes cluster accessibility",
+          "how": "ping the cluster and check response",
+          "expected": "Kubernetes cluster responds successfully"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "low"
+      },
+      {
+        "id": "deploy_internal_ca",
+        "description": "Deploy the internal Certificate Authority using cert-manager",
+        "action": "deploy",
+        "target": "cert-manager",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kubernetes cluster is accessible",
+            "fact": "k8s_accessible",
+            "established_by": "check_k8s_accessibility",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "internal CA deployment status",
+          "how": "check cert-manager logs",
+          "expected": "cert-manager is running without errors"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "revert to previous configuration",
+          "safety_guard": "ensure previous cert-manager version is stable"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_internal_ca_deployed",
+        "description": "Verify that the internal Certificate Authority is successfully deployed",
+        "action": "verify",
+        "target": "internal_ca",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Internal CA is deployed",
+            "fact": "internal_ca_deployed",
+            "established_by": "deploy_internal_ca",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "internal CA status",
+          "how": "check internal CA logs",
+          "expected": "internal CA is functioning properly"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "revert internal CA deployment",
+          "safety_guard": "ensure internal CA functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "issue_mtls_certs",
+        "description": "Issue mTLS certificates to all services",
+        "action": "issue_certs",
+        "target": "all_services",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "internal CA is deployed and verified",
+            "fact": "internal_ca_verified",
+            "established_by": "verify_internal_ca_deployed",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "certificate validity",
+          "how": "check certs with openssl",
+          "expected": "all certs are valid and issued correctly"
+        },
+        "rollback": {
+          "trigger": "cert issuance fails",
+          "action": "remove issued certs",
+          "safety_guard": "validate no services are using incomplete certs"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_mtls_certs_issued",
+        "description": "Verify that the mTLS certificates have been issued correctly",
+        "action": "verify",
+        "target": "mtls_certs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "mTLS certificates are issued",
+            "fact": "mtls_certs_issued",
+            "established_by": "issue_mtls_certs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "mTLS certificates issuance",
+          "how": "review certificate issuance logs",
+          "expected": "mTLS certificates are issued correctly"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "invalidate mTLS certs",
+          "safety_guard": "ensure no services are operating with invalid certs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_service_mesh",
+        "description": "Configure Istio service mesh with strict mTLS settings",
+        "action": "configure",
+        "target": "Istio",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "mTLS certificates are issued and verified",
+            "fact": "mtls_certs_verified",
+            "established_by": "verify_mtls_certs_issued",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Istio mTLS configuration",
+          "how": "check Istio config via kubectl",
+          "expected": "mTLS is enabled and set to STRICT"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "revert Istio configuration",
+          "safety_guard": "ensure previous Istio settings are restored"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_service_mesh_configured",
+        "description": "Verify that the service mesh is configured correctly",
+        "action": "verify",
+        "target": "service_mesh",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Service mesh is configured",
+            "fact": "service_mesh_configured",
+            "established_by": "configure_service_mesh",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Service Mesh configuration status",
+          "how": "check Istio configuration via logs",
+          "expected": "Service Mesh is configured correctly"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "revert service mesh configuration",
+          "safety_guard": "ensure previous traffic settings are active"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_identity_aware_proxy",
+        "description": "Deploy identity-aware proxy using Google IAP or AWS ALB with OIDC",
+        "action": "deploy",
+        "target": "identity_proxy",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Service mesh is configured and verified",
+            "fact": "service_mesh_verified",
+            "established_by": "verify_service_mesh_configured",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "identity-aware proxy status",
+          "how": "check proxy logs and health checks",
+          "expected": "identity proxy deployed and accessible"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "tear down identity proxy",
+          "safety_guard": "validate no services are routed through proxy"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_identity_proxy_deployed",
+        "description": "Verify that the identity-aware proxy is successfully deployed",
+        "action": "verify",
+        "target": "identity_proxy",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Identity-aware proxy is deployed",
+            "fact": "identity_proxy_deployed",
+            "established_by": "deploy_identity_aware_proxy",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Identity Proxy status",
+          "how": "check deployment logs",
+          "expected": "Identity Proxy is functioning correctly"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "revert identity proxy deployment",
+          "safety_guard": "ensure no services are dependent on proxy"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_egress_firewall",
+        "description": "Configure egress firewall rules with default deny plus allowlist",
+        "action": "configure",
+        "target": "firewall_rules",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "identity-aware proxy is deployed and verified",
+            "fact": "identity_proxy_verified",
+            "established_by": "verify_identity_proxy_deployed",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "egress firewall rules",
+          "how": "review firewall logs",
+          "expected": "only allowlisted traffic is permitted"
+        },
+        "rollback": {
+          "trigger": "egress configuration issues",
+          "action": "revert to previous firewall settings",
+          "safety_guard": "ensure no traffic is interrupted"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_mtls_traffic",
+        "description": "Verify that all service-to-service traffic uses mTLS",
+        "action": "verify",
+        "target": "service_traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "service mesh is configured",
+            "fact": "service_mesh_configured",
+            "established_by": "configure_service_mesh",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Check service-to-service traffic",
+          "how": "run traffic checks and review logs",
+          "expected": "All traffic uses mTLS"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "review configuration",
+          "safety_guard": "ensure traffic rules are not interrupted"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_k8s_accessibility",
+        "to_task": "deploy_internal_ca",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_internal_ca",
+        "to_task": "verify_internal_ca_deployed",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_internal_ca_deployed",
+        "to_task": "issue_mtls_certs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "issue_mtls_certs",
+        "to_task": "verify_mtls_certs_issued",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_mtls_certs_issued",
+        "to_task": "configure_service_mesh",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_service_mesh",
+        "to_task": "verify_service_mesh_configured",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_service_mesh_configured",
+        "to_task": "deploy_identity_aware_proxy",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_identity_aware_proxy",
+        "to_task": "verify_identity_proxy_deployed",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_identity_proxy_deployed",
+        "to_task": "configure_egress_firewall",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_service_mesh",
+        "to_task": "verify_mtls_traffic",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:feasibility:check_k8s_accessibility",
+      "task_id": "check_k8s_accessibility",
+      "version": 3,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Kubernetes cluster accessibility check may fail if Kubernetes is not properly set up for production environment.",
+      "suggested_fix": "Ensure Kubernetes cluster is correctly configured and accessible before proceeding."
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:verify_internal_ca_deployed",
+      "task_id": "verify_internal_ca_deployed",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'verify_internal_ca_deployed' is sequenced before its prerequisite 'deploy_internal_ca' is completed.",
+      "suggested_fix": "Ensure 'deploy_internal_ca' task is completed before executing 'verify_internal_ca_deployed'."
+    },
+    {
+      "id": "crit:3:unverified_dependencies:issue_mtls_certs",
+      "task_id": "issue_mtls_certs",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'issue_mtls_certs' depends on 'internal_ca_verified' which has not been established.",
+      "suggested_fix": "Add a verification step after 'deploy_internal_ca' to establish 'internal_ca_verified' before proceeding to 'issue_mtls_certs'."
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:verify_mtls_certs_issued",
+      "task_id": "verify_mtls_certs_issued",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'verify_mtls_certs_issued' is sequenced before its prerequisite 'issue_mtls_certs' is completed.",
+      "suggested_fix": "Ensure 'issue_mtls_certs' task is completed before executing 'verify_mtls_certs_issued'."
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:configure_service_mesh",
+      "task_id": "configure_service_mesh",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'configure_service_mesh' is sequenced before 'verify_mtls_certs_issued' is completed.",
+      "suggested_fix": "Ensure 'verify_mtls_certs_issued' task is completed before executing 'configure_service_mesh'."
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:verify_service_mesh_configured",
+      "task_id": "verify_service_mesh_configured",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'verify_service_mesh_configured' is sequenced before its prerequisite 'configure_service_mesh' is completed.",
+      "suggested_fix": "Ensure 'configure_service_mesh' task is completed before executing 'verify_service_mesh_configured'."
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:deploy_identity_aware_proxy",
+      "task_id": "deploy_identity_aware_proxy",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'deploy_identity_aware_proxy' is sequenced before its prerequisite 'verify_service_mesh_configured' is completed.",
+      "suggested_fix": "Ensure 'verify_service_mesh_configured' task is completed before executing 'deploy_identity_aware_proxy'."
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:verify_identity_proxy_deployed",
+      "task_id": "verify_identity_proxy_deployed",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'verify_identity_proxy_deployed' is sequenced before its prerequisite 'deploy_identity_aware_proxy' is completed.",
+      "suggested_fix": "Ensure 'deploy_identity_aware_proxy' task is completed before executing 'verify_identity_proxy_deployed'."
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:configure_egress_firewall",
+      "task_id": "configure_egress_firewall",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'configure_egress_firewall' is sequenced before its prerequisite 'verify_identity_proxy_deployed' is completed.",
+      "suggested_fix": "Ensure 'verify_identity_proxy_deployed' task is completed before executing 'configure_egress_firewall'."
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:verify_mtls_traffic",
+      "task_id": "verify_mtls_traffic",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'verify_mtls_traffic' is sequenced before its prerequisite 'configure_service_mesh' is completed.",
+      "suggested_fix": "Ensure 'configure_service_mesh' task is completed before executing 'verify_mtls_traffic'."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:id-02-zero-trust-rollout:3:3",
+    "plan_id": "plan-id-02-zero-trust-rollout-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:feasibility:check_k8s_accessibility",
+    "question": "Plan for goal 'id-02-zero-trust-rollout' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=11"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

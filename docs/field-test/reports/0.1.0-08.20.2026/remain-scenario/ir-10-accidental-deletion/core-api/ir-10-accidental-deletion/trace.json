@@ -1,0 +1,232 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-10-accidental-deletion",
+  "duration_seconds": 17.21,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "ir-10-accidental-deletion-plan",
+    "goal_id": "ir-10-accidental-deletion",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-21T00:00:46.043454Z",
+    "tasks": [
+      {
+        "id": "stop-writes",
+        "description": "Stop all writes to the PostgreSQL database",
+        "action": "stop",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "database is reachable",
+            "fact": "db_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "write operations status",
+          "how": "check application logs",
+          "expected": "no write operations"
+        },
+        "rollback": {
+          "trigger": "failed to stop writes",
+          "action": "restart application services",
+          "safety_guard": "verify application is stopped"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "identify-deletion-timestamp",
+        "description": "Identify the exact deletion timestamp from logs",
+        "action": "analyze",
+        "target": "logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "logs are accessible",
+            "fact": "logs_accessible",
+            "established_by": "stop-writes",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "pitr-restore",
+        "description": "Restore the database to a point-in-time just before deletion",
+        "action": "restore",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "deletion timestamp is identified",
+            "fact": "deletion_timestamp",
+            "established_by": "identify-deletion-timestamp",
+            "probe": null
+          },
+          {
+            "description": "backup exists for PITR",
+            "fact": "backup_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "database state",
+          "how": "check database integrity",
+          "expected": "database state prior to deletion"
+        },
+        "rollback": {
+          "trigger": "PITR restore fails",
+          "action": "restore from last backup",
+          "safety_guard": "verify backup integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "reconcile-data",
+        "description": "Reconcile any data created after the restore point from application logs",
+        "action": "reapply",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PITR restore completed successfully",
+            "fact": "pitr_success",
+            "established_by": "pitr-restore",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data integrity",
+          "how": "compare restored data with application logs",
+          "expected": "data is consistent"
+        },
+        "rollback": {
+          "trigger": "data reconciliation fails",
+          "action": "restore database to PITR state",
+          "safety_guard": "verify post-reconcile data integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "implement-preventive-controls",
+        "description": "Implement preventive controls for future data drops",
+        "action": "implement",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "stop-writes",
+        "to_task": "identify-deletion-timestamp",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "identify-deletion-timestamp",
+        "to_task": "pitr-restore",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "pitr-restore",
+        "to_task": "reconcile-data",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:pitr-restore",
+      "task_id": "pitr-restore",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The PITR restore task depends on identifying the deletion timestamp, which has not been verified as part of previous tasks.",
+      "suggested_fix": "Ensure the deletion timestamp is identified and available before executing the PITR restore."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:pitr-restore",
+      "task_id": "pitr-restore",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The PITR restore task depends on the availability of a backup, which is never established as verified in previous tasks.",
+      "suggested_fix": "Add a verification step to confirm that a backup is available before proceeding with the PITR restore."
+    },
+    {
+      "id": "crit:1:weak_rollback:pitr-restore",
+      "task_id": "pitr-restore",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for the PITR restore action relies on restoring from the last backup without validating its integrity.",
+      "suggested_fix": "Implement a safety guard to verify the integrity of the last backup before rolling back."
+    },
+    {
+      "id": "crit:1:missing_steps:stop-writes",
+      "task_id": "stop-writes",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The plan does not include verification of stopping write operations before proceeding to other tasks.",
+      "suggested_fix": "Include a confirmation step to ensure that all write operations have truly stopped."
+    },
+    {
+      "id": "crit:1:missing_steps:identify-deletion-timestamp",
+      "task_id": "identify-deletion-timestamp",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The plan lacks a step to verify that the deletion timestamp has been accurately identified.",
+      "suggested_fix": "Add a verification step to confirm that the deletion timestamp is correct after analysis."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

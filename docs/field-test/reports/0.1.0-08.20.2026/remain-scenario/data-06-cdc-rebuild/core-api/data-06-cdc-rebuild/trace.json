@@ -1,0 +1,261 @@
+{
+  "dimension": "core-api",
+  "goal_id": "data-06-cdc-rebuild",
+  "duration_seconds": 26.59,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-data-06-cdc-rebuild-r2",
+    "goal_id": "data-06-cdc-rebuild",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "data-06-cdc-rebuild-plan",
+    "created_at": "2026-08-21T00:11:25.397187Z",
+    "tasks": [
+      {
+        "id": "identify_cause",
+        "description": "Identify the cause of the replication lag due to consumer outage",
+        "action": "investigate",
+        "target": "system_logs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "root cause identified",
+          "how": "review investigation summary",
+          "expected": "consumer outage reported"
+        },
+        "rollback": {
+          "trigger": "investigation fails",
+          "action": "revert to previous logs",
+          "safety_guard": "confirm logs integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "capture_wal_position",
+        "description": "Capture the current WAL position",
+        "action": "capture",
+        "target": "wal_position",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "lag cause identified",
+            "fact": "cause_identified",
+            "established_by": "identify_cause",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "WAL position captured",
+          "how": "check WAL position log",
+          "expected": "current WAL position is recorded"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "replay_changes",
+        "description": "Replay missed changes from WAL archive",
+        "action": "replay",
+        "target": "wal_archive",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "changes applied",
+          "how": "compare with source data",
+          "expected": "data matches source"
+        },
+        "rollback": {
+          "trigger": "replay fails",
+          "action": "reset to last checkpoint",
+          "safety_guard": "verify checkpoint integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_parity",
+        "description": "Verify data parity between source and target",
+        "action": "verify",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data parity",
+          "how": "hash comparison",
+          "expected": "parity confirmed"
+        },
+        "rollback": {
+          "trigger": "parity check fails",
+          "action": "revert to previous state",
+          "safety_guard": "ensure state consistency"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover_consumers",
+        "description": "Cutover consumers back to real-time CDC stream",
+        "action": "cutover",
+        "target": "consumers",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "consumers online",
+          "how": "monitor consumer metrics",
+          "expected": "consumers are processing"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "switch back to old stream",
+          "safety_guard": "confirm no unprocessed events"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor",
+        "description": "Monitor the CDC pipeline for stability and performance",
+        "action": "monitor",
+        "target": "pipeline",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cutover completed",
+            "fact": "cutover_successful",
+            "established_by": "cutover_consumers",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "pipeline performance",
+          "how": "check predefined metrics",
+          "expected": "metrics in acceptable ranges"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "identify_cause",
+        "to_task": "capture_wal_position",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "capture_wal_position",
+        "to_task": "replay_changes",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "replay_changes",
+        "to_task": "verify_parity",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_parity",
+        "to_task": "cutover_consumers",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover_consumers",
+        "to_task": "monitor",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:capture_wal_position",
+      "task_id": "capture_wal_position",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'capture_wal_position' depends on 'identify_cause' but does not verify that the cause has been identified before execution.",
+      "suggested_fix": "Add a precondition that confirms the identification of the cause of replication lag."
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:replay_changes",
+      "task_id": "replay_changes",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'replay_changes' should depend on 'capture_wal_position' to ensure the current WAL position is available before replaying changes.",
+      "suggested_fix": "Make 'capture_wal_position' a hard prerequisite for 'replay_changes'."
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:verify_parity",
+      "task_id": "verify_parity",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'verify_parity' should depend on 'replay_changes' to ensure changes are applied before verifying data parity.",
+      "suggested_fix": "Make 'replay_changes' a hard prerequisite for 'verify_parity'."
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:cutover_consumers",
+      "task_id": "cutover_consumers",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'cutover_consumers' should depend on 'verify_parity' to ensure data parity is confirmed before cutover.",
+      "suggested_fix": "Make 'verify_parity' a hard prerequisite for 'cutover_consumers'."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:monitor",
+      "task_id": "monitor",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'monitor' depends on 'cutover_consumers' but does not verify that the cutover was successful before monitoring.",
+      "suggested_fix": "Add a precondition that confirms the successful cutover before monitoring."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:data-06-cdc-rebuild:2:2",
+    "plan_id": "plan-data-06-cdc-rebuild-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unverified_dependencies:capture_wal_position",
+    "question": "Plan for goal 'data-06-cdc-rebuild' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

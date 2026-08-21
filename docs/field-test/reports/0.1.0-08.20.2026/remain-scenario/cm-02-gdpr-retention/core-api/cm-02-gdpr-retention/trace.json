@@ -1,0 +1,307 @@
+{
+  "dimension": "core-api",
+  "goal_id": "cm-02-gdpr-retention",
+  "duration_seconds": 22.33,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "cm-02-gdpr-retention-plan",
+    "goal_id": "cm-02-gdpr-retention",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-21T00:02:03.038747Z",
+    "tasks": [
+      {
+        "id": "classify_data",
+        "description": "Classify data types by retention period",
+        "action": "classify",
+        "target": "data_types",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Environment is set up for classification",
+            "fact": "env_setup_completed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "build_postgresql_pipeline",
+        "description": "Build deletion pipeline for PostgreSQL",
+        "action": "build_pipeline",
+        "target": "postgresql",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data classification completed",
+            "fact": "data_classified",
+            "established_by": "classify_data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deletion pipeline functionality",
+          "how": "run test deletions",
+          "expected": "successful deletions without errors"
+        },
+        "rollback": {
+          "trigger": "pipeline fails",
+          "action": "revert to manual deletion process",
+          "safety_guard": "verify data integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "build_elasticsearch_pipeline",
+        "description": "Build deletion pipeline for Elasticsearch",
+        "action": "build_pipeline",
+        "target": "elasticsearch",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data classification completed",
+            "fact": "data_classified",
+            "established_by": "classify_data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deletion pipeline functionality",
+          "how": "run test deletions",
+          "expected": "successful deletions without errors"
+        },
+        "rollback": {
+          "trigger": "pipeline fails",
+          "action": "revert to manual deletion process",
+          "safety_guard": "verify data integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "build_s3_pipeline",
+        "description": "Build deletion pipeline for S3",
+        "action": "build_pipeline",
+        "target": "s3",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data classification completed",
+            "fact": "data_classified",
+            "established_by": "classify_data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deletion pipeline functionality",
+          "how": "run test deletions",
+          "expected": "successful deletions without errors"
+        },
+        "rollback": {
+          "trigger": "pipeline fails",
+          "action": "revert to manual deletion process",
+          "safety_guard": "verify data integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_audit_logging",
+        "description": "Configure audit logging for all deletions",
+        "action": "configure",
+        "target": "audit_logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Deletion pipelines built",
+            "fact": "pipelines_built",
+            "established_by": "build_postgresql_pipeline",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_lifecycle_policies",
+        "description": "Set up archive lifecycle policies for retention",
+        "action": "setup",
+        "target": "lifecycle_policies",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Deletion pipelines built",
+            "fact": "pipelines_built",
+            "established_by": "build_postgresql_pipeline",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_retention_rules",
+        "description": "Verify retention rules are enforced",
+        "action": "verify",
+        "target": "retention_rules",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Audit logging configured",
+            "fact": "audit_logs_configured",
+            "established_by": "configure_audit_logging",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "compliance with retention rules",
+          "how": "audit retention logs",
+          "expected": "all rules enforced according to classification"
+        },
+        "rollback": {
+          "trigger": "retention rules not enforced",
+          "action": "reassess and adjust policies",
+          "safety_guard": "ensure compliance with GDPR"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "classify_data",
+        "to_task": "build_postgresql_pipeline",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "classify_data",
+        "to_task": "build_elasticsearch_pipeline",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "classify_data",
+        "to_task": "build_s3_pipeline",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "build_postgresql_pipeline",
+        "to_task": "configure_audit_logging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "build_elasticsearch_pipeline",
+        "to_task": "configure_audit_logging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "build_s3_pipeline",
+        "to_task": "configure_audit_logging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "build_postgresql_pipeline",
+        "to_task": "setup_lifecycle_policies",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "build_elasticsearch_pipeline",
+        "to_task": "setup_lifecycle_policies",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "build_s3_pipeline",
+        "to_task": "setup_lifecycle_policies",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_audit_logging",
+        "to_task": "verify_retention_rules",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_lifecycle_policies",
+        "to_task": "verify_retention_rules",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unverified_dependencies:configure_audit_logging",
+      "task_id": "configure_audit_logging",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task requires confirmation of the deletion pipelines being built, which is not guaranteed before execution.",
+      "suggested_fix": "Ensure 'pipelines_built' is verified before this task or add a verification step."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:setup_lifecycle_policies",
+      "task_id": "setup_lifecycle_policies",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task requires confirmation of the deletion pipelines being built, which is not guaranteed before execution.",
+      "suggested_fix": "Ensure 'pipelines_built' is verified before this task or add a verification step."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:verify_retention_rules",
+      "task_id": "verify_retention_rules",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task depends on both audit logging and lifecycle policies being configured, which happen after the deletion pipelines are built, risking execution in an incorrect order.",
+      "suggested_fix": "Ensure the sequencing guarantees that both audit logging and lifecycle policies are completed before this task."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

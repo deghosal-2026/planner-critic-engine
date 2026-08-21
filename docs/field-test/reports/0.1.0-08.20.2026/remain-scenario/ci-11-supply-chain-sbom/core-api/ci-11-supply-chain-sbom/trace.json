@@ -1,0 +1,215 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-11-supply-chain-sbom",
+  "duration_seconds": 12.16,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "ci-11-supply-chain-sbom-v1",
+    "goal_id": "ci-11-supply-chain-sbom",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T23:59:34.407386Z",
+    "tasks": [
+      {
+        "id": "integrate-syft",
+        "description": "Integrate Syft for SBOM generation in all CI pipelines",
+        "action": "integrate",
+        "target": "Syft",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "SBOM generation",
+          "how": "check CI logs",
+          "expected": "SBOM files generated correctly"
+        },
+        "rollback": {
+          "trigger": "integration fails",
+          "action": "remove Syft integration",
+          "safety_guard": "ensure pipelines run without errors"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "sign-images",
+        "description": "Sign container images with Cosign",
+        "action": "sign",
+        "target": "images",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "image signatures",
+          "how": "run Cosign verify command",
+          "expected": "valid signatures for all images"
+        },
+        "rollback": {
+          "trigger": "signing fails",
+          "action": "disable Cosign signing",
+          "safety_guard": "ensure images are not used in production"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "generate-provenance",
+        "description": "Generate SLSA Level 3 provenance attestation",
+        "action": "generate",
+        "target": "provenance",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "provenance attestation",
+          "how": "check provenance logs",
+          "expected": "valid SLSA Level 3 attestation"
+        },
+        "rollback": {
+          "trigger": "generation fails",
+          "action": "remove provenance generation process",
+          "safety_guard": "ensure previous version is in use"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-policy",
+        "description": "Configure policy enforcement to reject unsigned images in production",
+        "action": "configure",
+        "target": "policy",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "policy behavior",
+          "how": "test deployment scenarios",
+          "expected": "only signed images are allowed"
+        },
+        "rollback": {
+          "trigger": "policy blocks deployments",
+          "action": "disable policy enforcement",
+          "safety_guard": "review logs for legitimate deploys"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-deploys",
+        "description": "Verify that all deployed images have valid signatures and SBOM",
+        "action": "verify",
+        "target": "deployments",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "images must be signed",
+            "fact": "image_signed",
+            "established_by": "sign-images",
+            "probe": null
+          },
+          {
+            "description": "SBOM must exist",
+            "fact": "sbom_exists",
+            "established_by": "integrate-syft",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "integrate-syft",
+        "to_task": "sign-images",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "sign-images",
+        "to_task": "generate-provenance",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "generate-provenance",
+        "to_task": "configure-policy",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-policy",
+        "to_task": "verify-deploys",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:sign-images",
+      "task_id": "sign-images",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The 'sign-images' task is ordered before the prerequisite 'integrate-syft' task is verified to be completed.",
+      "suggested_fix": "Reorder tasks so that 'integrate-syft' is completed and verified prior to 'sign-images'."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:verify-deploys",
+      "task_id": "verify-deploys",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'verify-deploys' task has unverified dependencies on both 'sign-images' and 'integrate-syft'.",
+      "suggested_fix": "Ensure that 'sign-images' and 'integrate-syft' are completed and verified before running 'verify-deploys'."
+    },
+    {
+      "id": "crit:1:weak_rollback:sign-images",
+      "task_id": "sign-images",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback plan for 'sign-images' does not guarantee that images won\u2019t be used in production if signing fails.",
+      "suggested_fix": "Revise the rollback to ensure that images are halted in production until a successful signing is verified."
+    },
+    {
+      "id": "crit:1:weak_rollback:configure-policy",
+      "task_id": "configure-policy",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback plan for 'configure-policy' does not guarantee that only valid deployments are reviewed; legitimate deploys could be missed.",
+      "suggested_fix": "Enhance rollback to include a comprehensive review of all logs to ensure that no legitimate deployments are lost."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

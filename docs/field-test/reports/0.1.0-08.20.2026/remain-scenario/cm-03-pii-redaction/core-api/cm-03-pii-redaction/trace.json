@@ -1,0 +1,192 @@
+{
+  "dimension": "core-api",
+  "goal_id": "cm-03-pii-redaction",
+  "duration_seconds": 11.1,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "cm-03-pii-redaction-plan",
+    "goal_id": "cm-03-pii-redaction",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-21T00:02:15.152719Z",
+    "tasks": [
+      {
+        "id": "identify_pii",
+        "description": "Identify all PII fields in application logs",
+        "action": "scan",
+        "target": "logs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "identified PII fields",
+          "how": "review logs",
+          "expected": "all PII fields listed"
+        },
+        "rollback": {
+          "trigger": "identification fails",
+          "action": "revert to previous scan parameters",
+          "safety_guard": "validate previous scan integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_redaction_sidecar",
+        "description": "Deploy a log redaction sidecar using FluentBit with Lua filter",
+        "action": "deploy",
+        "target": "FluentBit",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "sidecar deployment status",
+          "how": "check deployment logs",
+          "expected": "sidecar running without errors"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "remove sidecar and revert configuration",
+          "safety_guard": "check deployment status"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_elasticsearch_pipeline",
+        "description": "Configure Elasticsearch ingest pipelines for redaction",
+        "action": "configure",
+        "target": "Elasticsearch",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Elasticsearch pipeline configuration",
+          "how": "check pipeline status",
+          "expected": "configuration matches requirements"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "restore previous configuration",
+          "safety_guard": "validate configuration backup"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_redaction",
+        "description": "Verify redaction is working on sampled logs",
+        "action": "verify",
+        "target": "sampled logs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "redacted logs",
+          "how": "sample logs and check PII presence",
+          "expected": "no PII present in logs"
+        },
+        "rollback": {
+          "trigger": "redaction verification fails",
+          "action": "disable redaction rules",
+          "safety_guard": "monitor logs for new PII exposure"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "tune_false_positive_rate",
+        "description": "Tune false-positive rate of the redaction regex",
+        "action": "tune",
+        "target": "regex",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "identify_pii",
+        "to_task": "deploy_redaction_sidecar",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_redaction_sidecar",
+        "to_task": "configure_elasticsearch_pipeline",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_elasticsearch_pipeline",
+        "to_task": "verify_redaction",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_redaction",
+        "to_task": "tune_false_positive_rate",
+        "kind": "soft",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:deploy_redaction_sidecar",
+      "task_id": "deploy_redaction_sidecar",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'deploy_redaction_sidecar' is not sequenced after its prerequisite task 'identify_pii'. It depends on the identification of PII fields before deployment can proceed.",
+      "suggested_fix": "Ensure 'identify_pii' completes successfully before executing 'deploy_redaction_sidecar'."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:tune_false_positive_rate",
+      "task_id": "tune_false_positive_rate",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'tune_false_positive_rate' is sequenced after 'verify_redaction' but does not have a verified output dependency since its verification method is not specified.",
+      "suggested_fix": "Define a verification step for 'tune_false_positive_rate' to ensure it has a validated outcome from 'verify_redaction'."
+    },
+    {
+      "id": "crit:1:missing_steps:tune_false_positive_rate",
+      "task_id": "tune_false_positive_rate",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The task 'tune_false_positive_rate' does not include a rollback plan, which may lead to difficulties in reverting changes if tuning leads to undesirable outcomes.",
+      "suggested_fix": "Add a rollback plan for 'tune_false_positive_rate' to handle potential issues arising from regex adjustments."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

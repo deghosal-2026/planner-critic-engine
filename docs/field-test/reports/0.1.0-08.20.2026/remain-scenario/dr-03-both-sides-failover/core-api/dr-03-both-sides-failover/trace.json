@@ -1,0 +1,254 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dr-03-both-sides-failover",
+  "duration_seconds": 17.19,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "dr-03-both-sides-failover-v1",
+    "goal_id": "dr-03-both-sides-failover",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-21T00:02:27.484811Z",
+    "tasks": [
+      {
+        "id": "failover-dns",
+        "description": "Failover DNS from primary to secondary region",
+        "action": "update",
+        "target": "Route53 DNS records",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "primary DNS is operational",
+            "fact": "primary_dns_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "DNS resolution",
+          "how": "query DNS records",
+          "expected": "secondary DNS resolves correctly"
+        },
+        "rollback": {
+          "trigger": "DNS failover not successful",
+          "action": "restore primary DNS settings",
+          "safety_guard": "confirm primary DNS functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "scale-up-secondary",
+        "description": "Scale up application in secondary region",
+        "action": "scale",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Route53 DNS failover is successful",
+            "fact": "dns_failover_complete",
+            "established_by": "failover-dns",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application health in secondary region",
+          "how": "run health checks via Prometheus",
+          "expected": "secondary application is healthy"
+        },
+        "rollback": {
+          "trigger": "scale up fails",
+          "action": "scale down secondary application deployment",
+          "safety_guard": "ensure primary still serves traffic"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "scale-down-primary",
+        "description": "Scale down application in primary region",
+        "action": "scale",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "secondary application is running and healthy",
+            "fact": "secondary_app_healthy",
+            "established_by": "scale-up-secondary",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-secondary",
+        "description": "Verify application health in secondary region",
+        "action": "check",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "secondary application deployment has scaled up",
+            "fact": "secondary_app_scaled",
+            "established_by": "scale-up-secondary",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutback-traffic",
+        "description": "Cutback traffic to primary region to prevent split-brain",
+        "action": "update",
+        "target": "traffic distribution",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "secondary application confirmed healthy",
+            "fact": "secondary_app_verified",
+            "established_by": "verify-secondary",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic flow status",
+          "how": "monitor traffic distribution",
+          "expected": "traffic primarily to secondary"
+        },
+        "rollback": {
+          "trigger": "traffic cutback fails",
+          "action": "restore full traffic to primary",
+          "safety_guard": "monitor for split-brain conditions"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "final-check",
+        "description": "Perform final health check for both regions",
+        "action": "check",
+        "target": "overall system",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "traffic cutback is successful",
+            "fact": "traffic_cutback_done",
+            "established_by": "cutback-traffic",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "failover-dns",
+        "to_task": "scale-up-secondary",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "scale-up-secondary",
+        "to_task": "scale-down-primary",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "scale-up-secondary",
+        "to_task": "verify-secondary",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-secondary",
+        "to_task": "cutback-traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutback-traffic",
+        "to_task": "final-check",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:scale-down-primary",
+      "task_id": "scale-down-primary",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Scaling down the primary application is ordered before verifying the health of the secondary application.",
+      "suggested_fix": "Reorder the tasks to verify that the secondary application is healthy before scaling down the primary application."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:cutback-traffic",
+      "task_id": "cutback-traffic",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Traffic cutback depends on the verification of secondary application health, but this verification step lacks rollback procedures.",
+      "suggested_fix": "Add rollback procedures for the verify-secondary task to ensure safe operation."
+    },
+    {
+      "id": "crit:1:missing_steps:final-check",
+      "task_id": "final-check",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Final check step lacks verification and rollback procedures.",
+      "suggested_fix": "Define clear verification criteria and rollback actions for the final-check task."
+    },
+    {
+      "id": "crit:1:missing_steps:scale-up-secondary",
+      "task_id": "scale-up-secondary",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Missing verification for DNS failover after scaling up the secondary application.",
+      "suggested_fix": "Add a verification step to ensure that the DNS failover was successful before proceeding with scaling up."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

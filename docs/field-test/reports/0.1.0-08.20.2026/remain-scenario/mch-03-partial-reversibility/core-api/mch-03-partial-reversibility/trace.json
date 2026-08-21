@@ -1,0 +1,157 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mch-03-partial-reversibility",
+  "duration_seconds": 21.34,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-mch-03-partial-reversibility-r3",
+    "goal_id": "mch-03-partial-reversibility",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-mch-03-partial-reversibility-r2",
+    "created_at": "2026-08-21T00:03:06.680293Z",
+    "tasks": [
+      {
+        "id": "schema_migration",
+        "description": "Apply schema migration to add column",
+        "action": "migrate",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "new column exists",
+          "how": "describe table",
+          "expected": "column present"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "DROP COLUMN",
+          "safety_guard": "verify schema integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "check_repurposing",
+        "description": "Check if the column has been repurposed",
+        "action": "check",
+        "target": "column",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "repurposed column",
+          "how": "query column metadata",
+          "expected": "no repurposing detected"
+        },
+        "rollback": {
+          "trigger": "repurposing detected",
+          "action": "alert team",
+          "safety_guard": "record repurposing event"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "data_backfill",
+        "description": "Backfill data in the new column",
+        "action": "update",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data in all rows",
+          "how": "run count and sample check",
+          "expected": "all rows updated"
+        },
+        "rollback": {
+          "trigger": "backfill fails or repurposing detected",
+          "action": "restore previous data state",
+          "safety_guard": "verify restoration integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "schema_migration",
+        "to_task": "check_repurposing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check_repurposing",
+        "to_task": "data_backfill",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:data_backfill",
+      "task_id": "data_backfill",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Data backfill is executed before verifying that the column has not been repurposed, violating the hard dependency.",
+      "suggested_fix": "Reorder tasks to ensure 'check_repurposing' is completed before 'data_backfill'."
+    },
+    {
+      "id": "crit:3:weak_rollback:data_backfill",
+      "task_id": "data_backfill",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for backfill does not account for potential changes made to the column due to repurposing.",
+      "suggested_fix": "Clarify rollback procedures to handle cases where the column has been altered."
+    },
+    {
+      "id": "crit:3:unverified_dependencies:data_backfill",
+      "task_id": "data_backfill",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Data backfill execution depends on the assumption that the column remains unrepurposed without prior verification.",
+      "suggested_fix": "Ensure that 'data_backfill' is explicitly dependent on the verification from 'check_repurposing' to prevent execution unless confirmed."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mch-03-partial-reversibility:3:3",
+    "plan_id": "plan-mch-03-partial-reversibility-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:data_backfill",
+    "question": "Plan for goal 'mch-03-partial-reversibility' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

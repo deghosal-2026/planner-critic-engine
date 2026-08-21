@@ -1,0 +1,282 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-07-tf-provider-freeze",
+  "duration_seconds": 41.37,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-plat-07-tf-provider-freeze-r3",
+    "goal_id": "plat-07-tf-provider-freeze",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-plat-07-tf-provider-freeze-r2",
+    "created_at": "2026-08-21T00:12:23.048521Z",
+    "tasks": [
+      {
+        "id": "ensure_terraform_installed",
+        "description": "Ensure Terraform is installed",
+        "action": "check",
+        "target": "terraform",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Terraform installation",
+          "how": "check installation status",
+          "expected": "Terraform is installed"
+        },
+        "rollback": {
+          "trigger": "Terraform not installed",
+          "action": "alert user",
+          "safety_guard": "retry installation process"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "inventory_providers",
+        "description": "Inventory all provider versions in use",
+        "action": "list",
+        "target": "providers",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Terraform is installed",
+            "fact": "terraform_installed",
+            "established_by": "ensure_terraform_installed",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "provider versions inventory",
+          "how": "confirm inventory count",
+          "expected": "inventory matches expected count"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "pin_versions",
+        "description": "Pin provider versions in lock files",
+        "action": "pin",
+        "target": "lock_files",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Provider versions are inventoried",
+            "fact": "providers_inventory",
+            "established_by": "inventory_providers",
+            "probe": null
+          },
+          {
+            "description": "Terraform is installed",
+            "fact": "terraform_installed",
+            "established_by": "ensure_terraform_installed",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "lock file contents",
+          "how": "compare with previous version",
+          "expected": "exact match"
+        },
+        "rollback": {
+          "trigger": "failed to pin versions",
+          "action": "restore previous lock files",
+          "safety_guard": "ensure backups of lock files are kept"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "validate_plans",
+        "description": "Validate that pinned versions produce identical plans",
+        "action": "validate",
+        "target": "plans",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Versions are pinned",
+            "fact": "versions_pinned",
+            "established_by": "pin_versions",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "plan outputs",
+          "how": "diff comparison",
+          "expected": "no differences"
+        },
+        "rollback": {
+          "trigger": "plans differ",
+          "action": "revert to previous provider versions",
+          "safety_guard": "verify backup of current state"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "test_apply_staging",
+        "description": "Test apply in staging environment",
+        "action": "apply",
+        "target": "staging_env",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Plans are validated",
+            "fact": "plans_validated",
+            "established_by": "validate_plans",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "staging environment status",
+          "how": "check resource states",
+          "expected": "resources in desired state"
+        },
+        "rollback": {
+          "trigger": "apply fails",
+          "action": "restore staging from backup",
+          "safety_guard": "ensure staging backup is valid"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rollout_production",
+        "description": "Roll out version-pinned providers to production",
+        "action": "apply",
+        "target": "production_env",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Staging apply was successful",
+            "fact": "staging_apply_successful",
+            "established_by": "test_apply_staging",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "production environment status",
+          "how": "check resource states",
+          "expected": "resources in desired state"
+        },
+        "rollback": {
+          "trigger": "production apply fails",
+          "action": "revert to previous production state",
+          "safety_guard": "validate backup integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "ensure_terraform_installed",
+        "to_task": "inventory_providers",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "inventory_providers",
+        "to_task": "pin_versions",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "pin_versions",
+        "to_task": "validate_plans",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "validate_plans",
+        "to_task": "test_apply_staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test_apply_staging",
+        "to_task": "rollout_production",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:pin_versions",
+      "task_id": "pin_versions",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'pin_versions' is sequenced before the completion of 'inventory_providers', which is a hard prerequisite.",
+      "suggested_fix": "Ensure 'inventory_providers' completes before proceeding to 'pin_versions'."
+    },
+    {
+      "id": "crit:3:unverified_dependencies:validate_plans",
+      "task_id": "validate_plans",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'validate_plans' depends on 'versions_pinned', which is never established in the plan.",
+      "suggested_fix": "Add a verification step in the 'pin_versions' task to establish the 'versions_pinned' fact."
+    },
+    {
+      "id": "crit:3:unverified_dependencies:test_apply_staging",
+      "task_id": "test_apply_staging",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'test_apply_staging' depends on 'plans_validated', which is not verifiably established before it.",
+      "suggested_fix": "Establish 'plans_validated' as a verified fact in the 'validate_plans' task."
+    },
+    {
+      "id": "crit:3:unverified_dependencies:rollout_production",
+      "task_id": "rollout_production",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'rollout_production' needs 'staging_apply_successful', but this fact is not connected to the plan verification process.",
+      "suggested_fix": "Ensure 'staging_apply_successful' is verified after 'test_apply_staging'."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:plat-07-tf-provider-freeze:3:3",
+    "plan_id": "plan-plat-07-tf-provider-freeze-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:pin_versions",
+    "question": "Plan for goal 'plat-07-tf-provider-freeze' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

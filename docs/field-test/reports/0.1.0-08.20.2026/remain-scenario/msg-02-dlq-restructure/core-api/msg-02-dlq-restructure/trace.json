@@ -1,0 +1,233 @@
+{
+  "dimension": "core-api",
+  "goal_id": "msg-02-dlq-restructure",
+  "duration_seconds": 11.32,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "msg-02-dlq-restructure",
+    "goal_id": "msg-02-dlq-restructure",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-21T00:03:45.194691Z",
+    "tasks": [
+      {
+        "id": "define-dlq-policy",
+        "description": "Define DLQ policy including max retries and backoff strategy",
+        "action": "define",
+        "target": "dlq-policy",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kafka system is operational",
+            "fact": "kafka_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-retry-topics",
+        "description": "Configure retry topics with specified delay settings",
+        "action": "configure",
+        "target": "retry-topics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DLQ policy is defined",
+            "fact": "dlq_policy_defined",
+            "established_by": "define-dlq-policy",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "route-failed-messages",
+        "description": "Set up routing for failed messages to the new DLQ",
+        "action": "route",
+        "target": "failed-messages",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "message routing functionality",
+          "how": "send test messages and monitor logs",
+          "expected": "all failed messages routed to DLQ"
+        },
+        "rollback": {
+          "trigger": "routing fails",
+          "action": "revert to old routing",
+          "safety_guard": "verify no messages are lost during revert"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "backfill-messages",
+        "description": "Backfill messages from old DLQ to the new retry topology",
+        "action": "backfill",
+        "target": "retry-topology",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "message count in new topology",
+          "how": "compare counts before and after",
+          "expected": "counts match with expected message volume"
+        },
+        "rollback": {
+          "trigger": "backfill causes duplicates",
+          "action": "remove duplicates from new topology",
+          "safety_guard": "verify no duplicates remain"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-redelivery",
+        "description": "Ensure redelivery of messages from DLQ works as intended",
+        "action": "verify",
+        "target": "redelivery-mechanism",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "redelivery success rate",
+          "how": "monitor metrics in Prometheus",
+          "expected": "success rate above 95%"
+        },
+        "rollback": {
+          "trigger": "redelivery fails",
+          "action": "disable new redelivery mechanism",
+          "safety_guard": "ensure messages are stable during disable"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor-dlq-depth",
+        "description": "Set up monitoring for DLQ depth to ensure no message buildup",
+        "action": "monitor",
+        "target": "dlq-depth",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Metrics are integrated with Prometheus",
+            "fact": "prometheus_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define-dlq-policy",
+        "to_task": "configure-retry-topics",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-retry-topics",
+        "to_task": "route-failed-messages",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "route-failed-messages",
+        "to_task": "backfill-messages",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "backfill-messages",
+        "to_task": "verify-redelivery",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-redelivery",
+        "to_task": "monitor-dlq-depth",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unverified_dependencies:route-failed-messages",
+      "task_id": "route-failed-messages",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'route-failed-messages' lacks a prerequisite for the existence of a new DLQ, leading to potential errors in message routing.",
+      "suggested_fix": "Ensure 'define-dlq-policy' task includes a check for New DLQ existence before proceeding."
+    },
+    {
+      "id": "crit:1:weak_rollback:backfill-messages",
+      "task_id": "backfill-messages",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for 'backfill-messages' may not fully address issues if duplicates are caused, potentially leaving an inconsistent state.",
+      "suggested_fix": "Add a verification step after rollback to ensure dataset integrity."
+    },
+    {
+      "id": "crit:1:feasibility:backfill-messages",
+      "task_id": "backfill-messages",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "warning",
+      "reason_code": "llm_feasibility",
+      "message": "The backfill process could fail without indicated strategies for handling partial results from old DLQ.",
+      "suggested_fix": "Define contingencies for handling errors during the backfill process."
+    },
+    {
+      "id": "crit:1:missing_steps:monitor-dlq-depth",
+      "task_id": "monitor-dlq-depth",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The monitoring setup should include alerting mechanisms to detect if DLQ depth exceeds thresholds.",
+      "suggested_fix": "Implement alerting based on DLQ depth metrics in Prometheus."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

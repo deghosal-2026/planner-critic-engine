@@ -1,0 +1,305 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-10-csi-storageclass-migration",
+  "duration_seconds": 32.24,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-k8s-10-csi-storageclass-migration-r2",
+    "goal_id": "k8s-10-csi-storageclass-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "k8s-10-csi-storageclass-migration",
+    "created_at": "2026-08-21T00:08:46.023699Z",
+    "tasks": [
+      {
+        "id": "install-ebs-csi-driver",
+        "description": "Install ebs-csi-driver via Helm",
+        "action": "install",
+        "target": "ebs-csi-driver",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Helm is configured",
+            "fact": "helm_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": {
+          "trigger": "installation fails",
+          "action": "uninstall ebs-csi-driver",
+          "safety_guard": "ensure no PVCs reference the old driver"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create-storage-class",
+        "description": "Create new StorageClass pointing to the new driver",
+        "action": "create",
+        "target": "StorageClass",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ebs-csi-driver is installed",
+            "fact": "driver_installed",
+            "established_by": "install-ebs-csi-driver",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "StorageClass creation status",
+          "how": "check via kubectl",
+          "expected": "StorageClass exists"
+        },
+        "rollback": {
+          "trigger": "creation fails",
+          "action": "remove StorageClass",
+          "safety_guard": "ensure no PVC is referencing it"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "snapshot-existing-pvs",
+        "description": "Take snapshots of existing PersistentVolumes",
+        "action": "snapshot",
+        "target": "PersistentVolumes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Existing PVs are accessible",
+            "fact": "pvs_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "snapshot completion",
+          "how": "check snapshot status via AWS CLI",
+          "expected": "all snapshots created"
+        },
+        "rollback": {
+          "trigger": "snapshot fails",
+          "action": "alert and revert to previous state",
+          "safety_guard": "monitor snapshots in progress"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "migrate-pvs",
+        "description": "Migrate existing PVs by creating new volumes from snapshots",
+        "action": "migrate",
+        "target": "PersistentVolumes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Snapshots are successfully created",
+            "fact": "snapshots_created",
+            "established_by": "snapshot-existing-pvs",
+            "probe": null
+          },
+          {
+            "description": "StorageClass is created",
+            "fact": "storage_class_created",
+            "established_by": "create-storage-class",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "volume migration status",
+          "how": "check volumes in EKS",
+          "expected": "all PVs migrated successfully"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore from snapshots",
+          "safety_guard": "verify snapshot integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update-pvcs",
+        "description": "Update PVCs to reference the new StorageClass",
+        "action": "update",
+        "target": "PersistentVolumeClaims",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PVs are migrated successfully",
+            "fact": "pvs_migrated",
+            "established_by": "migrate-pvs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "PVC references",
+          "how": "check via kubectl",
+          "expected": "PVCs reference new StorageClass"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "revert PVC to old StorageClass",
+          "safety_guard": "check PVC status before rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "decommission-old-driver",
+        "description": "Decommission the old in-tree driver",
+        "action": "decommission",
+        "target": "in-tree driver",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "All PVCs reference new StorageClass",
+            "fact": "pvcs_updated",
+            "established_by": "update-pvcs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "check dependencies",
+          "how": "ensure no applications are using old driver",
+          "expected": "no dependencies on old driver"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "install-ebs-csi-driver",
+        "to_task": "create-storage-class",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create-storage-class",
+        "to_task": "snapshot-existing-pvs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "snapshot-existing-pvs",
+        "to_task": "migrate-pvs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate-pvs",
+        "to_task": "update-pvcs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-pvcs",
+        "to_task": "decommission-old-driver",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:install-ebs-csi-driver",
+      "task_id": "install-ebs-csi-driver",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Helm configuration status is not verified; ensure Helm is properly configured before installation.",
+      "suggested_fix": "Add a task to verify Helm configuration before proceeding with the installation."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:create-storage-class",
+      "task_id": "create-storage-class",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "This task is dependent on ebs-csi-driver installation, which lacks verification checks for successful installation before preceding tasks.",
+      "suggested_fix": "Add a verification step to ensure 'ebs-csi-driver' is installed before creating the StorageClass."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:snapshot-existing-pvs",
+      "task_id": "snapshot-existing-pvs",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Dependency on accessible existing PVs is established through the environment without verification of its success.",
+      "suggested_fix": "Include a verification step to check that existing PersistentVolumes are accessible before taking snapshots."
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:migrate-pvs",
+      "task_id": "migrate-pvs",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'migrate-pvs' is sequenced before verifying that storage class creation was successful, which is a prerequisite.",
+      "suggested_fix": "Ensure that the task to verify StorageClass creation status is completed before migrating PersistentVolumes."
+    },
+    {
+      "id": "crit:2:missing_steps:update-pvcs",
+      "task_id": "update-pvcs",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Potential risk during PVC updates if application downtime or snapshot integrity is not accounted for post-migration process.",
+      "suggested_fix": "Consider adding a step to alert stakeholders before starting PVC updates to minimize downtime."
+    },
+    {
+      "id": "crit:2:weak_rollback:decommission-old-driver",
+      "task_id": "decommission-old-driver",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback process is missing; if decommissioning fails, there's no clear recovery path to restore the old driver.",
+      "suggested_fix": "Implement a rollback procedure to restore the old in-tree driver if decommissions failed."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-10-csi-storageclass-migration:2:2",
+    "plan_id": "plan-k8s-10-csi-storageclass-migration-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:feasibility:install-ebs-csi-driver",
+    "question": "Plan for goal 'k8s-10-csi-storageclass-migration' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

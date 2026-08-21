@@ -1,0 +1,252 @@
+{
+  "dimension": "core-api",
+  "goal_id": "net-02-east-west-firewall",
+  "duration_seconds": 28.68,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-net-02-east-west-firewall-r2",
+    "goal_id": "net-02-east-west-firewall",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "net-02-east-west-firewall-plan",
+    "created_at": "2026-08-21T00:03:16.767926Z",
+    "tasks": [
+      {
+        "id": "baseline_traffic",
+        "description": "Baseline current traffic patterns across services",
+        "action": "analyze",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "traffic patterns documented",
+          "how": "review analysis report",
+          "expected": "report showing active service communication"
+        },
+        "rollback": {
+          "trigger": "baseline fails",
+          "action": "revert to previous state",
+          "safety_guard": "ensure traffic logs are intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "define_allow_list",
+        "description": "Define allow-list rules based on observed traffic",
+        "action": "create",
+        "target": "allow_list",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "allow-list rules",
+          "how": "perform rule audit",
+          "expected": "rules cover all observed services"
+        },
+        "rollback": {
+          "trigger": "allow-list incomplete",
+          "action": "revert to previous rules",
+          "safety_guard": "validate no service interruption"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_audit_mode",
+        "description": "Deploy Calico policies in audit mode",
+        "action": "deploy",
+        "target": "Calico policies",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "allow-list is defined",
+            "fact": "allow_list_ready",
+            "established_by": "define_allow_list",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Calico policies deployed",
+          "how": "check deployment status",
+          "expected": "Calico policies are active in audit mode"
+        },
+        "rollback": {
+          "trigger": "audit mode deploy fails",
+          "action": "remove incomplete policies",
+          "safety_guard": "ensure no lingering partial policies"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_traffic_blocking",
+        "description": "Verify no legitimate traffic is blocked",
+        "action": "monitor",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "traffic logs",
+          "how": "analyze tcpdump output",
+          "expected": "all legitimate connections are active"
+        },
+        "rollback": {
+          "trigger": "legitimate traffic is blocked",
+          "action": "remove Calico policies",
+          "safety_guard": "check service health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "switch_enforce_mode",
+        "description": "Switch Calico policies to enforce mode",
+        "action": "deploy",
+        "target": "Calico policies",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "active service connections",
+          "how": "comparison of connections pre and post deployment",
+          "expected": "no critical service interruptions"
+        },
+        "rollback": {
+          "trigger": "enforce mode blocks critical traffic",
+          "action": "revert to audit mode and verify",
+          "safety_guard": "confirm traffic resumes normal operations"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_denied_connections",
+        "description": "Monitor for denied connections in enforce mode",
+        "action": "monitor",
+        "target": "traffic logs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "denied connections",
+          "how": "review traffic log entries",
+          "expected": "documented denied connections are as expected"
+        },
+        "rollback": {
+          "trigger": "monitoring setup fails",
+          "action": "revert monitoring configuration",
+          "safety_guard": "ensure monitoring tools are functional"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "baseline_traffic",
+        "to_task": "define_allow_list",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "define_allow_list",
+        "to_task": "deploy_audit_mode",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_audit_mode",
+        "to_task": "verify_traffic_blocking",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_traffic_blocking",
+        "to_task": "switch_enforce_mode",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "switch_enforce_mode",
+        "to_task": "monitor_denied_connections",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:switch_enforce_mode",
+      "task_id": "switch_enforce_mode",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'switch_enforce_mode' is sequenced before verifying that no legitimate traffic is blocked, which is critical.",
+      "suggested_fix": "Ensure 'verify_traffic_blocking' is completed before 'switch_enforce_mode'."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:deploy_audit_mode",
+      "task_id": "deploy_audit_mode",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The deployment of Calico policies in audit mode depends on the completion of 'define_allow_list', which lacks confirmation.",
+      "suggested_fix": "Ensure that 'define_allow_list' task verification confirms the allow-list is fully defined before proceeding."
+    },
+    {
+      "id": "crit:2:weak_rollback:switch_enforce_mode",
+      "task_id": "switch_enforce_mode",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for 'switch_enforce_mode' does not ensure critical traffic resumes to normal before proceeding.",
+      "suggested_fix": "Enhance the rollback to confirm that all critical service communications are operational after reverting."
+    },
+    {
+      "id": "crit:2:missing_steps:monitor_denied_connections",
+      "task_id": "monitor_denied_connections",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding a step to assess whether denied connections impact any service functionalities.",
+      "suggested_fix": "Include an additional verification step that evaluates the operational implications of denied connections on services."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:net-02-east-west-firewall:2:2",
+    "plan_id": "plan-net-02-east-west-firewall-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:switch_enforce_mode",
+    "question": "Plan for goal 'net-02-east-west-firewall' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

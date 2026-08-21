@@ -1,0 +1,219 @@
+{
+  "dimension": "core-api",
+  "goal_id": "net-03-tls-termination-move",
+  "duration_seconds": 11.85,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "net-03-tls-termination-move",
+    "goal_id": "net-03-tls-termination-move",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-21T00:03:28.189554Z",
+    "tasks": [
+      {
+        "id": "deploy_nginx",
+        "description": "Deploy Nginx with TLS configured using cert-manager",
+        "action": "deploy",
+        "target": "nginx",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Nginx deployment status",
+          "how": "check deployment logs",
+          "expected": "Nginx Running"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "destroy nginx",
+          "safety_guard": "verify no stray configurations present"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_dual_termination",
+        "description": "Configure dual-termination on ALB and Nginx",
+        "action": "configure",
+        "target": "dual-termination",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "termination setup status",
+          "how": "check ALB and Nginx configurations",
+          "expected": "Dual termination correctly established"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "revert to previous settings",
+          "safety_guard": "double-check configuration backups"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover_traffic",
+        "description": "Cutover traffic from ALB termination to Nginx termination",
+        "action": "cutover",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "traffic flow check",
+          "how": "monitor traffic logs",
+          "expected": "Traffic flowing through Nginx"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "switch back to ALB termination",
+          "safety_guard": "ensure Nginx is healthy before cutover"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_tls_handshake",
+        "description": "Verify TLS handshake and certificate chain with openssl",
+        "action": "verify",
+        "target": "tls-connection",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "TLS handshake success",
+          "how": "use openssl s_client",
+          "expected": "Handshake succeeded without certificate errors"
+        },
+        "rollback": {
+          "trigger": "tls verification fails",
+          "action": "revert to ALB termination until fix",
+          "safety_guard": "ensure that reverting is possible without downtime"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update_alb",
+        "description": "Update ALB to TCP passthrough mode",
+        "action": "update",
+        "target": "alb",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Nginx is verifying TLS correctly",
+            "fact": "tls_handshake_verified",
+            "established_by": "verify_tls_handshake",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_nginx",
+        "to_task": "configure_dual_termination",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_dual_termination",
+        "to_task": "cutover_traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover_traffic",
+        "to_task": "verify_tls_handshake",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_tls_handshake",
+        "to_task": "update_alb",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unverified_dependencies:update_alb",
+      "task_id": "update_alb",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'update_alb' relies on the verification of TLS without a prerequisite check being established for the dependency earlier in the plan.",
+      "suggested_fix": "Ensure that 'verify_tls_handshake' is completed successfully before proceeding to 'update_alb'."
+    },
+    {
+      "id": "crit:1:weak_rollback:cutover_traffic",
+      "task_id": "cutover_traffic",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The task 'cutover_traffic' lacks a sound rollback mechanism that guarantees no downtime during a rollback if a failure occurs.",
+      "suggested_fix": "Implement a safety guard that checks Nginx health or the successful cutover flow before switching back to ALB termination."
+    },
+    {
+      "id": "crit:1:missing_steps:configure_dual_termination",
+      "task_id": "configure_dual_termination",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The task 'configure_dual_termination' might need additional verification steps to ensure configurations are applied correctly before moving to cutover.",
+      "suggested_fix": "Add a verification step to check that necessary configurations are fully loaded and recognized by both ALB and Nginx."
+    },
+    {
+      "id": "crit:1:risk:verify_tls_handshake",
+      "task_id": "verify_tls_handshake",
+      "version": 1,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "The TLS verification step may face potential issues if the TLS versions are incompatible or if there are regression problems with the cipher suites used, as outlined in the risk factors.",
+      "suggested_fix": "Conduct a pre-verification check of the configurations and cipher suites before executing the TLS handshake verification."
+    },
+    {
+      "id": "crit:1:risk:cutover_traffic",
+      "task_id": "cutover_traffic",
+      "version": 1,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Cutover risks the impact of certificate mismatch if dual-termination is not monitored closely during transition.",
+      "suggested_fix": "Implement monitoring for certificate consistency between ALB and Nginx during cutover."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

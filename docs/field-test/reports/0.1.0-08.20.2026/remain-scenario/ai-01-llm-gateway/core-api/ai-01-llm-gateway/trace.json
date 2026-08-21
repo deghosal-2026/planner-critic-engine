@@ -1,0 +1,270 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ai-01-llm-gateway",
+  "duration_seconds": 11.78,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "ai-01-llm-gateway-plan",
+    "goal_id": "ai-01-llm-gateway",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-21T00:03:03.531336Z",
+    "tasks": [
+      {
+        "id": "deploy_gateway",
+        "description": "Deploy the LLM gateway with API key management",
+        "action": "deploy",
+        "target": "LiteLLM",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "gateway health",
+          "how": "ping the gateway",
+          "expected": "responding"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "remove gateway and restore previous state",
+          "safety_guard": "verify previous configuration is intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_rate_limiting",
+        "description": "Configure rate limiting per consumer at 100 req/min",
+        "action": "configure",
+        "target": "Kong",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "rate limiting settings",
+          "how": "check Kong dashboard",
+          "expected": "100 req/min"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "reset rate limiting to previous settings",
+          "safety_guard": "ensure legitimate traffic is unaffected"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "set_canary_routing",
+        "description": "Set up canary routing for A/B testing",
+        "action": "configure",
+        "target": "Kong",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "gateway is deployed",
+            "fact": "gateway_deployed",
+            "established_by": "deploy_gateway",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "routing distribution",
+          "how": "run test requests",
+          "expected": "90% GPT-4o-mini, 10% Claude"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_model_routing",
+        "description": "Configure model routing rules for cheapest model meeting quality bar",
+        "action": "configure",
+        "target": "LiteLLM",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "model routing rules",
+          "how": "check routing configurations",
+          "expected": "correct model assigned based on quality"
+        },
+        "rollback": {
+          "trigger": "routing configuration fails",
+          "action": "revert to previous routing",
+          "safety_guard": "verify routing integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_monitoring",
+        "description": "Deploy monitoring for token usage, latency, and error rate",
+        "action": "deploy",
+        "target": "monitoring_tool",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "gateway is deployed",
+            "fact": "gateway_deployed",
+            "established_by": "deploy_gateway",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "monitoring status",
+          "how": "check monitoring dashboards",
+          "expected": "all metrics are reported"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_failover",
+        "description": "Verify failover to backup provider",
+        "action": "test",
+        "target": "failover_system",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "failover success",
+          "how": "simulate primary provider failure",
+          "expected": "failover occurs without issues"
+        },
+        "rollback": {
+          "trigger": "failover test fails",
+          "action": "restart primary provider",
+          "safety_guard": "ensure primary is operational"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_gateway",
+        "to_task": "configure_rate_limiting",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_gateway",
+        "to_task": "set_canary_routing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_gateway",
+        "to_task": "configure_model_routing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_gateway",
+        "to_task": "deploy_monitoring",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set_canary_routing",
+        "to_task": "verify_failover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_model_routing",
+        "to_task": "verify_failover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_rate_limiting",
+        "to_task": "verify_failover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_monitoring",
+        "to_task": "verify_failover",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:set_canary_routing",
+      "task_id": "set_canary_routing",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Canary routing setup should only occur after the gateway deployment is confirmed successful.",
+      "suggested_fix": "Ensure 'set_canary_routing' task has a dependency on 'deploy_gateway' task."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:verify_failover",
+      "task_id": "verify_failover",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Failover verification depends on the configurations from multiple previous tasks that are not clearly validated before this task execution.",
+      "suggested_fix": "Add explicit verifications for routing and monitoring configurations prior to executing the 'verify_failover' task."
+    },
+    {
+      "id": "crit:1:missing_steps:configure_model_routing",
+      "task_id": "configure_model_routing",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding a step to verify the quality benchmarks for the model routing.",
+      "suggested_fix": "Add a verification step to ensure chosen models meet the quality bar."
+    },
+    {
+      "id": "crit:1:weak_rollback:deploy_monitoring",
+      "task_id": "deploy_monitoring",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Monitoring deployment lacks a concrete rollback strategy in case of failure.",
+      "suggested_fix": "Define a rollback action to delete monitoring configurations if the deployment fails."
+    },
+    {
+      "id": "crit:1:risk:configure_rate_limiting",
+      "task_id": "configure_rate_limiting",
+      "version": 1,
+      "heuristic_family": "risk",
+      "severity": "info",
+      "reason_code": "llm_risk",
+      "message": "Rate limiting might impact legitimate traffic if not tested with realistic usage patterns before going live.",
+      "suggested_fix": null
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

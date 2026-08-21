@@ -1,0 +1,271 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dc-01-eks-retirement",
+  "duration_seconds": 35.0,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-dc-01-eks-retirement-r2",
+    "goal_id": "dc-01-eks-retirement",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "dc-01-eks-retirement-plan",
+    "created_at": "2026-08-21T00:00:39.513240Z",
+    "tasks": [
+      {
+        "id": "drain-workloads",
+        "description": "Drain all workloads from the EKS cluster",
+        "action": "drain",
+        "target": "eks",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "workload status",
+          "how": "check if workloads are terminated",
+          "expected": "no critical workloads remain"
+        },
+        "rollback": {
+          "trigger": "drain fails",
+          "action": "revert draining process",
+          "safety_guard": "ensure workloads are still running"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "export-data-configs",
+        "description": "Export any needed data/configs from the cluster",
+        "action": "export",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "drain-workloads completed successfully",
+            "fact": "workloads_drained",
+            "established_by": "drain-workloads",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "export status",
+          "how": "check exported data/configs",
+          "expected": "data/configs successfully exported"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "terraform-destroy",
+        "description": "Destroy the EKS infrastructure using Terraform",
+        "action": "destroy",
+        "target": "infrastructure",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "infrastructure state",
+          "how": "check Terraform state file",
+          "expected": "no resources remain"
+        },
+        "rollback": {
+          "trigger": "destroy fails",
+          "action": "restore infrastructure from latest state",
+          "safety_guard": "run tf plan before applying"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "purge-secrets",
+        "description": "Purge secrets from Vault",
+        "action": "purge",
+        "target": "Vault",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "export-data-configs completed successfully",
+            "fact": "data_exported",
+            "established_by": "export-data-configs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Vault secrets",
+          "how": "query Vault for existing secrets",
+          "expected": "no secrets found"
+        },
+        "rollback": {
+          "trigger": "purge fails",
+          "action": "restore secrets from backup",
+          "safety_guard": "verify no unpurged secrets exist"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "clean-up-iam",
+        "description": "Clean up cross-account IAM roles and peering connections",
+        "action": "cleanup",
+        "target": "IAM",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "purge-secrets completed successfully",
+            "fact": "secrets_purged",
+            "established_by": "purge-secrets",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "IAM roles and peering connections",
+          "how": "check IAM for remaining roles and connections",
+          "expected": "no IAM roles or connections remain"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-dns-records",
+        "description": "Verify DNS records are removed",
+        "action": "verify",
+        "target": "DNS",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "terraform-destroy completed successfully",
+            "fact": "infrastructure_destroyed",
+            "established_by": "terraform-destroy",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "DNS records status",
+          "how": "check DNS records",
+          "expected": "no DNS records remain"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "drain-workloads",
+        "to_task": "export-data-configs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "export-data-configs",
+        "to_task": "terraform-destroy",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "terraform-destroy",
+        "to_task": "purge-secrets",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "purge-secrets",
+        "to_task": "clean-up-iam",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "terraform-destroy",
+        "to_task": "verify-dns-records",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:export-data-configs",
+      "task_id": "export-data-configs",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'export-data-configs' is dependent on 'drain-workloads' but does not verify that workloads have been properly drained.",
+      "suggested_fix": "Ensure that 'export-data-configs' verifies the termination of workloads depending on the output status of 'drain-workloads'."
+    },
+    {
+      "id": "crit:2:missing_steps:terraform-destroy",
+      "task_id": "terraform-destroy",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Task 'terraform-destroy' does not specify preconditions related to successful state verification of workloads or data before destruction.",
+      "suggested_fix": "Include a check to ensure that all necessary data has been exported and that no workloads are running before proceeding with 'terraform-destroy'."
+    },
+    {
+      "id": "crit:2:weak_rollback:purge-secrets",
+      "task_id": "purge-secrets",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'purge-secrets' has a rollback action that relies on backup verification but lacks strict guarantees for recovering from partial purges.",
+      "suggested_fix": "Enhance the rollback process by including more robust verification to ensure all secrets are accounted for before executing the purge."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:clean-up-iam",
+      "task_id": "clean-up-iam",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'clean-up-iam' is dependent on 'purge-secrets' but does not verify that secrets have been successfully purged before cleanup occurs.",
+      "suggested_fix": "Add verification to 'clean-up-iam' to ensure that all secrets have been purged before allowing IAM cleanup to proceed."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:verify-dns-records",
+      "task_id": "verify-dns-records",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'verify-dns-records' relies on 'terraform-destroy' but does not confirm that all the resources have been successfully destroyed before verifying DNS records.",
+      "suggested_fix": "Ensure that 'verify-dns-records' includes a verification step that confirms all related infrastructure has been destroyed prior to executing this task."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:dc-01-eks-retirement:2:2",
+    "plan_id": "plan-dc-01-eks-retirement-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unverified_dependencies:export-data-configs",
+    "question": "Plan for goal 'dc-01-eks-retirement' cannot be approved: blockers remain (llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

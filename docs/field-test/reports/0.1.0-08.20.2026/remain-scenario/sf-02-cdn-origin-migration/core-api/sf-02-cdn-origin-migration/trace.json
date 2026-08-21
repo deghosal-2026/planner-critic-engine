@@ -1,0 +1,297 @@
+{
+  "dimension": "core-api",
+  "goal_id": "sf-02-cdn-origin-migration",
+  "duration_seconds": 18.9,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "sf-02-cdn-origin-migration-plan",
+    "goal_id": "sf-02-cdn-origin-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-21T00:02:05.211301Z",
+    "tasks": [
+      {
+        "id": "configure_origin",
+        "description": "Configure new origin behind CDN",
+        "action": "configure",
+        "target": "CloudFront",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CloudFront is reachable",
+            "fact": "cloudfront_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "origin settings",
+          "how": "check CloudFront settings",
+          "expected": "new origin successfully configured"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "revert to previous origin settings",
+          "safety_guard": "verify previous configuration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "set_up_dual_origin",
+        "description": "Set up dual-origin with weighted routing",
+        "action": "configure",
+        "target": "DNS",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "new origin is configured",
+            "fact": "configure_origin_success",
+            "established_by": "configure_origin",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "routing configuration",
+          "how": "check Route53 settings",
+          "expected": "dual-origin routing active with weights"
+        },
+        "rollback": {
+          "trigger": "misconfiguration detected",
+          "action": "reset routing to single origin",
+          "safety_guard": "verify traffic routing stability"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "stagger_traffic_cut",
+        "description": "Stagger traffic cut to new origin",
+        "action": "update",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dual-origin is set up",
+            "fact": "dual_origin_configured",
+            "established_by": "set_up_dual_origin",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic distribution",
+          "how": "monitor CloudFront traffic logs",
+          "expected": "staged traffic cut completed"
+        },
+        "rollback": {
+          "trigger": "issue at any stage",
+          "action": "revert traffic to S3",
+          "safety_guard": "ensure fallback is operational"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_cache_hit_rates",
+        "description": "Verify cache hit rates at each stage",
+        "action": "monitor",
+        "target": "cache",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "traffic cut is staggered",
+            "fact": "stagger_traffic_cut_success",
+            "established_by": "stagger_traffic_cut",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "warm_caches",
+        "description": "Warm caches before full cutover",
+        "action": "preload",
+        "target": "cache",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cache hit rate verified",
+            "fact": "cache_hit_verified",
+            "established_by": "verify_cache_hit_rates",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "full_cutover",
+        "description": "Full cutover to new origin",
+        "action": "update",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "caches warmed",
+            "fact": "caches_warmed",
+            "established_by": "warm_caches",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "full traffic switch",
+          "how": "confirm all traffic goes to new origin",
+          "expected": "100% traffic on new origin"
+        },
+        "rollback": {
+          "trigger": "final cutover fails",
+          "action": "roll back traffic to S3",
+          "safety_guard": "validate old origin serves correctly"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_content",
+        "description": "Verify edge locations serve correct content",
+        "action": "check",
+        "target": "CDN",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "full cutover is completed",
+            "fact": "full_cutover_success",
+            "established_by": "full_cutover",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "configure_origin",
+        "to_task": "set_up_dual_origin",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set_up_dual_origin",
+        "to_task": "stagger_traffic_cut",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "stagger_traffic_cut",
+        "to_task": "verify_cache_hit_rates",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_cache_hit_rates",
+        "to_task": "warm_caches",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "warm_caches",
+        "to_task": "full_cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "full_cutover",
+        "to_task": "verify_content",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:risk:configure_origin",
+      "task_id": "configure_origin",
+      "version": 1,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "High risk of origin overload due to potential cache misses during migration.",
+      "suggested_fix": "Implement additional monitoring for origin performance during traffic transition."
+    },
+    {
+      "id": "crit:1:missing_steps:set_up_dual_origin",
+      "task_id": "set_up_dual_origin",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding validation checks for weighted routing distribution to ensure traffic is balanced during the dual-origin phase.",
+      "suggested_fix": "Add verification step post-setup to confirm routing weights are operational."
+    },
+    {
+      "id": "crit:1:missing_steps:stagger_traffic_cut",
+      "task_id": "stagger_traffic_cut",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Missed opportunity for validation points during traffic cut stages to ensure stability and performance prior to full cutover.",
+      "suggested_fix": "Introduce checkpoints after each traffic cut stage to confirm no issues before proceeding."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:verify_cache_hit_rates",
+      "task_id": "verify_cache_hit_rates",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Cache hit rates verification depends on stagger_traffic_cut_success, which assumes the stagger process completed without issues, posing risks of unchecked performance during cut.",
+      "suggested_fix": "Ensure stagger_traffic_cut has verification steps to confirm completion successfully before proceeding."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:warm_caches",
+      "task_id": "warm_caches",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Warming caches depends on cache_hit_verified which is not guaranteed without verification in previous steps, leading to potential stale data.",
+      "suggested_fix": "Integrate checks to confirm cache hit prior to warming procedures to prevent deploying invalid data."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}
