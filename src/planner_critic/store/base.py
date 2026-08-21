@@ -100,6 +100,18 @@ class PlanStore(ABC):
         """
 
     @abstractmethod
+    def get_findings(self, plan_id: str, version: int) -> list[Finding]:
+        """Fetch the critique findings produced against one revision.
+
+        Args:
+            plan_id: Plan whose revision the findings target.
+            version: Revision number.
+
+        Returns:
+            The findings stored for that revision (empty if none).
+        """
+
+    @abstractmethod
     def list_plans(self, goal_id: str | None = None) -> list[PlanVersion]:
         """List stored plan revisions, newest first.
 
@@ -279,6 +291,10 @@ class InMemoryStore(PlanStore):
     def put_findings(self, plan_id: str, version: int, findings: list[Finding]) -> None:
         """Persist findings under the ``(plan_id, version)`` key."""
         self._findings[(plan_id, version)] = list(findings)
+
+    def get_findings(self, plan_id: str, version: int) -> list[Finding]:
+        """Return the findings stored for one revision (empty if none)."""
+        return list(self._findings.get((plan_id, version), []))
 
     def get_plan(self, plan_id: str, version: int | None = None) -> PlanVersion | None:
         """Return the requested revision, or the latest when version is None."""

@@ -83,6 +83,16 @@ class SQLiteStore(PlanStore):
             (plan_id, version, body),
         )
 
+    def get_findings(self, plan_id: str, version: int) -> list[Finding]:
+        """Fetch the critique findings stored for one revision (empty if none)."""
+        row = self._fetchone(
+            "SELECT body FROM findings WHERE plan_id = ? AND version = ?",
+            (plan_id, version),
+        )
+        if row is None:
+            return []
+        return [Finding.model_validate(item) for item in json.loads(row["body"])]
+
     def get_plan(self, plan_id: str, version: int | None = None) -> PlanVersion | None:
         """Fetch a revision; the latest when version is omitted."""
         if version is not None:

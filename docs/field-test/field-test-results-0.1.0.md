@@ -915,13 +915,13 @@ The original 5 adversarial goals (adv-01..05) all test "no safety" — plans wit
 | **budget** | db-01-schema-migration | ✅ PASS | Budget enforcement with max_revisions=1 correctly escalated |
 | **replan** | db-01-schema-migration | ✅ PASS | All 3 policies tested: patch, restart, abort |
 | **adapters** | ci-01-multistage-pipeline | ✅ PASS | Python adapter wrap/unwrap round-tripped |
-| **cli-surface** | not run | — | Deferred to M10 |
+| **cli-surface** | — | ✅ PASS | Hermetic C5 dispatch coverage (tests/test_cli_dispatch.py): all 11 subcommands registered & dispatch through `_cli.main` |
 | **http-surface** | not run | — | Deferred to M10 |
-| **cli-demo** | not run | — | Deferred to M10 |
-| **cli-quickstart** | not run | — | Deferred to M10 |
-| **cli-migrate** | not run | — | Deferred to M10 |
+| **cli-demo** | migration.json | ✅ PASS | `plancritic demo` exit 0 + `--format json` machine-readable record (C20) |
+| **cli-quickstart** | quickstart.json | pass\* | Scaffolds + fails closed on provider failure (C21); happy path needs live provider |
+| **cli-migrate** | — | ✅ PASS | `migrate` to SCHEMA_VERSION + lossless revert/reapply + plan write on migrated store (C23) |
 
-**Dimension summary:** 7 PASS, 3 pass\*, 4 deferred = 10/10 executed dimensions pass.
+**Dimension summary:** 9 PASS, 3 pass\*, 1 deferred = 12/13 executed dimensions pass.
 
 ---
 
@@ -1011,8 +1011,8 @@ The deterministic precondition closer is the highest-leverage fix — it would a
 6. **Amend §3/§4.2 plan tables** — flip 81 strict goals from `approve` to `escalate` (safe-fail) per §7.1a adjudication
 7. **Implement deterministic precondition closer** — post-generation validation pass, eliminates 48% of strict-goal blockers
 8. **Strengthen planner prompt** — add explicit precondition-closure and mandatory-rollback instructions for high-blast-radius tasks
-9. **Fix CLI subcommands** — `plancritic demo`, `quickstart`, `migrate` return non-zero exit codes (deferred to M10)
-10. **Fix viz replay** — replay trace empty because in-memory store doesn't have full revision history (deferred to M10)
+9. ✅ **Fix CLI subcommands** — `plancritic demo --format json` (C20), top-level C5 dispatch wiring, and C23 migrate verified; `quickstart` happy path still needs a live provider
+10. ✅ **Fix viz replay** — replay now reads findings through `PlanStore.get_findings`, so a persisted (SQLite) store returns a non-empty full-revision trace (C22)
 11. **Fix probes stubs** — db_query and deploy_status probes return ok=False (by design — stubs in v0.1.0)
 12. **Close M9** — update WBS, commit, push
 

@@ -90,16 +90,14 @@ def replay(
 
 
 def _get_findings(store: PlanStore, plan_id: str, version: int) -> list[Finding]:
-    """Fetch findings for a revision from the store's findings index.
+    """Fetch findings for a revision through the store protocol.
 
-    Works against both InMemoryStore (which exposes ``_findings``) and
-    SQLiteStore (which stores findings in a table). We try the internal
-    index first and fall back to an empty list.
+    Both store implementations persist findings under ``(plan_id, version)``
+    and expose :meth:`PlanStore.get_findings`; the private ``_findings`` index
+    is a legacy in-memory shortcut and is no longer consulted. This fixes the
+    C22/C15 field-test gap where SQLite stores returned empty replay traces.
     """
-    index = getattr(store, "_findings", None)
-    if index is not None:
-        return list(index.get((plan_id, version), []))
-    return []
+    return list(store.get_findings(plan_id, version))
 
 
 __all__ = ["ReplayResult", "ReplayStep", "replay"]

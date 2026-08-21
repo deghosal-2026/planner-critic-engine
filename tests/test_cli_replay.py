@@ -115,3 +115,88 @@ def test_replay_store_failure(tmp_path: Path, capsys: pytest.CaptureFixture) -> 
     rc = run_replay(["--store", "/nonexistent_dir/store.db", "plan-a"])
     assert rc == 1
     assert "replay failed" in capsys.readouterr().out
+
+
+def test_replay_top_level_cli_walks_all_revisions(tmp_path: Path, capsys) -> None:
+    """C22: ``plancritic replay`` via top-level main walks every stored
+    revision with per-revision findings (no empty-trace pass*)."""
+    import json as jsonlib
+
+    from planner_critic import _cli
+    from planner_critic.types import Finding, Severity
+
+    store_path = str(tmp_path / "store.db")
+    store = SQLiteStore(store_path)
+    store.put_plan_version(
+        PlanVersion.model_validate(
+            {
+                "id": "plan-b",
+                "goal_id": "goal-1",
+                "version": 1,
+                "tasks": [
+                    {
+                        "id": "t1",
+                        "description": "task t1",
+                        "action": "do",
+                        "target": "t1",
+                        "preconditions": [],
+                    }
+                ],
+                "dependencies": [],
+                "branches": [],
+            }
+        )
+    )
+    store.put_plan_version(
+        PlanVersion.model_validate(
+            {
+                "id": "plan-b",
+                "goal_id": "goal-1",
+                "version": 2,
+                "tasks": [
+                    {
+                        "id": "t1",
+                        "description": "task t1",
+                        "action": "do",
+                        "target": "t1",
+                        "preconditions": [],
+                    },
+                    {
+                        "id": "t2",
+                        "description": "task t2",
+                        "action": "do",
+                        "target": "t2",
+                        "preconditions": [],
+                    },
+                ],
+                "dependencies": [],
+                "branches": [],
+            }
+        )
+    )
+    store.put_findings(
+        "plan-b",
+        1,
+        [
+            Finding(
+                id="f1",
+                task_id="t1",
+                version=1,
+                severity=Severity.BLOCKER,
+                reason_code="missing_rollback",
+                message="v1 finding",
+            )
+        ],
+    )
+    store.put_findings("plan-b", 2, [])
+    store.close()
+
+    rc = _cli.main(["replay", "--store", store_path, "plan-b", "--format", "json"])
+    assert rc == 0
+    data = jsonlib.loads(capsys.readouterr().out)
+    assert data["plan_id"] == "plan-b"
+    assert len(data["steps"]) == 2
+    assert data["steps"][0]["version"] == 1
+    assert data["steps"][1]["version"] == 2
+    assert data["steps"][0]["findings"][0]["message"] == "v1 finding"
+    assert data["steps"][1]["findings"] == []
