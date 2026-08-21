@@ -1,0 +1,292 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-10-trunk-based-promo",
+  "duration_seconds": 51.25,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-ci-10-trunk-based-promo-r3",
+    "goal_id": "ci-10-trunk-based-promo",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-ci-10-trunk-based-promo-r2",
+    "created_at": "2026-08-20T23:59:25.163164Z",
+    "tasks": [
+      {
+        "id": "configure_branch_protection",
+        "description": "Configure branch protection rules on main",
+        "action": "configure",
+        "target": "branch_protection",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "GitHub repository exists",
+            "fact": "repo_existent",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "branch protection rules",
+          "how": "check GitHub settings",
+          "expected": "PR required, CI required, review required"
+        },
+        "rollback": {
+          "trigger": "branch protection misconfigured",
+          "action": "remove branch protection",
+          "safety_guard": "confirm with team"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "set_up_auto_deploy",
+        "description": "Set up auto-deploy to staging on merge",
+        "action": "configure",
+        "target": "auto_deploy",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Branch protection configured",
+            "fact": "branch_protection_configured",
+            "established_by": "configure_branch_protection",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment logs",
+          "how": "check deployment status",
+          "expected": "successful deployment to staging"
+        },
+        "rollback": {
+          "trigger": "auto-deploy fails",
+          "action": "disable auto-deploy",
+          "safety_guard": "verify staging health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run_integration_tests",
+        "description": "Run integration tests on staging",
+        "action": "test",
+        "target": "staging",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Auto-deploy configured",
+            "fact": "auto_deploy_configured",
+            "established_by": "set_up_auto_deploy",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "test results",
+          "how": "analyze test reports",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "test failures",
+          "action": "rollback to previous version",
+          "safety_guard": "confirm rollback success"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_promotion_gate",
+        "description": "Configure promotion gate for production",
+        "action": "configure",
+        "target": "promotion_gate",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Integration tests completed",
+            "fact": "integration_tests_passed",
+            "established_by": "run_integration_tests",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "promotion gate settings",
+          "how": "check configuration",
+          "expected": "green tests + manual approval required"
+        },
+        "rollback": {
+          "trigger": "promotion gate issues",
+          "action": "remove promotion gate",
+          "safety_guard": "confirm with team"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "confirm_promotion_gate_passed",
+        "description": "Confirm that promotion gate has been passed",
+        "action": "verify",
+        "target": "promotion_gate",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Promotion gate configured",
+            "fact": "promotion_gate_configured",
+            "established_by": "configure_promotion_gate",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "promotion gate status",
+          "how": "check promotion gate",
+          "expected": "promotion_gate_passed"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_promotion_gate_passed",
+        "description": "Verify promotion gate has passed",
+        "action": "check",
+        "target": "promotion_gate_status",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Promotion gate configured",
+            "fact": "promotion_gate_configured",
+            "established_by": "configure_promotion_gate",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "promotion gate status",
+          "how": "check promotion gate",
+          "expected": "promotion_gate_passed"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "promote_to_prod",
+        "description": "Promote changes to production",
+        "action": "deploy",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Promotion gate cleared",
+            "fact": "promotion_gate_passed",
+            "established_by": "verify_promotion_gate_passed",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "production status",
+          "how": "monitor health checks",
+          "expected": "production running smoothly"
+        },
+        "rollback": {
+          "trigger": "prod deployment fails",
+          "action": "rollback to previous prod version",
+          "safety_guard": "verify rollback success and environment stability"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "configure_branch_protection",
+        "to_task": "set_up_auto_deploy",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set_up_auto_deploy",
+        "to_task": "run_integration_tests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_integration_tests",
+        "to_task": "configure_promotion_gate",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_promotion_gate",
+        "to_task": "confirm_promotion_gate_passed",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "confirm_promotion_gate_passed",
+        "to_task": "verify_promotion_gate_passed",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_promotion_gate_passed",
+        "to_task": "promote_to_prod",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:promote_to_prod",
+      "task_id": "promote_to_prod",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Promotion to production is attempted before confirming the promotion gate status.",
+      "suggested_fix": "Reorder tasks to ensure 'verify_promotion_gate_passed' is completed before 'promote_to_prod'."
+    },
+    {
+      "id": "crit:3:unverified_dependencies:promote_to_prod",
+      "task_id": "promote_to_prod",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Promotion to production depends on the result of the promotion gate verification which must be established before proceeding.",
+      "suggested_fix": "Ensure that the dependency on 'verify_promotion_gate_passed' is correctly established and verified prior to 'promote_to_prod'."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ci-10-trunk-based-promo:3:3",
+    "plan_id": "plan-ci-10-trunk-based-promo-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:promote_to_prod",
+    "question": "Plan for goal 'ci-10-trunk-based-promo' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

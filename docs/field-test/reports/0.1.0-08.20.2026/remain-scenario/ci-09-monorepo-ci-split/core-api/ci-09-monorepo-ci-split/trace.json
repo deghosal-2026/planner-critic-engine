@@ -1,0 +1,259 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-09-monorepo-ci-split",
+  "duration_seconds": 16.83,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "ci-09-monorepo-ci-split",
+    "goal_id": "ci-09-monorepo-ci-split",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-21T00:09:16.710785Z",
+    "tasks": [
+      {
+        "id": "configure-path-triggers",
+        "description": "Configure path-based trigger rules for CI jobs",
+        "action": "configure",
+        "target": "GitHub Actions",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Access to CI configuration",
+            "fact": "ci_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup-dependency-caching",
+        "description": "Set up dependency caching for Go, npm, and pip",
+        "action": "setup",
+        "target": "caching",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Valid cache keys are defined",
+            "fact": "cache_keys_defined",
+            "established_by": "configure-path-triggers",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "caching performance",
+          "how": "run CI jobs and measure speed",
+          "expected": "reduced build times"
+        },
+        "rollback": {
+          "trigger": "caching fails",
+          "action": "revert to no caching",
+          "safety_guard": "ensure no jobs are blocked"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "parallelize-service-builds",
+        "description": "Implement parallelization for independent service builds",
+        "action": "implement",
+        "target": "CI pipeline",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Existing services are buildable",
+            "fact": "services_buildable",
+            "established_by": "setup-dependency-caching",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "build completion time",
+          "how": "check CI logs for duration",
+          "expected": "< 5 minutes for all services"
+        },
+        "rollback": {
+          "trigger": "parallelization causes errors",
+          "action": "fall back to sequential builds",
+          "safety_guard": "monitor for critical build failures"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "add-merge-gate",
+        "description": "Add a merge-gate that aggregates results",
+        "action": "add",
+        "target": "GitHub Actions",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CI jobs have results to aggregate",
+            "fact": "results_available",
+            "established_by": "parallelize-service-builds",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "validate-pr-completion",
+        "description": "Verify that PR builds complete in under 5 minutes",
+        "action": "validate",
+        "target": "CI process",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Merge-gate is functioning",
+            "fact": "merge_gate_functional",
+            "established_by": "add-merge-gate",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "PR build duration",
+          "how": "analyze CI job statistics",
+          "expected": "< 5 minutes"
+        },
+        "rollback": {
+          "trigger": "PR builds exceed time",
+          "action": "reassess build configurations",
+          "safety_guard": "ensure builds are optimized"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "configure-path-triggers",
+        "to_task": "setup-dependency-caching",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup-dependency-caching",
+        "to_task": "parallelize-service-builds",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "parallelize-service-builds",
+        "to_task": "add-merge-gate",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "add-merge-gate",
+        "to_task": "validate-pr-completion",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:setup-dependency-caching",
+      "task_id": "setup-dependency-caching",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'setup-dependency-caching' is sequenced before verifying the precondition 'Valid cache keys are defined'.",
+      "suggested_fix": "Ensure cache keys are defined before executing 'setup-dependency-caching'."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:parallelize-service-builds",
+      "task_id": "parallelize-service-builds",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'parallelize-service-builds' is sequenced before verifying the precondition 'Existing services are buildable'.",
+      "suggested_fix": "Ensure services are buildable before executing 'parallelize-service-builds'."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:add-merge-gate",
+      "task_id": "add-merge-gate",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'add-merge-gate' is sequenced before verifying the precondition 'CI jobs have results to aggregate'.",
+      "suggested_fix": "Ensure CI jobs have results available before executing 'add-merge-gate'."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:validate-pr-completion",
+      "task_id": "validate-pr-completion",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'validate-pr-completion' is sequenced before verifying the precondition 'Merge-gate is functioning'.",
+      "suggested_fix": "Ensure the merge-gate is functional before executing 'validate-pr-completion'."
+    },
+    {
+      "id": "crit:1:weak_rollback:setup-dependency-caching",
+      "task_id": "setup-dependency-caching",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'setup-dependency-caching' lacks detailed verification steps.",
+      "suggested_fix": "Add verification steps to ensure that reverting to no caching does not disrupt workflows."
+    },
+    {
+      "id": "crit:1:weak_rollback:parallelize-service-builds",
+      "task_id": "parallelize-service-builds",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'parallelize-service-builds' lacks detailed verification steps.",
+      "suggested_fix": "Add verification steps to monitor critical build failures during the fallback."
+    },
+    {
+      "id": "crit:1:weak_rollback:validate-pr-completion",
+      "task_id": "validate-pr-completion",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'validate-pr-completion' lacks specifics on monitoring adjustments.",
+      "suggested_fix": "Include explicit monitoring checks for build optimization changes."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

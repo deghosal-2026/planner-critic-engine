@@ -1,0 +1,297 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-09-ami-pipeline",
+  "duration_seconds": 14.83,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "inf-09-ami-pipeline-v1",
+    "goal_id": "inf-09-ami-pipeline",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-20T23:59:20.999181Z",
+    "tasks": [
+      {
+        "id": "build-ami",
+        "description": "Build base AMI from Amazon Linux 2",
+        "action": "build",
+        "target": "AMI",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "AMI ID",
+          "how": "describe image",
+          "expected": "valid AMI ID"
+        },
+        "rollback": {
+          "trigger": "AMI build fails",
+          "action": "terminate build process",
+          "safety_guard": "check build logs for errors"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "bake-dependencies",
+        "description": "Bake application dependencies into the AMI",
+        "action": "bake",
+        "target": "dependencies",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "installed packages",
+          "how": "list installed packages",
+          "expected": "all dependencies installed"
+        },
+        "rollback": {
+          "trigger": "baking fails",
+          "action": "rebuild base AMI",
+          "safety_guard": "verify base AMI integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "apply-hardening",
+        "description": "Apply CIS hardening baseline",
+        "action": "apply",
+        "target": "AMI",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "CIS compliance",
+          "how": "run CIS benchmark",
+          "expected": "compliance score above threshold"
+        },
+        "rollback": {
+          "trigger": "hardening fails",
+          "action": "revert to previous AMI",
+          "safety_guard": "validate AMI health"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run-security-scans",
+        "description": "Run security scans (Trivy, CIS-CAT)",
+        "action": "scan",
+        "target": "AMI",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "scan report",
+          "how": "generate report",
+          "expected": "no critical vulnerabilities"
+        },
+        "rollback": {
+          "trigger": "scan fails or vulnerabilities found",
+          "action": "report and remediate",
+          "safety_guard": "review scan results"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "promote-ami-dev",
+        "description": "Promote AMI to dev environment",
+        "action": "promote",
+        "target": "dev",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "dev instances",
+          "how": "check instances using new AMI",
+          "expected": "all dev instances run new AMI"
+        },
+        "rollback": {
+          "trigger": "promotion fails",
+          "action": "revert to previous AMI in dev",
+          "safety_guard": "check dev instance health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "promote-ami-staging",
+        "description": "Promote AMI to staging environment",
+        "action": "promote",
+        "target": "staging",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "staging instances",
+          "how": "check instances using new AMI",
+          "expected": "all staging instances run new AMI"
+        },
+        "rollback": {
+          "trigger": "promotion fails",
+          "action": "revert to previous AMI in staging",
+          "safety_guard": "check staging instance health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "promote-ami-prod",
+        "description": "Promote AMI to production environment",
+        "action": "promote",
+        "target": "prod",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "production instances",
+          "how": "check instances using new AMI",
+          "expected": "all production instances run new AMI"
+        },
+        "rollback": {
+          "trigger": "promotion fails",
+          "action": "revert to previous AMI in prod",
+          "safety_guard": "check production instance health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update-auto-scaling-groups",
+        "description": "Update auto-scaling groups to use new AMI",
+        "action": "update",
+        "target": "auto-scaling groups",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "New AMI is available",
+            "fact": "new_ami_available",
+            "established_by": "promote-ami-prod",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "build-ami",
+        "to_task": "bake-dependencies",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "bake-dependencies",
+        "to_task": "apply-hardening",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "apply-hardening",
+        "to_task": "run-security-scans",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run-security-scans",
+        "to_task": "promote-ami-dev",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote-ami-dev",
+        "to_task": "promote-ami-staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote-ami-staging",
+        "to_task": "promote-ami-prod",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote-ami-prod",
+        "to_task": "update-auto-scaling-groups",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unverified_dependencies:update-auto-scaling-groups",
+      "task_id": "update-auto-scaling-groups",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task depends on 'new_ami_available' which is never explicitly confirmed as true by the previous tasks.",
+      "suggested_fix": "Add a verification step in 'promote-ami-prod' to explicitly confirm 'new_ami_available' before proceeding to 'update-auto-scaling-groups'."
+    },
+    {
+      "id": "crit:1:weak_rollback:apply-hardening",
+      "task_id": "apply-hardening",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for applying hardening involves reverting to a previous AMI, which may not validate the application's functionality after changes.",
+      "suggested_fix": "Consider implementing a more robust rollback strategy that verifies application functionality before and after hardening."
+    },
+    {
+      "id": "crit:1:risk:promote-ami-prod",
+      "task_id": "promote-ami-prod",
+      "version": 1,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Promoting the AMI to production without prior staging verification may lead to issues in the production environment if the AMI is not properly validated.",
+      "suggested_fix": "Enhance testing in staging to include more extensive checks that mirror production use cases before promotion."
+    },
+    {
+      "id": "crit:1:risk:promote-ami-staging",
+      "task_id": "promote-ami-staging",
+      "version": 1,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Promotion to staging should include thorough testing to prevent issues that may arise due to unsupported configurations in dev.",
+      "suggested_fix": "Include integration tests that simulate production scenarios before promoting to staging."
+    },
+    {
+      "id": "crit:1:missing_steps:bake-dependencies",
+      "task_id": "bake-dependencies",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Dependency baking does not include any checks for version compatibility with the application before baking.",
+      "suggested_fix": "Add a step to validate application compatibility with the dependencies being baked."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

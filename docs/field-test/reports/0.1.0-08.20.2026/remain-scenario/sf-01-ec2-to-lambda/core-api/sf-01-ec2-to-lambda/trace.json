@@ -1,0 +1,270 @@
+{
+  "dimension": "core-api",
+  "goal_id": "sf-01-ec2-to-lambda",
+  "duration_seconds": 14.74,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "sf-01-ec2-to-lambda",
+    "goal_id": "sf-01-ec2-to-lambda",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-21T00:01:45.222055Z",
+    "tasks": [
+      {
+        "id": "refactor_handlers",
+        "description": "Refactor the application into Lambda-compatible handlers",
+        "action": "refactor",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application builds successfully",
+          "how": "run build process",
+          "expected": "build succeeds"
+        },
+        "rollback": {
+          "trigger": "refactor fails",
+          "action": "revert to previous codebase",
+          "safety_guard": "ensure application compiles without errors"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_lambda",
+        "description": "Deploy Lambda functions with provisioned concurrency",
+        "action": "deploy",
+        "target": "lambda_functions",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Lambda function version",
+          "how": "check deployment status",
+          "expected": "latest version deployed with provisioned concurrency"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to previous version",
+          "safety_guard": "ensure API Gateway is still functional"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_api_gateway",
+        "description": "Set up API Gateway with custom domains",
+        "action": "setup",
+        "target": "api_gateway",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Lambda functions are deployed",
+            "fact": "lambda_deployed",
+            "established_by": "deploy_lambda",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_dual_endpoint",
+        "description": "Configure dual-endpoint (EC2 + Lambda) during migration",
+        "action": "configure",
+        "target": "api_traffic",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "traffic distribution percentage",
+          "how": "monitor API Gateway traffic metrics",
+          "expected": "correct percentage forwarding to Lambda"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "restore endpoint configuration",
+          "safety_guard": "verify traffic routing behavior"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "drain_traffic",
+        "description": "Drain traffic from EC2 to Lambda (10% \u2192 50% \u2192 100%)",
+        "action": "drain",
+        "target": "api_traffic",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "EC2 traffic percentage",
+          "how": "check traffic metrics",
+          "expected": "traffic fully shifted to Lambda"
+        },
+        "rollback": {
+          "trigger": "traffic drain causes issues",
+          "action": "restore full traffic to EC2",
+          "safety_guard": "monitor for service degradation"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_response_parity",
+        "description": "Verify response parity between EC2 and Lambda",
+        "action": "verify",
+        "target": "api_response",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "API responses",
+          "how": "compare responses from EC2 and Lambda",
+          "expected": "responses are identical"
+        },
+        "rollback": {
+          "trigger": "response disparity detected",
+          "action": "switch traffic back to EC2",
+          "safety_guard": "verify critical API endpoints are responsive"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "decommission_ec2",
+        "description": "Decommission EC2 instances after successful migration",
+        "action": "decommission",
+        "target": "ec2_instances",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Response parity verified",
+            "fact": "response_parity_verified",
+            "established_by": "verify_response_parity",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "refactor_handlers",
+        "to_task": "deploy_lambda",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_lambda",
+        "to_task": "setup_api_gateway",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_api_gateway",
+        "to_task": "configure_dual_endpoint",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_dual_endpoint",
+        "to_task": "drain_traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "drain_traffic",
+        "to_task": "verify_response_parity",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_response_parity",
+        "to_task": "decommission_ec2",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:setup_api_gateway",
+      "task_id": "setup_api_gateway",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The setup_api_gateway task depends on the deployment of Lambda functions which has not been ensured prior to its execution. The hard prerequisite is not met.",
+      "suggested_fix": "Ensure the deploy_lambda task is completed successfully before starting setup_api_gateway."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:configure_dual_endpoint",
+      "task_id": "configure_dual_endpoint",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The configure_dual_endpoint task requires the setup_api_gateway task to be completed before it can execute. Order of tasks violates hard prerequisites.",
+      "suggested_fix": "Reorder the tasks to ensure setup_api_gateway completes before configure_dual_endpoint."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:drain_traffic",
+      "task_id": "drain_traffic",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The drain_traffic task requires the configure_dual_endpoint task to be completed before executing, violating task order.",
+      "suggested_fix": "Change task sequence to ensure configure_dual_endpoint completes before starting drain_traffic."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:verify_response_parity",
+      "task_id": "verify_response_parity",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The verify_response_parity task must occur after the drain_traffic task, which is not positioned properly in the sequence.",
+      "suggested_fix": "Ensure that drain_traffic completes successfully before executing verify_response_parity."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:decommission_ec2",
+      "task_id": "decommission_ec2",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The decommission_ec2 task is dependent on the verify_response_parity task, which has not been implemented correctly within the task flow.",
+      "suggested_fix": "Rearrange the tasks so that decommission_ec2 follows after verify_response_parity."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

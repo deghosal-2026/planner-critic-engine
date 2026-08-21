@@ -1,0 +1,263 @@
+{
+  "dimension": "core-api",
+  "goal_id": "id-01-idp-migration",
+  "duration_seconds": 50.13,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-id-01-idp-migration-r3",
+    "goal_id": "id-01-idp-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-id-01-idp-migration-r2",
+    "created_at": "2026-08-21T00:03:06.558836Z",
+    "tasks": [
+      {
+        "id": "configure_okta",
+        "description": "Configure Okta as new IdP with SAML 2.0 and OIDC",
+        "action": "configure",
+        "target": "Okta IdP",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Access to Okta admin panel",
+            "fact": "okta_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Okta configuration settings",
+          "how": "review configuration logs",
+          "expected": "correct SAML and OIDC settings exist"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "revert Okta configuration",
+          "safety_guard": "ensure legacy IdP remains functional"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_mfa",
+        "description": "Set up MFA enforcement (TOTP + push)",
+        "action": "setup",
+        "target": "Okta MFA",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Okta configured",
+            "fact": "configure_okta_completed",
+            "established_by": "configure_okta",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "MFA settings",
+          "how": "check MFA configuration",
+          "expected": "MFA options are enabled correctly"
+        },
+        "rollback": {
+          "trigger": "MFA setup fails",
+          "action": "disable MFA settings",
+          "safety_guard": "monitor user access"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "migrate_apps",
+        "description": "Migrate all applications from SAML to Okta",
+        "action": "migrate",
+        "target": "applications",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "MFA set up",
+            "fact": "setup_mfa_completed",
+            "established_by": "setup_mfa",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application authentication",
+          "how": "run authentication tests",
+          "expected": "all applications authenticate without errors"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore previous SAML configurations",
+          "safety_guard": "verify application availability"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "test_sessions",
+        "description": "Test session compatibility",
+        "action": "test",
+        "target": "user sessions",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Applications migrated",
+            "fact": "migrate_apps_completed",
+            "established_by": "migrate_apps",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "user session status",
+          "how": "check active user sessions",
+          "expected": "existing sessions remain active"
+        },
+        "rollback": {
+          "trigger": "session invalidation detected",
+          "action": "revert to previous session management",
+          "safety_guard": "ensure user complaints are monitored"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_authentication",
+        "description": "Verify all apps authenticate against Okta",
+        "action": "verify",
+        "target": "applications",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Applications migrated and sessions tested",
+            "fact": "test_sessions_completed",
+            "established_by": "test_sessions",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application authentication status",
+          "how": "monitor user reports and system logs",
+          "expected": "no authentication failures reported"
+        },
+        "rollback": {
+          "trigger": "authentication failures detected",
+          "action": "revert to legacy IdP",
+          "safety_guard": "monitor user feedback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover_dns",
+        "description": "Cutover DNS for the IdP endpoint",
+        "action": "cutover",
+        "target": "DNS records",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DNS settings verified for authentication",
+            "fact": "verify_authentication_completed",
+            "established_by": "verify_authentication",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "restore previous DNS settings",
+          "safety_guard": "monitor service status"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "configure_okta",
+        "to_task": "setup_mfa",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_mfa",
+        "to_task": "migrate_apps",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate_apps",
+        "to_task": "test_sessions",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test_sessions",
+        "to_task": "verify_authentication",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_authentication",
+        "to_task": "cutover_dns",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:missing_steps:cutover_dns",
+      "task_id": "cutover_dns",
+      "version": 3,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider including a step to monitor for DNS propagation delays.",
+      "suggested_fix": "Add a step to check for DNS propagation after cutover."
+    },
+    {
+      "id": "crit:3:risk:cutover_dns",
+      "task_id": "cutover_dns",
+      "version": 3,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Cutover DNS involves risks if users access outdated records during the transition, potentially causing authentication failures.",
+      "suggested_fix": "Ensure a communication plan is in place for users regarding possible access issues during DNS cutover."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:id-01-idp-migration:3:3",
+    "plan_id": "plan-id-01-idp-migration-r3",
+    "version": 3,
+    "blocker_finding_id": null,
+    "question": "Plan for goal 'id-01-idp-migration' did not converge (converged_stalled). Decide next step.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

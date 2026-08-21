@@ -1,0 +1,267 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mch-02-parallel-fanout",
+  "duration_seconds": 33.05,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-mch-02-parallel-fanout-r2",
+    "goal_id": "mch-02-parallel-fanout",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "mch-02-parallel-fanout",
+    "created_at": "2026-08-21T00:06:15.426861Z",
+    "tasks": [
+      {
+        "id": "update_db",
+        "description": "Update the database schema",
+        "action": "apply migration",
+        "target": "database",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "database schema version",
+          "how": "run SQL query",
+          "expected": "v2"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore from backup",
+          "safety_guard": "verify backup integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update_cache",
+        "description": "Deploy the new cache version",
+        "action": "deploy",
+        "target": "cache",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cache service is running",
+            "fact": "cache_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update_queue",
+        "description": "Update the message queue configuration",
+        "action": "apply changes",
+        "target": "queue",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "queue service is stable",
+            "fact": "queue_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update_search_index",
+        "description": "Reindex the search index with new data",
+        "action": "reindex",
+        "target": "search index",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "search index state",
+          "how": "run query on index",
+          "expected": "reindexed successfully"
+        },
+        "rollback": {
+          "trigger": "indexing fails",
+          "action": "restore last index",
+          "safety_guard": "check index integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update_cdn",
+        "description": "Update CDN configurations",
+        "action": "apply changes",
+        "target": "CDN",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CDN is operational",
+            "fact": "cdn_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update_ml_model",
+        "description": "Deploy the updated machine learning model",
+        "action": "deploy",
+        "target": "ML model",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "model accuracy",
+          "how": "run evaluation tests",
+          "expected": "accuracy > 90%"
+        },
+        "rollback": {
+          "trigger": "model deployment fails",
+          "action": "roll back to previous version",
+          "safety_guard": "validate model performance"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "update_db",
+        "to_task": "update_search_index",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_cache",
+        "to_task": "update_search_index",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_queue",
+        "to_task": "update_search_index",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_cdn",
+        "to_task": "update_ml_model",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_search_index",
+        "to_task": "update_ml_model",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": [
+      {
+        "id": "subsystem_updates",
+        "kind": "fan_out",
+        "tasks": [
+          "update_db",
+          "update_cache",
+          "update_queue",
+          "update_search_index",
+          "update_cdn",
+          "update_ml_model"
+        ],
+        "join": "all"
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:update_cache",
+      "task_id": "update_cache",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Cache deployment requires verification but none is specified, making it infeasible to ensure success.",
+      "suggested_fix": "Add a verification step to confirm that the cache has been deployed successfully."
+    },
+    {
+      "id": "crit:2:feasibility:update_queue",
+      "task_id": "update_queue",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Queue update lacks a verification step, making it impossible to assess if the task completed successfully.",
+      "suggested_fix": "Include a verification process to ensure the queue configuration changes are applied successfully."
+    },
+    {
+      "id": "crit:2:weak_rollback:update_cache",
+      "task_id": "update_cache",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Cache update does not specify a rollback mechanism, creating a risk of leaving the system in an inconsistent state if it fails.",
+      "suggested_fix": "Implement a rollback action that reverts the cache to its previous state."
+    },
+    {
+      "id": "crit:2:weak_rollback:update_queue",
+      "task_id": "update_queue",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Queue update does not have a rollback mechanism, which poses a risk in the event of failure.",
+      "suggested_fix": "Add a rollback procedure to restore the previous queue configuration."
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:update_ml_model",
+      "task_id": "update_ml_model",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "ML model deployment task is dependent on the completion of both queue update and search index update, yet it is not sequenced correctly based on dependencies.",
+      "suggested_fix": "Reorder the execution of the tasks to ensure that dependent updates complete before deploying the ML model."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:update_ml_model",
+      "task_id": "update_ml_model",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "ML model deployment is dependent on the successful execution of the cache, queue, and search index updates, but there are no guarantee mechanisms to verify their success.",
+      "suggested_fix": "Establish verification processes for the dependent updates to ensure they complete successfully before proceeding."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

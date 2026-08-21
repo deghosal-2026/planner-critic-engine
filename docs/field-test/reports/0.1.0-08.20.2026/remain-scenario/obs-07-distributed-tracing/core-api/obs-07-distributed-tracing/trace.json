@@ -1,0 +1,224 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-07-distributed-tracing",
+  "duration_seconds": 13.66,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "obs-07-distributed-tracing-plan",
+    "goal_id": "obs-07-distributed-tracing",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-21T00:00:11.094223Z",
+    "tasks": [
+      {
+        "id": "instrument_services",
+        "description": "Instrument all microservices with OpenTelemetry SDK",
+        "action": "instrument",
+        "target": "microservices",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "instrumentation logs",
+          "how": "check logs for trace IDs",
+          "expected": "trace IDs are present"
+        },
+        "rollback": {
+          "trigger": "instrumentation fails",
+          "action": "remove instrumentation",
+          "safety_guard": "verify system performance is restored"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_jaeger",
+        "description": "Deploy Jaeger collector",
+        "action": "deploy",
+        "target": "jaeger",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kubernetes cluster is operational",
+            "fact": "k8s_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_exporters",
+        "description": "Configure OpenTelemetry exporters for Jaeger",
+        "action": "configure",
+        "target": "exporters",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Jaeger collector is deployed",
+            "fact": "jaeger_deployed",
+            "established_by": "deploy_jaeger",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "add_trace_ids",
+        "description": "Add trace correlation IDs to logs",
+        "action": "modify",
+        "target": "logging",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Services are instrumented",
+            "fact": "instrumentation_complete",
+            "established_by": "instrument_services",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "log contents",
+          "how": "inspect log entries",
+          "expected": "trace correlation IDs are included"
+        },
+        "rollback": {
+          "trigger": "failure to add trace IDs",
+          "action": "revert logging changes",
+          "safety_guard": "ensure previous log format is restored"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_alerting",
+        "description": "Set up alerting on p99 latency anomalies",
+        "action": "configure",
+        "target": "alerting",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Logging with trace IDs is in place",
+            "fact": "logging_configured",
+            "established_by": "add_trace_ids",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_trace_propagation",
+        "description": "Verify trace propagation across service boundaries",
+        "action": "verify",
+        "target": "traces",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "trace continuity",
+          "how": "trace end-to-end journeys",
+          "expected": "traces are complete without breaks"
+        },
+        "rollback": {
+          "trigger": "trace propagation fails",
+          "action": "re-assess configuration",
+          "safety_guard": "hold more detailed tracing analysis"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_jaeger",
+        "to_task": "configure_exporters",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "instrument_services",
+        "to_task": "add_trace_ids",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "add_trace_ids",
+        "to_task": "setup_alerting",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_alerting",
+        "to_task": "verify_trace_propagation",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:instrument_services",
+      "task_id": "instrument_services",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Instrumentation may not be achievable with current system performance expectations due to overhead from OpenTelemetry SDK.",
+      "suggested_fix": "Assess and optimize the performance impact of OpenTelemetry SDK before proceeding with instrumentation."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:setup_alerting",
+      "task_id": "setup_alerting",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Setup alerting task depends on the completion of adding trace IDs, but no verification step is provided for this dependency.",
+      "suggested_fix": "Add a verification step to confirm trace IDs have been added successfully before proceeding to setup alerting."
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:configure_exporters",
+      "task_id": "configure_exporters",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Configuring exporters is sequenced before establishing that Jaeger collector is successfully deployed, which could lead to misconfiguration.",
+      "suggested_fix": "Ensure the task 'configure_exporters' is sequenced after successful deployment of Jaeger."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

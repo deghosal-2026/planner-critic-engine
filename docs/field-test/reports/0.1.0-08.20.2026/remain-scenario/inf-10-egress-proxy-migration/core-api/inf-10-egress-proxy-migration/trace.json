@@ -1,0 +1,281 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-10-egress-proxy-migration",
+  "duration_seconds": 33.87,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-inf-10-egress-proxy-migration-r2",
+    "goal_id": "inf-10-egress-proxy-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "inf-10-egress-proxy-migration-plan",
+    "created_at": "2026-08-20T23:59:57.133471Z",
+    "tasks": [
+      {
+        "id": "deploy_proxy",
+        "description": "Deploy egress proxy in a dedicated VPC using Terraform",
+        "action": "deploy",
+        "target": "egress_proxy_vpc",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Terraform is properly configured",
+            "fact": "terraform_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "VPC deployment status",
+          "how": "check AWS console or CLI",
+          "expected": "egress proxy VPC is active"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "destroy egress proxy",
+          "safety_guard": "ensure no traffic is routed through proxy"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_nat",
+        "description": "Configure NAT Gateway routing through the proxy",
+        "action": "configure",
+        "target": "nat_gateway",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Egress proxy is deployed",
+            "fact": "proxy_deployed",
+            "established_by": "deploy_proxy",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_dual_egress",
+        "description": "Set up dual-egress (old direct + new proxy) during migration",
+        "action": "setup",
+        "target": "dual_egress",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "NAT Gateway is configured",
+            "fact": "nat_configured",
+            "established_by": "configure_nat",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "egress traffic paths",
+          "how": "run traffic tests",
+          "expected": "traffic flows through both egress paths"
+        },
+        "rollback": {
+          "trigger": "dual egress fails",
+          "action": "revert to direct egress",
+          "safety_guard": "check service availability"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover_application_traffic",
+        "description": "Cutover application traffic to proxy in batches",
+        "action": "cutover",
+        "target": "application_traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dual egress is set up",
+            "fact": "dual_egress_setup",
+            "established_by": "setup_dual_egress",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application traffic flows",
+          "how": "monitor logs and metrics",
+          "expected": "all application traffic routed through proxy"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "switch traffic back to direct egress",
+          "safety_guard": "monitor application performance"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_traffic_flow",
+        "description": "Verify all traffic flows through proxy",
+        "action": "verify",
+        "target": "traffic_flow",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Application traffic cutover completed",
+            "fact": "traffic_cutover_done",
+            "established_by": "cutover_application_traffic",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "enforce_egress_allowlist",
+        "description": "Enforce egress allowlist rules",
+        "action": "enforce",
+        "target": "egress_allowlist",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Verify traffic flow is successful",
+            "fact": "traffic_verified",
+            "established_by": "verify_traffic_flow",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service accessibility tests",
+          "how": "run access audits",
+          "expected": "all necessary services are reachable"
+        },
+        "rollback": {
+          "trigger": "allowlist too restrictive",
+          "action": "rollback to previous allowlist",
+          "safety_guard": "check service functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_proxy",
+        "to_task": "configure_nat",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_nat",
+        "to_task": "setup_dual_egress",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_dual_egress",
+        "to_task": "cutover_application_traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover_application_traffic",
+        "to_task": "verify_traffic_flow",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_traffic_flow",
+        "to_task": "enforce_egress_allowlist",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:configure_nat",
+      "task_id": "configure_nat",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "NAT Gateway routing should not be configured before the egress proxy is fully deployed.",
+      "suggested_fix": "Ensure 'configure_nat' is sequenced after 'deploy_proxy' is successfully completed."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:setup_dual_egress",
+      "task_id": "setup_dual_egress",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The precondition 'NAT Gateway is configured' is not verified, which may lead to failure if NAT Gateway is not set up correctly.",
+      "suggested_fix": "Add a verification step to confirm NAT Gateway is fully operational before proceeding."
+    },
+    {
+      "id": "crit:2:unverified_dependencies:cutover_application_traffic",
+      "task_id": "cutover_application_traffic",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task depends on 'dual_egress_setup' being established, but this fact is not verified, potentially leading to traffic disruptions if the setup is faulty.",
+      "suggested_fix": "Include a verification step to confirm dual egress operationality prior to executing the cutover."
+    },
+    {
+      "id": "crit:2:missing_steps:verify_traffic_flow",
+      "task_id": "verify_traffic_flow",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No rollback mechanism is defined for verifying traffic flow; should handle failures during traffic verification.",
+      "suggested_fix": "Implement a rollback action to revert to the previous working state if verification fails."
+    },
+    {
+      "id": "crit:2:missing_steps:enforce_egress_allowlist",
+      "task_id": "enforce_egress_allowlist",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No rollback mechanism is defined for enforcing the egress allowlist; there should be considerations for service outages.",
+      "suggested_fix": "Define a rollback action to quickly revert changes to the allowlist if they cause accessibility issues."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:inf-10-egress-proxy-migration:2:2",
+    "plan_id": "plan-inf-10-egress-proxy-migration-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:configure_nat",
+    "question": "Plan for goal 'inf-10-egress-proxy-migration' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

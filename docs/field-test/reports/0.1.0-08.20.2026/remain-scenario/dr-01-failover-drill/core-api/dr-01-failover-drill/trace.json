@@ -1,0 +1,276 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dr-01-failover-drill",
+  "duration_seconds": 51.74,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-dr-01-failover-drill-r3",
+    "goal_id": "dr-01-failover-drill",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-dr-01-failover-drill-r2",
+    "created_at": "2026-08-21T00:01:52.238483Z",
+    "tasks": [
+      {
+        "id": "lower_dns_ttl",
+        "description": "Lower DNS TTL to 60 seconds",
+        "action": "update",
+        "target": "Route53",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Route53 is accessible",
+            "fact": "route53_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "wait_for_dns_propagation",
+        "description": "Wait for DNS changes to propagate",
+        "action": "wait",
+        "target": "DNS",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "low"
+      },
+      {
+        "id": "promote_replica",
+        "description": "Promote the us-west-2 read replica to primary",
+        "action": "promote",
+        "target": "RDS",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "promotion success",
+          "how": "check replication status",
+          "expected": "us-west-2 is now the primary"
+        },
+        "rollback": {
+          "trigger": "promotion fails or data loss occurs",
+          "action": "revert to previous primary",
+          "safety_guard": "verify data is consistent before rollback"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update_connection_strings",
+        "description": "Update application connection strings to point to new primary",
+        "action": "update",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Promotion of the replica was successful",
+            "fact": "promotion_successful",
+            "established_by": "promote_replica",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "connection strings updated",
+          "how": "check application configuration",
+          "expected": "application points to us-west-2"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_data_consistency",
+        "description": "Verify data consistency between us-west-2 and us-east-1",
+        "action": "check",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Application is using new primary",
+            "fact": "app_using_new_primary",
+            "established_by": "update_connection_strings",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data accuracy",
+          "how": "run consistency checks",
+          "expected": "data matches between regions"
+        },
+        "rollback": {
+          "trigger": "data inconsistency found",
+          "action": "revert connections to us-east-1",
+          "safety_guard": "verify application state is consistent before revert"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_write_conflicts",
+        "description": "Monitor for write conflicts in new primary",
+        "action": "monitor",
+        "target": "RDS",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data consistency verified",
+            "fact": "data_is_consistent",
+            "established_by": "verify_data_consistency",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "conflict logs",
+          "how": "analyze logs from Prometheus",
+          "expected": "no write conflicts logged"
+        },
+        "rollback": {
+          "trigger": "write conflicts detected",
+          "action": "terminate writes to us-west-2",
+          "safety_guard": "ensure write state is consistent before termination"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "failback_to_us_east_1",
+        "description": "Failback to us-east-1 primary with reverse replication",
+        "action": "failback",
+        "target": "RDS",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Monitoring for write conflicts has completed successfully",
+            "fact": "monitoring_successful",
+            "established_by": "monitor_write_conflicts",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application state after failback",
+          "how": "run full integration tests",
+          "expected": "application functions as expected on us-east-1"
+        },
+        "rollback": {
+          "trigger": "failback issues arise",
+          "action": "return to us-west-2",
+          "safety_guard": "validate application's state before reversion"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "lower_dns_ttl",
+        "to_task": "wait_for_dns_propagation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "wait_for_dns_propagation",
+        "to_task": "promote_replica",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote_replica",
+        "to_task": "update_connection_strings",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_connection_strings",
+        "to_task": "verify_data_consistency",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_data_consistency",
+        "to_task": "monitor_write_conflicts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_write_conflicts",
+        "to_task": "failback_to_us_east_1",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:update_connection_strings",
+      "task_id": "update_connection_strings",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'update_connection_strings' is sequenced before verifying if the data consistency is confirmed, which is essential to ensure no data issues occur after the promotion.",
+      "suggested_fix": "Ensure 'verify_data_consistency' is completed successfully before proceeding to 'update_connection_strings'."
+    },
+    {
+      "id": "crit:3:weak_rollback:verify_data_consistency",
+      "task_id": "verify_data_consistency",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'verify_data_consistency' lacks sound measures to address detected inconsistency, possibly leading to further issues.",
+      "suggested_fix": "Implement a rollback process that includes restoring a previous known good state if inconsistencies are found."
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:failback_to_us_east_1",
+      "task_id": "failback_to_us_east_1",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'failback_to_us_east_1' relies on completion of 'monitor_write_conflicts', but write conflicts could remain unaddressed if monitoring is not comprehensively executed first.",
+      "suggested_fix": "Ensure comprehensive monitoring of write conflicts is validated before initiating the failback to us-east-1."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:dr-01-failover-drill:3:3",
+    "plan_id": "plan-dr-01-failover-drill-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:update_connection_strings",
+    "question": "Plan for goal 'dr-01-failover-drill' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

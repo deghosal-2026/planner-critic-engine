@@ -1,0 +1,482 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mch-01-env-promotion",
+  "duration_seconds": 78.29,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-mch-01-env-promotion-r3",
+    "goal_id": "mch-01-env-promotion",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-mch-01-env-promotion-r2",
+    "created_at": "2026-08-21T00:05:46.166183Z",
+    "tasks": [
+      {
+        "id": "promote-dev",
+        "description": "Promote API to dev environment",
+        "action": "deploy",
+        "target": "dev",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dev environment is ready",
+            "fact": "dev_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "unit-tests-dev",
+        "description": "Run unit tests in dev",
+        "action": "test",
+        "target": "dev",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "API is deployed in dev",
+            "fact": "api_deployed_dev",
+            "established_by": "promote-dev",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "unit test results",
+          "how": "run tests",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "unit tests fail",
+          "action": "notify developers",
+          "safety_guard": "ensure environments remain unchanged"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "promote-staging",
+        "description": "Promote API to staging environment",
+        "action": "deploy",
+        "target": "staging",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "unit tests in dev passed",
+            "fact": "tests_passed_dev",
+            "established_by": "unit-tests-dev",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "run integration and smoke tests",
+          "how": "execute test suite",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "staging promotion fails",
+          "action": "rollback to dev",
+          "safety_guard": "verify dev is intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "integration-tests-staging",
+        "description": "Run integration tests in staging",
+        "action": "test",
+        "target": "staging",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "API is deployed in staging",
+            "fact": "api_deployed_staging",
+            "established_by": "promote-staging",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "integration test results",
+          "how": "run tests",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "integration tests fail",
+          "action": "notify developers",
+          "safety_guard": "ensure environments remain unchanged"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "smoke-tests-staging",
+        "description": "Run smoke tests in staging",
+        "action": "test",
+        "target": "staging",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "integration tests in staging passed",
+            "fact": "integration_tests_passed",
+            "established_by": "integration-tests-staging",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "smoke test results",
+          "how": "run tests",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "smoke tests fail",
+          "action": "notify developers",
+          "safety_guard": "ensure environments remain unchanged"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "promote-prod",
+        "description": "Promote API to prod environment using canary deployment",
+        "action": "deploy",
+        "target": "prod",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "smoke tests in staging passed",
+            "fact": "smoke_tests_passed",
+            "established_by": "smoke-tests-staging",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "run canary deployment checks",
+          "how": "check health metrics",
+          "expected": "all health checks pass"
+        },
+        "rollback": {
+          "trigger": "prod promotion fails",
+          "action": "rollback to staging",
+          "safety_guard": "verify staging is intact"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "canary-5-percent",
+        "description": "Deploy canary release (5%) to prod",
+        "action": "deploy",
+        "target": "prod",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "API is promoted to prod",
+            "fact": "api_deployed_prod",
+            "established_by": "promote-prod",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "verify canary deployment is successful",
+          "how": "check health metrics",
+          "expected": "5% healthy"
+        },
+        "rollback": {
+          "trigger": "canary 5% fails",
+          "action": "rollback to previous state",
+          "safety_guard": "verify previous state is intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "check-canary-health-5",
+        "description": "Check health of canary (5%)",
+        "action": "check",
+        "target": "prod",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary deployed to prod",
+            "fact": "canary_deployed_5",
+            "established_by": "canary-5-percent",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "health check results",
+          "how": "query Prometheus",
+          "expected": "5% healthy"
+        },
+        "rollback": {
+          "trigger": "health check fails",
+          "action": "roll back canary deployment",
+          "safety_guard": "verify canary deployment integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "canary-25-percent",
+        "description": "Deploy canary release (25%) to prod",
+        "action": "deploy",
+        "target": "prod",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "5% canary is healthy",
+            "fact": "canary_5_healthy",
+            "established_by": "check-canary-health-5",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "run health checks for 25%",
+          "how": "query Prometheus",
+          "expected": "25% healthy"
+        },
+        "rollback": {
+          "trigger": "canary 25% fails",
+          "action": "rollback to canary 5%",
+          "safety_guard": "verify canary 5% is intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "check-canary-health-25",
+        "description": "Check health of canary (25%)",
+        "action": "check",
+        "target": "prod",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary deployed to prod (25%)",
+            "fact": "canary_deployed_25",
+            "established_by": "canary-25-percent",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "health check results",
+          "how": "query Prometheus",
+          "expected": "25% healthy"
+        },
+        "rollback": {
+          "trigger": "health check fails",
+          "action": "roll back canary deployment",
+          "safety_guard": "verify canary deployment integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "canary-100-percent",
+        "description": "Deploy canary release (100%) to prod",
+        "action": "deploy",
+        "target": "prod",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "25% canary is healthy",
+            "fact": "canary_25_healthy",
+            "established_by": "check-canary-health-25",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "run health checks for 100%",
+          "how": "query Prometheus",
+          "expected": "100% healthy"
+        },
+        "rollback": {
+          "trigger": "canary 100% fails",
+          "action": "rollback to canary 25%",
+          "safety_guard": "verify canary 25% is intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "check-canary-health-100",
+        "description": "Check health of canary (100%)",
+        "action": "check",
+        "target": "prod",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary deployed to prod (100%)",
+            "fact": "canary_deployed_100",
+            "established_by": "canary-100-percent",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "health check results",
+          "how": "query Prometheus",
+          "expected": "100% healthy"
+        },
+        "rollback": {
+          "trigger": "health check fails",
+          "action": "roll back canary deployment",
+          "safety_guard": "verify canary deployment integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "finalize-promotion",
+        "description": "Finalize the production promotion after canary checks",
+        "action": "finalize",
+        "target": "prod",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "100% canary is healthy",
+            "fact": "canary_100_healthy",
+            "established_by": "check-canary-health-100",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "promote-dev",
+        "to_task": "unit-tests-dev",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "unit-tests-dev",
+        "to_task": "promote-staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote-staging",
+        "to_task": "integration-tests-staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "integration-tests-staging",
+        "to_task": "smoke-tests-staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "smoke-tests-staging",
+        "to_task": "promote-prod",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote-prod",
+        "to_task": "canary-5-percent",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "canary-5-percent",
+        "to_task": "check-canary-health-5",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check-canary-health-5",
+        "to_task": "canary-25-percent",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "canary-25-percent",
+        "to_task": "check-canary-health-25",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check-canary-health-25",
+        "to_task": "canary-100-percent",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "canary-100-percent",
+        "to_task": "check-canary-health-100",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check-canary-health-100",
+        "to_task": "finalize-promotion",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:weak_rollback:promote-prod",
+      "task_id": "promote-prod",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for prod promotion to staging lacks a mechanism to ensure the integrity of the staging environment.",
+      "suggested_fix": "Implement a safety guard to validate the state of the staging environment after rollback."
+    },
+    {
+      "id": "crit:3:weak_rollback:finalize-promotion",
+      "task_id": "finalize-promotion",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Finalization of the production promotion lacks a rollback plan.",
+      "suggested_fix": "Define a rollback procedure for the finalize step to revert the production environment to its previous stable state if needed."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mch-01-env-promotion:3:3",
+    "plan_id": "plan-mch-01-env-promotion-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:weak_rollback:promote-prod",
+    "question": "Plan for goal 'mch-01-env-promotion' cannot be approved: blockers remain (llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=13"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

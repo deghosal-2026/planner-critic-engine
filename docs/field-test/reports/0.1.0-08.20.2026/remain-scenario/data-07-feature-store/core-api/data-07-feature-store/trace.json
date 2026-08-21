@@ -1,0 +1,262 @@
+{
+  "dimension": "core-api",
+  "goal_id": "data-07-feature-store",
+  "duration_seconds": 13.29,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "data-07-feature-store",
+    "goal_id": "data-07-feature-store",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-21T00:11:41.575863Z",
+    "tasks": [
+      {
+        "id": "define_feature_specs",
+        "description": "Define the feature specifications for the ML model",
+        "action": "define",
+        "target": "feature_specs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "project requirements are defined",
+            "fact": "requirements_defined",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "backfill_features",
+        "description": "Backfill historical features from the data warehouse",
+        "action": "backfill",
+        "target": "historical_features",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "data warehouse is reachable",
+            "fact": "dw_healthy",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "feature specs are defined",
+            "fact": "feature_specs_defined",
+            "established_by": "define_feature_specs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "backfilled features validity",
+          "how": "compare counts with data warehouse",
+          "expected": "counts match"
+        },
+        "rollback": {
+          "trigger": "backfill takes too long",
+          "action": "stop backfill process",
+          "safety_guard": "monitor backfill runtime"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_feast",
+        "description": "Deploy Feast for online serving of features",
+        "action": "deploy",
+        "target": "feast_deployment",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "server environment is prepared",
+            "fact": "env_prepared",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Feast is running",
+          "how": "check Feast health endpoint",
+          "expected": "Feast service is healthy"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to last stable deployment",
+          "safety_guard": "verify current stable state"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_online_offline_parity",
+        "description": "Verify online-offline feature parity",
+        "action": "verify",
+        "target": "feature_parity",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "features have been served online",
+            "fact": "features_served_online",
+            "established_by": "deploy_feast",
+            "probe": null
+          },
+          {
+            "description": "features are available offline",
+            "fact": "offline_features_available",
+            "established_by": "backfill_features",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "online and offline features match",
+          "how": "run parity checks",
+          "expected": "feature sets are identical"
+        },
+        "rollback": {
+          "trigger": "parity skew found",
+          "action": "revert to offline calculation",
+          "safety_guard": "ensure data consistency"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "integrate_ml_pipeline",
+        "description": "Integrate the feature store with the ML training pipeline",
+        "action": "integrate",
+        "target": "ml_training_pipeline",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ML pipeline is defined",
+            "fact": "pipeline_defined",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "online serving is verified",
+            "fact": "online_serving_verified",
+            "established_by": "verify_online_offline_parity",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_feature_freshness",
+        "description": "Monitor the freshness of features in the feature store",
+        "action": "monitor",
+        "target": "feature_freshness",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "monitoring tools are set up",
+            "fact": "monitoring_tools_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define_feature_specs",
+        "to_task": "backfill_features",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "backfill_features",
+        "to_task": "deploy_feast",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_feast",
+        "to_task": "verify_online_offline_parity",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_online_offline_parity",
+        "to_task": "integrate_ml_pipeline",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "integrate_ml_pipeline",
+        "to_task": "monitor_feature_freshness",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:backfill_features",
+      "task_id": "backfill_features",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Backfill features task is dependent on feature specifications being defined, but it does not verify that this precondition is established before execution.",
+      "suggested_fix": "Order the backfill_features task after define_feature_specs and ensure that the precondition is checked properly."
+    },
+    {
+      "id": "crit:1:weak_rollback:backfill_features",
+      "task_id": "backfill_features",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Backfill features task has a weak rollback strategy that could lead to data inconsistency if the backfill takes too long.",
+      "suggested_fix": "Implement a rollback action that not only stops the backfill process but also restores previous valid state for historical features."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:integrate_ml_pipeline",
+      "task_id": "integrate_ml_pipeline",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Integration with ML pipeline depends on online serving being verified but does not verify the successful execution of verifying online-offline parity before it.",
+      "suggested_fix": "Ensure that the integration task verifies that online serving has been confirmed as healthy by the verify_online_offline_parity task."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

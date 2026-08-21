@@ -1,0 +1,249 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dr-02-point-in-time-restore",
+  "duration_seconds": 18.12,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "dr-02-point-in-time-restore-v1",
+    "goal_id": "dr-02-point-in-time-restore",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-21T00:02:07.227256Z",
+    "tasks": [
+      {
+        "id": "identify_restore_point",
+        "description": "Identify the timestamp for the restore point",
+        "action": "determine",
+        "target": "timestamp",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "WAL archive is accessible",
+            "fact": "wal_archive_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "pitr_restore",
+        "description": "Run point-in-time restore to isolated environment",
+        "action": "restore",
+        "target": "isolated_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Restore point is identified",
+            "fact": "restore_point_identified",
+            "established_by": "identify_restore_point",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "restore completion",
+          "how": "check restore logs",
+          "expected": "restore successful"
+        },
+        "rollback": {
+          "trigger": "restore fails",
+          "action": "cleanup isolated environment",
+          "safety_guard": "verify no data remains"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_data",
+        "description": "Verify row counts and critical records in restored database",
+        "action": "check",
+        "target": "isolated_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PITR restore is successful",
+            "fact": "restore_successful",
+            "established_by": "pitr_restore",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data integrity",
+          "how": "run comparison queries",
+          "expected": "row counts match expected"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "rollback to last known good state",
+          "safety_guard": "ensure backup is valid"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "test_application_compatibility",
+        "description": "Run application tests against the restored database",
+        "action": "test",
+        "target": "isolated_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data verification is successful",
+            "fact": "data_verified",
+            "established_by": "verify_data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "test results",
+          "how": "check application logs",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "tests fail",
+          "action": "revert to previous application state",
+          "safety_guard": "confirm application backup exists"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cleanup_isolated_env",
+        "description": "Securely delete the restored data and cleanup the isolated environment",
+        "action": "cleanup",
+        "target": "isolated_env",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Application tests have completed successfully",
+            "fact": "tests_passed",
+            "established_by": "test_application_compatibility",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "identify_restore_point",
+        "to_task": "pitr_restore",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "pitr_restore",
+        "to_task": "verify_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_data",
+        "to_task": "test_application_compatibility",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test_application_compatibility",
+        "to_task": "cleanup_isolated_env",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unverified_dependencies:pitr_restore",
+      "task_id": "pitr_restore",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The prerequisite 'restore_point_identified' for pitr_restore is not confirmed by a verification step, which makes the dependency unverified.",
+      "suggested_fix": "Add a verification step in identify_restore_point to explicitly confirm that the restore point is identified."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:verify_data",
+      "task_id": "verify_data",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The prerequisite 'restore_successful' for verify_data is not confirmed by a verification step, which makes the dependency unverified.",
+      "suggested_fix": "Add a verification step in pitr_restore to confirm that the restore was successful before proceeding to verify_data."
+    },
+    {
+      "id": "crit:1:unverified_dependencies:test_application_compatibility",
+      "task_id": "test_application_compatibility",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The prerequisite 'data_verified' for test_application_compatibility is not confirmed by a verification step, which makes the dependency unverified.",
+      "suggested_fix": "Add a verification step in verify_data to confirm that the data verification was successful before allowing test_application_compatibility."
+    },
+    {
+      "id": "crit:1:weak_rollback:pitr_restore",
+      "task_id": "pitr_restore",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for pitr_restore does not ensure that the cleanup verification is thorough. It just verifies that no data remains.",
+      "suggested_fix": "Enhance the rollback to include validation steps to ensure the environment is completely clean."
+    },
+    {
+      "id": "crit:1:missing_steps:pitr_restore",
+      "task_id": "pitr_restore",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding steps to handle WAL archive gaps which could impact the restore process.",
+      "suggested_fix": "Include a step to check for WAL archive integrity before restoration."
+    },
+    {
+      "id": "crit:1:missing_steps:test_application_compatibility",
+      "task_id": "test_application_compatibility",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The plan might benefit from including a step to handle potential application compatibility issues.",
+      "suggested_fix": "Add a step to perform preliminary tests or checks against application migration before the full test suite."
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

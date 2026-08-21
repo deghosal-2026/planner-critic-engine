@@ -1,0 +1,291 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-10-multi-tenant-split",
+  "duration_seconds": 58.2,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-db-10-multi-tenant-split-r3",
+    "goal_id": "db-10-multi-tenant-split",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-db-10-multi-tenant-split-r2",
+    "created_at": "2026-08-20T23:58:54.411612Z",
+    "tasks": [
+      {
+        "id": "enumerate_tenants",
+        "description": "Enumerate all tenants in the shared database",
+        "action": "list",
+        "target": "tenants",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "provision_databases",
+        "description": "Provision dedicated databases for each tenant",
+        "action": "create_db",
+        "target": "tenant_dbs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "tenant list is available",
+            "fact": "tenants",
+            "established_by": "enumerate_tenants",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "database list",
+          "how": "query information_schema",
+          "expected": "one database for each tenant"
+        },
+        "rollback": {
+          "trigger": "database creation fails",
+          "action": "delete tenant databases",
+          "safety_guard": "confirm database list is empty"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_connection_routing",
+        "description": "Set up connection routing layer using HAProxy",
+        "action": "configure",
+        "target": "HAProxy",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "tenant databases are provisioned",
+            "fact": "tenant_dbs",
+            "established_by": "provision_databases",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "routing layer operational",
+          "how": "check HAProxy status",
+          "expected": "HAProxy is up and serving traffic"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "migrate_data",
+        "description": "Migrate tenant data to their respective databases with row-level filtering",
+        "action": "migrate",
+        "target": "tenant_data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "databases are provisioned",
+            "fact": "tenant_dbs",
+            "established_by": "provision_databases",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "row counts for each tenant",
+          "how": "count rows in source and destination",
+          "expected": "row counts match"
+        },
+        "rollback": {
+          "trigger": "data migration fails",
+          "action": "restore shared database state using verified backup",
+          "safety_guard": "verify shared database consistency"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "dual_write_setup",
+        "description": "Configure dual-write to both shared and per-tenant databases",
+        "action": "configure",
+        "target": "data_writing",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "connection routing is set up",
+            "fact": "HAProxy configured",
+            "established_by": "setup_connection_routing",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "routing layer operational",
+          "how": "check HAProxy status",
+          "expected": "HAProxy is up and serving traffic"
+        },
+        "rollback": {
+          "trigger": "failure in dual-write",
+          "action": "switch to single-write mode",
+          "safety_guard": "monitor traffic for failures"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_row_counts",
+        "description": "Verify row counts per tenant to ensure data integrity",
+        "action": "check",
+        "target": "row_counts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "data migration is complete",
+            "fact": "tenant_data_migrated",
+            "established_by": "migrate_data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "row counts",
+          "how": "compare to expected values",
+          "expected": "row counts match for each tenant"
+        },
+        "rollback": {
+          "trigger": "discrepancies found",
+          "action": "restore previous data state",
+          "safety_guard": "verify restored data integrity"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover_connections",
+        "description": "Cutover application connections tenant-by-tenant",
+        "action": "switch",
+        "target": "application_connections",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "row counts are verified",
+            "fact": "row_counts_verified",
+            "established_by": "verify_row_counts",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application logs",
+          "how": "monitor error rates",
+          "expected": "no new errors related to DB access"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "redirect traffic back to shared DB",
+          "safety_guard": "confirm application stability"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "enumerate_tenants",
+        "to_task": "provision_databases",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provision_databases",
+        "to_task": "setup_connection_routing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provision_databases",
+        "to_task": "migrate_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_connection_routing",
+        "to_task": "dual_write_setup",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dual_write_setup",
+        "to_task": "verify_row_counts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_row_counts",
+        "to_task": "cutover_connections",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:feasibility:setup_connection_routing",
+      "task_id": "setup_connection_routing",
+      "version": 3,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The task to set up connection routing lacks a rollback plan, making it unsafe if actions fail.",
+      "suggested_fix": "Add a rollback procedure to revert changes made to HAProxy configuration."
+    },
+    {
+      "id": "crit:3:weak_rollback:dual_write_setup",
+      "task_id": "dual_write_setup",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The dual-write setup task's rollback only switches to single-write mode without addressing potential inconsistencies during the transition.",
+      "suggested_fix": "Implement a comprehensive rollback plan to handle potential data inconsistencies."
+    },
+    {
+      "id": "crit:3:unverified_dependencies:cutover_connections",
+      "task_id": "cutover_connections",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The cutover connections task relies on a verification of row counts that is not confirmed as successful before execution.",
+      "suggested_fix": "Ensure row counts are verified and confirmed before proceeding with cutover connections."
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-10-multi-tenant-split:3:3",
+    "plan_id": "plan-db-10-multi-tenant-split-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:feasibility:setup_connection_routing",
+    "question": "Plan for goal 'db-10-multi-tenant-split' cannot be approved: blockers remain (llm_feasibility; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": false,
+      "message": "expected approve but escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": false
+}
