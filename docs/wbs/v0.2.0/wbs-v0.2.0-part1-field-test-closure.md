@@ -70,12 +70,14 @@
 - [x] #87 Adapter coverage (C12, C28) — all 6 adapters × 2 goals + queryable audit trail
 - [x] #88 Critique-mode matrix (C2) — 4 goals × 3 modes = 12/12 (`b9af1be`)
 - [x] #89 Escalation/Explain/Replan partials (C9–C11, C25) — deny path, escalated-explain, restart+lineage on ARCH-01 (this commit)
-- [ ] #90 Never-exercised capabilities (C13, C14, C16, C18, C19, C24) — pending
-- [ ] #91 Cross-dimension correctness (C15, C17, C30) — pending
-- [ ] #92 Loop/budget/termination depth (C29, C4) — pending
-- [ ] #93 Model & robustness sweeps — pending
+- [x] #90 Never-exercised capabilities (C13, C14, C16, C18, C19, C24) — re-gate/forensics/shadow/TTL/probe/fixtures/migration
+- [x] #91 Cross-dimension correctness (C15, C17, C30) — SQLite replay, parallel complexity, reason-code sweep
+- [x] #92 Loop/budget/termination depth (C29, C4) — all 3 budget ceilings, regression_thrashing, converged_stalled
+- [x] #93 Model & robustness sweeps — fail-closed injection, concurrency stress
 - [x] #97 Finding-quality audit (Q3) — all 85 traces audited; 346 findings; 0% blocker noise; 1 info-level noise identified
 - [x] #98 Executor-usability audit (Q4) — 28 approved plans; 100% grounded preconditions; no placeholder/forward-ref gaps
+- [x] #172 Positive-control test — golden plan under strict; gates pass, result recorded
+- [x] #173 Failure-shape clustering — 98 blockers across 10 domains; shape-driven failure analysis
 - [ ] Coverage > 95; lint clean (ruff + mypy strict); code review passed
 - [ ] Hermetic gate holds: CI never calls a paid LLM
 
