@@ -27,6 +27,8 @@
 | Model & robustness sweeps | single model, healthy endpoint only | #93 — cross-model, fail-closed injection, local-model dimension, concurrency |
 | §1 Q3 finding quality | noise rate never measured | #97 — classify all 65 goals' findings; noise top-10; injection-bypass rescan |
 | §1 Q4 executor-usability | executability never validated | #98 — preconditions grounding + fresh-executor dry-run pass on 6 approved plans |
+| Failure clustering | reviewer asked "did planning failures cluster by task kind?" — current matrix lacks failure-kind tabulation | #173 — tag rows by failure shape; report whether signal is domain- or shape-driven |
+| Methodological control | field-doc reader noted strict-arm 81 goals/35 domains show zero variance | #172 — a known-clean golden plan run through strict to prove discriminating power |
 
 ### M1 Task Checklist
 
@@ -44,7 +46,9 @@
 | 8 | Loop/budget/termination depth | `.../{budget,termination}/` | 3 ceilings each produce `budget_exceeded`; `regression_thrashing` produced; 28+/31 strict converged_stalled | [#92](https://github.com/deghosal-2026/planner-critic-engine/issues/92) · [ ] |
 | 9 | Model & robustness sweeps | `.../{multi-model,failclosed,local-model,concurrency}/` | cross-model adversarial 5/5 escalate; fail-closed `planning_unavailable`; local-model recorded; no store corruption | [#93](https://github.com/deghosal-2026/planner-critic-engine/issues/93) · [ ] |
 | 10 | Finding-quality audit (Q3) | `docs/field-test/field-test-results-0.1.0.md` | % noise/specific/actionable/task-linked for all 65; noise top-10 cited; injection-bypass noted | [#97](https://github.com/deghosal-2026/planner-critic-engine/issues/97) · [ ] |
-| 11 | Executor-usability audit (Q4) | `.../field-test-results-0.1.0.md` | deterministic grounding on 29 approved; ≥80% walkable on 6 sampled; gap inventory + evidence | [#98](https://github.com/deghosal-2026/planner-critic-engine/issues/98) · [ ] |
+| 11 | Executor-usability audit (Q4) | `.../field-test-results-0.1.0.md` | deterministic grounding on 29 approved; ≥80% walkable; gap inventory + evidence | [#98](https://github.com/deghosal-2026/planner-critic-engine/issues/98) · [ ] |
+| 12 | Failure-shape clustering analysis | `docs/field-test/0.1.0-failure-clustering/` | tag rows by failure shape; report answers domain-vs-shape; cheap rule-based heuristic | [#173](https://github.com/deghosal-2026/planner-critic-engine/issues/173) · [ ] |
+| 13 | Positive-control test | `.../0.1.0-positive-control/` + matrix control row | known-clean plan under strict unmodified; result recorded whether or not surprising | [#172](https://github.com/deghosal-2026/planner-critic-engine/issues/172) · [ ] |
 
 ### M1 Success Metrics
 
@@ -54,6 +58,8 @@
 | CLI fidelity | every command exit 0; plan output structurally matches API | CLI suite |
 | MCP parity | stdio ∥ HTTP byte-consistent | parity test |
 | Reason-code catalog | 100% of catalog produced across sweep | C30 sweep |
+| Failure-cluster analysis | every row tagged; report answers domain-vs-shape | clustering report |
+| Positive control | known-clean plan result recorded, whatever it shows | control row in matrix |
 | Coverage | >95% | `--cov-fail-under=95` |
 | Lint | 0 ruff + 0 mypy strict | `ruff` + `mypy` |
 
