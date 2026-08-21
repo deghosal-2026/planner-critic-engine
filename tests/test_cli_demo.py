@@ -77,3 +77,62 @@ def test_demo_subcommand_is_registered(tmp_path: Path, capsys) -> None:
     rc = _cli.main(["demo", "--goal", str(MIGRATION), "--store", str(tmp_path / "p.db")])
     assert rc == 0
     assert "[5/5 complete]" in capsys.readouterr().out
+
+
+def test_demo_parser_accepts_json_format(tmp_path: Path) -> None:
+    """The ``--format json`` flag is exposed by the parser (C20)."""
+    parser = build_demo_parser()
+    args = parser.parse_args(["--format", "json"])
+    assert args.format == "json"
+
+
+def test_run_demo_json_produces_machine_readable_record(tmp_path: Path, capsys) -> None:
+    """``--format json`` emits a parseable, structured demo record (exit 0)."""
+    import json
+
+    store = tmp_path / "plans.db"
+    rc = run_demo(["--goal", str(MIGRATION), "--store", str(store), "--format", "json"])
+    assert rc == 0
+    out = capsys.readouterr().out
+    record = json.loads(out)
+    assert record["goal"] == "demo-migration"
+    assert record["approved"]["plan_id"]
+    assert record["approved"]["version"] >= 1
+    assert record["re_gate"]["status"] in ("pass", "stale")
+    assert record["graph"] is not None
+    assert "graph TD" in record["graph"]
+
+
+def test_run_demo_json_no_graph_drops_mermaid(tmp_path: Path, capsys) -> None:
+    """``--format json --no-graph`` yields a record without the graph field."""
+    import json
+
+    store = tmp_path / "plans.db"
+    rc = run_demo(
+        [
+            "--goal",
+            str(MIGRATION),
+            "--store",
+            str(store),
+            "--format",
+            "json",
+            "--no-graph",
+        ]
+    )
+    assert rc == 0
+    record = json.loads(capsys.readouterr().out)
+    assert record["graph"] is None
+    assert record["replay"] is None
+
+
+def test_run_demo_json_invalid_goal_still_exits_one(tmp_path: Path) -> None:
+    """A missing goal fails closed with code 1 even in JSON mode (C20)."""
+    rc = run_demo(
+        [
+            "--goal",
+            str(tmp_path / "nope.json"),
+            "--format",
+            "json",
+        ]
+    )
+    assert rc == 1
