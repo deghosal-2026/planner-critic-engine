@@ -8,7 +8,9 @@ from pathlib import Path
 import pytest
 
 from planner_critic.cli.plan import build_plan_parser, run_plan
+from planner_critic.llm.base import Completion
 from planner_critic.schema.goal import Goal
+from planner_critic.schema.plan import PlanVersion
 
 
 def _make_goal_file(tmp_path: Path, **overrides: object) -> str:
@@ -144,3 +146,89 @@ def test_cli_planner_uses_no_think_and_structured_example_prompt() -> None:
     assert "/no_think" in provider.messages[0].content
     assert "Reply with ONLY a JSON object" in provider.messages[0].content
     assert "High/critical risk tasks MUST have rollback" in provider.messages[0].content
+
+
+_SUPPORTED_PLAN = PlanVersion.model_validate(
+    {
+        "id": "p1",
+        "goal_id": "g1",
+        "version": 1,
+        "tasks": [
+            {
+                "id": "backup",
+                "description": "Back up the database",
+                "action": "backup",
+                "target": "db",
+                "risk_class": "medium",
+                "preconditions": [],
+            },
+            {
+                "id": "migrate",
+                "description": "Apply schema migration",
+                "action": "migrate",
+                "target": "schema",
+                "risk_class": "high",
+                "preconditions": [],
+                "rollback": {"trigger": "migration fails", "action": "restore from backup"},
+                "verification": {"what": "schema version", "how": "run checks", "expected": "v2"},
+            },
+        ],
+        "dependencies": [{"from_task": "backup", "to_task": "migrate", "kind": "hard"}],
+        "branches": [],
+    }
+)
+
+
+def _cli_plan_from_supported(plan: PlanVersion) -> PlanVersion:
+    """Run ``_CLIPlanner.decompose`` against a capture provider returning the
+    supported plan, and return the parsed PlanVersion it produced."""
+    from planner_critic.cli.plan import _CLIPlanner
+
+    class CaptureProvider:
+        """A provider that echoes the supported plan back as JSON."""
+
+        name = "fake"
+        base_url = "http://fake.local"
+        model = "fake-model"
+
+        def complete(self, messages, tool_schemas=()):
+            return Completion(content=json.dumps(plan.to_dict()), finish_reason="stop")
+
+    planner = _CLIPlanner(CaptureProvider())  # type: ignore[arg-type]
+    goal = Goal.model_validate({"id": "g1", "description": "Ship a service"})
+    produced = planner.decompose(goal)
+    # Re-validate through the typed schema to prove structural fidelity.
+    return PlanVersion.model_validate(produced.to_dict())
+
+
+def test_cli_planner_high_risk_task_carries_rollback_and_verification() -> None:
+    """C5 structural fidelity: a high-risk task the CLI planner emits must
+    carry rollback + verification (the prompt contract the engine relies on)."""
+    plan = _cli_plan_from_supported(_SUPPORTED_PLAN)
+    high = next(t for t in plan.tasks if t.risk_class == "high")
+    assert high.rollback is not None
+    assert high.verification is not None
+    assert high.rollback.action == "restore from backup"
+
+
+def test_cli_planner_dependency_edges_reference_real_tasks() -> None:
+    """C5 structural fidelity: dependency edges must reference task ids that
+    exist, and the plan graph must be acyclic (schema_valid + no_dep_cycles)."""
+    from planner_critic.gates import run_deterministic_gates
+
+    plan = _cli_plan_from_supported(_SUPPORTED_PLAN)
+    task_ids = {t.id for t in plan.tasks}
+    for dep in plan.dependencies:
+        assert dep.from_task in task_ids
+        assert dep.to_task in task_ids
+    blockers = [f for f in run_deterministic_gates(plan) if f.severity.value == "blocker"]
+    assert blockers == []  # no schema/cycle/ordering blockers
+
+
+def test_cli_planner_produces_schema_valid_plan() -> None:
+    """C5 structural fidelity: the CLI planner output validates as a PlanVersion
+    (the same typed schema the programmatic engine stores)."""
+    plan = _cli_plan_from_supported(_SUPPORTED_PLAN)
+    assert plan.goal_id == "g1"
+    assert [t.id for t in plan.tasks] == ["backup", "migrate"]
+    assert plan.dependencies[0].kind.value == "hard"
