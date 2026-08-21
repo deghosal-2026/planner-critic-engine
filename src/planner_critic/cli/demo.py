@@ -41,6 +41,12 @@ def build_demo_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Skip replay text and the Mermaid DAG (plain narrative only)",
     )
+    parser.add_argument(
+        "--format",
+        choices=("text", "json"),
+        default="text",
+        help="Output format: text narrative (default) or machine-readable JSON (C20)",
+    )
     return parser
 
 
@@ -56,7 +62,12 @@ def run_demo(argv: list[str]) -> int:
     args = build_demo_parser().parse_args(argv)
     store = _open_store(args.store)
     try:
-        return run_demo_engine(args.goal, store, no_graph=args.no_graph)
+        return run_demo_engine(
+            args.goal,
+            store,
+            no_graph=args.no_graph,
+            output_format=args.format,
+        )
     finally:
         store.close()
 

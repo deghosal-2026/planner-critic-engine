@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from ..engine import Engine
 from ..execution import ExecutionRecorder
@@ -83,13 +83,21 @@ def narrative(
     return lines
 
 
-def run_demo(goal_path: str | Path, store: PlanStore, *, no_graph: bool = False) -> int:
+def run_demo(
+    goal_path: str | Path,
+    store: PlanStore,
+    *,
+    no_graph: bool = False,
+    output_format: Literal["text", "json"] = "text",
+) -> int:
     """Run the demo against one corpus goal; return a process exit code.
 
     Args:
         goal_path: Path to a corpus Goal JSON file.
         store: The plan store to persist the v1 → v2 → v3 lineage into.
         no_graph: Skip replay text + Mermaid rendering (plain narrative only).
+        output_format: ``text`` prints the human narrative (D11 §6);
+            ``json`` prints the structured :func:`demo_payload` (C20).
 
     Returns:
         0 on a completed narrative; 1 when the goal is invalid or planning
@@ -153,7 +161,7 @@ def run_demo(goal_path: str | Path, store: PlanStore, *, no_graph: bool = False)
                 )
             )
 
-    for line in narrative(
+    narrative_lines = narrative(
         goal=goal,
         v1=v1,
         v1_findings=v1_findings,
@@ -161,14 +169,108 @@ def run_demo(goal_path: str | Path, store: PlanStore, *, no_graph: bool = False)
         re_gate=re_gate,
         replanned=replanned,
         replan_abort=replan_abort,
-    ):
-        print(line)
-
+    )
+    replay_lines: list[str] | None = None
+    graph: str | None = None
     if not no_graph:
-        for line in _render_replay(store, goal.id):
+        replay_lines = _render_replay(store, goal.id)
+        graph = to_mermaid(approved.plan)
+
+    payload = demo_payload(
+        goal=goal,
+        v1=v1,
+        v1_findings=v1_findings,
+        approved=approved,
+        re_gate=re_gate,
+        replanned=replanned,
+        replan_abort=replan_abort,
+        replay_lines=replay_lines,
+        graph=graph,
+    )
+    if output_format == "json":
+        print(json.dumps(payload, indent=2))
+        return 0
+
+    for line in narrative_lines:
+        print(line)
+    if not no_graph and replay_lines is not None and graph is not None:
+        for line in replay_lines:
             print(line)
-        print(to_mermaid(approved.plan), end="")
+        print(graph, end="")
     return 0
+
+
+def demo_payload(
+    *,
+    goal: Goal,
+    v1: PlanVersion,
+    v1_findings: list[Finding],
+    approved: ApprovedPlan,
+    re_gate: ReGateResult | None,
+    replanned: PlanVersion | None = None,
+    replan_abort: ReplanAbort | None = None,
+    replay_lines: list[str] | None = None,
+    graph: str | None = None,
+) -> dict[str, Any]:
+    """Structured, machine-readable summary of a completed demo story.
+
+    C20 of the 0.2.0 field test requires ``plancritic demo --format json`` to
+    emit a machine-readable record (not just the text narrative) so the demo
+    can be consumed by CI or reports. This function collects every stage of
+    the story — the seeded draft, approval, re-gate verdict, and (optional)
+    replan — into a stable JSON shape.
+
+    Args:
+        goal: The corpus goal the demo ran against.
+        v1: The flawed revision 1.
+        v1_findings: Findings the critic produced against revision 1.
+        approved: The approved revision 2.
+        re_gate: The execution-time re-gate result.
+        replanned: The replan revision, when the re-gate triggered one.
+        replan_abort: Surface of :class:`ReplanAbort` under the abort policy.
+        replay_lines: Per-revision ``plancritic replay`` lines (info).
+        graph: The Mermaid DAG (info; excluded when ``--no-graph``).
+
+    Returns:
+        A JSON-serializable payload describing the demo run.
+    """
+    re_gate_status = "pass" if re_gate is None or re_gate.status == "pass" else "stale"
+    replanned_ref = (
+        None
+        if replanned is None
+        else {
+            "id": replanned.id,
+            "version": replanned.version,
+            "parent_version": replanned.parent_version,
+        }
+    )
+    if replan_abort is not None:
+        replan: dict[str, Any] | None = {"aborted": str(replan_abort)}
+    else:
+        replan = None if replanned is None else {"plan": replanned_ref}
+    return {
+        "goal": goal.id,
+        "risk_tolerance": goal.risk_tolerance.value,
+        "replan_policy": goal.replan_policy.value,
+        "draft": {
+            "plan_id": v1.id,
+            "version": v1.version,
+            "tasks": len(v1.tasks),
+            "findings": [
+                {"reason_code": f.reason_code, "severity": f.severity.value, "message": f.message}
+                for f in v1_findings
+            ],
+        },
+        "approved": {
+            "plan_id": approved.plan.id,
+            "version": approved.plan.version,
+            "tasks": len(approved.plan.tasks),
+        },
+        "re_gate": {"status": re_gate_status},
+        "replan": replan,
+        "replay": replay_lines,
+        "graph": graph,
+    }
 
 
 def _link_policy(goal: Goal) -> Literal["patch", "restart"]:
@@ -268,4 +370,4 @@ def _findings_for(store: PlanStore, plan_id: str, version: int) -> list[Finding]
     return []
 
 
-__all__ = ["narrative", "run_demo"]
+__all__ = ["demo_payload", "narrative", "run_demo"]
