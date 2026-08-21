@@ -39,6 +39,25 @@ def _seed_plan(server: PlannerCriticHTTPServer) -> str:
     return plan_id
 
 
+def _seed_multi_revision(server: PlannerCriticHTTPServer) -> str:
+    """Persist two revisions of a plan directly so diff has added/changed/removed."""
+    from planner_critic.store.base import PlanStore
+
+    store: PlanStore = server.store
+    v1 = make_plan(tasks=[make_task("t0")])
+    v2 = make_plan(
+        plan_id=v1.id,
+        version=2,
+        parent=str(v1.version),
+        tasks=[make_task("t0"), make_task("t1"), make_task("t2")],
+    )
+    store.put_plan_version(v1)
+    store.put_plan_version(v2)
+    store.put_findings(v1.id, 1, [])
+    store.put_findings(v2.id, 2, [])
+    return v1.id
+
+
 # ---- Tests ----------------------------------------------------------------
 
 
@@ -255,6 +274,43 @@ def test_get_plan_diff_compute_failure(server: PlannerCriticHTTPServer) -> None:
     assert "could not compute diff" in resp["error"]
 
 
+def test_get_plan_diff_multi_revision_non_empty(server: PlannerCriticHTTPServer) -> None:
+    """C6: diff on a multi-revision plan returns added/changed/removed (structured)."""
+    plan_id = _seed_multi_revision(server)
+    resp = server.handle_request("GET", f"/plans/{plan_id}/diff", {"v2": "2"})
+    assert resp["status"] == 200
+    data = resp["data"]
+    assert data["plan_id"] == plan_id
+    assert data["from_version"] == 1
+    assert data["to_version"] == 2
+    assert "added_task_ids" in data
+    assert "removed_task_ids" in data
+    assert "changed_task_ids" in data
+
+
+def test_get_plan_graph_structured(server: PlannerCriticHTTPServer) -> None:
+    """C6: graph returns parseable Mermaid + version (structured data)."""
+    plan_id = _seed_plan(server)
+    resp = server.handle_request("GET", f"/plans/{plan_id}/graph")
+    assert resp["status"] == 200
+    data = resp["data"]
+    assert data["plan_id"] == plan_id
+    assert data["version"] >= 1
+    assert "graph TD" in data["mermaid"]
+
+
+def test_get_plan_explain_structured(server: PlannerCriticHTTPServer) -> None:
+    """C6: explain returns reason-trace fields (reason + decision per revision)."""
+    plan_id = _seed_plan(server)
+    resp = server.handle_request("GET", f"/plans/{plan_id}/explain")
+    assert resp["status"] == 200
+    data = resp["data"]
+    assert data["plan_id"] == plan_id
+    assert len(data["decisions"]) >= 1
+    assert data["decisions"][0]["action"] in ("approved", "escalated", "revised")
+    assert data["decisions"][0]["reason"]
+
+
 def test_handle_request_value_error(server: PlannerCriticHTTPServer) -> None:
     """handle_request catches ValueError from handlers (line 72-73)."""
     resp = server.handle_request("POST", "/plan", {"id": None})
@@ -280,3 +336,26 @@ def test_create_fastapi_app_missing() -> None:
     with patch.dict("sys.modules", {"fastapi": None}):
         result = create_fastapi_app(":memory:")
     assert result is None
+
+
+# ---- C6: FastAPI live routes via ASGI transport (no network, no docker) ----
+
+
+def test_fastapi_healthz_live() -> None:
+    """C6: the FastAPI app serves /healthz over a real ASGI transport."""
+    import asyncio
+
+    import httpx
+
+    app = create_fastapi_app(":memory:")
+    assert app is not None
+
+    async def _probe() -> httpx.Response:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            return await client.get("/healthz")
+
+    resp = asyncio.run(_probe())
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok"}
