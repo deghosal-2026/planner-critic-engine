@@ -75,13 +75,42 @@ The plan is a persisted, versioned artifact — you can diff revisions, see whic
 
 ## Quick Start
 
+### Install
+
 ```bash
 pip install planner-critic
-plancritic quickstart  # creates a demo goal and runs the loop
-plancritic demo        # runs the full demo scenario
 ```
 
-Requires Python 3.11+ and an LLM provider (OpenRouter, OpenAI, or local model).
+Requires Python 3.11+.
+
+### Configure an LLM provider
+
+Create a config file (or set an env var for the API key):
+
+```toml
+# plancritic.toml
+[roles]
+planner = "local"
+critic = "local"
+
+[providers.local]
+transport = "openai-compatible"
+base_url = "https://openrouter.ai/api/v1"      # or your provider
+model = "openai/gpt-4o-mini"
+api_key = "${OPENROUTER_API_KEY}"               # or set in your shell
+max_tokens = 16384
+timeout_s = 300.0
+```
+
+### Run your first plan
+
+```bash
+plancritic plan path/to/goal.json --config plancritic.toml
+plancritic demo       # run the bundled demo scenario
+plancritic quickstart # create and run a sample goal
+```
+
+Requires an LLM provider (OpenRouter, OpenAI, or a local model). See the [User Guide](docs/reference/quickstart.md) for a full walkthrough.
 
 ---
 
