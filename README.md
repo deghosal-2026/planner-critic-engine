@@ -9,7 +9,7 @@
 [![Type checked](https://img.shields.io/badge/mypy-strict-blue)](https://github.com/python/mypy)
 [![Coverage](https://img.shields.io/badge/coverage-87%25-brightgreen)](https://github.com/deghosal-2026/planner-critic-engine/actions)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
-[![OpenSSF](https://img.shields.io/badge/OpenSSF-Passing-brightgreen)](SECURITY.md)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14184/badge)](https://www.bestpractices.dev/projects/14184)
 [![Field Test](https://img.shields.io/badge/field%20test-157%20goals%2C%200%20failures-brightgreen)](docs/field-test/field-test-results-0.1.0.md)
 
 **Hierarchical task planning with an independent LLM critic. A planner decomposes a goal into a structured plan; a critic audits every subtask; the plan is revised until approval — or escalated to a human.**
