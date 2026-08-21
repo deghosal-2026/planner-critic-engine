@@ -917,7 +917,8 @@ The original 5 adversarial goals (adv-01..05) all test "no safety" — plans wit
 | **budget** | db-01, k8s-01, ci-01 | ✅ PASS | C29: all 3 budget ceilings (max_revisions, max_calls, max_tokens) individually produce BUDGET_EXCEEDED at loop level; C4 regression_thrashing + converged_stalled produced (tests/test_loop_c29_c4.py) |
 | **robustness** | — | ✅ PASS | C5 fail-closed injection (broken provider → PlanningError); concurrency stress (5 concurrent plan writes, 3 concurrent store readers, no corruption/exceptions) |
 | **finding-quality (Q3)** | all 85 traces | ✅ PASS | 346 total findings: 100% specific, 100% actionable, 89.6% task-linked; 0% blocker noise; 1 info-level noise finding identified and documented |
-| **executor-usability (Q4)** | 28 approved plans | ✅ PASS | 130 tasks, 118 preconditions across 28 approved plans: 100% grounded preconditions; 0 placeholder tokens; 0 forward references; 0 ungrounded preconditions
+| **executor-usability (Q4)** | 28 approved plans | ✅ PASS | 130 tasks, 118 preconditions across 28 approved plans: 100% grounded preconditions; 0 placeholder tokens; 0 forward references; 0 ungrounded preconditions |
+| **positive-control (P172)** | golden plan | ✅ PASS | Clean golden plan under strict: gates pass, escalation/approval decision recorded; demonstrates critic discriminating power on a known-clean input |
 | **adapters** | ci-01, data-01 | ✅ PASS | All 6 adapters (raw, LangGraph, PydanticAI, CrewAI, OpenAI Agents, MCP) tested with a scripted approved plan; C28 audit trail covers 6 distinct adapter entries (tests/test_adapters/test_c12_c28_matrix.py) |
 | **cli-surface** | — | ✅ PASS | Hermetic C5 dispatch coverage (tests/test_cli_dispatch.py): all 11 subcommands registered & dispatch through `_cli.main` |
 | **http-surface** | db-01, k8s-01, adv-01 | ✅ PASS | C6 endpoint matrix 200: plan/critique/plans/diff/graph/explain/escalations + healthz (tests/test_http_server.py) |
