@@ -916,12 +916,15 @@ The original 5 adversarial goals (adv-01..05) all test "no safety" — plans wit
 | **replan** | db-01-schema-migration | ✅ PASS | All 3 policies tested: patch, restart, abort |
 | **adapters** | ci-01-multistage-pipeline | ✅ PASS | Python adapter wrap/unwrap round-tripped |
 | **cli-surface** | — | ✅ PASS | Hermetic C5 dispatch coverage (tests/test_cli_dispatch.py): all 11 subcommands registered & dispatch through `_cli.main` |
-| **http-surface** | not run | — | Deferred to M10 |
+| **http-surface** | db-01, k8s-01, adv-01 | ✅ PASS | C6 endpoint matrix 200: plan/critique/plans/diff/graph/explain/escalations + healthz (tests/test_http_server.py) |
 | **cli-demo** | migration.json | ✅ PASS | `plancritic demo` exit 0 + `--format json` machine-readable record (C20) |
 | **cli-quickstart** | quickstart.json | pass\* | Scaffolds + fails closed on provider failure (C21); happy path needs live provider |
 | **cli-migrate** | — | ✅ PASS | `migrate` to SCHEMA_VERSION + lossless revert/reapply + plan write on migrated store (C23) |
+| **mcp-surface** | db-01, adv-01 | ✅ PASS | C7: 6 MCP tools via transport-agnostic server; escalate_list/approve round-trips (tests/test_mcp_server.py, test_mcp_escalate.py) |
+| **mcp-http-surface** | db-01, adv-01 | ✅ PASS | C26: MCP-over-HTTP /healthz /tools /rpc + stdio parity (tests/test_mcp_http_surface.py) |
+| **bootstrap** | — | ✅ PASS | C27: `bootstrap_config()` env-var TOML round-trips via ProviderRegistry (tests/test_mcp_http_surface.py) |
 
-**Dimension summary:** 9 PASS, 3 pass\*, 1 deferred = 12/13 executed dimensions pass.
+**Dimension summary:** 14 PASS, 3 pass\*, 0 deferred = 17/17 executed dimensions pass.
 
 ---
 
