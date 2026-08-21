@@ -157,9 +157,7 @@ def current_schema_version(conn: sqlite3.Connection) -> int:
         The applied schema version (0 when none have run).
     """
     ensure_migration_table(conn)
-    row = conn.execute(
-        "SELECT COALESCE(MAX(version), 0) AS v FROM schema_migrations"
-    ).fetchone()
+    row = conn.execute("SELECT COALESCE(MAX(version), 0) AS v FROM schema_migrations").fetchone()
     return int(row[0]) if row else 0
 
 
@@ -180,9 +178,7 @@ def apply_migrations(conn: sqlite3.Connection, target: int | None = None) -> int
     desired = SCHEMA_VERSION if target is None else target
     current = current_schema_version(conn)
     if desired < current:
-        raise StoreUnavailable(
-            f"cannot migrate up to {desired}: already at {current}"
-        )
+        raise StoreUnavailable(f"cannot migrate up to {desired}: already at {current}")
     for migration in MIGRATIONS:
         if migration.version <= current:
             continue
@@ -219,9 +215,7 @@ def revert_migrations(conn: sqlite3.Connection, target: int = 0) -> int:
     ensure_migration_table(conn)
     current = current_schema_version(conn)
     if target > current:
-        raise StoreUnavailable(
-            f"cannot revert to {target}: currently at {current}"
-        )
+        raise StoreUnavailable(f"cannot revert to {target}: currently at {current}")
     for migration in reversed(MIGRATIONS):
         if migration.version > current:
             continue

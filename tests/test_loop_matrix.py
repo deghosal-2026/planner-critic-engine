@@ -41,7 +41,7 @@ def _dirty_plan() -> object:
 
 #: Sentinels for critic scripts, resolved to concrete finding lists.
 CRITIC_SCRIPTS: dict[str, list[list[object]]] = {
-    "quiet": [[]],                                          # type: ignore[list-item]
+    "quiet": [[]],  # type: ignore[list-item]
     "warning_only": [[finding("t1", "unsafe_ordering", severity=Severity.WARNING)]],
     "blocker": [[finding("t1", "missing_verification")]],
     "warning_then_blocker": [

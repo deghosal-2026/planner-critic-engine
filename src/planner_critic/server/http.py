@@ -140,9 +140,7 @@ class PlannerCriticHTTPServer:
             (re.compile(r"^/escalations$"), "GET", "list_escalations"),
         ]
 
-    def _route(
-        self, method: str, path: str, body: dict[str, Any]
-    ) -> dict[str, Any]:
+    def _route(self, method: str, path: str, body: dict[str, Any]) -> dict[str, Any]:
         self._compile_patterns()
         for pattern, expected_method, handler_name in self._PATH_PATTERNS:
             match = pattern.match(path)
@@ -175,9 +173,7 @@ class PlannerCriticHTTPServer:
                 "findings": [f.model_dump(mode="json") for f in result.findings],
                 "reason_code": result.reason_code,
                 "escalation": (
-                    result.escalation.model_dump(mode="json")
-                    if result.escalation
-                    else None
+                    result.escalation.model_dump(mode="json") if result.escalation else None
                 ),
             },
         }
@@ -323,6 +319,7 @@ class PlannerCriticHTTPServer:
 
 # ---- FastAPI adapter (import-safe) -------------------------------------------
 
+
 def create_fastapi_app(store_path: str, config_path: str | None = None) -> Any | None:
     """Build a FastAPI application wrapping the PlannerCritic HTTP surface.
 
@@ -386,18 +383,14 @@ def create_fastapi_app(store_path: str, config_path: str | None = None) -> Any |
         escalation_id: str,
         body: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        return server.handle_request(
-            "POST", f"/escalations/{escalation_id}/approve", body or {}
-        )
+        return server.handle_request("POST", f"/escalations/{escalation_id}/approve", body or {})
 
     @app.post("/escalations/{escalation_id}/deny")
     async def post_escalate_deny(
         escalation_id: str,
         body: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        return server.handle_request(
-            "POST", f"/escalations/{escalation_id}/deny", body or {}
-        )
+        return server.handle_request("POST", f"/escalations/{escalation_id}/deny", body or {})
 
     @app.get("/healthz")
     async def get_healthz() -> dict[str, str]:

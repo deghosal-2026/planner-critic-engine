@@ -47,9 +47,7 @@ def build_quickstart_parser() -> argparse.ArgumentParser:
 def run_quickstart(argv: list[str]) -> int:
     """Scaffold a project, bind the chosen provider, and run the quickstart goal."""
     args = build_quickstart_parser().parse_args(argv)
-    workspace = (
-        Path(args.dir) if args.dir else Path(tempfile.mkdtemp(prefix="plancritic-qs-"))
-    )
+    workspace = Path(args.dir) if args.dir else Path(tempfile.mkdtemp(prefix="plancritic-qs-"))
 
     rc = run_init(["--dir", str(workspace), "--force"])
     if rc != 0:

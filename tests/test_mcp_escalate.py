@@ -26,9 +26,7 @@ def _seed_escalation(store_path: str, esc_id: str = "esc:plan-1:1") -> None:
     """Create a plan and an open escalation in the store."""
     store = SQLiteStore(store_path)
     store.put_plan_version(make_plan(plan_id="plan-1", version=1))
-    store.put_escalation(
-        Escalation(id=esc_id, plan_id="plan-1", version=1, question="proceed?")
-    )
+    store.put_escalation(Escalation(id=esc_id, plan_id="plan-1", version=1, question="proceed?"))
     store.close()
 
 

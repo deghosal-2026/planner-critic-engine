@@ -12,9 +12,7 @@ class TestAuditEvent:
         assert event.details == {}
 
     def test_create_full(self):
-        event = AuditEvent(
-            "langgraph", "re_gate_check", plan_id="plan-1", details={"found": True}
-        )
+        event = AuditEvent("langgraph", "re_gate_check", plan_id="plan-1", details={"found": True})
         assert event.plan_id == "plan-1"
         assert event.details == {"found": True}
 

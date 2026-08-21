@@ -40,9 +40,7 @@ class EstimateConfig:
     price_per_1k_tokens: float = PRICE_PER_1K_TOKENS
 
 
-def estimate_complexity(
-    plan: PlanVersion, config: EstimateConfig | None = None
-) -> PlanComplexity:
+def estimate_complexity(plan: PlanVersion, config: EstimateConfig | None = None) -> PlanComplexity:
     """Compute the deterministic complexity summary for a plan (F-17).
 
     Args:

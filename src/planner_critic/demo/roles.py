@@ -456,9 +456,7 @@ def _incident() -> _Scenario:
                 _task(
                     "verify-mitigation",
                     "Verify the incident is mitigated",
-                    verification=_verify(
-                        "mitigation", "run the payment health checks", "healthy"
-                    ),
+                    verification=_verify("mitigation", "run the payment health checks", "healthy"),
                 ),
             ],
             deps=[_dep("diagnose", "remediate"), _dep("remediate", "verify-mitigation")],

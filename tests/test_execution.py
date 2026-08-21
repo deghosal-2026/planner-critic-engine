@@ -82,9 +82,7 @@ class TestRecord:
             reason_code="llm_risk",
             message="risk overlooked",
         )
-        trace = recorder.record(
-            approved, task_id="t1", outcome="failed", linked_finding=finding
-        )
+        trace = recorder.record(approved, task_id="t1", outcome="failed", linked_finding=finding)
         assert trace.failure_class == "planning"
         assert trace.linked_finding_id == "f:missed"
 
@@ -120,8 +118,12 @@ class TestClassifyFailure:
     def test_with_linked_finding_is_planning(self, recorder: ExecutionRecorder) -> None:
         """A linked finding means the critic missed something."""
         finding = Finding(
-            id="f1", task_id="t1", version=1,
-            severity=Severity.WARNING, reason_code="llm_risk", message="x",
+            id="f1",
+            task_id="t1",
+            version=1,
+            severity=Severity.WARNING,
+            reason_code="llm_risk",
+            message="x",
         )
         assert recorder.classify_failure(linked_finding=finding) == "planning"
 

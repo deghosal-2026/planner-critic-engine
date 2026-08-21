@@ -85,12 +85,14 @@ def explain(store: PlanStore, plan_id: str) -> ExplainResult:
             reason = _revision_reason(step.findings)
 
         key_findings = _format_key_findings(step.findings)
-        decisions.append(ExplainDecision(
-            version=step.version,
-            action=action,
-            reason=reason,
-            key_findings=key_findings,
-        ))
+        decisions.append(
+            ExplainDecision(
+                version=step.version,
+                action=action,
+                reason=reason,
+                key_findings=key_findings,
+            )
+        )
 
     summary = _build_summary(decisions, escalation)
     narrative = _build_narrative(decisions, plan_id)

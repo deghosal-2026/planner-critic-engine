@@ -60,12 +60,9 @@ class LoggingProvider:
 
         # Serialize the prompt
         prompt_data = [
-            {"role": m.role, "content": m.content, "content_len": len(m.content)}
-            for m in messages
+            {"role": m.role, "content": m.content, "content_len": len(m.content)} for m in messages
         ]
-        prompt_text = "\n\n".join(
-            f"--- {m.role} ---\n{m.content}" for m in messages
-        )
+        prompt_text = "\n\n".join(f"--- {m.role} ---\n{m.content}" for m in messages)
 
         # Call the inner provider
         error = None

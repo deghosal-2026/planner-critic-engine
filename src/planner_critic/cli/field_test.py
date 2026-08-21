@@ -43,16 +43,22 @@ def build_field_test_parser() -> argparse.ArgumentParser:
 
     run_parser = sub.add_parser("run", help="Run the field test sweep")
     run_parser.add_argument("--goals", required=True, help="Goals directory or single goal file")
-    run_parser.add_argument("--output", required=True, help="Output directory for traces, logs, report")
+    run_parser.add_argument(
+        "--output", required=True, help="Output directory for traces, logs, report"
+    )
     run_parser.add_argument("--config", default="plancritic.toml", help="Provider TOML config path")
-    run_parser.add_argument("--revision-cap", type=int, default=4, help="Loop revision cap (default: 4)")
+    run_parser.add_argument(
+        "--revision-cap", type=int, default=4, help="Loop revision cap (default: 4)"
+    )
     run_parser.add_argument(
         "--critique-mode",
         choices=["heuristic-only", "deterministic-first", "llm-every-revision"],
         default="deterministic-first",
         help="Critique mode (default: deterministic-first)",
     )
-    run_parser.add_argument("--dimensions", default=None, help="Comma-separated dimension names to run (default: all)")
+    run_parser.add_argument(
+        "--dimensions", default=None, help="Comma-separated dimension names to run (default: all)"
+    )
     return parser
 
 
@@ -87,7 +93,9 @@ def _write_report(summary: dict[str, Any], output_path: Path) -> None:
         lines.append("| Dimension | Goal | Error |")
         lines.append("|-----------|------|-------|")
         for f in failures:
-            lines.append(f"| {f.get('dimension', '?')} | {f.get('goal_id', '?')} | {str(f.get('error', '?'))[:100]} |")
+            lines.append(
+                f"| {f.get('dimension', '?')} | {f.get('goal_id', '?')} | {str(f.get('error', '?'))[:30]} |"  # noqa: E501
+            )
     else:
         lines.append("No failures.")
 
@@ -97,7 +105,9 @@ def _write_report(summary: dict[str, Any], output_path: Path) -> None:
     lines.append("")
     lines.append("| Goal | Pass | Status | Reason | Revs | LLM Calls | Tasks | Findings |")
     lines.append("|------|------|--------|--------|------|-----------|-------|----------|")
-    for goal_dir in sorted((output_path / "core-api").iterdir()) if (output_path / "core-api").exists() else []:
+    for goal_dir in (
+        sorted((output_path / "core-api").iterdir()) if (output_path / "core-api").exists() else []
+    ):
         trace_file = goal_dir / "trace.json"
         if not trace_file.exists():
             continue

@@ -37,9 +37,7 @@ class TestGoalSchema:
     def test_bad_enum_raises(self) -> None:
         """Unknown enum values must fail type validation."""
         with pytest.raises(ValidationError):
-            Goal.model_validate(
-                {"id": "g1", "description": "x", "risk_tolerance": "whatever"}
-            )
+            Goal.model_validate({"id": "g1", "description": "x", "risk_tolerance": "whatever"})
 
     def test_blank_description_rejected(self) -> None:
         """A whitespace-only description plans nothing and must be rejected."""
@@ -92,9 +90,7 @@ class TestPlanSchema:
     def test_branch_unknown_task_rejected(self) -> None:
         """Branch members must exist as tasks."""
         with pytest.raises(ValidationError):
-            make_plan(
-                branches=[Branch(id="b1", kind=BranchKind.FAN_OUT, tasks=["ghost"])]
-            )
+            make_plan(branches=[Branch(id="b1", kind=BranchKind.FAN_OUT, tasks=["ghost"])])
 
     def test_hard_dependency_inside_parallel_group_rejected(self) -> None:
         """Parallel-group members cannot have a hard edge between them."""
@@ -125,7 +121,10 @@ class TestPlanSchema:
             make_plan(
                 branches=[
                     Branch(
-                        id="b1", kind=BranchKind.FAN_IN, tasks=["t1"], join="nope"  # type: ignore[arg-type]
+                        id="b1",
+                        kind=BranchKind.FAN_IN,
+                        tasks=["t1"],
+                        join="nope",  # type: ignore[arg-type]
                     )
                 ]
             )
@@ -134,8 +133,12 @@ class TestPlanSchema:
         """to_dict/from_dict must preserve the plan losslessly."""
         plan = make_plan(
             tasks=[
-                make_task("t2", risk_class="high", blast_radius="high",
-                          verification={"what": "x", "how": "y", "expected": "z"}),
+                make_task(
+                    "t2",
+                    risk_class="high",
+                    blast_radius="high",
+                    verification={"what": "x", "how": "y", "expected": "z"},
+                ),
                 make_task("t1", risk_class="low"),
             ],
             dependencies=[hard_dep("t1", "t2")],

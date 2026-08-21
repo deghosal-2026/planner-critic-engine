@@ -138,9 +138,9 @@ class ProviderRegistry:
                     timeout_s=(
                         float(timeout_raw) if isinstance(timeout_raw, (int, float)) else None
                     ),
-                    suppress_thinking=bool(suppress_thinking_raw) if isinstance(
-                        suppress_thinking_raw, bool
-                    ) else False,
+                    suppress_thinking=bool(suppress_thinking_raw)
+                    if isinstance(suppress_thinking_raw, bool)
+                    else False,
                 )
         raw_roles = data.get("roles")
         roles: dict[str, str] = {}
@@ -257,9 +257,7 @@ class ProviderRegistry:
             raise PlanningError(f"no provider bound to role '{role}'")
         spec = self.providers.get(provider_name)
         if spec is None:
-            raise PlanningError(
-                f"role '{role}' references unknown provider '{provider_name}'"
-            )
+            raise PlanningError(f"role '{role}' references unknown provider '{provider_name}'")
         if spec.transport != "openai-compatible":
             raise PlanningError(
                 f"unsupported transport '{spec.transport}' for provider '{provider_name}'"

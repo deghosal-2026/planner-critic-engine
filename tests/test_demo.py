@@ -140,9 +140,7 @@ def clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("PC_DEMO_MAINTENANCE_WINDOW", raising=False)
 
 
-def test_run_demo_hermetic_full_run(
-    clean_env: None, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_run_demo_hermetic_full_run(clean_env: None, capsys: pytest.CaptureFixture[str]) -> None:
     """plan -> approve -> re-gate stale -> replan -> complete, store history."""
     store = InMemoryStore()
     rc = run_demo(MIGRATION, store)

@@ -75,8 +75,7 @@ def narrative(
         lines.append(f"[4/5 replan] aborted: {replan_abort}")
     elif replanned is not None:
         lines.append(
-            f"[4/5 replan] {replanned.id} v{replanned.version} "
-            f"(parent {replanned.parent_version})"
+            f"[4/5 replan] {replanned.id} v{replanned.version} (parent {replanned.parent_version})"
         )
     else:
         lines.append("[4/5 replan] none needed")
@@ -236,9 +235,7 @@ def _regate_after_drift(
     previous = os.environ.get(probe.query)
     try:
         os.environ[probe.query] = f"not-{probe.expected}"
-        return check_preconditions(
-            approved, task_id, store, ReGateConfig(mode="before-each-step")
-        )
+        return check_preconditions(approved, task_id, store, ReGateConfig(mode="before-each-step"))
     finally:
         if previous is None:
             os.environ.pop(probe.query, None)

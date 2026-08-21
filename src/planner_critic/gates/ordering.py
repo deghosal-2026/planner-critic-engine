@@ -38,7 +38,7 @@ class Gate(BaseGate):
             return []
 
         findings: list[Finding] = []
-        for (pred, succ) in sorted(hard_from_to):
+        for pred, succ in sorted(hard_from_to):
             if id_to_index[pred] > id_to_index[succ]:
                 findings.append(
                     Finding(

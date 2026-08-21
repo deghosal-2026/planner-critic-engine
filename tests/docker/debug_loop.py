@@ -114,11 +114,13 @@ def main() -> int:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
     out = LOG_DIR / f"{ts}_debug_{label}.json"
-    out.write_text(json.dumps(
-        {"timestamp": ts, "label": label, "request": {"goal": goal}, "response": body},
-        indent=2,
-        sort_keys=True,
-    ))
+    out.write_text(
+        json.dumps(
+            {"timestamp": ts, "label": label, "request": {"goal": goal}, "response": body},
+            indent=2,
+            sort_keys=True,
+        )
+    )
     print(f"\nEvidence saved: {out}")
 
     return 0

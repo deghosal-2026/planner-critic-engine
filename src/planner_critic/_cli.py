@@ -62,9 +62,7 @@ def _build_parser() -> argparse.ArgumentParser:
     Returns:
         The root parser; subcommand parsers are attached as children.
     """
-    parser = argparse.ArgumentParser(
-        prog="plancritic", description="PlannerCritic Engine CLI"
-    )
+    parser = argparse.ArgumentParser(prog="plancritic", description="PlannerCritic Engine CLI")
     parser.add_argument("--version", action="version", version=f"plancritic {__version__}")
     subparsers = parser.add_subparsers(dest="command", metavar="COMMAND")
     for name, (sub_parser, _) in _SUBCOMMANDS.items():

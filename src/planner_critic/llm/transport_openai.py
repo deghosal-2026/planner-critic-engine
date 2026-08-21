@@ -162,14 +162,10 @@ class OpenAICompatibleProvider:
                 self.model,
                 resp.text[:1000],
             )
-            raise BadJSONError(
-                f"provider '{self.name}' returned malformed response shape"
-            ) from err
+            raise BadJSONError(f"provider '{self.name}' returned malformed response shape") from err
 
         if not isinstance(content, str):
-            raise BadJSONError(
-                f"provider '{self.name}' returned non-string content"
-            )
+            raise BadJSONError(f"provider '{self.name}' returned non-string content")
 
         logger.info(
             "provider '%s' completed — model=%s finish=%s content_len=%d",

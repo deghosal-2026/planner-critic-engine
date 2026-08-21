@@ -21,9 +21,7 @@ from typing import Literal
 
 from ..types import Finding, Severity
 
-CriticMode = Literal[
-    "heuristic-only", "deterministic-first", "llm-every-revision"
-]
+CriticMode = Literal["heuristic-only", "deterministic-first", "llm-every-revision"]
 
 DEFAULT_MODE: CriticMode = "deterministic-first"
 

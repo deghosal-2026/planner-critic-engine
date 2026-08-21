@@ -67,8 +67,16 @@ def _dirty_plan():
 def _finding_json(family: str, severity: str, task_id: str, message: str) -> str:
     """A one-finding critique payload."""
     return json.dumps(
-        {"findings": [{"heuristic_family": family, "severity": severity,
-                       "task_id": task_id, "message": message}]}
+        {
+            "findings": [
+                {
+                    "heuristic_family": family,
+                    "severity": severity,
+                    "task_id": task_id,
+                    "message": message,
+                }
+            ]
+        }
     )
 
 

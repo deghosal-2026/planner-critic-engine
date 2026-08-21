@@ -28,7 +28,11 @@ def test_mode_off_returns_pass_regardless_of_preconditions() -> None:
         id="t1",
         description="a task",
         preconditions=[
-            Precondition(description="must be prod", fact="env=prod", probe=EnvProbe(kind="env_var", query="ENV", expected="prod"))
+            Precondition(
+                description="must be prod",
+                fact="env=prod",
+                probe=EnvProbe(kind="env_var", query="ENV", expected="prod"),
+            )
         ],
     )
     approved = _make_approved_plan([task])
@@ -87,7 +91,9 @@ def test_before_each_step_matching_probe_returns_pass(monkeypatch: pytest.Monkey
     store = InMemoryStore()
 
     def _fake_run_probe(request: ProbeRequest) -> ProbeResult:
-        return ProbeResult(kind=request.kind, query=request.query, observed="prod", matched=True, ok=True)
+        return ProbeResult(
+            kind=request.kind, query=request.query, observed="prod", matched=True, ok=True
+        )
 
     monkeypatch.setattr("planner_critic.regate.run_probe", _fake_run_probe)
 
@@ -114,7 +120,9 @@ def test_before_each_step_mismatched_probe_returns_stale(monkeypatch: pytest.Mon
     store = InMemoryStore()
 
     def _fake_run_probe(request: ProbeRequest) -> ProbeResult:
-        return ProbeResult(kind=request.kind, query=request.query, observed="staging", matched=False, ok=True)
+        return ProbeResult(
+            kind=request.kind, query=request.query, observed="staging", matched=False, ok=True
+        )
 
     monkeypatch.setattr("planner_critic.regate.run_probe", _fake_run_probe)
 
@@ -158,8 +166,12 @@ def test_multiple_stale_preconditions_all_listed(monkeypatch: pytest.MonkeyPatch
         call_count += 1
         # First two probes mismatch, third matches
         if call_count <= 2:
-            return ProbeResult(kind=request.kind, query=request.query, observed="wrong", matched=False, ok=True)
-        return ProbeResult(kind=request.kind, query=request.query, observed="true", matched=True, ok=True)
+            return ProbeResult(
+                kind=request.kind, query=request.query, observed="wrong", matched=False, ok=True
+            )
+        return ProbeResult(
+            kind=request.kind, query=request.query, observed="true", matched=True, ok=True
+        )
 
     monkeypatch.setattr("planner_critic.regate.run_probe", _fake_run_probe)
 

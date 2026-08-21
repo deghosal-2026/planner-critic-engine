@@ -236,7 +236,9 @@ def _run(
 
     logger.info(
         "loop: planner produced plan=%s v%d (%d tasks)",
-        plan.id, plan.version, len(plan.tasks),
+        plan.id,
+        plan.version,
+        len(plan.tasks),
     )
 
     approval: ApprovalGate = ApprovalGate(goal.risk_tolerance, goal.approval_ttl)
@@ -247,7 +249,10 @@ def _run(
         state.record_revision()
         logger.info(
             "loop: revision %d/%d — plan=%s v%d",
-            revision, config.revision_cap, plan.id, plan.version,
+            revision,
+            config.revision_cap,
+            plan.id,
+            plan.version,
         )
 
         gate_findings = run_deterministic_gates(plan)
@@ -265,7 +270,9 @@ def _run(
                 return _escalate(goal, plan, gate_findings, "budget_exceeded", revision)
             if revision < config.revision_cap:
                 plan = _revise_or_raise(
-                    planner, plan, gate_findings,
+                    planner,
+                    plan,
+                    gate_findings,
                     next_id=f"plan-{goal.id}-r{revision + 1}",
                 )
                 continue

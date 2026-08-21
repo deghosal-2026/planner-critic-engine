@@ -25,8 +25,12 @@ class TestApprovalGuard:
     def test_guard_raises_when_not_approved(self):
         planner = ScriptedPlanner([make_plan()])
         blocker = Finding(
-            id="f:1", task_id="t1", version=1, severity=Severity.BLOCKER,
-            reason_code="unsafe_ordering", message="blocker"
+            id="f:1",
+            task_id="t1",
+            version=1,
+            severity=Severity.BLOCKER,
+            reason_code="unsafe_ordering",
+            message="blocker",
         )
         critic = ScriptedCritic([[blocker]])
         engine = Engine(planner, critic, LoopConfig(mode="deterministic-first"))

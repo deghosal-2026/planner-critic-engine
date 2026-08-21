@@ -18,7 +18,7 @@ def _make_approved_plan(*, task_descriptions=None):
         for i, desc in enumerate(task_descriptions, 1)
     ]
     gate = ApprovalGate(RiskTolerance.BALANCED)
-    satisfied, outcome = resolve_threshold([], RiskTolerance.BALANCED)
+    _satisfied, outcome = resolve_threshold([], RiskTolerance.BALANCED)
     return gate.approve(make_plan(tasks=tasks), outcome)
 
 
