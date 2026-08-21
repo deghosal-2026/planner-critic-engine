@@ -4,15 +4,20 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![PyPI](https://img.shields.io/badge/pypi-v0.1.0-blue)](https://pypi.org/project/planner-critic/)
 [![Ruff](https://img.shields.io/badge/code%20style-ruff-000000)](https://github.com/astral-sh/ruff)
 [![Type checked](https://img.shields.io/badge/mypy-strict-blue)](https://github.com/python/mypy)
+[![Coverage](https://img.shields.io/badge/coverage-87%25-brightgreen)](https://github.com/deghosal-2026/planner-critic-engine/actions)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
+[![OpenSSF](https://img.shields.io/badge/OpenSSF-Passing-brightgreen)](SECURITY.md)
+[![Field Test](https://img.shields.io/badge/field%20test-157%20goals%2C%200%20failures-brightgreen)](docs/field-test/field-test-results-0.1.0.md)
 
-**Hierarchical task planning with an LLM critic. A planner decomposes a goal into a typed plan; a critic audits every subtask before execution; the plan is revised until approval — or escalated to a human.**
+**Hierarchical task planning with an independent LLM critic. A planner decomposes a goal into a structured plan; a critic audits every subtask; the plan is revised until approval — or escalated to a human.**
 
 </div>
 
 > [!NOTE]
-> **Status:** Design phase (pre-release). Private repo; will be made public under OSS.
+> **Status:** v0.1.0 released · [PyPI](https://pypi.org/project/planner-critic/) · `pip install planner-critic`
 > **License:** MIT
 
 ---
@@ -33,12 +38,12 @@ PlannerCritic Engine closes this gap by treating planning as a first-class, prod
 
 ```
  Goal + Constraints → PLANNER → typed plan → CRITIC → findings
-                        ↑  │                        │
-                        │  └────── revise ←──────────┘
-                        │                             │
-                        └──────── approved plan ──────┘
-                                     │
-                                  ESCALATE (if no convergence)
+                         ↑  │                        │
+                         │  └────── revise ←──────────┘
+                         │                             │
+                         └──────── approved plan ──────┘
+                                      │
+                                   ESCALATE (if no convergence)
 ```
 
 - **Draft** — a planner LLM decomposes a goal into a structured, typed plan: tasks, dependencies, ordering, verification steps, and rollback points.
@@ -48,9 +53,19 @@ PlannerCritic Engine closes this gap by treating planning as a first-class, prod
 
 The plan is a persisted, versioned artifact — you can diff revisions, see which critiques drove which changes, and trace whether a failed run was a planning failure or an execution failure.
 
----
+### Key Features
 
-## What It Is Not
+| Feature | Description |
+|---------|-------------|
+| **Risk tolerance** | `balanced` (findings are advisory warnings) or `strict` (zero tolerance, fail-closed) |
+| **Deterministic gates** | 7 injection-immune gates — ordering, branch-sanity, rollback, verification, preconditions, branch-tasks, high-risk completeness |
+| **Escalation management** | Human-in-the-loop with override, patch, and restart decisions |
+| **Convergence detection** | Early termination when the planner stops making progress — saves LLM calls |
+| **Provider registry** | Pluggable LLM providers (OpenRouter, OpenAI, oMLX, Ollama) via TOML config |
+| **StructuredEnforcer** | Retry mechanism for LLM JSON output — fail-closed after 3 retries |
+| **Plan versioning** | Every revision is a persisted artifact with diff support |
+
+### What It Is Not
 
 - It does **not** execute the plan — an existing runner consumes the approved plan.
 - It does **not** guarantee plan correctness — it reduces risk, it cannot eliminate it.
@@ -58,37 +73,49 @@ The plan is a persisted, versioned artifact — you can diff revisions, see whic
 
 ---
 
-## Scope (MVP 0.1.0)
+## Quick Start
 
-- Typed goal schema with constraints and risk tolerance
-- Structured plan representation (tasks, deps, ordering, verification, rollback)
-- Separate planner and critic LLM calls with distinct prompts and model selection
-- Six critique heuristic families with severity-graded findings
-- Bounded revise-until-approved loop with revision budget
-- Human escalation with minimal questions
-- Plan versioning and diff
+```bash
+pip install planner-critic
+plancritic quickstart  # creates a demo goal and runs the loop
+plancritic demo        # runs the full demo scenario
+```
 
-**Nice-to-have:** web UI for plan review and revision diffs, execution-engine adapter (AgentLab).
+Requires Python 3.11+ and an LLM provider (OpenRouter, OpenAI, or local model).
 
 ---
 
-## Layout
+## CLI
 
+```bash
+plancritic plan <goal.json>              # Plan a goal
+plancritic critique <plan.json>          # Critique a plan
+plancritic field-test run --goals <dir>   # Run field test
+plancritic demo                          # Run demo scenario
+plancritic quickstart                    # Quickstart demo
+plancritic migrate <old> <new>           # Migrate config
+plancritic serve                         # Start HTTP server
 ```
-planner_critic_engine/
-docs/             Documentation
-docs/architecture/   System architecture and spec
-docs/design/         PRD, design spec, design decisions
-docs/field-test/     Field test plan + results
-  field-test-plan.md          Field test plan (65 goals, 10 domains, 30 capabilities)
-  field-test-results-0.1.0.md Field test results v0.1.0 (BLUF, conclusions, data)
-  goals/                      65 real-world goal scenarios across 10 domains
-  reports/0.1.0/full-sweep/   Full sweep traces, LLM logs, per-goal evidence
-docs/wbs/             Work breakdown structure (M1–M10)
-docs/reference/       API reference, quickstart
-tests/            Test suite
-examples/         Sample goal: draft → critique → revise trace
-```
+
+See [API Reference](docs/reference/api.md) for full CLI docs, HTTP endpoints, and MCP tools.
+
+---
+
+## Field Test
+
+157 goals across 35 domains, all run against a real LLM (gpt-4o-mini via OpenRouter):
+
+| Metric | Result |
+|--------|--------|
+| Balanced goals approved | **71/71 (100%)** |
+| Strict goals escalated | **81/81 (100%)** |
+| Adversarial goals escalated | **8/8 (100%)** |
+| True failures | **0** |
+| Deterministic gate passes | **156/157 (99%)** |
+| **Scorecard A (post-amendment)** | **PASS** |
+| **Scorecard B (pass\* semantics)** | **100%** |
+
+Full results: [field-test-results-0.1.0.md](docs/field-test/field-test-results-0.1.0.md)
 
 ---
 
@@ -96,21 +123,52 @@ examples/         Sample goal: draft → critique → revise trace
 
 | Doc | Path | Contents |
 |-----|------|----------|
-| **Field Test Plan** | `docs/field-test/field-test-plan.md` | 65-goal corpus, 30 capabilities, invariant assertions, execution design |
-| **Field Test Results v0.1.0** | `docs/field-test/field-test-results-0.1.0.md` | BLUF, conclusions, observations, surprises, learnings, per-goal data, evidence |
-| **Docker Integration** | `docs/field-test/docker-integration.md` | Containerized engine + CLI/HTTP/MCP vs local LLM |
-| **Architecture v0.1.0** | `docs/architecture/architecture-v0.1.0.md` | Component diagram, module map, data flow |
-| **WBS Index** | `docs/wbs/v0.1.0/wbs-v0.1.0-index.md` | Milestone overview, dependency graph, issue ranges |
-| **Design Decisions** | `docs/design/design-decisions.md` | DD-01..N decision records |
-| **API Reference** | `docs/reference/api.md` | CLI cheat-sheet, HTTP endpoints, MCP tools |
+| **Field Test Results v0.1.0** | [results](docs/field-test/field-test-results-0.1.0.md) | BLUF, conclusions, per-goal data, scorecards, blocker analysis |
+| **Field Test Plan** | [plan](docs/field-test/field-test-plan.md) | 156-goal corpus, 35 capabilities, invariant assertions |
+| **Architecture v0.1.0** | [architecture](docs/architecture/architecture-v0.1.0.md) | Component diagram, module map, data flow |
+| **API Reference** | [api](docs/reference/api.md) | CLI cheat-sheet, HTTP endpoints, MCP tools |
+| **Design Decisions** | [decisions](docs/design/design-decisions.md) | DD-01..N decision records |
+| **Demo Scenario** | [demo](docs/design/demo-scenario.md) | End-to-end walkthrough |
+| **WBS Index** | [wbs](docs/wbs/v0.1.0/wbs-v0.1.0-index.md) | Milestone overview, dependency graph |
 
 ---
 
-## Planned Articles
+## Project Layout
 
-- "Why Your Agent Needs a Code Review for Its Plans"
-- "The Draft-Critique-Revise Loop: How Humans Plan, Productized for LLMs"
-- "Escalation Is a Feature: Teaching Agents When to Ask a Human"
+```
+planner-critic-engine/
+├── docs/                    Documentation
+│   ├── architecture/          System architecture and spec
+│   ├── design/                PRD, design spec, design decisions
+│   ├── field-test/            Field test plan + results (157 goals, 35 domains)
+│   ├── reference/             API reference, quickstart
+│   └── wbs/                   Work breakdown structure (M1–M10)
+├── src/planner_critic/       Engine source
+│   ├── cli/                    CLI commands
+│   ├── critique/               LLM critic with severity guardrail
+│   ├── gates/                  7 deterministic gates
+│   ├── llm/                    Provider registry, transport, logging
+│   ├── loop/                   Plan revision loop, convergence detection
+│   └── server/                 HTTP server
+├── tests/                    Test suite
+├── .github/                  Issue templates, PR template, CI workflows
+├── CHANGELOG.md               Release history
+├── CONTRIBUTING.md            How to contribute
+├── SECURITY.md                Security policy + OWASP + OpenSSF
+└── pyproject.toml             Package metadata
+```
+
+---
+
+## Known Gaps (v0.2.0)
+
+- **Planner capability gap** — 132 concrete blockers across 63 strict goals. A deterministic precondition closer would eliminate 48%.
+- CLI, HTTP, adapter surfaces — partial coverage
+- Multi-model sweeps — only gpt-4o-mini tested
+- Finding quality audit — not yet measured
+- Executor usability — not yet audited
+
+See [CHANGELOG.md](CHANGELOG.md) for full details.
 
 ---
 
