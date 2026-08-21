@@ -47,6 +47,13 @@
 - `SecretsRedactor`: deterministic interception at every external-output surface (LLM call, plan store, OTel F-82, CLI, `diagnose`, `studio`). Built-in patterns (AWS keys, API keys ≥16, OAuth2, JWT, private keys, Slack tokens, GH PATs, email, phone, SSN) + custom regex via `secrets.yaml`.
 - Modes `redact` / `hash` (SHA-256, for dedup) / `skip` (per pattern). Audit trail logs redaction counts without the secret; `secret_redacted` (info) reason code. SOC 2 / HIPAA / GDPR / ISO 27001 compliance story; never sends content to an external classifier.
 
+### M6.7 Gate rationale as first-class metadata (#174)
+
+- Every gate definition carries `{author, rationale, added_at, stale_at, amend_conditions}` as first-class schema fields.
+- Rationale surfaced in escalation, explain, and dashboard surfaces (#53 HTTP, #51 explain, #138) so a gate is never a silent verdict.
+- Planner can introspect rule rationale at runtime to reason about a constraint rather than just being blocked by it.
+- Stale-rule signal flags a gate when the evidence/precondition cited in its rationale has moved since `added_at`, triggering re-review. Prevents permanent silent dead-ends.
+
 ### M6 Task Checklist
 
 | # | Task | Verify | Issue | Status |
@@ -57,6 +64,7 @@
 | 4 | PreconditionLedger + compaction detection | 5-rev plan survives compaction; gate checks ledger | [#151](https://github.com/deghosal-2026/planner-critic-engine/issues/151) · [ ] |
 | 5 | BlastRadiusQuota + auto-escalation | quota breach blocked pre-LLM; restricted_* escalate | [#158](https://github.com/deghosal-2026/planner-critic-engine/issues/158) · [ ] |
 | 6 | SecretsRedactor + patterns + modes + audit | secret stripped before all external surfaces; counts w/o value | [#159](https://github.com/deghosal-2026/planner-critic-engine/issues/159) · [ ] |
+| 7 | Gate rationale metadata + stale-rule signal | every gate has author+rationale+added_at; stale gates surfaced | [#174](https://github.com/deghosal-2026/planner-critic-engine/issues/174) · [ ] |
 
 ### M6 Success Metrics
 
@@ -68,12 +76,14 @@
 | Ledger | accuracy across 5+ revisions w/ compaction | ledger field test |
 | Quota | breach blocked pre-LLM; restricted actions escalate | quota field test |
 | Redaction | 0 secrets in any external output; audit counts only | redaction suite |
+| Gate rationale | every gate has author+rationale+added_at; stale signal surfaces in dashboard | schema audit + dashboard query |
 | Coverage | >95% | `--cov-fail-under=95` |
 | Lint | 0 ruff + 0 mypy strict | `ruff` + `mypy` |
 
 ### M6 Exit Gate
 
 - [ ] All six safety mechanisms enforced deterministically (no LLM requirement to trigger)
+- [ ] Gate rationale metadata shipped: every gate carries author+rationale+added_at; stale signal surfaces
 - [ ] **Design doc authored:** D24 (enterprise safety)
 - [ ] Every new reason code in catalog (F-77)
 - [ ] Coverage > 95; lint clean; code review passed
