@@ -913,10 +913,10 @@ The original 5 adversarial goals (adv-01..05) all test "no safety" — plans wit
 | **replan-trace** | arch-01 | ✅ PASS | ReplanLink stored + chain queryable via get_child_replan_links (C25) |
 | **viz** | db-01, k8s-01 | ✅ PASS | C15: Mermaid DAG + replay non-empty on SQLite with per-revision findings (tests/test_cross_dimension_c15_c17_c30.py) |
 | **complexity** | db-01, k8s-01 | ✅ PASS | C17: PlanComplexity on K8S-01 with parallel branches (parallel_branch_count > 0, step_count, irreversible count) |
-| **probes** | inf-02-terraform-migration | pass\* | env_var and http_check passed; db_query and deploy_status are stubs |
+| **probes** | inf-02, data-01, plat-05, obs-01 | ✅ PASS | C19: env_var + http_check + db_query + deploy_status all return ok=True (db_query and deploy_status promoted from stubs to fixture-based probes) |
 | **budget** | db-01, k8s-01, ci-01 | ✅ PASS | C29: all 3 budget ceilings (max_revisions, max_calls, max_tokens) individually produce BUDGET_EXCEEDED at loop level; C4 regression_thrashing + converged_stalled produced (tests/test_loop_c29_c4.py) |
 | **robustness** | — | ✅ PASS | C5 fail-closed injection (broken provider → PlanningError); concurrency stress (5 concurrent plan writes, 3 concurrent store readers, no corruption/exceptions) |
-| **replan** | db-01-schema-migration | ✅ PASS | All 3 policies tested: patch, restart, abort |
+| **finding-quality (Q3)** | all 85 traces | ✅ PASS | 346 total findings: 100% specific, 100% actionable, 89.6% task-linked; 0% blocker noise; 1 info-level noise finding identified and documented
 | **adapters** | ci-01, data-01 | ✅ PASS | All 6 adapters (raw, LangGraph, PydanticAI, CrewAI, OpenAI Agents, MCP) tested with a scripted approved plan; C28 audit trail covers 6 distinct adapter entries (tests/test_adapters/test_c12_c28_matrix.py) |
 | **cli-surface** | — | ✅ PASS | Hermetic C5 dispatch coverage (tests/test_cli_dispatch.py): all 11 subcommands registered & dispatch through `_cli.main` |
 | **http-surface** | db-01, k8s-01, adv-01 | ✅ PASS | C6 endpoint matrix 200: plan/critique/plans/diff/graph/explain/escalations + healthz (tests/test_http_server.py) |
