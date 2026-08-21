@@ -914,7 +914,7 @@ The original 5 adversarial goals (adv-01..05) all test "no safety" — plans wit
 | **probes** | inf-02-terraform-migration | pass\* | env_var and http_check passed; db_query and deploy_status are stubs |
 | **budget** | db-01-schema-migration | ✅ PASS | Budget enforcement with max_revisions=1 correctly escalated |
 | **replan** | db-01-schema-migration | ✅ PASS | All 3 policies tested: patch, restart, abort |
-| **adapters** | ci-01-multistage-pipeline | ✅ PASS | Python adapter wrap/unwrap round-tripped |
+| **adapters** | ci-01, data-01 | ✅ PASS | All 6 adapters (raw, LangGraph, PydanticAI, CrewAI, OpenAI Agents, MCP) tested with a scripted approved plan; C28 audit trail covers 6 distinct adapter entries (tests/test_adapters/test_c12_c28_matrix.py) |
 | **cli-surface** | — | ✅ PASS | Hermetic C5 dispatch coverage (tests/test_cli_dispatch.py): all 11 subcommands registered & dispatch through `_cli.main` |
 | **http-surface** | db-01, k8s-01, adv-01 | ✅ PASS | C6 endpoint matrix 200: plan/critique/plans/diff/graph/explain/escalations + healthz (tests/test_http_server.py) |
 | **cli-demo** | migration.json | ✅ PASS | `plancritic demo` exit 0 + `--format json` machine-readable record (C20) |
