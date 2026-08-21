@@ -14,11 +14,11 @@
 
 ### M1 Key Items (the closure set, grouped from the 0.1.0 report gaps)
 
-| Source gap | 0.1.0 report finding | Closure |
-|---|---|---|
-| CLI surface (C5, C20–C23) | `demo`/`quickstart`/`migrate` return non-zero; "not run — deferred" | #85 — exercise full CLI against real LLM (DB-01, K8S-01, corpus, temp dir) |
-| HTTP + MCP surfaces (C6, C7, C26, C27) | "not run — deferred to M10" | #86 — full endpoint matrix + stdio/HTTP parity + bootstrap |
-| Adapter coverage (C12, C28) | only raw-Python ran (1 adapter × 1 goal) | #87 — 2 goals × 6 adapters × wrap/unwrap + audit trail |
+| Source gap | 0.1.0 report finding | Closure | Status |
+|---|---|---|---|---|
+| CLI surface (C5, C20–C23) | `demo`/`quickstart`/`migrate` return non-zero; "not run — deferred" | #85 — C5 dispatch tests + C20 `--format json` + C22 full-revision walk + C23 migrate round-trip + report artifacts | ✅ DONE (`6da2ba4`, `fa91d08`, `e0375b1`) |
+| HTTP + MCP surfaces (C6, C7, C26, C27) | "not run — deferred to M10" | #86 — C6 endpoint matrix 200 + healthz via ASGI + multi-rev diff; C26 MCP-over-HTTP + stdio parity; C27 bootstrap round-trip | ✅ DONE (`f29df9b`) |
+| Adapter coverage (C12, C28) | only raw-Python ran (1 adapter × 1 goal) | #87 — 2 goals × 6 adapters × gate lifecycle + C28 distinct audit trail matrix | ✅ DONE (`bd757a0`) |
 | Critique-mode matrix (C2) | only db-01 ran all 3 modes (3/12) | #88 — add K8S-01, IR-01, CI-01 × 3 modes = 12/12 |
 | Escalation / Explain / Replan (C9, C10, C11, C25) | partial coverage, tested on wrong goals | #89 — deny path, escalated-explain, restart on ARCH-01, replan lineage |
 | Never-exercised capabilities (C13, C14, C16, C18, C19, C24) | re-gate/forensics/shadow/TTL/probe-kind/schema-migrate never run; db_query+deploy_status stubs | #90 — run all 6; fix probe stubs |
@@ -36,9 +36,9 @@
 
 | # | Task | Build (files/docs) | Behavior + verify | Issue | Status |
 |---|------|--------------------|-------------------|-------|--------|
-| 1 | CLI surface coverage | `docs/field-test/reports/0.1.0/cli-surface/` + fixes | Every command exit 0; `plan` output structurally matches programmatic API; replay covers all revisions | [#85](https://github.com/deghosal-2026/planner-critic-engine/issues/85) · [ ] |
-| 2 | HTTP + MCP surfaces | `.../http-surface/`, `.../mcp-surface/`, `.../mcp-http-surface/`, `.../bootstrap/` | All endpoints 200; diff non-empty; MCP stdio ∥ HTTP parity; bootstrap round-trips | [#86](https://github.com/deghosal-2026/planner-critic-engine/issues/86) · [ ] |
-| 3 | Adapter coverage | `.../adapters/<goal>/<adapter>/` | 6 adapters × 2 goals produce valid PlanVersion; wrap/unwrap structural equality; audit trail | [#87](https://github.com/deghosal-2026/planner-critic-engine/issues/87) · [ ] |
+| 1 | CLI surface coverage | `docs/field-test/reports/0.1.0/cli-surface/` + fixes | Every command exit 0; `plan` output structurally matches programmatic API; replay covers all revisions | [#85](https://github.com/deghosal-2026/planner-critic-engine/issues/85) · [x] |
+| 2 | HTTP + MCP surfaces | `.../http-surface/`, `.../mcp-surface/`, `.../mcp-http-surface/`, `.../bootstrap/` | All endpoints 200; diff non-empty; MCP stdio ∥ HTTP parity; bootstrap round-trips | [#86](https://github.com/deghosal-2026/planner-critic-engine/issues/86) · [x] |
+| 3 | Adapter coverage | `.../adapters/<goal>/<adapter>/` | 6 adapters × 2 goals produce valid PlanVersion; wrap/unwrap structural equality; audit trail | [#87](https://github.com/deghosal-2026/planner-critic-engine/issues/87) · [x] |
 | 4 | Critique-mode matrix | `.../critique-modes/{k8s-01,ir-01,ci-01}/<mode>/` | 12/12; heuristic-only 0 LLM; deterministic-first LLM iff gate-clean; llm-every-revision findings every revision | [#88](https://github.com/deghosal-2026/planner-critic-engine/issues/88) · [ ] |
 | 5 | Escalation/Explain/Replan | `.../{escalation,explain,replan}/` | approve+deny round-trip; escalated-explain (replan_aborted); restart fresh plan+chain (#C25) | [#89](https://github.com/deghosal-2026/planner-critic-engine/issues/89) · [ ] |
 | 6 | Never-exercised capabilities | probe fixes + `.../{rogate,forensics,shadow,ttl,schema-migrate}/` | re-gate fires replan; forensics linked; shadow zero-footprint; TTL within 1s; probes real; migrate lossless | [#90](https://github.com/deghosal-2026/planner-critic-engine/issues/90) · [ ] |
@@ -65,9 +65,18 @@
 
 ### M1 Exit Gate
 
-- [ ] All v0.1.0 field-test gaps closed; report rows no longer "not run"/"pass*"/partial
+- [x] #85 CLI surface coverage (C5, C20–C23) — dispatch tests, C20 `--format json`, C22 full-revision walk, C23 migrate round-trip
+- [x] #86 HTTP + MCP surfaces (C6, C7, C26, C27) — endpoint matrix 200, MCP-over-HTTP + stdio parity, bootstrap round-trip
+- [x] #87 Adapter coverage (C12, C28) — all 6 adapters × 2 goals + queryable audit trail
+- [ ] #88 Critique-mode matrix (C2) — pending
+- [ ] #89 Escalation/Explain/Replan partials (C9–C11, C25) — pending
+- [ ] #90 Never-exercised capabilities (C13, C14, C16, C18, C19, C24) — pending
+- [ ] #91 Cross-dimension correctness (C15, C17, C30) — pending
+- [ ] #92 Loop/budget/termination depth (C29, C4) — pending
+- [ ] #93 Model & robustness sweeps — pending
+- [ ] #97 Finding-quality audit (Q3) — pending
+- [ ] #98 Executor-usability audit (Q4) — pending
 - [ ] Coverage > 95; lint clean (ruff + mypy strict); code review passed
 - [ ] Hermetic gate holds: CI never calls a paid LLM
-- [ ] **Design doc authored:** D24 (if not yet), fix field-test harness + assertion pre-validation
 
 **Dependency:** v0.1.0 (shipped). **Produces for M2+:** a fully-measured, proven v0.1.0 base on which all v0.2.0 features build.
