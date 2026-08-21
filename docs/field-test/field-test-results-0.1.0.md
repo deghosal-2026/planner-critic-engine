@@ -907,10 +907,12 @@ The original 5 adversarial goals (adv-01..05) all test "no safety" — plans wit
 | Dimension | Goal | Result | Notes |
 |-----------|------|--------|-------|
 | **critique-modes** | db-01, k8s-01, ir-01, ci-01 | ✅ PASS | 4 goals x 3 modes = 12/12: heuristic-only 0 LLM, deterministic-first skips LLM on gate-blocker, llm-every-revision always invokes (tests/test_critique_c2_matrix.py) |
-| **escalation** | adv-01-billing-no-safety | ✅ PASS | Escalation created, listed, and resolved via EscalationManager |
-| **explain** | db-01-schema-migration | ✅ PASS | Explain engine produced reason_code trace |
-| **viz** | db-01-schema-migration | pass\* | Mermaid graph generated; replay trace empty (store doesn't have full revision history) |
-| **complexity** | db-01-schema-migration | ✅ PASS | PlanComplexity computed correctly |
+| **escalation** | adv-01, adv-02 | ✅ PASS | Full round-trip: create → list → approve + deny (test_escalation_explain_replan_c9_c11_c25.py) |
+| **explain** | db-01, adv-01 | ✅ PASS | Explain on escalated (replan_aborted) plan, not just approved — references escalation reason |
+| **replan** | db-01, arch-01, adv-01 | ✅ PASS | Policies on designated goals: patch=DB-01, restart=ARCH-01 (fresh lineage), abort=ADV-01 |
+| **replan-trace** | arch-01 | ✅ PASS | ReplanLink stored + chain queryable via get_child_replan_links (C25) |
+| **viz** | db-01, k8s-01 | ✅ PASS | C15: Mermaid DAG + replay non-empty on SQLite with per-revision findings (tests/test_cross_dimension_c15_c17_c30.py) |
+| **complexity** | db-01, k8s-01 | ✅ PASS | C17: PlanComplexity on K8S-01 with parallel branches (parallel_branch_count > 0, step_count, irreversible count) |
 | **probes** | inf-02-terraform-migration | pass\* | env_var and http_check passed; db_query and deploy_status are stubs |
 | **budget** | db-01-schema-migration | ✅ PASS | Budget enforcement with max_revisions=1 correctly escalated |
 | **replan** | db-01-schema-migration | ✅ PASS | All 3 policies tested: patch, restart, abort |
