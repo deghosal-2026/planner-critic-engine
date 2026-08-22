@@ -14,6 +14,7 @@ from .corpus import build_corpus_parser, run_corpus
 from .critique import build_critique_parser, run_critique
 from .demo import build_demo_parser, run_demo
 from .escalate import build_escalate_parser, run_escalate
+from .eval import build_eval_parser, run_eval
 from .field_test import build_field_test_parser, run_field_test  # noqa: F401
 from .init import build_init_parser, run_init
 from .migrate import build_migrate_parser, run_migrate
@@ -28,6 +29,7 @@ __all__ = [
     "build_critique_parser",
     "build_demo_parser",
     "build_escalate_parser",
+    "build_eval_parser",
     "build_init_parser",
     "build_migrate_parser",
     "build_plan_parser",
@@ -39,6 +41,7 @@ __all__ = [
     "run_critique",
     "run_demo",
     "run_escalate",
+    "run_eval",
     "run_init",
     "run_migrate",
     "run_plan",
