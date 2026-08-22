@@ -49,7 +49,7 @@
 | 1 | GitHub Action + GitLab template + goal_template + artifact | PR status mapping correct; shadow never fails; check #162 integrated | [#128](https://github.com/deghosal-2026/planner-critic-engine/issues/128) · [x] |
 | 2 | AutoGen adapter | pre-gate + re-gate + Human escalation; same pattern as F-41–44 | [#134](https://github.com/deghosal-2026/planner-critic-engine/issues/134) · [x] |
 | 3 | CloudEvents notifier (Slack/Teams/webhook + HMAC) | multi-surface delivery; HMAC/JWT verified callbacks; at-least-once | [#161](https://github.com/deghosal-2026/planner-critic-engine/issues/161) · [x] |
-| 4 | Finding drift observability | dual severity storage + escalation enrichment + dashboard drift panel + CLI --include-raw | [#181](https://github.com/deghosal-2026/planner-critic-engine/issues/181) · [ ] |
+| 4 | Finding drift observability | dual severity storage + escalation enrichment + dashboard drift panel + CLI --include-raw | [#181](https://github.com/deghosal-2026/planner-critic-engine/issues/181) · [x] |
 
 ### M8 Success Metrics
 
@@ -66,9 +66,9 @@
 - [x] CI runner (GitHub Action + GitLab template) shipped
 - [x] AutoGen adapter shipped (pre-gate + re-gate + escalation)
 - [x] Webhook event bridge shipped (Slack/Teams/webhook formatters + HMAC verification)
+- [x] Drift observability: dual severity storage, drift check, CLI --include-raw, z-score alerting (#181)
 - [x] **Design doc authored:** D26 (integration surfaces)
 - [x] Coverage > 95; lint clean; code review passed
-- [ ] Drift observability: dual severity storage, escalation enrichment, dashboard drift panel, CLI --include-raw (#181)
 - [ ] Backstage plugin (#133), Slack bot (#135), fleet dashboard (#138) deferred to v0.3.0
 
 **Dependency:** M1 (+ M6 safety, M7 `plancritic check`, M4 packs). **Produces for M9–M10:** the CI distribution channel and notifier infrastructure that M9's fleet field-tests and M10's release gate validate.
