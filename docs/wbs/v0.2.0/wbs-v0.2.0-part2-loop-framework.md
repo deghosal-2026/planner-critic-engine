@@ -90,10 +90,17 @@
 
 | # | Milestone | Task | Verify | Issue | Status |
 |---|-----------|------|--------|-------|--------|
-| 1 | M3 | DomainPack protocol + engine integration + manifest + CLI | gate additive; prompt prepended; pack loads + hermetic test | [#139](https://github.com/deghosal-2026/planner-critic-engine/issues/139) · [x] |
-| 2 | M3 | PolicyEngine + RegoGate + CelGate + policy lib + CLI | Rego/CEL gates fire; additive; built-in never replaced | [#129](https://github.com/deghosal-2026/planner-critic-engine/issues/129) · [x] |
+| 1 | M3 | DomainPack protocol + engine integration + manifest | gate additive; prompt prepended; pack loads + hermetic test | [#139](https://github.com/deghosal-2026/planner-critic-engine/issues/139) · [x] |
+| 2 | M3 | PolicyEngine + RegoGate + CelGate | Rego/CEL gates fire; additive; built-in never replaced | [#129](https://github.com/deghosal-2026/planner-critic-engine/issues/129) · [x] |
 | 3 | M3 | pytest-planner-critic plugin + assertion hooks + GraphDiffFormatter | $0/<30s; DAG diffs; assertions pass on fixtures | [#156](https://github.com/deghosal-2026/planner-critic-engine/issues/156) · [x] |
-| 4 | M3 | `plancritic templates add/list/test` CLI (carried from M2) | list shows seed templates; add registers one; test dry-runs | [#175](https://github.com/deghosal-2026/planner-critic-engine/issues/175) · [ ] |
+
+### Deferred from M3 (moved to M7 Developer Surfaces)
+
+| # | Original issue | Task | New issue | Status |
+|---|----------------|------|-----------|--------|
+| 1 | [#139](https://github.com/deghosal-2026/planner-critic-engine/issues/139) | `plancritic domains add/list/show/test` CLI | [#178](https://github.com/deghosal-2026/planner-critic-engine/issues/178) · [ ] |
+| 2 | [#129](https://github.com/deghosal-2026/planner-critic-engine/issues/129) | `plancritic policy add/list/test` CLI + seed Rego library | [#179](https://github.com/deghosal-2026/planner-critic-engine/issues/179) · [ ] |
+| 3 | [#175](https://github.com/deghosal-2026/planner-critic-engine/issues/175) | `plancritic templates add/list/test` CLI (carried from M2) | [#175](https://github.com/deghosal-2026/planner-critic-engine/issues/175) · [ ] (moved to M7) |
 
 ### M3 Exit Gate
 
