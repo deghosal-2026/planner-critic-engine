@@ -65,6 +65,7 @@
 | 5 | BlastRadiusQuota + auto-escalation | quota breach blocked pre-LLM; restricted_* escalate | [#158](https://github.com/deghosal-2026/planner-critic-engine/issues/158) · [ ] |
 | 6 | SecretsRedactor + patterns + modes + audit | secret stripped before all external surfaces; counts w/o value | [#159](https://github.com/deghosal-2026/planner-critic-engine/issues/159) · [ ] |
 | 7 | Gate rationale metadata + stale-rule signal | every gate has author+rationale+added_at; stale gates surfaced | [#174](https://github.com/deghosal-2026/planner-critic-engine/issues/174) · [ ] |
+| 8 | PlanSignature persistence to store (carried from M2) | per-revision sig recorded; queryable; lossless migration | [#176](https://github.com/deghosal-2026/planner-critic-engine/issues/176) · [ ] |
 
 ### M6 Success Metrics
 

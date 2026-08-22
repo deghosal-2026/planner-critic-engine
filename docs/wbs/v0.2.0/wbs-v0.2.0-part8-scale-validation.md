@@ -51,6 +51,7 @@
 | 3 | SRE (§3.38) | SRE-01..03 | blast-radius cap/telemetry precondition/HITL-destructive | [#146](https://github.com/deghosal-2026/planner-critic-engine/issues/146) · [ ] |
 | 4 | SCP (§3.39) | SCP-01..03 | topo propagation/per-service CI/canary gates | [#147](https://github.com/deghosal-2026/planner-critic-engine/issues/147) · [ ] |
 | 5 | FNG (§3.40) | FNG-01..02 | budget-threshold + contractual-commitment gates | [#148](https://github.com/deghosal-2026/planner-critic-engine/issues/148) · [ ] |
+| 6 | Auto-repair benchmark (carried from M2) | ≥30% revision reduction on ordering-violation corpus | [#177](https://github.com/deghosal-2026/planner-critic-engine/issues/177) · [ ] |
 
 ### M9 Success Metrics
 
