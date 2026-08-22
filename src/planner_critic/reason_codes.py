@@ -23,6 +23,14 @@ MISSING_ROLLBACK: Literal["missing_rollback"] = "missing_rollback"
 UNVERIFIED_PRECONDITION: Literal["unverified_precondition"] = "unverified_precondition"
 UNSAFE_PARALLELIZATION: Literal["unsafe_parallelization"] = "unsafe_parallelization"
 
+# --- Deterministic auto-fix codes (PRD §2.6, M2) ------------------------------
+AUTO_REPAIRED_ORDERING: Literal["auto_repaired_ordering"] = "auto_repaired_ordering"
+AUTO_CLOSED_PRECONDITION: Literal["auto_closed_precondition"] = "auto_closed_precondition"
+PLAN_OSCILLATION_DETECTED: Literal["plan_oscillation_detected"] = "plan_oscillation_detected"
+AUTO_CONVERGE_PARTIAL_APPROVAL: Literal["auto_converge_partial_approval"] = (
+    "auto_converge_partial_approval"
+)
+
 # --- Loop decision codes (PRD §2.6) ------------------------------------------
 REVISION_CAP_REACHED: Literal["revision_cap_reached"] = "revision_cap_reached"
 CONVERGED_STALLED: Literal["converged_stalled"] = "converged_stalled"
@@ -51,6 +59,10 @@ ReasonCode: TypeAlias = Literal[
     "missing_rollback",
     "unverified_precondition",
     "unsafe_parallelization",
+    "auto_repaired_ordering",
+    "auto_closed_precondition",
+    "plan_oscillation_detected",
+    "auto_converge_partial_approval",
     "revision_cap_reached",
     "converged_stalled",
     "regression_thrashing",
@@ -76,6 +88,12 @@ REASON_CODE_DESCRIPTIONS: dict[ReasonCode, str] = {
     MISSING_ROLLBACK: "A high-blast-radius step lacks a rollback step",
     UNVERIFIED_PRECONDITION: "A precondition does not reference an established earlier fact",
     UNSAFE_PARALLELIZATION: "Tasks in one parallel_group break concurrency safety",
+    AUTO_REPAIRED_ORDERING: "Auto-repaired task ordering to satisfy hard-dependency precedences",
+    AUTO_CLOSED_PRECONDITION: "Auto-closed a precondition gap from a template match",
+    PLAN_OSCILLATION_DETECTED: "Plan oscillates between two structural signatures — no convergence",
+    AUTO_CONVERGE_PARTIAL_APPROVAL: (
+        "Auto-converged non-oscillating tasks; oscillating subset escalated"
+    ),
     REVISION_CAP_REACHED: "Loop terminated because the revision cap was hit",
     CONVERGED_STALLED: "Revisions are circling the same blockers or diff converges to zero",
     REGRESSION_THRASHING: "A revision introduced a new blocker",
