@@ -146,6 +146,8 @@ RESOURCE_LOCKED_BY_CONCURRENT_EXECUTION: Literal["resource_locked_by_concurrent_
 CONCURRENT_RESOURCE_CONFLICT: Literal["concurrent_resource_conflict"] = (
     "concurrent_resource_conflict"
 )
+FINDING_DRIFT_STORED: Literal["finding_drift_stored"] = "finding_drift_stored"
+DRIFT_ALERT_TRIGGERED: Literal["drift_alert_triggered"] = "drift_alert_triggered"
 PRECONDITION_REDUNDANTLY_RE_INJECTED: Literal["precondition_redundantly_re_injected"] = (
     "precondition_redundantly_re_injected"
 )
@@ -227,6 +229,8 @@ ReasonCode: TypeAlias = Literal[
     "state_view_stale",
     "resource_locked_by_concurrent_execution",
     "concurrent_resource_conflict",
+    "finding_drift_stored",
+    "drift_alert_triggered",
     "precondition_redundantly_re_injected",
     "precondition_dropped_from_compaction",
     "blast_radius_quota_breach",
@@ -304,6 +308,8 @@ REASON_CODE_DESCRIPTIONS: dict[ReasonCode, str] = {
     STATE_VIEW_STALE: "State snapshot taken at approval time diverged from live state — re-gate triggered",
     RESOURCE_LOCKED_BY_CONCURRENT_EXECUTION: "Resource is locked by concurrent agent execution — plan must wait or escalate",
     CONCURRENT_RESOURCE_CONFLICT: "Plan targets a resource currently locked by another execution — blocker",
+    FINDING_DRIFT_STORED: "Finding stored with dual severity (raw + normalized) for drift observability",
+    DRIFT_ALERT_TRIGGERED: "Drift z-score exceeded 2-sigma threshold for a heuristic family",
     PRECONDITION_REDUNDANTLY_RE_INJECTED: "LLM re-injected a precondition the ledger shows as already satisfied",
     PRECONDITION_DROPPED_FROM_COMPACTION: "LLM dropped a precondition the ledger shows as satisfied — compaction likely",
     BLAST_RADIUS_QUOTA_BREACH: "Plan exceeds a blast-radius quota (resource/action count limit)",
