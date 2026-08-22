@@ -37,6 +37,26 @@
 - Lightweight, sub-second, **zero-LLM offline** gate evaluation against a plan file: `plancritic check <plan_file> [--domain PACK] [--policies-dir] [--enforcement] [--context] [--fail-on-severity] [--output json|text|yaml]`.
 - Loads plan into a `SyntheticPlan`; runs domain-pack deterministic gates + Rego policies; exits 0 (pass / below threshold) / 1 (gate violation ≥ threshold) / 4 (config error). Reads `planner-critic.yaml`. **Integrates #157 (IDE backend) and #128 (CI lightweight path).**
 
+### M7.6 `plancritic domains` CLI (#178 — carried from M3)
+
+- `plancritic domains list` — shows installed packs from namespace scanning
+- `plancritic domains show <name>` — displays pack details (gates, preconditions, prompt)
+- `plancritic domains add <path>` — registers a `domain-pack.yaml`
+- `plancritic domains test <name> <plan-file>` — dry-run domain gates against a file
+
+### M7.7 `plancritic policy` CLI + seed Rego library (#179 — carried from M3)
+
+- `plancritic policy list` — shows installed policy gates
+- `plancritic policy add <path>` — registers a `policy-pack.yaml` or `.rego` file
+- `plancritic policy test <name> <plan-file>` — dry-run a policy against a plan
+- Populate `BUILTIN_POLICIES` with Rego equivalents of the six built-in gates
+
+### M7.8 `plancritic templates` CLI (#175 — carried from M2/M3)
+
+- `plancritic templates list` — shows installed precondition templates
+- `plancritic templates add <name> --pattern <str> --task-id <id> --description <str>` — register a new template
+- `plancritic templates test <name> <plan-file>` — dry-run the closer against a sample plan
+
 ### M7 Task Checklist
 
 | # | Task | Verify | Issue | Status |
@@ -46,6 +66,9 @@
 | 3 | `studio` (time-travel + breakpoints + synthetic edit + replay) | step-forward/back; pause+edit+resume; real-time gate update | [#154](https://github.com/deghosal-2026/planner-critic-engine/issues/154) · [ ] |
 | 4 | IDE extensions (VS Code + JetBrains) | inline sim $0; schema autocomplete; DAG preview; DAP → studio | [#157](https://github.com/deghosal-2026/planner-critic-engine/issues/157) · [ ] |
 | 5 | `plancritic check` (offline gate eval + exit codes) | sub-second, $0; exit 0/1/4; severity threshold; JSON/YAML | [#162](https://github.com/deghosal-2026/planner-critic-engine/issues/162) · [ ] |
+| 6 | `plancritic domains` CLI (carried from M3) | list/show/add/test work against a real pack | [#178](https://github.com/deghosal-2026/planner-critic-engine/issues/178) · [ ] |
+| 7 | `plancritic policy` CLI + seed Rego lib (carried from M3) | list/add/test work; Rego policies fire alongside built-in gates | [#179](https://github.com/deghosal-2026/planner-critic-engine/issues/179) · [ ] |
+| 8 | `plancritic templates` CLI (carried from M2/M3) | list shows seed templates; add registers one; test dry-runs | [#175](https://github.com/deghosal-2026/planner-critic-engine/issues/175) · [ ] |
 
 ### M7 Success Metrics
 

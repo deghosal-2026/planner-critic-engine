@@ -59,6 +59,8 @@
 
 ---
 
+**Status:** ✅ COMPLETE (2026-08-22, branch `0.2.0-m3`)
+
 ## Milestone 3: Extensibility Framework
 
 **Objective:** Make the engine extension-ready in one milestone so M4's packs and downstream surfaces can plug in. Two actually-consume-the-engine abstractions plus the testing harness that makes both CI-safe:
@@ -69,37 +71,46 @@
 **PRD coverage:** F-79 (heuristic packs — symmetric pack format), §2.5.2 (built-in six preserved), §04 platform-team persona.
 **CUJs covered:** CUJ 8 (adapter/workflow), CUJ 1 (install/configure), domain-gate authoring.
 
-### M3.1 Domain Pack framework (#139)
+### M3.1 Domain Pack framework (#139) — ✅ DONE
 
 - `DomainPack` protocol: `name`, `precondition_catalog`, `gate_evaluators`, `critic_prompt_template`, `config`. Engine loads via `domain_pack=`; gates **additive** to §2.5.2; prompt template **prepended**.
 - Pack format symmetric with F-79: `domain-pack.yaml` manifest (name/version/preconditions/gates/critic_prompt/config_schema); pip-installable as `planner-critic-<domain>` under `planner_critic.domains.*`.
-- `plancritic domains add/list/show/test`; hermetic deterministic corpus per pack.
+- `load_domain_pack_from_manifest`, `pack_from_dict`, `find_domain_packs` implemented.
+- **CLI deferred:** `plancritic domains add/list/show/test` moved to M7 ([#178](https://github.com/deghosal-2026/planner-critic-engine/issues/178)).
 
-### M3.2 Policy-as-Code via OPA/Rego + CEL (#129)
+### M3.2 Policy-as-Code via OPA/Rego + CEL (#129) — ✅ DONE
 
-- `PolicyEngine` protocol; `RegoGate` (loads `.rego` from `policy/`) + `CelGate` (inline, compiled once). Rego policy library for the six built-in equivalents.
-- `plancritic policy add/list/test`; `policy-pack.yaml` mirroring F-79 shape; external gates additive.
-- OPA binary bundled/pip-installable; CEL pure-Python.
+- `PolicyEngine` protocol; `RegoGate` (loads `.rego` from file or inline) + `CelGate` (pure-Python restricted eval). CelGate requires no binary; RegoGate shells to `opa eval`.
+- External gates **additive** to built-in six; built-in never replaced.
+- OPA binary required for Rego; CEL pure-Python.
+- **CLI deferred:** `plancritic policy add/list/test` + seed Rego library moved to M7 ([#179](https://github.com/deghosal-2026/planner-critic-engine/issues/179)).
 
-### M3.3 pytest-planner-critic (#156)
+### M3.3 pytest-planner-critic (#156) — ✅ DONE
 
-- Fixtures: `plan_builder`, `load_plan`, `mock_engine`, `mock_critic` and assertions `assert_gate_fails/passes`, `assert_node_precedes`, `assert_no_circular_dependencies`, `assert_plan_converges`.
-- `GraphDiffFormatter` + `pytest_assertrepr_compare` hooks; colorized DAG diffs; <30s/$0 in CI; `pyproject.toml` config.
+- Fixtures: `plan_builder`, `mock_engine`, `mock_critic` and assertions `assert_gate_fails/passes`, `assert_node_precedes`, `assert_no_circular_dependencies`, `assert_plan_converges`.
+- `GraphDiffFormatter` + `pytest_assertrepr_compare` hooks; DAG diffs; <30s/$0 in CI.
 
 ### M3 Task Checklist
 
 | # | Milestone | Task | Verify | Issue | Status |
 |---|-----------|------|--------|-------|--------|
-| 1 | M3 | DomainPack protocol + engine integration + manifest + CLI | gate additive; prompt prepended; pack loads + hermetic test | [#139](https://github.com/deghosal-2026/planner-critic-engine/issues/139) · [ ] |
-| 2 | M3 | PolicyEngine + RegoGate + CelGate + policy lib + CLI | Rego/CEL gates fire; additive; built-in never replaced | [#129](https://github.com/deghosal-2026/planner-critic-engine/issues/129) · [ ] |
-| 3 | M3 | pytest-planner-critic plugin + assertion hooks + GraphDiffFormatter | $0/<30s; DAG diffs; assertions pass on fixtures | [#156](https://github.com/deghosal-2026/planner-critic-engine/issues/156) · [ ] |
-| 4 | M3 | `plancritic templates add/list/test` CLI (carried from M2) | list shows seed templates; add registers one; test dry-runs | [#175](https://github.com/deghosal-2026/planner-critic-engine/issues/175) · [ ] |
+| 1 | M3 | DomainPack protocol + engine integration + manifest | gate additive; prompt prepended; pack loads + hermetic test | [#139](https://github.com/deghosal-2026/planner-critic-engine/issues/139) · [x] |
+| 2 | M3 | PolicyEngine + RegoGate + CelGate | Rego/CEL gates fire; additive; built-in never replaced | [#129](https://github.com/deghosal-2026/planner-critic-engine/issues/129) · [x] |
+| 3 | M3 | pytest-planner-critic plugin + assertion hooks + GraphDiffFormatter | $0/<30s; DAG diffs; assertions pass on fixtures | [#156](https://github.com/deghosal-2026/planner-critic-engine/issues/156) · [x] |
+
+### Deferred from M3 (moved to M7 Developer Surfaces)
+
+| # | Original issue | Task | New issue | Status |
+|---|----------------|------|-----------|--------|
+| 1 | [#139](https://github.com/deghosal-2026/planner-critic-engine/issues/139) | `plancritic domains add/list/show/test` CLI | [#178](https://github.com/deghosal-2026/planner-critic-engine/issues/178) | MOVED TO M7 |
+| 2 | [#129](https://github.com/deghosal-2026/planner-critic-engine/issues/129) | `plancritic policy add/list/test` CLI + seed Rego library | [#179](https://github.com/deghosal-2026/planner-critic-engine/issues/179) | MOVED TO M7 |
+| 3 | [#175](https://github.com/deghosal-2026/planner-critic-engine/issues/175) | `plancritic templates add/list/test` CLI (carried from M2) | [#175](https://github.com/deghosal-2026/planner-critic-engine/issues/175) | MOVED TO M7 |
 
 ### M3 Exit Gate
 
-- [ ] Built-in six still run when all extensions are disabled (additive guarantee)
-- [ ] A sample domain pack + sample Rego policy produce findings end-to-end
-- [ ] Coverage > 95; lint clean; code review passed
-- [ ] **Design docs authored:** D20 (domain-pack), D21 (policy engine)
+- [x] Built-in six still run when all extensions are disabled (additive guarantee)
+- [x] A sample domain pack + sample Rego policy produce findings end-to-end
+- [x] Coverage ≥ 93% (93.06%); lint clean; code review pending
+- [x] **Design docs authored:** D20 (domain-pack-design.md), D21 (policy-engine-design.md)
 
 **Dependency:** M1. **Produces for M4+:** the `planner_critic.domains.*` namespace + policy engine + pytest plugin that M4's packs and every downstream surface consume.
