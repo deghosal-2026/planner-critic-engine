@@ -52,6 +52,8 @@
 | 4 | SCP (§3.39) | SCP-01..03 | topo propagation/per-service CI/canary gates | [#147](https://github.com/deghosal-2026/planner-critic-engine/issues/147) · [ ] |
 | 5 | FNG (§3.40) | FNG-01..02 | budget-threshold + contractual-commitment gates | [#148](https://github.com/deghosal-2026/planner-critic-engine/issues/148) · [ ] |
 | 6 | Auto-repair benchmark (carried from M2) | ≥30% revision reduction on ordering-violation corpus | [#177](https://github.com/deghosal-2026/planner-critic-engine/issues/177) · [ ] |
+| 7 | Rollback credibility field test | 21 goals across 8 domains, 3 credibility patterns; measure gate false-negative rate + critic recall | [#182](https://github.com/deghosal-2026/planner-critic-engine/issues/182) · [ ] |
+| 8 | Family-histogram stasis benchmark | ≥20% revision reduction from family-based convergence signal across 85+ strict-goal traces | [#183](https://github.com/deghosal-2026/planner-critic-engine/issues/183) · [ ] |
 
 ### M9 Success Metrics
 
