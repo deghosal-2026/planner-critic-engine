@@ -8,13 +8,11 @@ irreversible steps.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from ..gates.base import BaseGate
-from ..reason_codes import (
-    IRREVERSIBLE_INVARIANT_BLOCKED,
-)
-from ..schema.plan import PlanVersion
+from ..reason_codes import IRREVERSIBLE_INVARIANT_BLOCKED
+from ..schema.plan import Dependency, DependencyKind, PlanVersion, Task
 from ..types import Finding, Severity
 
 
@@ -121,9 +119,76 @@ def build_confusion_matrix(
     return matrix
 
 
+def generate_boundary_cases() -> list[BoundaryCase]:
+    """Generate one-fact-diff boundary cases for label-migration testing.
+
+    Each pair of plans differs by exactly one fact. The expected verdict
+    should not flip under family migration.
+
+    Returns:
+        A list of boundary-case pairs.
+    """
+    base_task = Task.model_validate({
+        "id": "t1", "description": "apply change", "action": "fix",
+        "target": "service", "risk_class": "low", "blast_radius": "low",
+    })
+    base_plan = PlanVersion(
+        id="boundary-base", goal_id="test", version=1,
+        tasks=[base_task], dependencies=[],
+    )
+
+    high_task = Task.model_validate({
+        "id": "t1", "description": "apply change", "action": "fix",
+        "target": "service", "risk_class": "high", "blast_radius": "high",
+        "rollback": {"trigger": "fail", "action": "revert", "safety_guard": "backup"},
+        "verification": {"what": "check", "how": "manual", "expected": "pass"},
+    })
+    high_plan = PlanVersion(
+        id="boundary-high", goal_id="test", version=1,
+        tasks=[high_task], dependencies=[],
+    )
+
+    return [
+        BoundaryCase(
+            case_id="optional-step-vs-required-dependency",
+            description="Optional step vs required dependency — single-fact diff",
+            plan_a=base_plan,
+            plan_b=high_plan,
+            expected_blocker_family="missing_steps",
+            expected_reason_code="missing_verification",
+        ),
+        BoundaryCase(
+            case_id="rollback-improvement-vs-no-viable-rollback",
+            description="Rollback improvement vs no viable rollback — single-fact diff",
+            plan_a=PlanVersion(
+                id="boundary-rollback-ok", goal_id="test", version=1,
+                tasks=[Task.model_validate({
+                    "id": "t1", "description": "deploy", "action": "deploy",
+                    "target": "prod", "risk_class": "high", "blast_radius": "high",
+                    "rollback": {"trigger": "fail", "action": "revert", "safety_guard": "backup"},
+                    "verification": {"what": "health", "how": "check", "expected": "pass"},
+                })],
+                dependencies=[],
+            ),
+            plan_b=PlanVersion(
+                id="boundary-rollback-missing", goal_id="test", version=1,
+                tasks=[Task.model_validate({
+                    "id": "t1", "description": "deploy", "action": "deploy",
+                    "target": "prod", "risk_class": "high", "blast_radius": "high",
+                    "verification": {"what": "health", "how": "check", "expected": "pass"},
+                })],
+                dependencies=[],
+            ),
+            expected_blocker_family="weak_rollback",
+            expected_reason_code="missing_rollback",
+        ),
+    ]
+
+
 __all__ = [
     "BoundaryCase",
     "IrreversibleInvariantGate",
     "LabelMigrationRecord",
     "build_confusion_matrix",
+    "generate_boundary_cases",
 ]
