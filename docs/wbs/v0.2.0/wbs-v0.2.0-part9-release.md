@@ -43,6 +43,16 @@
 
 - Mark all 0.2.0 milestones complete; zero open 0.2.0 issues except documented caveats; tag v0.2.0; crosslink release notes/announcement; update README install/quickstart to the released version.
 
+### M10.8 Benchmarks (carried from M9)
+
+The following benchmarks were deferred from M9 and are executed as part of the release gate:
+
+| # | Issue | Description | Verification |
+|---|-------|-------------|-------------|
+| 8 | [#177](https://github.com/deghosal-2026/planner-critic-engine/issues/177) | Auto-repair benchmark — measure revision reduction on ordering-violation corpus | ≥30% revision reduction |
+| 9 | [#182](https://github.com/deghosal-2026/planner-critic-engine/issues/182) | Rollback credibility field test — 21 goals across 8 domains, 3 credibility patterns | gate false-negative rate + critic recall |
+| 10 | [#183](https://github.com/deghosal-2026/planner-critic-engine/issues/183) | Family-histogram stasis benchmark — retrospective revision reduction from family-based convergence | ≥20% revision reduction across 85+ strict-goal traces |
+
 ### M10 Task Checklist
 
 | # | Task | Verify | Issue | Status |
@@ -54,6 +64,9 @@
 | 5 | Release notes v0.2.0 | doc authored; API reference + quickstart current | [#167](https://github.com/deghosal-2026/planner-critic-engine/issues/167) · [ ] |
 | 6 | Final quality gate | ruff/mypy/coverage ≥95; code review resolved; tagged | [#168](https://github.com/deghosal-2026/planner-critic-engine/issues/168) · [ ] |
 | 7 | Release coordination | milestones closed; tag + announcement + README updated | [#169](https://github.com/deghosal-2026/planner-critic-engine/issues/169) · [ ] |
+| 8 | Auto-repair benchmark (carried from M9) | ≥30% revision reduction on ordering-violation corpus | [#177](https://github.com/deghosal-2026/planner-critic-engine/issues/177) · [ ] |
+| 9 | Rollback credibility field test (carried from M9) | 21 goals across 8 domains, 3 credibility patterns; measure gate false-negative rate + critic recall | [#182](https://github.com/deghosal-2026/planner-critic-engine/issues/182) · [ ] |
+| 10 | Family-histogram stasis benchmark (carried from M9) | ≥20% revision reduction from family-based convergence signal across 85+ strict-goal traces | [#183](https://github.com/deghosal-2026/planner-critic-engine/issues/183) · [ ] |
 
 ### M10 Success Metrics
 
