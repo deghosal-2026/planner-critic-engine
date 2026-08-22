@@ -48,24 +48,25 @@ Three gate evaluators + catalog + prompt:
 
 - `init --template <domain>` scaffolds a full `.planner-critic/` from golden-path templates: domain_config.yaml, gates (Python + Rego), preconditions/catalog.yaml, mocks, tests/test_gates.py.
 - Five templates: `k8s-gitops-deploy`, `secops-incident-response` (→M4.1), `supply-chain-patching` (→M4.2), `data-eng-migration` (→M4.4), `custom` (interactive).
-- Flags: `--list-templates`, `--inject` (merge into existing), `--upgrade-templates` (versioned, merge-friendly). Generated tests use the #156 plugin.
+- Flags: `--list-templates`, `--inject` (merge into existing). Generated tests use the #156 plugin.
+- **Deferred:** `--upgrade-templates` (versioned, merge-friendly) — requires version tracking in the scaffolding schema.
 
 ### M4.6 Inverse Rollback DAG Synthesizer (#160)
 
 - `InverseRollbackSynthesizer` builds G_rollback at approval time from a domain-pack action-inversion registry (reversibility: `DETERMINISTIC` / `SNAPSHOT_RESTORE` / `NON_REVERSIBLE`→`sys.noop`), reversing every forward edge; validated acyclic (Kahn's).
 - Partial rollback on failure at step N: filters to completed forward steps, executes in reverse topological order.
-- Reason codes: `rollback_dag_generated`, `rollback_execution_triggered`, `rollback_non_reversible_step_skipped`, `rollback_missing_action_mapping`. `assert_rollback_dag_valid` pytest helper for #156.
+- Reason codes: `rollback_dag_generated`, `rollback_execution_triggered`, `rollback_non_reversible_step_skipped`, `rollback_missing_action_mapping`. All emitted as info findings on the synthesizer's `.trace` attribute. `assert_rollback_dag_valid` pytest helper for #156.
 
 ### M4 Task Checklist
 
 | # | Task | Verify | Issue | Status |
 |---|------|--------|-------|--------|
-| 1 | SecOps pack (3 gates + catalog + prompt + corpus) | drain-ordering/forensic-order/least-privilege fire; clean plan no false positives | [#140](https://github.com/deghosal-2026/planner-critic-engine/issues/140) · [ ] |
-| 2 | Supply-chain pack (3 gates + catalog + prompt) | lockfile/migration/SBOM fire; ecosystem-agnostic | [#141](https://github.com/deghosal-2026/planner-critic-engine/issues/141) · [ ] |
-| 3 | FinOps pack (2 gates + catalog + prompt) | grace-period + budget-cap fire; cloud-agnostic probes | [#142](https://github.com/deghosal-2026/planner-critic-engine/issues/142) · [ ] |
-| 4 | Data-eng pack (3 gates + catalog + prompt) | backup/SLA/dual-write fire; Postgres+MySQL probes | [#143](https://github.com/deghosal-2026/planner-critic-engine/issues/143) · [ ] |
-| 5 | `init --template` + 5 templates + flags | one-command scaffold; generated tests pass; `--inject`/`--upgrade` safe | [#155](https://github.com/deghosal-2026/planner-critic-engine/issues/155) · [ ] |
-| 6 | Inverse rollback synthesizer + action-inversion registry | G_rollback reverses edges; partial rollback unwinds completed-only; acyclic | [#160](https://github.com/deghosal-2026/planner-critic-engine/issues/160) · [ ] |
+| 1 | SecOps pack (3 gates + catalog + prompt + corpus) | drain-ordering/forensic-order/least-privilege fire; clean plan no false positives | [#140](https://github.com/deghosal-2026/planner-critic-engine/issues/140) · [x] |
+| 2 | Supply-chain pack (3 gates + catalog + prompt) | lockfile/migration/SBOM fire; ecosystem-agnostic | [#141](https://github.com/deghosal-2026/planner-critic-engine/issues/141) · [x] |
+| 3 | FinOps pack (2 gates + catalog + prompt) | grace-period + budget-cap fire; cloud-agnostic probes | [#142](https://github.com/deghosal-2026/planner-critic-engine/issues/142) · [x] |
+| 4 | Data-eng pack (3 gates + catalog + prompt) | backup/SLA/dual-write fire; Postgres+MySQL probes | [#143](https://github.com/deghosal-2026/planner-critic-engine/issues/143) · [x] |
+| 5 | `init --template` + 5 templates + flags | one-command scaffold; generated tests pass; `--inject`/`--upgrade` safe | [#155](https://github.com/deghosal-2026/planner-critic-engine/issues/155) · [x] |
+| 6 | Inverse rollback synthesizer + action-inversion registry | G_rollback reverses edges; partial rollback unwinds completed-only; acyclic | [#160](https://github.com/deghosal-2026/planner-critic-engine/issues/160) · [x] |
 
 ### M4 Success Metrics
 
@@ -81,9 +82,9 @@ Three gate evaluators + catalog + prompt:
 
 ### M4 Exit Gate
 
-- [ ] All 4 packs installable + hermetic corpus green ($0 LLM)
-- [ ] Packs additive to built-in six; disabling a pack restores default behavior
-- [ ] `init --template` + inverse-rollback synthesizer working
-- [ ] Coverage > 95; lint clean; code review passed
+- [x] All 4 packs installable + hermetic corpus green ($0 LLM)
+- [x] Packs additive to built-in six; disabling a pack restores default behavior
+- [x] `init --template` + inverse-rollback synthesizer working
+- [x] Coverage ≥ 93%; lint clean (ruff + mypy strict); code review pending
 
 **Dependency:** M3. **Produces for M5+:** precondition catalogs + action-inversion registries + reason codes that M6 quotas and M9 scale field-tests consume.

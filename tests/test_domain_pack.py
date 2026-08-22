@@ -34,8 +34,10 @@ from planner_critic.types import Finding, Severity
 
 # ── Sample domain gates for testing ───────────────────────────────────────
 
+
 class SampleGate(BaseGate):
     """A no-op gate that always produces one warning finding."""
+
     name = "sample_gate"
 
     def run(self, plan: PlanVersion) -> list[Finding]:
@@ -55,6 +57,7 @@ SAMPLE_PROMPT = "Audit this plan from a security-engineering perspective.\n"
 
 class SampleDomainPack:
     """A minimal protocol-compliant domain pack for testing."""
+
     name = "sample-domain"
     precondition_catalog: dict = {
         "traffic_drained": "Traffic has been drained from the target",
@@ -155,29 +158,36 @@ class TestManifestLoading:
 
     def test_build_gate_from_import(self) -> None:
         """A gate spec with a module path resolves to a BaseGate."""
-        pack = pack_from_dict({
-            "name": "import-test",
-            "gates": [{"module": "planner_critic.gates.ordering"}],
-        })
+        pack = pack_from_dict(
+            {
+                "name": "import-test",
+                "gates": [{"module": "planner_critic.gates.ordering"}],
+            }
+        )
         assert len(pack.gate_evaluators) == 1
         assert isinstance(pack.gate_evaluators[0], BaseGate)
 
     def test_build_gate_missing_module_raises(self) -> None:
         """A gate spec without a module raises ValueError."""
         with pytest.raises(ValueError, match="module"):
-            pack_from_dict({
-                "name": "bad-gate",
-                "gates": [{"class": "MissingGate"}],
-            })
+            pack_from_dict(
+                {
+                    "name": "bad-gate",
+                    "gates": [{"class": "MissingGate"}],
+                }
+            )
 
     def test_build_gate_bad_class_raises(self) -> None:
         """A gate spec with a non-existent class raises ImportError."""
         with pytest.raises(ImportError):
-            pack_from_dict({
-                "name": "bad-gate",
-                "gates": [{"module": "planner_critic.gates.ordering",
-                           "class": "NonExistentGate"}],
-            })
+            pack_from_dict(
+                {
+                    "name": "bad-gate",
+                    "gates": [
+                        {"module": "planner_critic.gates.ordering", "class": "NonExistentGate"}
+                    ],
+                }
+            )
 
     def test_find_domain_packs_empty(self) -> None:
         """Scanning a namespace with no packs returns an empty dict."""
@@ -224,6 +234,7 @@ class TestEngineIntegration:
         class FakePlanner:
             def decompose(self, goal):
                 return make_plan()
+
             def revise(self, plan, findings):
                 return plan
 

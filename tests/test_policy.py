@@ -108,7 +108,7 @@ class TestCelGate:
         )
         gate = CelGate(
             name="has-deps",
-            expression='len(dependencies) > 0',
+            expression="len(dependencies) > 0",
         )
         findings = gate.evaluate(plan)
         assert len(findings) == 0  # true, passes
@@ -170,9 +170,7 @@ class TestRegoGate:
         """A Rego module loaded from a .rego file is evaluated correctly."""
         rego_dir = tmp_path / "policy"
         rego_dir.mkdir()
-        (rego_dir / "test.rego").write_text(
-            'package test\nviolation contains "bad" if 1 == 2'
-        )
+        (rego_dir / "test.rego").write_text('package test\nviolation contains "bad" if 1 == 2')
         gate = RegoGate(
             name="file-rego",
             module=rego_dir / "test.rego",
