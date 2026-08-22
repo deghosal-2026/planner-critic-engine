@@ -215,6 +215,21 @@ class SQLiteStore(PlanStore):
             return None
         return str(row["body"])
 
+    def put_plan_signature(self, plan_id: str, version: int, signature: str) -> None:
+        """Persist a plan's structural signature."""
+        self._execute(
+            "INSERT OR REPLACE INTO plan_signatures (plan_id, version, signature) VALUES (?, ?, ?)",
+            (plan_id, version, signature),
+        )
+
+    def get_plan_signatures(self, plan_id: str) -> list[tuple[int, str]]:
+        """Fetch all stored signatures for a plan, newest first."""
+        rows = self._fetchall(
+            "SELECT version, signature FROM plan_signatures WHERE plan_id = ? ORDER BY version DESC",
+            (plan_id,),
+        )
+        return [(int(r["version"]), str(r["signature"])) for r in rows]
+
     def close(self) -> None:
         """Close the underlying connection."""
         self._conn.close()

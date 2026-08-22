@@ -14,7 +14,7 @@ from ..engine import Engine
 from ..loop import LoopConfig
 from ..roles import CriticRole, PlannerRole
 from ..schema.goal import Goal
-from .injection import InjectionResult, InjectionTrap, generate_traps
+from .injection import InjectionResult, generate_traps
 
 
 def run_injection_harness(

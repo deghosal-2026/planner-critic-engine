@@ -117,8 +117,8 @@ def list_instances(corpus_dir: str | Path) -> list[dict[str, object]]:
 
 
 __all__ = [
+    "list_instances",
     "load_all_instances",
     "load_corpus_manifest",
     "load_instance",
-    "list_instances",
 ]

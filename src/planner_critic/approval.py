@@ -62,19 +62,20 @@ def resolve_threshold(
 
     Returns:
         ``(satisfied, outcome)``. ``outcome.acknowledged`` are the warnings
-        that can carry into the approved record under ``balanced``;
-        ``outcome.pending_warnings`` are warnings still requiring
-        acknowledgment under ``strict``; ``outcome.blockers`` are always
-        disqualifying.
+        that can carry into the approved record under ``balanced`` or
+        ``permissive``; ``outcome.pending_warnings`` are warnings still
+        requiring acknowledgment under ``strict``; ``outcome.blockers`` are
+        always disqualifying.
 
     **Deterministic vs LLM blockers (§2.5.1):** a deterministic gate blocker
-    (from :mod:`planner_critic.gates`) is always a hard blocker under both
-    ``strict`` and ``balanced`` — it is reproducible and injection-immune.
-    An LLM critic blocker is probabilistic: under ``balanced`` it is treated
-    as a warning (acknowledged, not disqualifying) so the loop can converge
-    despite LLM non-determinism; under ``strict`` it remains a blocker
-    (fail-closed for high-risk goals). A deterministic gate blocker can
-    never be overridden here regardless of mode.
+    (from :mod:`planner_critic.gates`) is always a hard blocker under all
+    postures — it is reproducible and injection-immune.
+    An LLM critic blocker is probabilistic: under ``balanced`` and
+    ``permissive`` it is treated as a warning (acknowledged, not
+    disqualifying) so the loop can converge despite LLM non-determinism;
+    under ``strict`` it remains a blocker (fail-closed for high-risk goals).
+    A deterministic gate blocker can never be overridden here regardless of
+    mode.
     """
     blockers: list[Finding] = []
     acknowledged: list[Finding] = []
@@ -82,7 +83,7 @@ def resolve_threshold(
 
     for f in findings:
         if f.severity is Severity.BLOCKER:
-            if f.is_llm_finding and risk_tolerance is RiskTolerance.BALANCED:
+            if f.is_llm_finding and risk_tolerance is not RiskTolerance.STRICT:
                 acknowledged.append(f)
             else:
                 blockers.append(f)

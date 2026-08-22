@@ -113,8 +113,8 @@ class CorpusManifest(BaseModel):
 
 
 __all__ = [
-    "CWEBucket",
     "CWE_LABELS",
+    "CWEBucket",
     "CorpusManifest",
     "ExpectedCriticSignal",
     "SecurityInstance",

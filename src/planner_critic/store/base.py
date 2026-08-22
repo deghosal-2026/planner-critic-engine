@@ -236,6 +236,27 @@ class PlanStore(ABC):
         """
 
     @abstractmethod
+    def put_plan_signature(self, plan_id: str, version: int, signature: str) -> None:
+        """Persist a plan's structural signature for oscillation analysis.
+
+        Args:
+            plan_id: The plan id.
+            version: The revision number.
+            signature: The structural signature string.
+        """
+
+    @abstractmethod
+    def get_plan_signatures(self, plan_id: str) -> list[tuple[int, str]]:
+        """Fetch all stored signatures for a plan, newest first.
+
+        Args:
+            plan_id: The plan to look up.
+
+        Returns:
+            List of ``(version, signature)`` tuples, newest first.
+        """
+
+    @abstractmethod
     def close(self) -> None:
         """Close the store and release resources."""
 
@@ -280,6 +301,7 @@ class InMemoryStore(PlanStore):
         self._links: set[tuple[str, int, str]] = set()
         self._replan_links: dict[tuple[str, int], ReplanLink] = {}
         self._missed_critiques: dict[str, str] = {}
+        self._signatures: dict[tuple[str, int], str] = {}
 
     def close(self) -> None:
         """No-op for in-memory store."""
@@ -361,6 +383,15 @@ class InMemoryStore(PlanStore):
     def get_missed_critique(self, plan_id: str) -> str | None:
         """Return the missed-critique JSON for a plan, or None."""
         return self._missed_critiques.get(plan_id)
+
+    def put_plan_signature(self, plan_id: str, version: int, signature: str) -> None:
+        """Persist a plan signature keyed by (plan_id, version)."""
+        self._signatures[(plan_id, version)] = signature
+
+    def get_plan_signatures(self, plan_id: str) -> list[tuple[int, str]]:
+        """Return stored signatures for a plan, newest first."""
+        items = [(v, s) for (pid, v), s in self._signatures.items() if pid == plan_id]
+        return sorted(items, key=lambda x: -x[0])
 
 
 def _compute_diff(a: PlanVersion, b: PlanVersion) -> PlanDiff:

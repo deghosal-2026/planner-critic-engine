@@ -123,6 +123,23 @@ MIGRATIONS: tuple[Migration, ...] = (
         DROP TABLE IF EXISTS missed_critiques;
         """,
     ),
+    Migration(
+        version=4,
+        name="plan signatures",
+        up="""
+        CREATE TABLE IF NOT EXISTS plan_signatures (
+            plan_id   TEXT NOT NULL,
+            version   INTEGER NOT NULL,
+            signature TEXT NOT NULL,
+            PRIMARY KEY (plan_id, version)
+        );
+        CREATE INDEX IF NOT EXISTS idx_sig_plan
+            ON plan_signatures (plan_id, version);
+        """,
+        down="""
+        DROP TABLE IF EXISTS plan_signatures;
+        """,
+    ),
 )
 
 #: Highest schema version known to this release.

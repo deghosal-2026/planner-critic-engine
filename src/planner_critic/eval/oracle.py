@@ -16,8 +16,8 @@ from ..corpus import load_all_instances
 from ..corpus.types import SecurityInstance
 from ..engine import Engine
 from ..loop import LoopConfig
-from ..roles import CriticRole, PlannerRole
 from ..reason_codes import ReasonCode
+from ..roles import CriticRole, PlannerRole
 from ..schema.goal import Goal, RiskTolerance
 from ..types import Finding, Severity
 

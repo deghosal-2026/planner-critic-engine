@@ -124,6 +124,43 @@ IRREVERSIBLE_INVARIANT_BLOCKED: Literal["irreversible_invariant_blocked"] = (
     "irreversible_invariant_blocked"
 )
 
+# --- Enterprise safety codes (M6) --------------------------------------------
+POSTURE_RESOLVED: Literal["posture_resolved"] = "posture_resolved"
+RUN_BUDGET_EXCEEDED: Literal["run_budget_exceeded"] = "run_budget_exceeded"
+RUN_DEPTH_EXCEEDED: Literal["run_depth_exceeded"] = "run_depth_exceeded"
+RUN_TIMEOUT: Literal["run_timeout"] = "run_timeout"
+TRANSIENT_RETRY_TRIGGERED: Literal["transient_retry_triggered"] = "transient_retry_triggered"
+DETERMINISTIC_REPLAN_TRIGGERED: Literal["deterministic_replan_triggered"] = (
+    "deterministic_replan_triggered"
+)
+AMBIGUOUS_REPLAN_ESCALATED: Literal["ambiguous_replan_escalated"] = (
+    "ambiguous_replan_escalated"
+)
+STEP_RETRY_BUDGET_EXCEEDED: Literal["step_retry_budget_exceeded"] = (
+    "step_retry_budget_exceeded"
+)
+STATE_VIEW_STALE: Literal["state_view_stale"] = "state_view_stale"
+RESOURCE_LOCKED_BY_CONCURRENT_EXECUTION: Literal["resource_locked_by_concurrent_execution"] = (
+    "resource_locked_by_concurrent_execution"
+)
+CONCURRENT_RESOURCE_CONFLICT: Literal["concurrent_resource_conflict"] = (
+    "concurrent_resource_conflict"
+)
+PRECONDITION_REDUNDANTLY_RE_INJECTED: Literal["precondition_redundantly_re_injected"] = (
+    "precondition_redundantly_re_injected"
+)
+PRECONDITION_DROPPED_FROM_COMPACTION: Literal["precondition_dropped_from_compaction"] = (
+    "precondition_dropped_from_compaction"
+)
+BLAST_RADIUS_QUOTA_BREACH: Literal["blast_radius_quota_breach"] = "blast_radius_quota_breach"
+BLAST_RADIUS_RESTRICTED_CLUSTER: Literal["blast_radius_restricted_cluster"] = (
+    "blast_radius_restricted_cluster"
+)
+BLAST_RADIUS_RESTRICTED_ACTION: Literal["blast_radius_restricted_action"] = (
+    "blast_radius_restricted_action"
+)
+SECRET_REDACTED: Literal["secret_redacted"] = "secret_redacted"
+
 ReasonCode: TypeAlias = Literal[
     "plan_schema_invalid",
     "dependency_cycle",
@@ -179,6 +216,23 @@ ReasonCode: TypeAlias = Literal[
     "label_migration_detected",
     "boundary_case_flip",
     "irreversible_invariant_blocked",
+    "posture_resolved",
+    "run_budget_exceeded",
+    "run_depth_exceeded",
+    "run_timeout",
+    "transient_retry_triggered",
+    "deterministic_replan_triggered",
+    "ambiguous_replan_escalated",
+    "step_retry_budget_exceeded",
+    "state_view_stale",
+    "resource_locked_by_concurrent_execution",
+    "concurrent_resource_conflict",
+    "precondition_redundantly_re_injected",
+    "precondition_dropped_from_compaction",
+    "blast_radius_quota_breach",
+    "blast_radius_restricted_cluster",
+    "blast_radius_restricted_action",
+    "secret_redacted",
 ]
 
 # Descriptions are the source of truth for docs and any generated API reference.
@@ -239,6 +293,23 @@ REASON_CODE_DESCRIPTIONS: dict[ReasonCode, str] = {
     LABEL_MIGRATION_DETECTED: "Label-migration: a model-chosen severity family differs from the normalized family",
     BOUNDARY_CASE_FLIP: "Label-migration: a boundary case flipped the verdict from blocker to non-blocker",
     IRREVERSIBLE_INVARIANT_BLOCKED: "Irreversible invariant: an irreversible step without verified precondition was blocked",
+    POSTURE_RESOLVED: "Posture resolved from context rules or fallback to goal posture",
+    RUN_BUDGET_EXCEEDED: "Run-level spend ceiling (run_max_budget_usd) exceeded",
+    RUN_DEPTH_EXCEEDED: "Cascading replan depth (run_max_depth) exceeded",
+    RUN_TIMEOUT: "Run-level wall-clock timeout (run_max_time) exceeded",
+    TRANSIENT_RETRY_TRIGGERED: "Transient execution failure — retrying with backoff, not replanning",
+    DETERMINISTIC_REPLAN_TRIGGERED: "Deterministic execution failure — triggering a replan (F-16)",
+    AMBIGUOUS_REPLAN_ESCALATED: "Execution failure could be transient or deterministic — escalated to human",
+    STEP_RETRY_BUDGET_EXCEEDED: "Per-step retry budget (step_max_retries) exceeded — escalated",
+    STATE_VIEW_STALE: "State snapshot taken at approval time diverged from live state — re-gate triggered",
+    RESOURCE_LOCKED_BY_CONCURRENT_EXECUTION: "Resource is locked by concurrent agent execution — plan must wait or escalate",
+    CONCURRENT_RESOURCE_CONFLICT: "Plan targets a resource currently locked by another execution — blocker",
+    PRECONDITION_REDUNDANTLY_RE_INJECTED: "LLM re-injected a precondition the ledger shows as already satisfied",
+    PRECONDITION_DROPPED_FROM_COMPACTION: "LLM dropped a precondition the ledger shows as satisfied — compaction likely",
+    BLAST_RADIUS_QUOTA_BREACH: "Plan exceeds a blast-radius quota (resource/action count limit)",
+    BLAST_RADIUS_RESTRICTED_CLUSTER: "Plan targets a restricted cluster — escalation required",
+    BLAST_RADIUS_RESTRICTED_ACTION: "Plan includes a restricted action — escalation required",
+    SECRET_REDACTED: "A secret or PII was redacted from output",
 }
 
 # All valid codes; a test asserts every produced reason code is in this set.

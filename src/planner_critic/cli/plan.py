@@ -10,8 +10,9 @@ from ..llm.base import LLMProvider, Message
 from ..llm.registry import ProviderRegistry
 from ..llm.structured import StructuredEnforcer
 from ..loop import LoopConfig
+from ..posture import PostureResolver
 from ..roles import CriticRole, PlannerRole
-from ..schema.goal import Goal
+from ..schema.goal import Goal, RiskTolerance
 from ..schema.plan import PlanVersion
 from ..types import Finding
 
@@ -128,6 +129,17 @@ def build_plan_parser() -> argparse.ArgumentParser:
     parser.add_argument("--store", default=DEFAULT_STORE_PATH, help="Store path")
     parser.add_argument("--config", default=DEFAULT_CONFIG_PATH, help="Config file path")
     parser.add_argument("--dry-run", action="store_true", help="Print the plan but don't store")
+    parser.add_argument(
+        "--posture-rules-file",
+        default=None,
+        help="Path to a posture-rules YAML file for dynamic posture resolution",
+    )
+    parser.add_argument(
+        "--posture",
+        default=None,
+        choices=["strict", "balanced", "permissive"],
+        help="Override posture (overrides goal's risk_tolerance and posture rules)",
+    )
     return parser
 
 
@@ -178,6 +190,18 @@ def run_plan(argv: list[str]) -> int:
     except Exception as err:
         print(f"failed to build provider roles: {err}")
         return 1
+
+    if args.posture:
+        goal = goal.model_copy(update={"risk_tolerance": RiskTolerance(args.posture)})
+    elif args.posture_rules_file:
+        try:
+            resolver = PostureResolver.from_yaml(args.posture_rules_file)
+            resolved = resolver.resolve(goal.risk_tolerance)
+            goal = goal.model_copy(update={"risk_tolerance": resolved.posture})
+            print(f"posture resolved: {resolved.posture.value} ({resolved.context_signal or 'fallback'})")
+        except Exception as err:
+            print(f"failed to resolve posture: {err}")
+            return 1
 
     engine = Engine(planner=planner, critic=critic, config=LoopConfig())
 
