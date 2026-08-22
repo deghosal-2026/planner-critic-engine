@@ -104,6 +104,26 @@ LLM_UNSAFE_SEQUENCING: Literal["llm_unsafe_sequencing"] = "llm_unsafe_sequencing
 LLM_UNVERIFIED_DEPENDENCIES: Literal["llm_unverified_dependencies"] = "llm_unverified_dependencies"
 LLM_WEAK_ROLLBACK: Literal["llm_weak_rollback"] = "llm_weak_rollback"
 
+# --- Security oracle / eval codes (M5) ---------------------------------------
+SECURITY_CRITIC_ALIGNED: Literal["security_critic_aligned"] = "security_critic_aligned"
+SECURITY_CRITIC_MISSED: Literal["security_critic_missed"] = "security_critic_missed"
+SECURITY_CRITIC_SPURIOUS: Literal["security_critic_spurious"] = "security_critic_spurious"
+SECURITY_INJECTION_BLOCKED: Literal["security_injection_blocked"] = (
+    "security_injection_blocked"
+)
+SECURITY_INJECTION_BYPASSED: Literal["security_injection_bypassed"] = (
+    "security_injection_bypassed"
+)
+STANDING_RULE_PROPOSED: Literal["standing_rule_proposed"] = "standing_rule_proposed"
+STANDING_RULE_PROMOTED: Literal["standing_rule_promoted"] = "standing_rule_promoted"
+LABEL_MIGRATION_DETECTED: Literal["label_migration_detected"] = (
+    "label_migration_detected"
+)
+BOUNDARY_CASE_FLIP: Literal["boundary_case_flip"] = "boundary_case_flip"
+IRREVERSIBLE_INVARIANT_BLOCKED: Literal["irreversible_invariant_blocked"] = (
+    "irreversible_invariant_blocked"
+)
+
 ReasonCode: TypeAlias = Literal[
     "plan_schema_invalid",
     "dependency_cycle",
@@ -149,6 +169,16 @@ ReasonCode: TypeAlias = Literal[
     "llm_unsafe_sequencing",
     "llm_unverified_dependencies",
     "llm_weak_rollback",
+    "security_critic_aligned",
+    "security_critic_missed",
+    "security_critic_spurious",
+    "security_injection_blocked",
+    "security_injection_bypassed",
+    "standing_rule_proposed",
+    "standing_rule_promoted",
+    "label_migration_detected",
+    "boundary_case_flip",
+    "irreversible_invariant_blocked",
 ]
 
 # Descriptions are the source of truth for docs and any generated API reference.
@@ -199,6 +229,16 @@ REASON_CODE_DESCRIPTIONS: dict[ReasonCode, str] = {
     LLM_UNSAFE_SEQUENCING: "LLM critic: ordering or parallelization breaks safety",
     LLM_UNVERIFIED_DEPENDENCIES: "LLM critic: a step depends on a fact never established earlier",
     LLM_WEAK_ROLLBACK: "LLM critic: a high-blast-radius step lacks sound rollback coverage",
+    SECURITY_CRITIC_ALIGNED: "Security oracle: critic finding aligns with ground-truth patch",
+    SECURITY_CRITIC_MISSED: "Security oracle: critic missed a finding the ground-truth patch addresses",
+    SECURITY_CRITIC_SPURIOUS: "Security oracle: critic reported a finding not supported by ground truth",
+    SECURITY_INJECTION_BLOCKED: "Security oracle: an injection attempt was correctly blocked",
+    SECURITY_INJECTION_BYPASSED: "Security oracle: an injection attempt bypassed the critic",
+    STANDING_RULE_PROPOSED: "Standing rule: a candidate rule was proposed from missed-critique analysis",
+    STANDING_RULE_PROMOTED: "Standing rule: a candidate rule was promoted to the heuristic pack",
+    LABEL_MIGRATION_DETECTED: "Label-migration: a model-chosen severity family differs from the normalized family",
+    BOUNDARY_CASE_FLIP: "Label-migration: a boundary case flipped the verdict from blocker to non-blocker",
+    IRREVERSIBLE_INVARIANT_BLOCKED: "Irreversible invariant: an irreversible step without verified precondition was blocked",
 }
 
 # All valid codes; a test asserts every produced reason code is in this set.

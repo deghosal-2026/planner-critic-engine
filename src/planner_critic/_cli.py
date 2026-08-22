@@ -15,9 +15,11 @@ from collections.abc import Callable, Sequence
 
 from . import __version__
 from .cli import (  # type: ignore[attr-defined, unused-ignore]
+    build_corpus_parser,
     build_critique_parser,
     build_demo_parser,
     build_escalate_parser,
+    build_eval_parser,
     build_field_test_parser,
     build_init_parser,
     build_migrate_parser,
@@ -26,9 +28,11 @@ from .cli import (  # type: ignore[attr-defined, unused-ignore]
     build_providers_parser,
     build_quickstart_parser,
     build_replay_parser,
+    run_corpus,
     run_critique,
     run_demo,
     run_escalate,
+    run_eval,
     run_field_test,
     run_init,
     run_migrate,
@@ -42,9 +46,11 @@ from .cli import (  # type: ignore[attr-defined, unused-ignore]
 SubcommandRunner = Callable[[list[str]], int]
 
 _SUBCOMMANDS: dict[str, tuple[argparse.ArgumentParser, SubcommandRunner]] = {
+    "corpus": (build_corpus_parser(), run_corpus),
     "critique": (build_critique_parser(), run_critique),
     "demo": (build_demo_parser(), run_demo),
     "escalate": (build_escalate_parser(), run_escalate),
+    "eval": (build_eval_parser(), run_eval),
     "field-test": (build_field_test_parser(), run_field_test),
     "init": (build_init_parser(), run_init),
     "migrate": (build_migrate_parser(), run_migrate),
