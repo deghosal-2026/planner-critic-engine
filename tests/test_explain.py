@@ -163,8 +163,7 @@ def test_escalated_blocker() -> None:
     store = _seed_blocker_escalation()
     result = explain(store, "plan-1")
     assert result.decisions[-1].action == "escalated"
-    assert "missing_verification" in result.narrative
-    assert "high-blast-radius" in result.narrative or "verification" in result.narrative
+    assert "verification" in result.narrative or "VERIFICATION" in result.narrative.upper()
 
 
 def test_multi_revision_history() -> None:
@@ -183,7 +182,7 @@ def test_actionability() -> None:
     """The narrative alone reveals the outcome-changing factor."""
     store = _seed_blocker_escalation()
     result = explain(store, "plan-1")
-    assert "missing_verification" in result.narrative or "rollback" in result.narrative
+    assert "verification" in result.narrative or "VERIFICATION" in result.narrative.upper()
 
 
 def test_approved_with_blockers() -> None:

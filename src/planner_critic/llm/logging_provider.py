@@ -71,7 +71,7 @@ class LoggingProvider:
             response_content = completion.content
             finish_reason = completion.finish_reason
         except Exception as e:
-            completion = None  # type: ignore[assignment]
+            completion = None
             response_content = None
             finish_reason = None
             error = f"{type(e).__name__}: {e}"
@@ -100,6 +100,6 @@ class LoggingProvider:
             fh.write(json.dumps(entry, indent=2, default=str) + "\n")
 
         if error:
-            raise RuntimeError(error)  # type: ignore[misc]
+            raise RuntimeError(error)
 
-        return completion  # type: ignore[return-value]
+        return completion

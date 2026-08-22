@@ -104,7 +104,7 @@ def run_probe(request: ProbeRequest) -> ProbeResult:
     impls: dict[str, Probe] = {p.kind: p for p in BUILTIN_PROBES}
     impl = impls.get(request.kind)
     if impl is None:
-        return ProbeResult(
+        return ProbeResult.model_construct(
             kind=request.kind,
             query=request.query,
             observed=f"no probe implementation for kind '{request.kind}'",
@@ -114,7 +114,7 @@ def run_probe(request: ProbeRequest) -> ProbeResult:
     try:
         return impl.run(request)
     except ProbeError as err:
-        return ProbeResult(
+        return ProbeResult.model_construct(
             kind=request.kind,
             query=request.query,
             observed=str(err),
