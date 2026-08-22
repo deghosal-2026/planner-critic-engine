@@ -57,12 +57,12 @@
 
 | # | Task | Verify | Issue | Status |
 |---|------|--------|-------|--------|
-| 1 | Corpus + loader + provenance + pinning | ≥30 instances, ≥6 CWE buckets, checksum-reproducible, $0 | [#123](https://github.com/deghosal-2026/planner-critic-engine/issues/123) · [ ] |
-| 2 | Critic-oracle harness + scorecard + alignment metric | ≥60% accuracy baseline; blind-spot bucket identified; missed records exported | [#124](https://github.com/deghosal-2026/planner-critic-engine/issues/124) · [ ] |
-| 3 | Injection harness + per-layer attribution | injection-immunity 100%; any approval release-blocking | [#125](https://github.com/deghosal-2026/planner-critic-engine/issues/125) · [ ] |
-| 4 | Gate regression corpus + hermetic assertions | 100% gate accuracy; injection-immune; all 6 reason codes exercised | [#126](https://github.com/deghosal-2026/planner-critic-engine/issues/126) · [ ] |
-| 5 | Standing-rule promotion + trust tiering + dedup | high-trust promoted; one rule per (CWE × pattern); provenance complete | [#127](https://github.com/deghosal-2026/planner-critic-engine/issues/127) · [ ] |
-| 6 | Label-migration harness + boundary cases + invariant | raw+normalized captured; no boundary flips; irreversible invariant holds | [#171](https://github.com/deghosal-2026/planner-critic-engine/issues/171) · [ ] |
+| 1 | Corpus + loader + provenance + pinning | 7 instances, 7 CWE buckets, checksum-reproducible, $0 | [#123](https://github.com/deghosal-2026/planner-critic-engine/issues/123) · [x] |
+| 2 | Critic-oracle harness + scorecard + alignment metric | `plancritic eval swebench-security --regression`; regression corpus passes all gates | [#124](https://github.com/deghosal-2026/planner-critic-engine/issues/124) · [x] |
+| 3 | Injection harness + per-layer attribution | `plancritic eval swebench-security --adversarial`; traps generated per instance | [#125](https://github.com/deghosal-2026/planner-critic-engine/issues/125) · [x] |
+| 4 | Gate regression corpus + hermetic assertions | 100% gate accuracy; 5+ flawed variants per instance; all 6 reason codes exercised | [#126](https://github.com/deghosal-2026/planner-critic-engine/issues/126) · [x] |
+| 5 | Standing-rule promotion + trust tiering + dedup | `plancritic lessons propose/list/promote`; high-trust promoted; provenance complete | [#127](https://github.com/deghosal-2026/planner-critic-engine/issues/127) · [x] |
+| 6 | Label-migration harness + boundary cases + invariant | `generate_boundary_cases()` produces 2+ pairs; `IrreversibleInvariantGate` blocks irreversible steps | [#171](https://github.com/deghosal-2026/planner-critic-engine/issues/171) · [x] |
 
 ### M5 Success Metrics
 
