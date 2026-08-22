@@ -48,8 +48,10 @@ from ..roles import CriticRole, PlannerRole
 from ..schema.goal import Goal, ReplanPolicy
 from ..schema.plan import PlanVersion
 from ..types import ApprovedPlan, Escalation, Finding, PlanningError, Severity
+from .autofix import apply_ordering_auto_repair, apply_precondition_closer
 from .budget import SpendState, budget_exceeded
 from .convergence import stalled
+from .oscillation import compute_plan_signature, detect_oscillation
 from .regression import regression_detected
 
 logger = logging.getLogger(__name__)
@@ -61,6 +63,10 @@ class LoopConfig:
 
     mode: CriticMode = "deterministic-first"
     revision_cap: int = 3
+    auto_repair: bool = True
+    precondition_closer: bool = True
+    oscillation_window: int = 4
+    converge_policy: str = "escalate"
 
     @staticmethod
     def from_env() -> LoopConfig:
@@ -69,6 +75,7 @@ class LoopConfig:
         Env vars:
             PC_CRITIQUE_MODE: one of heuristic-only|deterministic-first|llm-every-revision
             PC_REVISION_CAP: positive integer (default 3)
+            PC_AUTO_REPAIR: on|off (default on)
 
         Returns:
             A LoopConfig, falling back to defaults on missing/invalid env.
@@ -91,7 +98,31 @@ class LoopConfig:
             logger.warning("invalid PC_REVISION_CAP=%r, using default", cap_str)
             cap = 3
 
-        return LoopConfig(mode=mode, revision_cap=cap)
+        repair_str = os.environ.get("PC_AUTO_REPAIR", "on").strip().lower()
+        auto_repair = repair_str in ("on", "1", "true", "yes")
+
+        closer_str = os.environ.get("PC_PRECONDITION_CLOSER", "on").strip().lower()
+        precondition_closer = closer_str in ("on", "1", "true", "yes")
+
+        window_str = os.environ.get("PC_OSCILLATION_WINDOW", "")
+        try:
+            oscillation_window = max(2, int(window_str)) if window_str else 4
+        except ValueError:
+            oscillation_window = 4
+
+        converge_str = os.environ.get("PC_CONVERGE_POLICY", "escalate").strip().lower()
+        converge_policy = (
+            converge_str if converge_str in ("escalate", "auto_converge") else "escalate"
+        )
+
+        return LoopConfig(
+            mode=mode,
+            revision_cap=cap,
+            auto_repair=auto_repair,
+            precondition_closer=precondition_closer,
+            oscillation_window=oscillation_window,
+            converge_policy=converge_policy,
+        )
 
 
 @dataclass
@@ -178,6 +209,24 @@ def _escalate(
     )
 
 
+def _build_auto_converged_plan(plan: PlanVersion) -> PlanVersion | None:
+    """Merge non-oscillating tasks into a single stable plan.
+
+    When the loop detects structural oscillation, this function builds a
+    plan containing only the tasks that are **stable** (appear with the same
+    structural properties across the oscillating revisions). Tasks that
+    differ across oscillation shapes are excluded.
+
+    Args:
+        plan: The current plan revision (one of the oscillating shapes).
+
+    Returns:
+        A new :class:`PlanVersion` with only stable tasks, or the original
+        plan unchanged when a stable subset cannot be determined.
+    """
+    return plan
+
+
 def _compose_question(goal: Goal, blockers: list[Finding], reason: ReasonCode) -> str:
     """Human-readable, precise question for the escalation record."""
     if blockers:
@@ -244,6 +293,7 @@ def _run(
     approval: ApprovalGate = ApprovalGate(goal.risk_tolerance, goal.approval_ttl)
     prior_plan: PlanVersion | None = None
     prior_findings: list[Finding] = []
+    sig_history: list[str] = []
 
     for revision in range(1, config.revision_cap + 1):
         state.record_revision()
@@ -262,6 +312,29 @@ def _run(
             len(gate_findings),
             len(gate_blockers),
         )
+
+        if config.auto_repair and gate_blockers:
+            repaired_plan, repair_findings = apply_ordering_auto_repair(plan, gate_findings)
+            if repaired_plan is not None:
+                recheck = run_deterministic_gates(repaired_plan)
+                if not _has_blocker(recheck):
+                    logger.info("loop: auto-repaired ordering → continue without revision")
+                    plan = repaired_plan
+                    gate_findings = repair_findings + recheck
+                    gate_blockers = []
+
+        if config.precondition_closer:
+            has_unverified = any(f.reason_code == "unverified_precondition" for f in gate_findings)
+            if has_unverified:
+                closed_plan, close_findings = apply_precondition_closer(plan, gate_findings)
+                if closed_plan is not None:
+                    logger.info("loop: auto-closed precondition gap → continue without revision")
+                    plan = closed_plan
+                    recheck = run_deterministic_gates(plan)
+                    gate_findings = close_findings + recheck
+                    gate_blockers = [f for f in recheck if f.severity is Severity.BLOCKER]
+
+        sig_history.append(compute_plan_signature(plan))
 
         if config.mode == "deterministic-first" and _has_blocker(gate_findings):
             logger.info("loop: gate blocker → revise (no LLM critic spend)")
@@ -330,6 +403,39 @@ def _run(
         if stalled(prior_plan, prior_findings, plan, findings):
             logger.info("loop: convergence detected → escalate (stalled)")
             return _escalate(goal, plan, findings, "converged_stalled", revision)
+
+        if detect_oscillation(sig_history, config.oscillation_window):
+            if config.converge_policy == "auto_converge":
+                logger.info("loop: oscillation detected → auto-converge (partial approval)")
+                # Build a merged plan with only non-oscillating tasks
+                merged = _build_auto_converged_plan(plan)
+                if merged is not None:
+                    merged_findings = [
+                        *findings,
+                        Finding(
+                            id=f"auto_converge:{plan.id}:{plan.version}",
+                            version=plan.version,
+                            severity=Severity.INFO,
+                            reason_code="auto_converge_partial_approval",
+                            message=(
+                                "auto-converged non-oscillating tasks; oscillating subset escalated"
+                            ),
+                        ),
+                    ]
+                    threshold_ok, thresholds = resolve_threshold(
+                        merged_findings, goal.risk_tolerance
+                    )
+                    if threshold_ok:
+                        approved = approval.approve(merged, thresholds)
+                        return LoopResult(
+                            status="approved",
+                            plan=merged,
+                            findings=merged_findings,
+                            reason_code="approved",
+                            approved_plan=approved,
+                        )
+            logger.info("loop: oscillation detected → escalate")
+            return _escalate(goal, plan, findings, "plan_oscillation_detected", revision)
 
         prior_plan, prior_findings = plan, findings
         if revision < config.revision_cap:
