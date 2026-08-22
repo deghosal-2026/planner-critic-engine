@@ -28,6 +28,7 @@ from . import (
     schema_valid,
     verification,
 )
+from .base import BaseGate
 
 GATES = [
     schema_valid.Gate(),
@@ -40,11 +41,16 @@ GATES = [
 ]
 
 
-def run_deterministic_gates(plan: PlanVersion) -> list[Finding]:
+def run_deterministic_gates(
+    plan: PlanVersion,
+    extra_gates: list[BaseGate] | None = None,
+) -> list[Finding]:
     """Run every deterministic gate against a plan version.
 
     Args:
         plan: The typed plan to audit.
+        extra_gates: Optional domain-pack gate evaluators to run *in
+            addition* to the built-in six. Never replace built-in gates.
 
     Returns:
         A list of findings in gate-stable order. Empty when the plan passes
@@ -56,7 +62,10 @@ def run_deterministic_gates(plan: PlanVersion) -> list[Finding]:
     findings: list[Finding] = []
     for gate in GATES:
         findings.extend(gate.run(plan))
+    if extra_gates:
+        for gate in extra_gates:
+            findings.extend(gate.run(plan))
     return findings
 
 
-__all__ = ["GATES", "Finding", "Severity", "run_deterministic_gates"]
+__all__ = ["GATES", "BaseGate", "Finding", "Severity", "run_deterministic_gates"]
