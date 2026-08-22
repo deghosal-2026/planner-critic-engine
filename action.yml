@@ -1,0 +1,113 @@
+name: 'planner-critic-check'
+description: 'Run PlannerCritic deterministic gate check on PR changes'
+author: 'Debashish Ghosal'
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  goal:
+    description: 'Goal description for the plan check'
+    required: false
+    default: ''
+  risk_tolerance:
+    description: 'Risk tolerance (strict, balanced, permissive)'
+    required: false
+    default: 'strict'
+  mode:
+    description: 'Execution mode (shadow or enforce)'
+    required: false
+    default: 'shadow'
+  domain:
+    description: 'Domain pack name or manifest path'
+    required: false
+    default: ''
+  policies-dir:
+    description: 'Directory containing .rego policy files'
+    required: false
+    default: ''
+  fail-on-severity:
+    description: 'Minimum severity to fail the check (low, medium, high, critical)'
+    required: false
+    default: 'high'
+  plancritic-path:
+    description: 'Path to the plancritic binary'
+    required: false
+    default: 'plancritic'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: 'Install PlannerCritic'
+      shell: bash
+      run: |
+        if ! command -v ${{ inputs.plancritic-path }} &> /dev/null; then
+          echo "Installing planner-critic..."
+          pip install planner-critic
+        fi
+
+    - name: 'Derive goal from changed files'
+      id: goal
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.goal }}" ]; then
+          echo "goal=${{ inputs.goal }}" >> $GITHUB_OUTPUT
+        else
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD 2>/dev/null || echo "")
+          if [ -z "$CHANGED" ]; then
+            CHANGED=$(git diff --name-only HEAD~1 2>/dev/null || echo ".")
+          fi
+          echo "goal=Apply changes to: $(echo $CHANGED | tr '\n' ' ')" >> $GITHUB_OUTPUT
+        fi
+
+    - name: 'Run plancritic check'
+      id: check
+      shell: bash
+      continue-on-error: ${{ inputs.mode == 'shadow' }}
+      run: |
+        ARGS=""
+        if [ -n "${{ inputs.domain }}" ]; then
+          ARGS="$ARGS --domain ${{ inputs.domain }}"
+        fi
+        if [ -n "${{ inputs.policies-dir }}" ]; then
+          ARGS="$ARGS --policies-dir ${{ inputs.policies-dir }}"
+        fi
+        ARGS="$ARGS --fail-on-severity ${{ inputs.fail-on-severity }}"
+        ARGS="$ARGS --output json"
+
+        ${{ inputs.plancritic-path }} check $ARGS 2>&1 | tee plancritic-report.json
+        if [ ${PIPESTATUS[0]} -eq 0 ]; then
+          echo "status=success" >> $GITHUB_OUTPUT
+        elif [ ${PIPESTATUS[0]} -eq 1 ]; then
+          echo "status=failure" >> $GITHUB_OUTPUT
+        else
+          echo "status=neutral" >> $GITHUB_OUTPUT
+        fi
+
+    - name: 'Upload plan report'
+      uses: actions/upload-artifact@v4
+      with:
+        name: plancritic-report
+        path: plancritic-report.json
+
+    - name: 'Create PR comment'
+      if: ${{ github.event_name == 'pull_request' }}
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const report = JSON.parse(fs.readFileSync('plancritic-report.json', 'utf8'));
+          const status = '${{ steps.check.outputs.status }}';
+          let body = `## PlannerCritic Check: ${status.toUpperCase()}\n\n`;
+          body += `| Severity | Findings |\n|---------|----------|\n`;
+          if (report.findings) {
+            for (const f of report.findings) {
+              body += `| ${f.severity} | ${f.message} |\n`;
+            }
+          }
+          await github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: body
+          });
