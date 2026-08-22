@@ -148,6 +148,41 @@ CONCURRENT_RESOURCE_CONFLICT: Literal["concurrent_resource_conflict"] = (
 )
 FINDING_DRIFT_STORED: Literal["finding_drift_stored"] = "finding_drift_stored"
 DRIFT_ALERT_TRIGGERED: Literal["drift_alert_triggered"] = "drift_alert_triggered"
+
+# --- M9 scale-validation reason codes (§3.36–§3.40) --------------------------
+IDP_RBAC_BROAD_ROLE: Literal["idp_rbac_broad_role"] = "idp_rbac_broad_role"
+IDP_MISSING_CORPORATE_METADATA: Literal["idp_missing_corporate_metadata"] = (
+    "idp_missing_corporate_metadata"
+)
+IDP_QUOTA_BREACH: Literal["idp_quota_breach"] = "idp_quota_breach"
+IDP_NOISY_NEIGHBOR_RISK: Literal["idp_noisy_neighbor_risk"] = "idp_noisy_neighbor_risk"
+MULTI_AGENT_CYCLIC_HANDOFF: Literal["multi_agent_cyclic_handoff"] = "multi_agent_cyclic_handoff"
+MULTI_AGENT_UNVERIFIED_STATE_SIGNAL: Literal["multi_agent_unverified_state_signal"] = (
+    "multi_agent_unverified_state_signal"
+)
+MULTI_AGENT_ROLLBACK_UNSYNCHRONIZED: Literal["multi_agent_rollback_unsynchronized"] = (
+    "multi_agent_rollback_unsynchronized"
+)
+SRE_BLAST_RADIUS_EXCEEDED: Literal["sre_blast_radius_exceeded"] = "sre_blast_radius_exceeded"
+SRE_MISSING_INTER_BATCH_HEALTHCHECK: Literal["sre_missing_inter_batch_healthcheck"] = (
+    "sre_missing_inter_batch_healthcheck"
+)
+SRE_DESTRUCTIVE_WITHOUT_HITL: Literal["sre_destructive_without_hitl"] = (
+    "sre_destructive_without_hitl"
+)
+SCP_NO_TOPOLOGICAL_PROPAGATION: Literal["scp_no_topological_propagation"] = (
+    "scp_no_topological_propagation"
+)
+SCP_MISSING_PER_SERVICE_CI: Literal["scp_missing_per_service_ci"] = "scp_missing_per_service_ci"
+SCP_BULK_DEPLOY_INTERNAL_DEP: Literal["scp_bulk_deploy_internal_dep"] = (
+    "scp_bulk_deploy_internal_dep"
+)
+FNG_COST_IMPACT_EXCEEDS_BUDGET: Literal["fng_cost_impact_exceeds_budget"] = (
+    "fng_cost_impact_exceeds_budget"
+)
+FNG_TERMINATES_COMMITTED_INSTANCE: Literal["fng_terminates_committed_instance"] = (
+    "fng_terminates_committed_instance"
+)
 PRECONDITION_REDUNDANTLY_RE_INJECTED: Literal["precondition_redundantly_re_injected"] = (
     "precondition_redundantly_re_injected"
 )
@@ -237,6 +272,21 @@ ReasonCode: TypeAlias = Literal[
     "blast_radius_restricted_cluster",
     "blast_radius_restricted_action",
     "secret_redacted",
+    "idp_rbac_broad_role",
+    "idp_missing_corporate_metadata",
+    "idp_quota_breach",
+    "idp_noisy_neighbor_risk",
+    "multi_agent_cyclic_handoff",
+    "multi_agent_unverified_state_signal",
+    "multi_agent_rollback_unsynchronized",
+    "sre_blast_radius_exceeded",
+    "sre_missing_inter_batch_healthcheck",
+    "sre_destructive_without_hitl",
+    "scp_no_topological_propagation",
+    "scp_missing_per_service_ci",
+    "scp_bulk_deploy_internal_dep",
+    "fng_cost_impact_exceeds_budget",
+    "fng_terminates_committed_instance",
 ]
 
 # Descriptions are the source of truth for docs and any generated API reference.
@@ -316,6 +366,21 @@ REASON_CODE_DESCRIPTIONS: dict[ReasonCode, str] = {
     BLAST_RADIUS_RESTRICTED_CLUSTER: "Plan targets a restricted cluster — escalation required",
     BLAST_RADIUS_RESTRICTED_ACTION: "Plan includes a restricted action — escalation required",
     SECRET_REDACTED: "A secret or PII was redacted from output",
+    IDP_RBAC_BROAD_ROLE: "IDP: plan attaches broad RBAC role instead of namespace-scoped",
+    IDP_MISSING_CORPORATE_METADATA: "IDP: plan omits required corporate metadata tags",
+    IDP_QUOTA_BREACH: "IDP: plan exceeds shared-node resource quota",
+    IDP_NOISY_NEIGHBOR_RISK: "IDP: plan risks noisy-neighbor interference on shared resources",
+    MULTI_AGENT_CYCLIC_HANDOFF: "MAO: cross-agent dependency graph contains a cycle",
+    MULTI_AGENT_UNVERIFIED_STATE_SIGNAL: "MAO: agent starts before predecessor's state signal verified",
+    MULTI_AGENT_ROLLBACK_UNSYNCHRONIZED: "MAO: distributed rollback steps are not synchronized",
+    SRE_BLAST_RADIUS_EXCEEDED: "SRE: instant drain exceeds blast-radius cap (max 25% rolling)",
+    SRE_MISSING_INTER_BATCH_HEALTHCHECK: "SRE: batch drain missing inter-batch health check probe",
+    SRE_DESTRUCTIVE_WITHOUT_HITL: "SRE: destructive action during incident without HITL approval",
+    SCP_NO_TOPOLOGICAL_PROPAGATION: "SCP: bulk update lacks topological propagation order",
+    SCP_MISSING_PER_SERVICE_CI: "SCP: bulk update missing per-service CI pipeline check",
+    SCP_BULK_DEPLOY_INTERNAL_DEP: "SCP: bulk deploy of internal dependency without canary",
+    FNG_COST_IMPACT_EXCEEDS_BUDGET: "FNG: fleet scale-up exceeds cost-impact budget threshold",
+    FNG_TERMINATES_COMMITTED_INSTANCE: "FNG: plan terminates RI/Savings-Plan-covered instance",
 }
 
 # All valid codes; a test asserts every produced reason code is in this set.
