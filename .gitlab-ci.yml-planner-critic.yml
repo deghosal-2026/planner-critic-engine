@@ -1,0 +1,47 @@
+# PlannerCritic Check — GitLab CI template
+# Include in your .gitlab-ci.yml:
+#
+# include:
+#   - local: .gitlab-ci.yml-planner-critic.yml
+#
+# variables:
+#   PC_RISK_TOLERANCE: "strict"
+#   PC_MODE: "shadow"
+
+planner-critic-check:
+  image: python:3.12-slim
+  stage: test
+  variables:
+    PC_RISK_TOLERANCE: "strict"
+    PC_MODE: "shadow"
+    PC_FAIL_ON_SEVERITY: "high"
+    PC_DOMAIN: ""
+    PC_POLICIES_DIR: ""
+  before_script:
+    - pip install planner-critic
+  script:
+    - |
+      GOAL="Apply changes from merge request"
+      ARGS=""
+      if [ -n "$PC_DOMAIN" ]; then
+        ARGS="$ARGS --domain $PC_DOMAIN"
+      fi
+      if [ -n "$PC_POLICIES_DIR" ]; then
+        ARGS="$ARGS --policies-dir $PC_POLICIES_DIR"
+      fi
+      ARGS="$ARGS --fail-on-severity $PC_FAIL_ON_SEVERITY --output json"
+      
+      plancritic check "$GOAL" $ARGS > plancritic-report.json 2>&1
+      EXIT_CODE=$?
+      
+      if [ "$PC_MODE" = "shadow" ]; then
+        echo "Shadow mode: check result logged but not enforced"
+        echo "Report: $(cat plancritic-report.json)"
+        exit 0
+      fi
+      exit $EXIT_CODE
+  artifacts:
+    paths:
+      - plancritic-report.json
+    when: always
+  allow_failure: $PC_MODE == "shadow"
