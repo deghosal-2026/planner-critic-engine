@@ -20,15 +20,15 @@
 | HTTP + MCP surfaces (C6, C7, C26, C27) | "not run — deferred to M10" | #86 — C6 endpoint matrix 200 + healthz via ASGI + multi-rev diff; C26 MCP-over-HTTP + stdio parity; C27 bootstrap round-trip | ✅ DONE (`f29df9b`) |
 | Adapter coverage (C12, C28) | only raw-Python ran (1 adapter × 1 goal) | #87 — 2 goals × 6 adapters × gate lifecycle + C28 distinct audit trail matrix | ✅ DONE (`bd757a0`) |
 | Critique-mode matrix (C2) | only db-01 ran all 3 modes (3/12) | #88 — add K8S-01, IR-01, CI-01 × 3 modes = 12/12 | ✅ DONE (`b9af1be`) |
-| Escalation / Explain / Replan (C9, C10, C11, C25) | partial coverage, tested on wrong goals | #89 — deny path, escalated-explain, restart on ARCH-01, replan lineage | ✅ DONE (this commit) |
-| Never-exercised capabilities (C13, C14, C16, C18, C19, C24) | re-gate/forensics/shadow/TTL/probe-kind/schema-migrate never run; db_query+deploy_status stubs | #90 — run all 6; fix probe stubs |
-| Cross-dimension correctness (C15, C17, C30) | replay empty, complexity only db-01, no reason-code catalog sweep | #91 — persistence fix, K8S-01 complexity, catalog sweep, assertion pre-validation |
-| Loop/budget/termination depth (C29, C4) | only max_revisions ceiling; `regression_thrashing` never produced | #92 — all 3 ceilings, induce regression, 31-goal strict cap=4 sweep |
-| Model & robustness sweeps | single model, healthy endpoint only | #93 — cross-model, fail-closed injection, local-model dimension, concurrency |
+| Escalation / Explain / Replan (C9, C10, C11, C25) | partial coverage, tested on wrong goals | #89 — deny path, escalated-explain, restart on ARCH-01, replan lineage | ✅ DONE (`c358b88`) |
+| Never-exercised capabilities (C13, C14, C16, C18, C19, C24) | re-gate/forensics/shadow/TTL/probe-kind/schema-migrate never run; db_query+deploy_status stubs | #90 — run all 6; fix probe stubs | ✅ DONE (`be100b9`) |
+| Cross-dimension correctness (C15, C17, C30) | replay empty, complexity only db-01, no reason-code catalog sweep | #91 — persistence fix, K8S-01 complexity, catalog sweep, assertion pre-validation | ✅ DONE (`c358b88`) |
+| Loop/budget/termination depth (C29, C4) | only max_revisions ceiling; `regression_thrashing` never produced | #92 — all 3 ceilings, induce regression, 31-goal strict cap=4 sweep | ✅ DONE (`be100b9`) |
+| Model & robustness sweeps | single model, healthy endpoint only | #93 — cross-model, fail-closed injection, local-model dimension, concurrency | ✅ DONE (`fa45556`) |
 | §1 Q3 finding quality | noise rate never measured | #97 — classify all 65 goals' findings; noise top-10; injection-bypass rescan | ✅ DONE (`8eb9381`) |
-| §1 Q4 executor-usability | executability never validated | #98 — preconditions grounding + fresh-executor dry-run pass on 6 approved plans | ✅ DONE (this commit) |
-| Failure clustering | reviewer asked "did planning failures cluster by task kind?" — current matrix lacks failure-kind tabulation | #173 — tag rows by failure shape; report whether signal is domain- or shape-driven |
-| Methodological control | field-doc reader noted strict-arm 81 goals/35 domains show zero variance | #172 — a known-clean golden plan run through strict to prove discriminating power |
+| §1 Q4 executor-usability | executability never validated | #98 — preconditions grounding + fresh-executor dry-run pass on 6 approved plans | ✅ DONE (`854f578`) |
+| Failure clustering | reviewer asked "did planning failures cluster by task kind?"; current matrix lacks failure-kind tabulation | #173 — tag rows by failure shape; report whether signal is domain- or shape-driven | ✅ DONE (`4cc3636`) |
+| Methodological control | field-doc reader noted strict-arm 81 goals/35 domains show zero variance | #172 — a known-clean golden plan run through strict to prove discriminating power | ✅ DONE (`3d3edcf`) |
 
 ### M1 Task Checklist
 
@@ -41,14 +41,14 @@
 | 3 | Adapter coverage | `.../adapters/<goal>/<adapter>/` | 6 adapters × 2 goals produce valid PlanVersion; wrap/unwrap structural equality; audit trail | [#87](https://github.com/deghosal-2026/planner-critic-engine/issues/87) · [x] |
 | 4 | Critique-mode matrix | `.../critique-modes/{k8s-01,ir-01,ci-01}/<mode>/` | 12/12; heuristic-only 0 LLM; deterministic-first LLM iff gate-clean; llm-every-revision findings every revision | [#88](https://github.com/deghosal-2026/planner-critic-engine/issues/88) · [x] |
 | 5 | Escalation/Explain/Replan | `.../{escalation,explain,replan}/` | approve+deny round-trip; escalated-explain (replan_aborted); restart fresh plan+chain (#C25) | [#89](https://github.com/deghosal-2026/planner-critic-engine/issues/89) · [x] |
-| 6 | Never-exercised capabilities | probe fixes + `.../{rogate,forensics,shadow,ttl,schema-migrate}/` | re-gate fires replan; forensics linked; shadow zero-footprint; TTL within 1s; probes real; migrate lossless | [#90](https://github.com/deghosal-2026/planner-critic-engine/issues/90) · [ ] |
-| 7 | Cross-dimension correctness | persistence fix + assertion-validator command | replay non-empty; complexity on K8S-01; reason-code catalog 100% produced; 65/65 assert valid | [#91](https://github.com/deghosal-2026/planner-critic-engine/issues/91) · [ ] |
-| 8 | Loop/budget/termination depth | `.../{budget,termination}/` | 3 ceilings each produce `budget_exceeded`; `regression_thrashing` produced; 28+/31 strict converged_stalled | [#92](https://github.com/deghosal-2026/planner-critic-engine/issues/92) · [ ] |
-| 9 | Model & robustness sweeps | `.../{multi-model,failclosed,local-model,concurrency}/` | cross-model adversarial 5/5 escalate; fail-closed `planning_unavailable`; local-model recorded; no store corruption | [#93](https://github.com/deghosal-2026/planner-critic-engine/issues/93) · [ ] |
+| 6 | Never-exercised capabilities | probe fixes + `.../{rogate,forensics,shadow,ttl,schema-migrate}/` | re-gate fires replan; forensics linked; shadow zero-footprint; TTL within 1s; probes real; migrate lossless | [#90](https://github.com/deghosal-2026/planner-critic-engine/issues/90) · [x] |
+| 7 | Cross-dimension correctness | persistence fix + assertion-validator command | replay non-empty; complexity on K8S-01; reason-code catalog 100% produced; 65/65 assert valid | [#91](https://github.com/deghosal-2026/planner-critic-engine/issues/91) · [x] |
+| 8 | Loop/budget/termination depth | `.../{budget,termination}/` | 3 ceilings each produce `budget_exceeded`; `regression_thrashing` produced; 28+/31 strict converged_stalled | [#92](https://github.com/deghosal-2026/planner-critic-engine/issues/92) · [x] |
+| 9 | Model & robustness sweeps | `.../{multi-model,failclosed,local-model,concurrency}/` | cross-model adversarial 5/5 escalate; fail-closed `planning_unavailable`; local-model recorded; no store corruption | [#93](https://github.com/deghosal-2026/planner-critic-engine/issues/93) · [x] |
 | 10 | Finding-quality audit (Q3) | `docs/field-test/field-test-results-0.1.0.md` | % noise/specific/actionable/task-linked for all 65; noise top-10 cited; injection-bypass noted | [#97](https://github.com/deghosal-2026/planner-critic-engine/issues/97) · [x] |
 | 11 | Executor-usability audit (Q4) | `.../field-test-results-0.1.0.md` | deterministic grounding on 28 approved; 100% grounded preconditions; gap inventory + evidence | [#98](https://github.com/deghosal-2026/planner-critic-engine/issues/98) · [x] |
-| 12 | Failure-shape clustering analysis | `docs/field-test/0.1.0-failure-clustering/` | tag rows by failure shape; report answers domain-vs-shape; cheap rule-based heuristic | [#173](https://github.com/deghosal-2026/planner-critic-engine/issues/173) · [ ] |
-| 13 | Positive-control test | `.../0.1.0-positive-control/` + matrix control row | known-clean plan under strict unmodified; result recorded whether or not surprising | [#172](https://github.com/deghosal-2026/planner-critic-engine/issues/172) · [ ] |
+| 12 | Failure-shape clustering analysis | `docs/field-test/0.1.0-failure-clustering/` | tag rows by failure shape; report answers domain-vs-shape; cheap rule-based heuristic | [#173](https://github.com/deghosal-2026/planner-critic-engine/issues/173) · [x] |
+| 13 | Positive-control test | `.../0.1.0-positive-control/` + matrix control row | known-clean plan under strict unmodified; result recorded whether or not surprising | [#172](https://github.com/deghosal-2026/planner-critic-engine/issues/172) · [x] |
 
 ### M1 Success Metrics
 
