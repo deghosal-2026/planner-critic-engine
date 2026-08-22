@@ -198,9 +198,14 @@ def _run_opa_eval(
 
         result = subprocess.run(  # noqa: S603
             [
-                opa, "eval", "--format", "json",
-                "--data", str(rego_path),
-                "--data", str(input_path),
+                opa,
+                "eval",
+                "--format",
+                "json",
+                "--data",
+                str(rego_path),
+                "--data",
+                str(input_path),
                 query,
             ],
             capture_output=True,
