@@ -23,6 +23,7 @@ import yaml
 from conftest import make_plan
 from planner_critic.domains.base import (
     DomainPack,
+    find_domain_packs,
     load_domain_pack_from_manifest,
     pack_from_dict,
 )
@@ -151,6 +152,37 @@ class TestManifestLoading:
         """A missing file raises FileNotFoundError."""
         with pytest.raises(FileNotFoundError):
             load_domain_pack_from_manifest("/nonexistent/pack.yaml")
+
+    def test_build_gate_from_import(self) -> None:
+        """A gate spec with a module path resolves to a BaseGate."""
+        pack = pack_from_dict({
+            "name": "import-test",
+            "gates": [{"module": "planner_critic.gates.ordering"}],
+        })
+        assert len(pack.gate_evaluators) == 1
+        assert isinstance(pack.gate_evaluators[0], BaseGate)
+
+    def test_build_gate_missing_module_raises(self) -> None:
+        """A gate spec without a module raises ValueError."""
+        with pytest.raises(ValueError, match="module"):
+            pack_from_dict({
+                "name": "bad-gate",
+                "gates": [{"class": "MissingGate"}],
+            })
+
+    def test_build_gate_bad_class_raises(self) -> None:
+        """A gate spec with a non-existent class raises ImportError."""
+        with pytest.raises(ImportError):
+            pack_from_dict({
+                "name": "bad-gate",
+                "gates": [{"module": "planner_critic.gates.ordering",
+                           "class": "NonExistentGate"}],
+            })
+
+    def test_find_domain_packs_empty(self) -> None:
+        """Scanning a namespace with no packs returns an empty dict."""
+        packs = find_domain_packs("planner_critic.adapters")
+        assert isinstance(packs, dict)
 
 
 class TestEngineIntegration:

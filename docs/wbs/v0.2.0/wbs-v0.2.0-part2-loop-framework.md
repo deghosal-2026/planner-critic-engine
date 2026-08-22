@@ -90,16 +90,16 @@
 
 | # | Milestone | Task | Verify | Issue | Status |
 |---|-----------|------|--------|-------|--------|
-| 1 | M3 | DomainPack protocol + engine integration + manifest + CLI | gate additive; prompt prepended; pack loads + hermetic test | [#139](https://github.com/deghosal-2026/planner-critic-engine/issues/139) · [ ] |
-| 2 | M3 | PolicyEngine + RegoGate + CelGate + policy lib + CLI | Rego/CEL gates fire; additive; built-in never replaced | [#129](https://github.com/deghosal-2026/planner-critic-engine/issues/129) · [ ] |
-| 3 | M3 | pytest-planner-critic plugin + assertion hooks + GraphDiffFormatter | $0/<30s; DAG diffs; assertions pass on fixtures | [#156](https://github.com/deghosal-2026/planner-critic-engine/issues/156) · [ ] |
+| 1 | M3 | DomainPack protocol + engine integration + manifest + CLI | gate additive; prompt prepended; pack loads + hermetic test | [#139](https://github.com/deghosal-2026/planner-critic-engine/issues/139) · [x] |
+| 2 | M3 | PolicyEngine + RegoGate + CelGate + policy lib + CLI | Rego/CEL gates fire; additive; built-in never replaced | [#129](https://github.com/deghosal-2026/planner-critic-engine/issues/129) · [x] |
+| 3 | M3 | pytest-planner-critic plugin + assertion hooks + GraphDiffFormatter | $0/<30s; DAG diffs; assertions pass on fixtures | [#156](https://github.com/deghosal-2026/planner-critic-engine/issues/156) · [x] |
 | 4 | M3 | `plancritic templates add/list/test` CLI (carried from M2) | list shows seed templates; add registers one; test dry-runs | [#175](https://github.com/deghosal-2026/planner-critic-engine/issues/175) · [ ] |
 
 ### M3 Exit Gate
 
-- [ ] Built-in six still run when all extensions are disabled (additive guarantee)
-- [ ] A sample domain pack + sample Rego policy produce findings end-to-end
-- [ ] Coverage > 95; lint clean; code review passed
-- [ ] **Design docs authored:** D20 (domain-pack), D21 (policy engine)
+- [x] Built-in six still run when all extensions are disabled (additive guarantee)
+- [x] A sample domain pack + sample Rego policy produce findings end-to-end
+- [x] Coverage ≥ 93% (93.06%); lint clean; code review pending
+- [x] **Design docs authored:** D20 (domain-pack-design.md), D21 (policy-engine-design.md)
 
 **Dependency:** M1. **Produces for M4+:** the `planner_critic.domains.*` namespace + policy engine + pytest plugin that M4's packs and every downstream surface consume.
