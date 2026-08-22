@@ -50,13 +50,13 @@ M1 (Field-Test Closure) — proven base
 |-----------|-------------|---------------------|
 | M1 Field-Test Closure | [#85–#98](https://github.com/deghosal-2026/planner-critic-engine/issues/85), [#172–#173](https://github.com/deghosal-2026/planner-critic-engine/issues/172) | close v0.1.0 field-test + audit gaps; failure-shape clustering, positive control |
 | M2 Loop Efficiency | [#130](https://github.com/deghosal-2026/planner-critic-engine/issues/130), #131, #152 | loop controller auto-fix |
-| M3 Extensibility Framework | [#129](https://github.com/deghosal-2026/planner-critic-engine/issues/129), #139, #156 | domain-pack / policy / pytest |
+| M3 Extensibility Framework | [#129](https://github.com/deghosal-2026/planner-critic-engine/issues/129), #139, #156, [#175](https://github.com/deghosal-2026/planner-critic-engine/issues/175) | domain-pack / policy / pytest / templates CLI |
 | M4 Domain Packs | [#140–#143](https://github.com/deghosal-2026/planner-critic-engine/issues/140), #155, #160 | 4 packs + scaffolding + rollback synth |
 | M5 Security Oracle | [#123–#127](https://github.com/deghosal-2026/planner-critic-engine/issues/123), [#171](https://github.com/deghosal-2026/planner-critic-engine/issues/171) | SWE-bench security chain + label-migration harness |
-| M6 Enterprise Safety | [#132](https://github.com/deghosal-2026/planner-critic-engine/issues/132), #149–#151, #158, #159, [#174](https://github.com/deghosal-2026/planner-critic-engine/issues/174) | posture/budget/state/ledger/quota/redact + gate rationale |
+| M6 Enterprise Safety | [#132](https://github.com/deghosal-2026/planner-critic-engine/issues/132), #149–#151, #158, #159, [#174](https://github.com/deghosal-2026/planner-critic-engine/issues/174), [#176](https://github.com/deghosal-2026/planner-critic-engine/issues/176) | posture/budget/state/ledger/quota/redact + gate rationale + signature persistence |
 | M7 Developer Surfaces | [#136](https://github.com/deghosal-2026/planner-critic-engine/issues/136), #137, #153, #154, #157, #162 | TUI/diagnose/studio/IDE/check |
 | M8 Integration & Adoption | [#128](https://github.com/deghosal-2026/planner-critic-engine/issues/128), #133–#135, #138, #161 | CI/Backstage/AutoGen/Slack/webhook/dashboard |
-| M9 Scale Validation | [#144–#148](https://github.com/deghosal-2026/planner-critic-engine/issues/144) | fleet field-test corpora |
+| M9 Scale Validation | [#144–#148](https://github.com/deghosal-2026/planner-critic-engine/issues/144), [#177](https://github.com/deghosal-2026/planner-critic-engine/issues/177) | fleet field-test corpora + auto-repair benchmark |
 | M10 Release Activities | [#163–#169](https://github.com/deghosal-2026/planner-critic-engine/issues/163) | packaging/security/sweep/migration/docs/gate/ship |
 
 ## 4. Posture Toward v0.1.0 WBS

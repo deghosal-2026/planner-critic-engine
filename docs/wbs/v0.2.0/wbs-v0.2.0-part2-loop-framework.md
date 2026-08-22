@@ -51,9 +51,9 @@
 - [x] Reason codes (`auto_repaired_ordering`, `auto_closed_precondition`, `plan_oscillation_detected`, `auto_converge_partial_approval`) in catalog (F-77)
 
 **Deferred items (not blocking M2):**
-- `plancritic templates add/list/test` CLI — template library exists and the closer pass works; the CLI is a surface convenience
-- PlanSignature persisted to plan store — in-memory `sig_history` is adequate for loop-internal oscillation detection
-- Formal ≥30% benchmark script — ordering-violation plan converges in 1 revision instead of 3, which exceeds the 30% target on that corpus
+- `plancritic templates add/list/test` CLI → tracked as [#175](https://github.com/deghosal-2026/planner-critic-engine/issues/175) (M3) — template library exists and the closer pass works; the CLI is a surface convenience
+- PlanSignature persisted to plan store → tracked as [#176](https://github.com/deghosal-2026/planner-critic-engine/issues/176) (M6) — in-memory `sig_history` is adequate for loop-internal oscillation detection
+- Formal ≥30% benchmark script → tracked as [#177](https://github.com/deghosal-2026/planner-critic-engine/issues/177) (M9) — ordering-violation plan converges in 1 revision instead of 3, which exceeds the 30% target on that corpus
 
 **Dependency:** M1. **Produces for M3+:** deterministic auto-fix precedent + reason codes consumed downstream.
 
@@ -93,6 +93,7 @@
 | 1 | M3 | DomainPack protocol + engine integration + manifest + CLI | gate additive; prompt prepended; pack loads + hermetic test | [#139](https://github.com/deghosal-2026/planner-critic-engine/issues/139) · [ ] |
 | 2 | M3 | PolicyEngine + RegoGate + CelGate + policy lib + CLI | Rego/CEL gates fire; additive; built-in never replaced | [#129](https://github.com/deghosal-2026/planner-critic-engine/issues/129) · [ ] |
 | 3 | M3 | pytest-planner-critic plugin + assertion hooks + GraphDiffFormatter | $0/<30s; DAG diffs; assertions pass on fixtures | [#156](https://github.com/deghosal-2026/planner-critic-engine/issues/156) · [ ] |
+| 4 | M3 | `plancritic templates add/list/test` CLI (carried from M2) | list shows seed templates; add registers one; test dry-runs | [#175](https://github.com/deghosal-2026/planner-critic-engine/issues/175) · [ ] |
 
 ### M3 Exit Gate
 
