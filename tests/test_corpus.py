@@ -165,3 +165,29 @@ class TestCorpusLoader:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestLoaderCoverage:
+    """Targeted tests for coverage of loader edge cases."""
+
+    def test_compute_sha256_returns_hex(self) -> None:
+        from planner_critic.corpus.loader import _compute_sha256
+        digest = _compute_sha256({"key": "value"})
+        assert isinstance(digest, str)
+        assert len(digest) == 64
+        assert all(c in "0123456789abcdef" for c in digest)
+
+    def test_load_manifest_nonexistent_dir(self) -> None:
+        manifest = load_corpus_manifest("/nonexistent/path")
+        assert manifest is None
+
+    def test_load_all_instances_nonexistent_instances_dir(self, tmp_path) -> None:
+        instances = load_all_instances(str(tmp_path))
+        assert instances == []
+
+    def test_load_all_instances_with_verify_checksums(self) -> None:
+        instances = load_all_instances(
+            "docs/field-test/corpus/swebench-security",
+            verify_checksums=True,
+        )
+        assert len(instances) > 0

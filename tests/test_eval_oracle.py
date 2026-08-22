@@ -94,6 +94,32 @@ class TestSaveReport:
         assert '"total_instances"' in content
         assert '"accuracy"' in content
 
+    def test_save_with_per_instance_results(self, tmp_path: Path) -> None:
+        scorecard = EvalScorecard(total_instances=1, total_aligned=1, total_missed=0)
+        scorecard.compute()
+        results = [
+            InstanceResult(
+                instance_id="TEST-001", cwe="CWE-79", cwe_bucket="XSS",
+                aligned=[], missed=[], spurious=[],
+            )
+        ]
+        out = tmp_path / "detailed.json"
+        save_report(scorecard, str(out), results=results)
+        content = out.read_text()
+        assert '"instances"' in content
+        assert '"instance_id"' in content
+
+
+class TestHarnessRunAllWithFilter:
+    def test_run_all_with_instance_filter(self) -> None:
+        from conftest import ScriptedCritic, ScriptedPlanner, make_plan, make_task
+        planner = ScriptedPlanner([make_plan(tasks=[make_task("t1")])])
+        critic = ScriptedCritic([[]])
+        harness = OracleEvalHarness(planner, critic)
+        scorecard, results = harness.run_all(instance_ids=["CWE-079-001"])
+        assert scorecard.total_instances == 1
+        assert results[0].instance_id == "CWE-079-001"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
