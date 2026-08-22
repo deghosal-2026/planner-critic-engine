@@ -10,6 +10,7 @@ module so a command is self-describing and testable in isolation.
 
 from __future__ import annotations
 
+from .corpus import build_corpus_parser, run_corpus
 from .critique import build_critique_parser, run_critique
 from .demo import build_demo_parser, run_demo
 from .escalate import build_escalate_parser, run_escalate
@@ -23,6 +24,7 @@ from .quickstart import build_quickstart_parser, run_quickstart
 from .replay import build_replay_parser, run_replay
 
 __all__ = [
+    "build_corpus_parser",
     "build_critique_parser",
     "build_demo_parser",
     "build_escalate_parser",
@@ -33,6 +35,7 @@ __all__ = [
     "build_providers_parser",
     "build_quickstart_parser",
     "build_replay_parser",
+    "run_corpus",
     "run_critique",
     "run_demo",
     "run_escalate",
