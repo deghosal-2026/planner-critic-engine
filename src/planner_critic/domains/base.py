@@ -47,6 +47,8 @@ class DomainPack(Protocol):
     gate_evaluators: list[BaseGate]
     precondition_catalog: dict[str, str]
     critic_prompt_template: str | None
+
+
 pack_config: dict[str, Any]
 
 
@@ -123,17 +125,13 @@ def _build_gate(gate_spec: dict[str, Any]) -> BaseGate:
     mod_path = gate_spec.get("module", "")
     class_name = gate_spec.get("class", gate_spec.get("class_name", "Gate"))
     if not mod_path:
-        raise ValueError(
-            f"gate spec must include a 'module' path; got {gate_spec}"
-        )
+        raise ValueError(f"gate spec must include a 'module' path; got {gate_spec}")
     import importlib
 
     mod = importlib.import_module(mod_path)
     cls = getattr(mod, class_name, None)
     if cls is None:
-        raise ImportError(
-            f"class {class_name!r} not found in module {mod_path!r}"
-        )
+        raise ImportError(f"class {class_name!r} not found in module {mod_path!r}")
     gate_cls: type[BaseGate] = cast("type[BaseGate]", cls)
     return gate_cls()
 
@@ -162,9 +160,7 @@ def find_domain_packs(
     if spec is None or spec.submodule_search_locations is None:
         return packs
 
-    for _finder, mod_name, _ispkg in pkgutil.iter_modules(
-        spec.submodule_search_locations
-    ):
+    for _finder, mod_name, _ispkg in pkgutil.iter_modules(spec.submodule_search_locations):
         full_name = f"{namespace}.{mod_name}"
         try:
             mod = importlib.import_module(full_name)

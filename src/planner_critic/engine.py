@@ -42,9 +42,7 @@ class Engine:
         self.critic = critic
         self.config = config or LoopConfig()
         self.domain_gates = list(domain_pack.gate_evaluators) if domain_pack else []
-        self.domain_critic_prompt = (
-            domain_pack.critic_prompt_template if domain_pack else None
-        )
+        self.domain_critic_prompt = domain_pack.critic_prompt_template if domain_pack else None
 
     def run_domain_gates(self, plan: PlanVersion) -> list[Finding]:
         """Run both built-in six gates and domain gates (if any).
