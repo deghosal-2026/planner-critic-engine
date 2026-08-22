@@ -30,6 +30,8 @@ PLAN_OSCILLATION_DETECTED: Literal["plan_oscillation_detected"] = "plan_oscillat
 AUTO_CONVERGE_PARTIAL_APPROVAL: Literal["auto_converge_partial_approval"] = (
     "auto_converge_partial_approval"
 )
+POLICY_EVALUATION_ERROR: Literal["policy_evaluation_error"] = "policy_evaluation_error"
+POLICY_VIOLATION: Literal["policy_violation"] = "policy_violation"
 
 # --- Loop decision codes (PRD §2.6) ------------------------------------------
 REVISION_CAP_REACHED: Literal["revision_cap_reached"] = "revision_cap_reached"
@@ -63,6 +65,8 @@ ReasonCode: TypeAlias = Literal[
     "auto_closed_precondition",
     "plan_oscillation_detected",
     "auto_converge_partial_approval",
+    "policy_evaluation_error",
+    "policy_violation",
     "revision_cap_reached",
     "converged_stalled",
     "regression_thrashing",
@@ -94,6 +98,8 @@ REASON_CODE_DESCRIPTIONS: dict[ReasonCode, str] = {
     AUTO_CONVERGE_PARTIAL_APPROVAL: (
         "Auto-converged non-oscillating tasks; oscillating subset escalated"
     ),
+    POLICY_EVALUATION_ERROR: "An external policy evaluation failed or the runtime was unavailable",
+    POLICY_VIOLATION: "A policy-as-code rule produced a violation",
     REVISION_CAP_REACHED: "Loop terminated because the revision cap was hit",
     CONVERGED_STALLED: "Revisions are circling the same blockers or diff converges to zero",
     REGRESSION_THRASHING: "A revision introduced a new blocker",
