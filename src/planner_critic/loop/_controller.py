@@ -43,6 +43,7 @@ from ..approval import ApprovalGate, meets_threshold, resolve_threshold
 from ..critique.diff import scope_between
 from ..critique.mode import CriticMode, should_invoke_llm
 from ..gates import run_deterministic_gates
+from ..gates.base import BaseGate
 from ..reason_codes import ReasonCode
 from ..roles import CriticRole, PlannerRole
 from ..schema.goal import Goal, ReplanPolicy
@@ -150,6 +151,7 @@ def run_loop(
     critic: CriticRole,
     config: LoopConfig | None = None,
     spend: SpendState | None = None,
+    extra_gates: list[BaseGate] | None = None,
 ) -> LoopResult:
     """Run the draft → critique → revise → (approve|escalate) loop.
 
@@ -160,6 +162,8 @@ def run_loop(
         config: Loop tuning (mode + revision cap). Defaults to
             deterministic-first with cap 3.
         spend: Optional spend counter; a fresh one is created when omitted.
+        extra_gates: Optional domain-pack gate evaluators to run *in
+            addition* to the built-in six.
 
     Returns:
         A :class:`LoopResult` — ``approved`` (with an ``ApprovedPlan``) or
@@ -178,6 +182,7 @@ def run_loop(
         critic=critic,
         config=cfg,
         state=state,
+        extra_gates=extra_gates,
     )
     result.spend = state
     return result
@@ -265,6 +270,7 @@ def _run(
     critic: CriticRole,
     config: LoopConfig,
     state: SpendState,
+    extra_gates: list[BaseGate] | None = None,
 ) -> LoopResult:
     """Internal deterministic loop body."""
     logger.info(
@@ -305,7 +311,7 @@ def _run(
             plan.version,
         )
 
-        gate_findings = run_deterministic_gates(plan)
+        gate_findings = run_deterministic_gates(plan, extra_gates=extra_gates)
         gate_blockers = [f for f in gate_findings if f.severity is Severity.BLOCKER]
         logger.info(
             "loop: gates — %d findings (%d blockers)",
@@ -316,7 +322,7 @@ def _run(
         if config.auto_repair and gate_blockers:
             repaired_plan, repair_findings = apply_ordering_auto_repair(plan, gate_findings)
             if repaired_plan is not None:
-                recheck = run_deterministic_gates(repaired_plan)
+                recheck = run_deterministic_gates(repaired_plan, extra_gates=extra_gates)
                 if not _has_blocker(recheck):
                     logger.info("loop: auto-repaired ordering → continue without revision")
                     plan = repaired_plan
@@ -330,7 +336,7 @@ def _run(
                 if closed_plan is not None:
                     logger.info("loop: auto-closed precondition gap → continue without revision")
                     plan = closed_plan
-                    recheck = run_deterministic_gates(plan)
+                    recheck = run_deterministic_gates(plan, extra_gates=extra_gates)
                     gate_findings = close_findings + recheck
                     gate_blockers = [f for f in recheck if f.severity is Severity.BLOCKER]
 
