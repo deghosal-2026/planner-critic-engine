@@ -1,7 +1,7 @@
 # WBS — PlannerCritic Engine v0.2.0 Part 7: Enterprise Integration & Adoption
 
-> **Milestone covered:** M8 (Enterprise Integration & Adoption) — ✅ COMPLETE
-> **PRD covering this milestone:** [05-features](../../design/prd/05-features.md) (F-14 shadow, F-30 escalation, F-33 web UI, F-62 HTTP, F-45 MCP, F-82 OTel) · [03-landscape](../../design/prd/03-landscape.md) (adjacent frameworks) · [04-users-and-cujs](../../design/prd/04-users-and-cujs.md)
+> **Milestone covered:** M8 (Enterprise Integration & Adoption)
+> **PRD coverage:** [05-features](../../design/prd/05-features.md) (F-14 shadow, F-30 escalation, F-33 web UI, F-62 HTTP, F-45 MCP, F-82 OTel) · [03-landscape](../../design/prd/03-landscape.md) (adjacent frameworks) · [04-users-and-cujs](../../design/prd/04-users-and-cujs.md)
 
 ---
 
@@ -26,6 +26,14 @@
 - `planner-critic-notifier`: stateless CloudEvents-capable notifier with per-platform formatters (Slack Block Kit, Teams Adaptive Card v1.4, generic webhook) → **HMAC-verified interactive callbacks** (Slack `X-Slack-Signature` + replay protection; Teams JWT) proxying decisions to the escalation API.
 - At-least-once delivery (3 retries, exp backoff, `escalation_id` dedup 5min).
 
+### M8.6 Finding drift observability (#181)
+
+- Dual severity storage on every Finding (raw_severity + normalized_severity + drift_delta) so label-migration drift surfaces as data, not a surprise audit.
+- Escalation payload enrichment (drift summary + per-finding dual-severity card in Slack, Teams, webhook events).
+- Fleet dashboard drift panel: time-series downgrade rate, family breakout, critical_underclaim_watch for the under-claim direction.
+- CLI `plancritic findings --include-raw` flag.
+- Nightly z-score drift check with dashboard badge on 2-sigma breach.
+
 ### Deferred to v0.3.0
 
 | # | Issue | Reason |
@@ -41,6 +49,7 @@
 | 1 | GitHub Action + GitLab template + goal_template + artifact | PR status mapping correct; shadow never fails; check #162 integrated | [#128](https://github.com/deghosal-2026/planner-critic-engine/issues/128) · [x] |
 | 2 | AutoGen adapter | pre-gate + re-gate + Human escalation; same pattern as F-41–44 | [#134](https://github.com/deghosal-2026/planner-critic-engine/issues/134) · [x] |
 | 3 | CloudEvents notifier (Slack/Teams/webhook + HMAC) | multi-surface delivery; HMAC/JWT verified callbacks; at-least-once | [#161](https://github.com/deghosal-2026/planner-critic-engine/issues/161) · [x] |
+| 4 | Finding drift observability | dual severity storage + escalation enrichment + dashboard drift panel + CLI --include-raw | [#181](https://github.com/deghosal-2026/planner-critic-engine/issues/181) · [ ] |
 
 ### M8 Success Metrics
 
@@ -59,6 +68,7 @@
 - [x] Webhook event bridge shipped (Slack/Teams/webhook formatters + HMAC verification)
 - [x] **Design doc authored:** D26 (integration surfaces)
 - [x] Coverage > 95; lint clean; code review passed
+- [ ] Drift observability: dual severity storage, escalation enrichment, dashboard drift panel, CLI --include-raw (#181)
 - [ ] Backstage plugin (#133), Slack bot (#135), fleet dashboard (#138) deferred to v0.3.0
 
 **Dependency:** M1 (+ M6 safety, M7 `plancritic check`, M4 packs). **Produces for M9–M10:** the CI distribution channel and notifier infrastructure that M9's fleet field-tests and M10's release gate validate.
