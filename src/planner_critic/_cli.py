@@ -15,9 +15,12 @@ from collections.abc import Callable, Sequence
 
 from . import __version__
 from .cli import (  # type: ignore[attr-defined, unused-ignore]
+    build_check_parser,
     build_corpus_parser,
     build_critique_parser,
     build_demo_parser,
+    build_diagnose_parser,
+    build_domains_parser,
     build_escalate_parser,
     build_eval_parser,
     build_field_test_parser,
@@ -25,13 +28,18 @@ from .cli import (  # type: ignore[attr-defined, unused-ignore]
     build_migrate_parser,
     build_plan_parser,
     build_plans_parser,
+    build_policy_parser,
     build_providers_parser,
     build_quickstart_parser,
     build_quota_parser,
     build_replay_parser,
+    build_templates_parser,
+    run_check,
     run_corpus,
     run_critique,
     run_demo,
+    run_diagnose,
+    run_domains,
     run_escalate,
     run_eval,
     run_field_test,
@@ -39,18 +47,23 @@ from .cli import (  # type: ignore[attr-defined, unused-ignore]
     run_migrate,
     run_plan,
     run_plans,
+    run_policy,
     run_providers,
     run_quickstart,
     run_quota,
     run_replay,
+    run_templates,
 )
 
 SubcommandRunner = Callable[[list[str]], int]
 
 _SUBCOMMANDS: dict[str, tuple[argparse.ArgumentParser, SubcommandRunner]] = {
+    "check": (build_check_parser(), run_check),
     "corpus": (build_corpus_parser(), run_corpus),
     "critique": (build_critique_parser(), run_critique),
     "demo": (build_demo_parser(), run_demo),
+    "diagnose": (build_diagnose_parser(), run_diagnose),
+    "domains": (build_domains_parser(), run_domains),
     "escalate": (build_escalate_parser(), run_escalate),
     "eval": (build_eval_parser(), run_eval),
     "field-test": (build_field_test_parser(), run_field_test),
@@ -58,10 +71,12 @@ _SUBCOMMANDS: dict[str, tuple[argparse.ArgumentParser, SubcommandRunner]] = {
     "migrate": (build_migrate_parser(), run_migrate),
     "plan": (build_plan_parser(), run_plan),
     "plans": (build_plans_parser(), run_plans),
+    "policy": (build_policy_parser(), run_policy),
     "providers": (build_providers_parser(), run_providers),
     "quota": (build_quota_parser(), run_quota),
     "quickstart": (build_quickstart_parser(), run_quickstart),
     "replay": (build_replay_parser(), run_replay),
+    "templates": (build_templates_parser(), run_templates),
 }
 
 
