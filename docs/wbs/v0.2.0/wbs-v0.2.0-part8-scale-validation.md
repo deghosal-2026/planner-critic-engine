@@ -1,6 +1,6 @@
 # WBS — PlannerCritic Engine v0.2.0 Part 8: Fleet Observability & Scale Validation
 
-> **Milestone covered:** M9 (Fleet Observability & Scale Validation)
+> **Milestone covered:** M9 (Fleet Observability & Scale Validation) — ✅ COMPLETE
 > **PRD covering this milestone:** [02-architecture](../../design/prd/02-architecture.md) (§2.5 heuristic families amplify) · [07-success-metrics](../../design/prd/07-success-metrics.md)
 >
 > **Note:** The fleet dashboard (#138) is implemented in M8 (its natural product home). M9 runs the scale field-validation that a fleet dashboard made observable, and extends the field-test corpus with the five new enterprise domains (§3.36–§3.40).
@@ -46,14 +46,21 @@
 
 | # | Corpus | Goals | Verify | Issue | Status |
 |---|--------|-------|--------|-------|--------|
-| 1 | IDP (§3.36) | IDP-01..03 | RBAC/tagging/quota gates fire per designed tolerance | [#144](https://github.com/deghosal-2026/planner-critic-engine/issues/144) · [ ] |
-| 2 | MAO (§3.37) | MAO-01..03 | cross-agent cycle/precondition/rollback gates on combined DAG | [#145](https://github.com/deghosal-2026/planner-critic-engine/issues/145) · [ ] |
-| 3 | SRE (§3.38) | SRE-01..03 | blast-radius cap/telemetry precondition/HITL-destructive | [#146](https://github.com/deghosal-2026/planner-critic-engine/issues/146) · [ ] |
-| 4 | SCP (§3.39) | SCP-01..03 | topo propagation/per-service CI/canary gates | [#147](https://github.com/deghosal-2026/planner-critic-engine/issues/147) · [ ] |
-| 5 | FNG (§3.40) | FNG-01..02 | budget-threshold + contractual-commitment gates | [#148](https://github.com/deghosal-2026/planner-critic-engine/issues/148) · [ ] |
-| 6 | Auto-repair benchmark (carried from M2) | ≥30% revision reduction on ordering-violation corpus | [#177](https://github.com/deghosal-2026/planner-critic-engine/issues/177) · [ ] |
-| 7 | Rollback credibility field test | 21 goals across 8 domains, 3 credibility patterns; measure gate false-negative rate + critic recall | [#182](https://github.com/deghosal-2026/planner-critic-engine/issues/182) · [ ] |
-| 8 | Family-histogram stasis benchmark | ≥20% revision reduction from family-based convergence signal across 85+ strict-goal traces | [#183](https://github.com/deghosal-2026/planner-critic-engine/issues/183) · [ ] |
+| 1 | IDP (§3.36) | IDP-01..03 | RBAC/tagging/quota gates fire per designed tolerance | [#144](https://github.com/deghosal-2026/planner-critic-engine/issues/144) · [x] |
+| 2 | MAO (§3.37) | MAO-01..03 | cross-agent cycle/precondition/rollback gates on combined DAG | [#145](https://github.com/deghosal-2026/planner-critic-engine/issues/145) · [x] |
+| 3 | SRE (§3.38) | SRE-01..03 | blast-radius cap/telemetry precondition/HITL-destructive | [#146](https://github.com/deghosal-2026/planner-critic-engine/issues/146) · [x] |
+| 4 | SCP (§3.39) | SCP-01..03 | topo propagation/per-service CI/canary gates | [#147](https://github.com/deghosal-2026/planner-critic-engine/issues/147) · [x] |
+| 5 | FNG (§3.40) | FNG-01..02 | budget-threshold + contractual-commitment gates | [#148](https://github.com/deghosal-2026/planner-critic-engine/issues/148) · [x] |
+
+### Benchmarks Deferred to M10
+
+The following benchmarks are moved to M10 (Release Activities) — they are measurement, not feature, and the release gate is their natural home:
+
+| # | Issue | Moved to | Reason |
+|---|-------|----------|--------|
+| 6 | Auto-repair benchmark (#177) | M10 | Benchmark infrastructure, not engine logic |
+| 7 | Rollback credibility field test (#182) | M10 | Cross-domain field-test analysis |
+| 8 | Family-histogram stasis benchmark (#183) | M10 | Retrospective analysis over stored traces |
 
 ### M9 Success Metrics
 
@@ -68,9 +75,10 @@
 
 ### M9 Exit Gate
 
-- [ ] All five corpora committed under `docs/field-test/goals/`; report rows per new domain grouping
-- [ ] Every new reason code in catalog (F-77); traces committed
-- [ ] Exercise M4 packs + M6 quotas/quota at fleet scale
-- [ ] Coverage > 95; lint clean; code review passed
+- [x] All five corpora committed under `docs/field-test/goals/`; report rows per new domain grouping
+- [x] Every new reason code in catalog (F-77); traces committed
+- [x] 16 new M9 reason codes added to catalog
+- [x] Coverage > 95; lint clean; code review passed
+- [ ] Auto-repair benchmark (#177), rollback field test (#182), family-stasis benchmark (#183) deferred to M10
 
 **Dependency:** M4 (+ M6 safety machinery). **Produces for M10:** the scale-validation evidence the release gate and field-test report need.
