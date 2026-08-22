@@ -77,5 +77,7 @@ def run_quota(argv: list[str]) -> int:
             print(f"  [{f.severity.value}] {f.reason_code}: {f.message} (task={f.task_id})")
         return 1
 
+    return 0
+
 
 __all__ = ["build_quota_parser", "run_quota"]
