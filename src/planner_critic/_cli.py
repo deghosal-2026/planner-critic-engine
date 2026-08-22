@@ -14,7 +14,7 @@ import sys
 from collections.abc import Callable, Sequence
 
 from . import __version__
-from .cli import (
+from .cli import (  # type: ignore[attr-defined, unused-ignore]
     build_critique_parser,
     build_demo_parser,
     build_escalate_parser,

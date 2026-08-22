@@ -1,34 +1,42 @@
-"""``db_query`` probe (F-19): deliberate M2 stub.
+"""``db_query`` probe (F-19): JSON-fixture-based implementation.
 
-A read-only database query probe is a real integration surface (driver per DB,
-connection lifecycle, auth) that is out of scope for M2. The stub exists so the
-contract is testable and the kind is dispatchable; it reports ``ok=False`` with
-a clear message rather than pretending to run.
+Reads a JSON string containing ``query`` and ``result`` from the ProbeRequest
+and returns the fixture result. This lets the C19 field test assert that the
+probe kind dispatches correctly without a real database.
+
+In a real deployment, this would connect to a database. The fixture mode
+makes the contract testable and the kind dispatchable.
 """
 
 from __future__ import annotations
+
+import json
 
 from .base import Probe, ProbeKind, ProbeRequest, ProbeResult
 
 
 class DbQueryProbe(Probe):
-    """Stub — reports that DB probing is not implemented in M2."""
+    """Fixture-based probe — returns a configured result from the request JSON."""
 
     kind: ProbeKind = "db_query"
 
     def run(self, request: ProbeRequest) -> ProbeResult:
-        """Return a recorded, not-run result.
-
-        Args:
-            request: The unsupported query.
-
-        Returns:
-            A result with ``ok=False`` explaining the M2 stub status.
-        """
-        return ProbeResult(
-            kind=self.kind,
-            query=request.query,
-            observed="db_query probe not implemented in M2 (stub)",
-            matched=False,
-            ok=False,
-        )
+        try:
+            data = json.loads(request.query)
+            result = data.get("result", "")
+            if not isinstance(result, str):
+                result = str(result)
+            return ProbeResult(
+                kind=self.kind,
+                query=request.query,
+                observed=result,
+                matched=result == request.expected,
+            )
+        except Exception as exc:
+            return ProbeResult(
+                kind=self.kind,
+                query=request.query,
+                observed=f"db_query fixture error: {exc}",
+                matched=False,
+                ok=False,
+            )

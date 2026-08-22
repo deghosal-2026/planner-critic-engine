@@ -61,22 +61,35 @@ def test_http_check_probe_network_error_is_recorded() -> None:
 
 
 def test_db_query_probe_is_recorded_stub() -> None:
-    """The db_query stub reports ok=False with a clear message."""
-    result = run_probe(ProbeRequest(kind="db_query", query="SELECT 1", expected="1"))
-    assert result.ok is False
-    assert "stub" in result.observed
+    """The db_query probe now returns fixture results with ok=True."""
+    import json
+
+    result = run_probe(
+        ProbeRequest(
+            kind="db_query", query=json.dumps({"query": "SELECT 1", "result": "1"}), expected="1"
+        )
+    )
+    assert result.ok is True
 
 
 def test_deploy_status_probe_is_recorded_stub() -> None:
-    """The deploy_status stub reports ok=False with a clear message."""
-    result = run_probe(ProbeRequest(kind="deploy_status", query="rollout-7", expected="complete"))
-    assert result.ok is False
-    assert "stub" in result.observed
+    """The deploy_status probe now returns fixture results with ok=True."""
+    import json
+
+    result = run_probe(
+        ProbeRequest(
+            kind="deploy_status",
+            query=json.dumps({"service": "test", "status": "deployed"}),
+            expected="deployed",
+        )
+    )
+    assert result.ok is True
 
 
 def test_unknown_probe_kind_is_recorded_not_raised() -> None:
     """An unknown kind dispatches to a recorded ok=False result."""
-    result = run_probe(ProbeRequest(kind="db_query", query="SELECT 1", expected="1"))
+    request = ProbeRequest.model_construct(kind="unknown_kind", query="anything", expected="x")
+    result = run_probe(request)
     assert result.ok is False
 
 

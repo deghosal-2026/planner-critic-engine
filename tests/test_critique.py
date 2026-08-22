@@ -94,7 +94,9 @@ def test_critic_maps_heuristic_to_reason_code() -> None:
     assert len(findings) == 1
     assert findings[0].heuristic_family is HeuristicFamily.RISK
     assert findings[0].reason_code == LLM_RISK
-    assert findings[0].severity is Severity.BLOCKER
+    # Risk findings are downgraded from blocker to warning because risk
+    # is not a blocker-eligible family per _BLOCKER_ELIGIBLE_FAMILIES.
+    assert findings[0].severity is Severity.WARNING
     assert findings[0].task_id == "t1"
     assert findings[0].version == 1
 

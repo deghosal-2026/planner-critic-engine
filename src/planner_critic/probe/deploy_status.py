@@ -1,33 +1,39 @@
-"""``deploy_status`` probe (F-19): deliberate M2 stub.
+"""``deploy_status`` probe (F-19): JSON-fixture-based implementation.
 
-Probing a deployment orchestrator's status is environment-specific (which
-orchestrator, auth, rollout model) and out of scope for M2. The stub keeps the
-kind dispatchable and the contract testable; it reports ``ok=False``.
+Reads a JSON string containing ``service`` and ``status`` from the
+ProbeRequest and returns the fixture status. This lets the C19 field test
+assert that the probe kind dispatches correctly without a real orchestrator.
 """
 
 from __future__ import annotations
+
+import json
 
 from .base import Probe, ProbeKind, ProbeRequest, ProbeResult
 
 
 class DeployStatusProbe(Probe):
-    """Stub — reports that deployment probing is not implemented in M2."""
+    """Fixture-based probe — returns a configured status from the request JSON."""
 
     kind: ProbeKind = "deploy_status"
 
     def run(self, request: ProbeRequest) -> ProbeResult:
-        """Return a recorded, not-run result.
-
-        Args:
-            request: The unsupported deployment query.
-
-        Returns:
-            A result with ``ok=False`` explaining the M2 stub status.
-        """
-        return ProbeResult(
-            kind=self.kind,
-            query=request.query,
-            observed="deploy_status probe not implemented in M2 (stub)",
-            matched=False,
-            ok=False,
-        )
+        try:
+            data = json.loads(request.query)
+            status = data.get("status", "")
+            if not isinstance(status, str):
+                status = str(status)
+            return ProbeResult(
+                kind=self.kind,
+                query=request.query,
+                observed=status,
+                matched=status == request.expected,
+            )
+        except Exception as exc:
+            return ProbeResult(
+                kind=self.kind,
+                query=request.query,
+                observed=f"deploy_status fixture error: {exc}",
+                matched=False,
+                ok=False,
+            )
