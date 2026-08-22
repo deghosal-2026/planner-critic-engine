@@ -20,6 +20,7 @@ from .escalate import build_escalate_parser, run_escalate
 from .eval import build_eval_parser, run_eval
 from .field_test import build_field_test_parser, run_field_test
 from .init import build_init_parser, run_init
+from .lessons import build_lessons_parser, run_lessons
 from .migrate import build_migrate_parser, run_migrate
 from .plan import build_plan_parser, run_plan
 from .plans import build_plans_parser, run_plans
@@ -39,7 +40,9 @@ __all__ = [
     "build_domains_parser",
     "build_escalate_parser",
     "build_eval_parser",
+    "build_field_test_parser",
     "build_init_parser",
+    "build_lessons_parser",
     "build_migrate_parser",
     "build_plan_parser",
     "build_plans_parser",
@@ -57,7 +60,9 @@ __all__ = [
     "run_domains",
     "run_escalate",
     "run_eval",
+    "run_field_test",
     "run_init",
+    "run_lessons",
     "run_migrate",
     "run_plan",
     "run_plans",
