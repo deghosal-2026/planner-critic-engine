@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
-
 from planner_critic.domains.base import find_domain_packs
-from planner_critic.policy import CelGate, RegoGate
+from planner_critic.policy import CelGate
 from planner_critic.pytest_plugin import format_dag_diff
 
 
@@ -32,6 +28,7 @@ class TestPolicyEdgeCases:
         """An expression that raises during eval produces a finding."""
         gate = CelGate(name="bad-expr", expression="1/0")
         from conftest import make_plan
+
         findings = gate.evaluate(make_plan())
         assert len(findings) == 1
         assert findings[0].reason_code == "policy_violation"
@@ -40,6 +37,7 @@ class TestPolicyEdgeCases:
         """A syntax error in the CEL expression produces a finding."""
         gate = CelGate(name="syntax", expression="invalid syntax!!!")
         from conftest import make_plan
+
         findings = gate.evaluate(make_plan())
         assert len(findings) == 1
 
@@ -50,6 +48,7 @@ class TestPytestPluginEdgeCases:
     def test_format_diff_with_different_edges(self) -> None:
         """Two plans with different edge sets produce edge diffs."""
         from conftest import hard_dep, make_plan, make_task
+
         a = make_plan(
             tasks=[make_task("A"), make_task("B")],
             dependencies=[hard_dep("A", "B")],
@@ -64,6 +63,7 @@ class TestPytestPluginEdgeCases:
     def test_format_diff_with_different_tasks(self) -> None:
         """Two plans with different task sets produce task diffs."""
         from conftest import make_plan, make_task
+
         a = make_plan(tasks=[make_task("A"), make_task("B")])
         b = make_plan(tasks=[make_task("A")])
         diff = format_dag_diff(a, b)

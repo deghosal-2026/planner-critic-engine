@@ -104,8 +104,7 @@ def assert_gate_fails(
         if not matched:
             codes = {f.reason_code for f in blockers}
             raise AssertionError(
-                f"expected reason_code {reason_code!r} among "
-                f"blocker codes: {codes}"
+                f"expected reason_code {reason_code!r} among blocker codes: {codes}"
             )
     return blockers
 
@@ -127,14 +126,9 @@ def assert_node_precedes(plan: PlanVersion, before: str, after: str) -> None:
         i_before = order.index(before)
         i_after = order.index(after)
     except ValueError as exc:
-        raise AssertionError(
-            f"task not found in plan: {exc}"
-        ) from exc
+        raise AssertionError(f"task not found in plan: {exc}") from exc
     if i_before >= i_after:
-        raise AssertionError(
-            f"expected {before!r} before {after!r}, "
-            f"but order is {order}"
-        )
+        raise AssertionError(f"expected {before!r} before {after!r}, but order is {order}")
 
 
 def assert_no_circular_dependencies(plan: PlanVersion) -> None:
@@ -150,9 +144,7 @@ def assert_no_circular_dependencies(plan: PlanVersion) -> None:
 
     findings = CycleGate().run(plan)
     if findings:
-        raise AssertionError(
-            f"plan has a circular dependency: {findings[0].message}"
-        )
+        raise AssertionError(f"plan has a circular dependency: {findings[0].message}")
 
 
 def assert_plan_converges(
@@ -184,6 +176,21 @@ def assert_plan_converges(
             f"reason={result.reason_code!r}"
         )
     return result
+
+
+def assert_rollback_dag_valid(plan: PlanVersion) -> None:
+    """Assert that a rollback plan's dependency graph is a valid DAG.
+
+    Args:
+        plan: The plan whose rollback DAG to validate.
+
+    Raises:
+        AssertionError: When the graph contains a cycle.
+    """
+    from .rollback_synth import rollback_dag_valid
+
+    if not rollback_dag_valid(plan):
+        raise AssertionError("plan is not a valid DAG for rollback synthesis")
 
 
 # ── Graph diff formatting ────────────────────────────────────────────────
@@ -306,20 +313,20 @@ class _PlanBuilder:
         from .schema.plan import Task
 
         self._tasks.append(
-            Task.model_validate({
-                "id": task_id,
-                "description": f"task {task_id}",
-                "action": "do",
-                "target": task_id,
-                "risk_class": risk_class,
-                "blast_radius": blast_radius,
-            })
+            Task.model_validate(
+                {
+                    "id": task_id,
+                    "description": f"task {task_id}",
+                    "action": "do",
+                    "target": task_id,
+                    "risk_class": risk_class,
+                    "blast_radius": blast_radius,
+                }
+            )
         )
         return self
 
-    def with_dependency(
-        self, from_task: str, to_task: str, kind: str = "hard"
-    ) -> _PlanBuilder:
+    def with_dependency(self, from_task: str, to_task: str, kind: str = "hard") -> _PlanBuilder:
         """Add a dependency edge."""
         from .schema.plan import Dependency, DependencyKind
 
@@ -372,15 +379,11 @@ def mock_engine() -> Engine:
                 tasks=[],  # subclasses should set plans
             )
 
-        def revise(
-            self, plan: PlanVersion, findings: list[Finding]
-        ) -> PlanVersion:
+        def revise(self, plan: PlanVersion, findings: list[Finding]) -> PlanVersion:
             return plan
 
     class _QuietCritic(CriticRole):
-        def audit(
-            self, plan: PlanVersion, findings: list[Finding]
-        ) -> list[Finding]:
+        def audit(self, plan: PlanVersion, findings: list[Finding]) -> list[Finding]:
             return list(findings)
 
     return Engine(_SimplePlanner(), _QuietCritic(), config=LoopConfig())
@@ -402,6 +405,7 @@ __all__ = [
     "assert_no_circular_dependencies",
     "assert_node_precedes",
     "assert_plan_converges",
+    "assert_rollback_dag_valid",
     "format_dag_diff",
     "mock_critic",
     "mock_engine",
