@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
-from ..reason_codes import STANDING_RULE_PROMOTED, STANDING_RULE_PROPOSED, ReasonCode
+from ..reason_codes import ReasonCode
 
 
 @dataclass
@@ -135,7 +135,7 @@ class StandingRuleRegistry:
             True if the rule was found and promoted; False if not found or
             already promoted.
         """
-        for dedup_key, rule in self._rules.items():
+        for _dedup_key, rule in self._rules.items():
             if rule.rule_id == rule_id:
                 if rule.status == "promoted":
                     return False

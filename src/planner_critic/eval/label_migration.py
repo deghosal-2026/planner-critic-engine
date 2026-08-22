@@ -8,19 +8,14 @@ irreversible steps.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
 
 from ..gates.base import BaseGate
 from ..reason_codes import (
-    BOUNDARY_CASE_FLIP,
     IRREVERSIBLE_INVARIANT_BLOCKED,
-    LABEL_MIGRATION_DETECTED,
-    MISSING_ROLLBACK,
-    UNVERIFIED_PRECONDITION,
 )
 from ..schema.plan import PlanVersion
-from ..types import Finding, HeuristicFamily, Severity
+from ..types import Finding, Severity
 
 
 @dataclass

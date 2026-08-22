@@ -15,13 +15,14 @@ from .critique import build_critique_parser, run_critique
 from .demo import build_demo_parser, run_demo
 from .escalate import build_escalate_parser, run_escalate
 from .eval import build_eval_parser, run_eval
-from .field_test import build_field_test_parser, run_field_test  # noqa: F401
+from .field_test import build_field_test_parser, run_field_test
 from .init import build_init_parser, run_init
 from .migrate import build_migrate_parser, run_migrate
 from .plan import build_plan_parser, run_plan
 from .plans import build_plans_parser, run_plans
 from .providers import build_providers_parser, run_providers
 from .quickstart import build_quickstart_parser, run_quickstart
+from .quota import build_quota_parser, run_quota
 from .replay import build_replay_parser, run_replay
 
 __all__ = [

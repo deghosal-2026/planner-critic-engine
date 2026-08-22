@@ -10,11 +10,9 @@ Subcommands:
 from __future__ import annotations
 
 import argparse
-import json
-import sys
 from pathlib import Path
 
-from ..corpus import load_all_instances, load_corpus_manifest, load_instance, list_instances
+from ..corpus import list_instances, load_all_instances, load_corpus_manifest, load_instance
 
 _DEFAULT_CORPUS = str(
     Path(__file__).resolve().parent.parent.parent.parent
@@ -107,7 +105,7 @@ def run_corpus(argv: list[str]) -> int:
         print(f"Instances:   {manifest.instance_count}")
         print(f"Description: {manifest.description}")
         if manifest.cwe_counts:
-            print(f"\nCWE breakdown:")
+            print("\nCWE breakdown:")
             for bucket, count in sorted(manifest.cwe_counts.items()):
                 print(f"  {bucket.value}: {count}")
         return 0

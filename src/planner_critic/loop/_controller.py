@@ -44,8 +44,14 @@ from ..critique.diff import scope_between
 from ..critique.mode import CriticMode, should_invoke_llm
 from ..gates import run_deterministic_gates
 from ..gates.base import BaseGate
-from ..reason_codes import ReasonCode
+from ..ledger import PreconditionLedger
+from ..reason_codes import (
+    RUN_BUDGET_EXCEEDED,
+    ReasonCode,
+)
+from ..redaction import SecretsRedactor
 from ..roles import CriticRole, PlannerRole
+from ..run_budget import RunBudget
 from ..schema.goal import Goal, ReplanPolicy
 from ..schema.plan import PlanVersion
 from ..types import ApprovedPlan, Escalation, Finding, PlanningError, Severity
@@ -152,6 +158,9 @@ def run_loop(
     config: LoopConfig | None = None,
     spend: SpendState | None = None,
     extra_gates: list[BaseGate] | None = None,
+    run_budget: RunBudget | None = None,
+    precondition_ledger: PreconditionLedger | None = None,
+    redactor: SecretsRedactor | None = None,
 ) -> LoopResult:
     """Run the draft → critique → revise → (approve|escalate) loop.
 
@@ -164,6 +173,11 @@ def run_loop(
         spend: Optional spend counter; a fresh one is created when omitted.
         extra_gates: Optional domain-pack gate evaluators to run *in
             addition* to the built-in six.
+        run_budget: Optional run-level budget ceilings enforced above the
+            per-goal F-13 budget.
+        precondition_ledger: Optional deterministic precondition state store
+            that survives context compaction.
+        redactor: Optional secrets redactor applied to output surfaces.
 
     Returns:
         A :class:`LoopResult` — ``approved`` (with an ``ApprovedPlan``) or
@@ -183,6 +197,9 @@ def run_loop(
         config=cfg,
         state=state,
         extra_gates=extra_gates,
+        run_budget=run_budget,
+        precondition_ledger=precondition_ledger,
+        redactor=redactor,
     )
     result.spend = state
     return result
@@ -271,8 +288,13 @@ def _run(
     config: LoopConfig,
     state: SpendState,
     extra_gates: list[BaseGate] | None = None,
+    run_budget: RunBudget | None = None,
+    precondition_ledger: PreconditionLedger | None = None,
+    redactor: SecretsRedactor | None = None,
 ) -> LoopResult:
     """Internal deterministic loop body."""
+    redactor = redactor or SecretsRedactor()
+
     logger.info(
         "loop start — goal=%s mode=%s revision_cap=%d risk=%s",
         goal.id,
@@ -295,6 +317,11 @@ def _run(
         plan.version,
         len(plan.tasks),
     )
+
+    if precondition_ledger is not None:
+        precondition_ledger.process_plan(plan)
+        for diag in precondition_ledger.diagnostics():
+            logger.info("ledger: %s", diag.get("message", ""))
 
     approval: ApprovalGate = ApprovalGate(goal.risk_tolerance, goal.approval_ttl)
     prior_plan: PlanVersion | None = None
@@ -347,6 +374,12 @@ def _run(
             if budget_exceeded(goal.constraints.budget, state):
                 logger.info("loop: budget exceeded → escalate")
                 return _escalate(goal, plan, gate_findings, "budget_exceeded", revision)
+            run_budget_hit = run_budget and run_budget.check()
+            if run_budget_hit:
+                return _escalate(
+                    goal, plan, gate_findings,
+                    cast("ReasonCode", run_budget_hit), revision,
+                )
             if revision < config.revision_cap:
                 plan = _revise_or_raise(
                     planner,
@@ -365,6 +398,11 @@ def _run(
             ):
                 logger.info("loop: LLM call budget exceeded → escalate")
                 return _escalate(goal, plan, gate_findings, "budget_exceeded", revision)
+            if run_budget and run_budget.check() is not None:
+                rc = run_budget.check()
+                logger.info("loop: run budget ceiling hit → escalate")
+                reason = cast("ReasonCode", rc or RUN_BUDGET_EXCEEDED)
+                return _escalate(goal, plan, gate_findings, reason, revision)
             logger.info("loop: invoking LLM critic (call %d)", state.calls_used + 1)
             state.record_llm_call()
             if config.mode == "deterministic-first":
@@ -397,6 +435,10 @@ def _run(
         if budget_exceeded(goal.constraints.budget, state):
             logger.info("loop: budget exceeded → escalate")
             return _escalate(goal, plan, findings, "budget_exceeded", revision)
+
+        run_budget_hit = run_budget and run_budget.check()
+        if run_budget_hit:
+            return _escalate(goal, plan, findings, cast("ReasonCode", run_budget_hit), revision)
 
         if goal.replan_policy is ReplanPolicy.ABORT:
             logger.info("loop: replan_policy=abort → escalate (no revise)")
@@ -448,6 +490,10 @@ def _run(
             logger.info("loop: revising plan (revision %d → %d)", revision, revision + 1)
             next_id = f"plan-{goal.id}-r{revision + 1}"
             plan = _revise_or_raise(planner, plan, findings, next_id=next_id)
+            if precondition_ledger is not None:
+                precondition_ledger.process_plan(plan)
+                for diag in precondition_ledger.diagnostics():
+                    logger.info("ledger (post-revise): %s", diag.get("message", ""))
 
     logger.info("loop: revision cap reached → escalate")
     return _escalate(goal, plan, prior_findings or [], "revision_cap_reached", config.revision_cap)

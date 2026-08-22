@@ -30,11 +30,13 @@ class RiskTolerance(StrEnum):
     """Approval threshold posture for a goal.
 
     ``strict`` tolerates zero warnings; ``balanced`` tolerates acknowledged
-    warnings. No blockers may ever remain under either posture (F-73).
+    warnings; ``permissive`` tolerates warnings without acknowledgement.
+    No blockers may ever remain under any posture (F-73).
     """
 
     STRICT = "strict"
     BALANCED = "balanced"
+    PERMISSIVE = "permissive"
 
 
 class ReplanPolicy(StrEnum):
