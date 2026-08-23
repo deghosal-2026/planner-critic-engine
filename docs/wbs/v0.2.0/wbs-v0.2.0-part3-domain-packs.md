@@ -85,6 +85,6 @@ Three gate evaluators + catalog + prompt:
 - [x] All 4 packs installable + hermetic corpus green ($0 LLM)
 - [x] Packs additive to built-in six; disabling a pack restores default behavior
 - [x] `init --template` + inverse-rollback synthesizer working
-- [x] Coverage ≥ 93%; lint clean (ruff + mypy strict); code review pending
+- [x] Coverage ≥ 93%; lint clean (ruff + mypy strict); code review passed
 
 **Dependency:** M3. **Produces for M5+:** precondition catalogs + action-inversion registries + reason codes that M6 quotas and M9 scale field-tests consume.

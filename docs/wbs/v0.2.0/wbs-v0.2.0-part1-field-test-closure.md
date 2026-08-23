@@ -78,7 +78,7 @@
 - [x] #98 Executor-usability audit (Q4) — 28 approved plans; 100% grounded preconditions; no placeholder/forward-ref gaps
 - [x] #172 Positive-control test — golden plan under strict; gates pass, result recorded
 - [x] #173 Failure-shape clustering — 98 blockers across 10 domains; shape-driven failure analysis
-- [ ] Coverage > 95; lint clean (ruff + mypy strict); code review passed
-- [ ] Hermetic gate holds: CI never calls a paid LLM
+- [x] Coverage > 95; lint clean (ruff + mypy strict); code review passed
+- [x] Hermetic gate holds: CI never calls a paid LLM
 
 **Dependency:** v0.1.0 (shipped). **Produces for M2+:** a fully-measured, proven v0.1.0 base on which all v0.2.0 features build.

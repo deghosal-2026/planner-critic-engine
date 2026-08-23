@@ -12,6 +12,8 @@
 **PRD coverage:** F-14 shadow mode (productized as CI observe→enforce), F-30 escalation surfaces, F-62 HTTP, F-45 MCP, F-82 OTel.
 **CUJs covered:** CUJ 1/15 (install + platform lead), on-call persona, platform-engineer persona.
 
+> **Numbering note:** M8.2 (Backstage plugin #133) and M8.4 (Slack escalation bot #135) were deferred to v0.3.0. See the Deferred section below.
+
 ### M8.1 GitHub Action / GitLab CI runner (#128)
 
 - First-party `action.yml` + GitLab CI template running `plancritic check` on PR-scoped changes; emits a PR status check (`planner-critic / plan`) — **blocker→fail, escalation→neutral, approve→success** — plus inline annotations on flagged files and a trace artifact.

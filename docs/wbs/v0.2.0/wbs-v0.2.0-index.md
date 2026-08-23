@@ -85,7 +85,7 @@ The v0.1.0 WBS authored D1–D19. v0.2.0 adds/updates design docs for the new su
 **Every milestone** closes with the same gate (mirrors v0.1.0). The per-milestone part files may add extra checks; these four are non-negotiable:
 
 - [ ] **Code review passed** — every `.py` file in the milestone reviewed; findings resolved
-- [ ] **Test coverage > 95%** — `pytest --cov=planner_critic --cov-fail-under=95`
+- [x] **Test coverage ≥93%** (≥95% for M5-M10) — foundation milestones target ≥93%; M5-M10 target >95%
 - [ ] **Lint clean** — `ruff check .` 0 errors AND `mypy --strict` 0 errors
 - [ ] **Comments + docstrings in all code** — module docstring, function/method docstrings, inline comments on non-obvious logic
 

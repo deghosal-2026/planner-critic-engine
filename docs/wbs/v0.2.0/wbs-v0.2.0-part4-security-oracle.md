@@ -79,10 +79,10 @@
 
 ### M5 Exit Gate
 
-- [ ] Release-blocking security claim now corpus-backed (not "one hand-written ADV-07")
-- [ ] Baseline security-critic accuracy + blind-spot bucket published
-- [ ] Hermetic gate holds ($0 LLM in CI); checksums CI-asserted
-- [ ] Label-migration harness green: no boundary flips; irreversible invariant blocks regardless of model label
-- [ ] Coverage > 95; lint clean; code review passed
+- [x] Release-blocking security claim now corpus-backed (not "one hand-written ADV-07")
+- [x] Baseline security-critic accuracy + blind-spot bucket published
+- [x] Hermetic gate holds ($0 LLM in CI); checksums CI-asserted
+- [x] Label-migration harness green: no boundary flips; irreversible invariant blocks regardless of model label
+- [x] Coverage > 95; lint clean; code review passed
 
 **Dependency:** v0.1.0 base (parallelizable with M2–M4). **Produces for M4/M9/M10:** heuristic-pack rule source for M4 packs, regression evidence for M10 release gate.
