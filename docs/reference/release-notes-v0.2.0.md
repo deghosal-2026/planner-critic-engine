@@ -66,7 +66,7 @@
 
 ### Code Quality
 - **31 bugs found and fixed** by pre-release code review (#184–#214) — including 6 critical (redaction offset corruption, RegoGate `--data`→`--input`, dead `@re_gate`, MCP critic cache, diagnose `KeyError`, oracle double-count)
-- Coverage ≥95%
+- Coverage > 90%
 - Lint clean (ruff + mypy strict)
 
 ## Breaking Changes
