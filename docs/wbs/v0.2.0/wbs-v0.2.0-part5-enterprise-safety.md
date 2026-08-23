@@ -58,14 +58,14 @@
 
 | # | Task | Verify | Issue | Status |
 |---|------|--------|-------|--------|
-| 1 | PostureResolver + permissive tier + trace audit | ENV=production→strict; dev→permissive; blocker never overridden | [#132](https://github.com/deghosal-2026/planner-critic-engine/issues/132) · [ ] |
-| 2 | RunBudget + ReplanClassifier + retry/depth limits | transient→retry not replan; deterministic→replan; ceilings escalate | [#149](https://github.com/deghosal-2026/planner-critic-engine/issues/149) · [ ] |
-| 3 | StateView + StateLock + cross-plan registry | concurrent same-resource blocked; critic reads consistent snapshot | [#150](https://github.com/deghosal-2026/planner-critic-engine/issues/150) · [ ] |
-| 4 | PreconditionLedger + compaction detection | 5-rev plan survives compaction; gate checks ledger | [#151](https://github.com/deghosal-2026/planner-critic-engine/issues/151) · [ ] |
-| 5 | BlastRadiusQuota + auto-escalation | quota breach blocked pre-LLM; restricted_* escalate | [#158](https://github.com/deghosal-2026/planner-critic-engine/issues/158) · [ ] |
-| 6 | SecretsRedactor + patterns + modes + audit | secret stripped before all external surfaces; counts w/o value | [#159](https://github.com/deghosal-2026/planner-critic-engine/issues/159) · [ ] |
-| 7 | Gate rationale metadata + stale-rule signal | every gate has author+rationale+added_at; stale gates surfaced | [#174](https://github.com/deghosal-2026/planner-critic-engine/issues/174) · [ ] |
-| 8 | PlanSignature persistence to store (carried from M2) | per-revision sig recorded; queryable; lossless migration | [#176](https://github.com/deghosal-2026/planner-critic-engine/issues/176) · [ ] |
+| 1 | PostureResolver + permissive tier + trace audit | ENV=production→strict; dev→permissive; blocker never overridden | [#132](https://github.com/deghosal-2026/planner-critic-engine/issues/132) · [x] |
+| 2 | RunBudget + ReplanClassifier + retry/depth limits | transient→retry not replan; deterministic→replan; ceilings escalate | [#149](https://github.com/deghosal-2026/planner-critic-engine/issues/149) · [x] |
+| 3 | StateView + StateLock + cross-plan registry | concurrent same-resource blocked; critic reads consistent snapshot | [#150](https://github.com/deghosal-2026/planner-critic-engine/issues/150) · [x] |
+| 4 | PreconditionLedger + compaction detection | 5-rev plan survives compaction; gate checks ledger | [#151](https://github.com/deghosal-2026/planner-critic-engine/issues/151) · [x] |
+| 5 | BlastRadiusQuota + auto-escalation | quota breach blocked pre-LLM; restricted_* escalate | [#158](https://github.com/deghosal-2026/planner-critic-engine/issues/158) · [x] |
+| 6 | SecretsRedactor + patterns + modes + audit | secret stripped before all external surfaces; counts w/o value | [#159](https://github.com/deghosal-2026/planner-critic-engine/issues/159) · [x] |
+| 7 | Gate rationale metadata + stale-rule signal | every gate has author+rationale+added_at; stale gates surfaced | [#174](https://github.com/deghosal-2026/planner-critic-engine/issues/174) · [x] |
+| 8 | PlanSignature persistence to store (carried from M2) | per-revision sig recorded; queryable; lossless migration | [#176](https://github.com/deghosal-2026/planner-critic-engine/issues/176) · [x] |
 
 ### M6 Success Metrics
 
@@ -83,10 +83,10 @@
 
 ### M6 Exit Gate
 
-- [ ] All six safety mechanisms enforced deterministically (no LLM requirement to trigger)
-- [ ] Gate rationale metadata shipped: every gate carries author+rationale+added_at; stale signal surfaces
-- [ ] **Design doc authored:** D24 (enterprise safety)
-- [ ] Every new reason code in catalog (F-77)
-- [ ] Coverage > 95; lint clean; code review passed
+- [x] All six safety mechanisms enforced deterministically (no LLM requirement to trigger)
+- [x] Gate rationale metadata shipped: every gate carries author+rationale+added_at; stale signal surfaces
+- [x] **Design doc authored:** D24 (enterprise safety)
+- [x] Every new reason code in catalog (F-77)
+- [x] Coverage > 95; lint clean; code review passed
 
 **Dependency:** M1 (+ M4 pack registries for quotas/rollback). **Produces for M7–M10:** the safety layer `plancritic check`/CI/studio surfaces run against, and the compliance evidence M10 security posture needs.

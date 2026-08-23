@@ -47,7 +47,7 @@
 
 - [x] Median revisions-to-approval reduced on an ordering-violation corpus — ordering plan was 3 revisions → escalate; now approves at revision 1
 - [x] 0 false repairs / false synthesis (cycles, parallel, novel misses still hit the LLM critic)
-- [x] Coverage ≥93% (93.21%); lint clean (ruff + mypy strict); code review pending
+- [x] Coverage ≥93% (93.21%); lint clean (ruff + mypy strict); code review passed
 - [x] Reason codes (`auto_repaired_ordering`, `auto_closed_precondition`, `plan_oscillation_detected`, `auto_converge_partial_approval`) in catalog (F-77)
 
 **Deferred items (not blocking M2):**
@@ -110,7 +110,7 @@
 
 - [x] Built-in six still run when all extensions are disabled (additive guarantee)
 - [x] A sample domain pack + sample Rego policy produce findings end-to-end
-- [x] Coverage ≥ 93% (93.06%); lint clean; code review pending
+- [x] Coverage ≥ 93% (93.06%); lint clean; code review passed
 - [x] **Design docs authored:** D20 (domain-pack-design.md), D21 (policy-engine-design.md)
 
 **Dependency:** M1. **Produces for M4+:** the `planner_critic.domains.*` namespace + policy engine + pytest plugin that M4's packs and every downstream surface consume.
