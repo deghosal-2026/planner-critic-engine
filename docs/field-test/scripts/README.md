@@ -1,8 +1,25 @@
 # Field Test Scripts
 
+Shared batch runners for field-test execution across versions.
+
+## Structure
+
+```
+docs/field-test/scripts/
+├── README.md
+├── run_remaining.py     # Runs remaining field-test scenarios (v0.1.0 / batch runners)
+├── batch-01.py          # Batch 1:  5 scenarios
+├── batch-02.py          # Batch 2:  5 scenarios
+├── ...                  # (batch-03 through batch-13)
+└── v0.2.0/             # v0.2.0-specific benchmark scripts
+    ├── bench_auto_repair.py    # Auto-repair benchmark (#177)
+    ├── bench_rollback.py       # Rollback credibility field test (#182)
+    └── bench_stasis.py         # Family-histogram stasis benchmark (#183)
+```
+
 ## run_remaining.py
 
-Runs the 61 remaining field-test scenarios (§3.11–§3.22 + expanded goals in existing domains) one at a time into `docs/field-test/reports/0.1.0-08.20.2026/remain-scenario/`.
+Runs field-test scenarios one at a time. Output goes to version-specific report directories.
 
 ### Prerequisites
 
@@ -12,7 +29,7 @@ Runs the 61 remaining field-test scenarios (§3.11–§3.22 + expanded goals in 
 ### Usage
 
 ```bash
-# Run all 61 scenarios
+# Run all scenarios
 python3 docs/field-test/scripts/run_remaining.py
 
 # Run first 5 only
@@ -24,9 +41,7 @@ python3 docs/field-test/scripts/run_remaining.py --skip-existing
 
 ### Output
 
-- Per-goal traces: `docs/field-test/reports/0.1.0-08.20.2026/remain-scenario/<goal-id>/core-api/<goal-id>/trace.json`
-- LLM logs: `docs/field-test/reports/0.1.0-08.20.2026/remain-scenario/<goal-id>/core-api/<goal-id>/llm-logs/`
-- Results registry: `docs/field-test/reports/0.1.0-08.20.2026/remain-scenario/results.json`
+- Per-goal traces: `docs/field-test/v0.1.0/reports/...` or `docs/field-test/v0.2.0/reports/...`
 
 ### Config
 

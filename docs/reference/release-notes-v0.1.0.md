@@ -57,8 +57,8 @@ None — v0.1.0 is the initial release.
 
 | Doc | Location |
 |-----|----------|
-| Field Test Results | `docs/field-test/field-test-results-0.1.0.md` |
-| Field Test Plan | `docs/field-test/field-test-plan.md` |
+| Field Test Results | `docs/field-test/v0.1.0/field-test-results-0.1.0.md` |
+| Field Test Plan | `docs/field-test/v0.1.0/field-test-plan.md` |
 | Architecture | `docs/architecture/architecture-v0.1.0.md` |
 | API Reference | `docs/reference/api.md` |
 | Design Decisions | `docs/design/design-decisions.md` |
