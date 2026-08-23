@@ -97,14 +97,14 @@ The following benchmarks were deferred from M9 and are executed as part of the r
 |---|------|--------|-------|--------|
 | 1 | Packaging + pip release | fresh-venv install of base + extras; `--help` lists new commands | [#163](https://github.com/deghosal-2026/planner-critic-engine/issues/163) · [ ] |
 | 2 | Security posture (OpenSSF Silver + Hardened) | badge passing; callback signatures verified; redaction end-to-end | [#164](https://github.com/deghosal-2026/planner-critic-engine/issues/164) · [ ] |
-| 3 | Release-gate sweep + hermetic CI | full matrix green; gate + injection hermetic; §7.1 met | [#165](https://github.com/deghosal-2026/planner-critic-engine/issues/165) · [ ] |
+| 3 | Release-gate sweep + hermetic CI | full matrix green; gate + injection hermetic; §7.1 met | [#165](https://github.com/deghosal-2026/planner-critic-engine/issues/165) · [x] |
 | 4 | Migration & backward-compat | v0.1.0 → v0.2.0 lossless; replay works | [#166](https://github.com/deghosal-2026/planner-critic-engine/issues/166) · [ ] |
 | 5 | Release notes v0.2.0 | doc authored; API reference + quickstart current | [#167](https://github.com/deghosal-2026/planner-critic-engine/issues/167) · [ ] |
 | 6 | Final quality gate | ruff/mypy/coverage ≥95; code review resolved; tagged | [#168](https://github.com/deghosal-2026/planner-critic-engine/issues/168) · [ ] |
 | 7 | Release coordination | milestones closed; tag + announcement + README updated | [#169](https://github.com/deghosal-2026/planner-critic-engine/issues/169) · [ ] |
-| 8 | Auto-repair benchmark (carried from M9) | ≥30% revision reduction on ordering-violation corpus | [#177](https://github.com/deghosal-2026/planner-critic-engine/issues/177) · [ ] |
-| 9 | Rollback credibility field test (carried from M9) | 21 goals across 8 domains, 3 credibility patterns; measure gate false-negative rate + critic recall | [#182](https://github.com/deghosal-2026/planner-critic-engine/issues/182) · [ ] |
-| 10 | Family-histogram stasis benchmark (carried from M9) | ≥20% revision reduction from family-based convergence signal across 85+ strict-goal traces | [#183](https://github.com/deghosal-2026/planner-critic-engine/issues/183) · [ ] |
+| 8 | Auto-repair benchmark (carried from M9) | ≥30% revision reduction on ordering-violation corpus | [#177](https://github.com/deghosal-2026/planner-critic-engine/issues/177) · [x] |
+| 9 | Rollback credibility field test (carried from M9) | 21 goals across 8 domains, 3 credibility patterns; measure gate false-negative rate + critic recall | [#182](https://github.com/deghosal-2026/planner-critic-engine/issues/182) · [x] |
+| 10 | Family-histogram stasis benchmark (carried from M9) | ≥20% revision reduction from family-based convergence signal across 85+ strict-goal traces | [#183](https://github.com/deghosal-2026/planner-critic-engine/issues/183) · [x] |
 | 11 | **CodeReview bug-fix sweep** — fix or classify all 31 bugs | every [#184–#214](https://github.com/deghosal-2026/planner-critic-engine/issues/184) closed or filed as documented caveat | [#184–#214](https://github.com/deghosal-2026/planner-critic-engine/issues/184) · [x] |
 
 ### M10 Success Metrics
