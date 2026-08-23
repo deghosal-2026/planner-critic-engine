@@ -52,12 +52,14 @@ from ..reason_codes import (
 from ..redaction import SecretsRedactor
 from ..roles import CriticRole, PlannerRole
 from ..run_budget import RunBudget
+from ..schema.acceptance import AcceptanceContract, bind_acceptance, evaluate_contract
 from ..schema.goal import Goal, ReplanPolicy
 from ..schema.plan import PlanVersion
 from ..types import ApprovedPlan, Escalation, Finding, PlanningError, Severity
 from .autofix import apply_ordering_auto_repair, apply_precondition_closer
 from .budget import SpendState, budget_exceeded
 from .convergence import stalled
+from .histogram import FamilyHistogram, compute_family_histogram, detect_histogram_cycling
 from .oscillation import compute_plan_signature, detect_oscillation
 from .regression import regression_detected
 
@@ -73,6 +75,7 @@ class LoopConfig:
     auto_repair: bool = True
     precondition_closer: bool = True
     oscillation_window: int = 4
+    histogram_lag: int = 2
     converge_policy: str = "escalate"
 
     @staticmethod
@@ -117,6 +120,12 @@ class LoopConfig:
         except ValueError:
             oscillation_window = 4
 
+        lag_str = os.environ.get("PC_HISTOGRAM_LAG", "")
+        try:
+            histogram_lag = max(2, int(lag_str)) if lag_str else 2
+        except ValueError:
+            histogram_lag = 2
+
         converge_str = os.environ.get("PC_CONVERGE_POLICY", "escalate").strip().lower()
         converge_policy = (
             converge_str if converge_str in ("escalate", "auto_converge") else "escalate"
@@ -128,6 +137,7 @@ class LoopConfig:
             auto_repair=auto_repair,
             precondition_closer=precondition_closer,
             oscillation_window=oscillation_window,
+            histogram_lag=histogram_lag,
             converge_policy=converge_policy,
         )
 
@@ -161,6 +171,7 @@ def run_loop(
     run_budget: RunBudget | None = None,
     precondition_ledger: PreconditionLedger | None = None,
     redactor: SecretsRedactor | None = None,
+    acceptance: AcceptanceContract | None = None,
 ) -> LoopResult:
     """Run the draft → critique → revise → (approve|escalate) loop.
 
@@ -200,6 +211,7 @@ def run_loop(
         run_budget=run_budget,
         precondition_ledger=precondition_ledger,
         redactor=redactor,
+        acceptance=acceptance,
     )
     result.spend = state
     return result
@@ -309,6 +321,7 @@ def _run(
     run_budget: RunBudget | None = None,
     precondition_ledger: PreconditionLedger | None = None,
     redactor: SecretsRedactor | None = None,
+    acceptance: AcceptanceContract | None = None,
 ) -> LoopResult:
     """Internal deterministic loop body."""
     redactor = redactor or SecretsRedactor()
@@ -341,10 +354,15 @@ def _run(
         for diag in precondition_ledger.diagnostics():
             logger.info("ledger: %s", diag.get("message", ""))
 
+    # Bind the acceptance contract before the loop starts (#215): approval
+    # reads the frozen posture, never ambient goal/config state.
+    contract = acceptance if acceptance is not None else bind_acceptance(goal)
+
     approval: ApprovalGate = ApprovalGate(goal.risk_tolerance, goal.approval_ttl)
     prior_plan: PlanVersion | None = None
     prior_findings: list[Finding] = []
     sig_history: list[str] = []
+    hist_history: list[FamilyHistogram] = []
 
     for revision in range(1, config.revision_cap + 1):
         state.record_revision()
@@ -440,7 +458,7 @@ def _run(
         else:
             findings = list(gate_findings)
 
-        threshold_ok, thresholds = resolve_threshold(findings, goal.risk_tolerance)
+        threshold_ok, thresholds = evaluate_contract(findings, contract)
         if threshold_ok:
             approved = approval.approve(plan, thresholds)
             logger.info("loop: threshold met → APPROVED plan=%s v%d", plan.id, plan.version)
@@ -490,8 +508,8 @@ def _run(
                             ),
                         ),
                     ]
-                    threshold_ok, thresholds = resolve_threshold(
-                        merged_findings, goal.risk_tolerance
+                    threshold_ok, thresholds = evaluate_contract(
+                        merged_findings, contract
                     )
                     if threshold_ok:
                         approved = approval.approve(merged, thresholds)
@@ -504,6 +522,16 @@ def _run(
                         )
             logger.info("loop: oscillation detected → escalate")
             return _escalate(goal, plan, findings, "plan_oscillation_detected", revision)
+
+        hist_history.append(compute_family_histogram(findings))
+        # Cycling waits until structural oscillation's window has had its
+        # chance: when a trace exhibits BOTH patterns, #152's shape-based
+        # diagnosis (which tasks cycle) is the richer escalation and wins.
+        if len(hist_history) >= config.oscillation_window and detect_histogram_cycling(
+            hist_history, config.histogram_lag
+        ):
+            logger.info("loop: family histogram cycling detected → escalate (reshuffling)")
+            return _escalate(goal, plan, findings, "family_histogram_cycling", revision)
 
         prior_plan, prior_findings = plan, findings
         if revision < config.revision_cap:

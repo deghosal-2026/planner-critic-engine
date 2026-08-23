@@ -1,0 +1,30 @@
+# Failure-Mode Register — intentional trade-offs vs claims needing evidence
+
+One row per known failure mode or load-bearing assumption. The class column
+answers, per row: is this **Intentional** (an accepted trade-off with written
+rationale) or **Needs evidence** (an unverified claim awaiting measurement)?
+
+Process rules (do not edit around them):
+
+1. New rows are appended alongside the change that introduces the assumption.
+2. Class changes require an evidence link in the same commit — no silent edits.
+3. Every row resolves to a design decision, field-test section, benchmark
+   report, or tracking issue. Stale rows are visible via `Last verified`.
+
+| # | Failure mode / assumption | Class | Rationale / evidence link | Status owner | Last verified |
+|---|---|---|---|---|---|
+| F-01 | Strict mode + LLM critic escalates every non-trivial plan; the strict arm cannot distinguish "correctly refuses unsafe" from "refuses everything" on zero-variance corpora | Intentional (posture) | [v0.1.0 field test §Scorecard A](../field-test/v0.1.0/field-test-results-0.1.0.md); positive-control test [`tests/test_positive_control_p172.py`](https://github.com/deghosal-2026/planner-critic-engine/blob/main/tests/test_positive_control_p172.py) | Closed — documented negative result | 2026-08-23 |
+| F-02 | The severity guardrail is one-directional by design: it can downgrade critic over-claims but never upgrade under-claims | Intentional (architecture) | Under-claim direction owned by deterministic gates — see [#171](https://github.com/deghosal-2026/planner-critic-engine/issues/171), guardrail docstring | Closed | 2026-08-23 |
+| F-03 | Gate coverage seam: a rollback that exists but cannot undo (unreachable / self-dependent basis / inconsistent-state / post-consumed window) passed all gates | Needs evidence → fixed | Fixed by the `rollback_credible` gate — [#216](https://github.com/deghosal-2026/planner-critic-engine/issues/216); boundary twins pin each pattern | v0.2.1 / #216 | 2026-08-23 |
+| F-04 | Gate coverage seam: a verification step that runs after its result was consumed was invisible to presence-only checks | Needs evidence → fixed | Fixed by the `verification_ordering` gate + verifies-before-mutate twin pair — [#219](https://github.com/deghosal-2026/planner-critic-engine/issues/219) | v0.2.1 / #219 | 2026-08-23 |
+| F-05 | Stall-signal gap: blocker-family histogram cycling A→B→A→B evades F-06 text convergence and #152 structural oscillation | Needs evidence → signal shipped | Engine signal shipped behind precedence rule — [#217](https://github.com/deghosal-2026/planner-critic-engine/issues/217); retrospective benchmark: `docs/field-test/v0.2.1/scripts/bench_cycling.py` | v0.2.1 / #217 | 2026-08-23 |
+| F-06 | Critic label variance and invented evidence across repeated trials of identical plans are unmeasured; guardrail demotions were indistinguishable from correct warnings | Needs evidence | Live-critic boundary runner measures flip/migration/evidence-drift/underclaim rates — [#218](https://github.com/deghosal-2026/planner-critic-engine/issues/218) | Open — v0.2.1 | 2026-08-23 |
+| F-07 | Operational cost of running the engine (latency added, reviewer burden, operator workload) has never been stated as before/after numbers | Needs evidence | Benchmark over stored traces + paired heuristic-only run — [#221](https://github.com/deghosal-2026/planner-critic-engine/issues/221); downstream error rate deferred to partner-runner spec | Open — v0.2.1 | 2026-08-23 |
+| F-08 | Approval semantics read mutable goal/posture config at decision time; nothing freezes acceptance criteria or approving authority before execution | Intentional (deferred) → in progress | Accepted-contract mechanism designed — [#215](https://github.com/deghosal-2026/planner-critic-engine/issues/215); rationale thread: joinwell52 review, Part 1 | Open — v0.2.1 | 2026-08-23 |
+| F-09 | Local models as planner role: DeepSeek-R1-8B emits broken JSON; Qwen3-4B JSON valid but critic role too weak | Intentional (accepted limitation) | v0.1.0 model sweep; CHANGELOG "Known Issues" | Deferred to v0.3.0 | 2026-08-23 |
+| F-10 | Adaptive revision cap (detect strict goals, reduce cap to save LLM calls) not implemented | Needs evidence | Candidate follow-on to #183/#217 benchmarks — measure first, then automate | Deferred to v0.3.0 | 2026-08-23 |
+| F-11 | TUI / studio / IDE surfaces absent; interactive use requires CLI/HTTP/MCP | Intentional (scoped out) | PRD 09 roadmap; [#133–138](https://github.com/deghosal-2026/planner-critic-engine/issues/133) filed for v0.3.0 | Deferred to v0.3.0 | 2026-08-23 |
+| F-12 | Backstage portal plugin / Slack dashboard absent — fleet observability limited to webhook notifier | Intentional (scoped out) | [#133](https://github.com/deghosal-2026/planner-critic-engine/issues/133), [#135](https://github.com/deghosal-2026/planner-critic-engine/issues/135) | Deferred to v0.3.0 | 2026-08-23 |
+
+Maintenance: append new rows with the change that introduces the assumption;
+flip classes only with evidence in the same commit.

@@ -230,11 +230,13 @@ planner-critic-engine/
 
 ## Known Gaps (v0.3.0)
 
-- **Planner capability gap** — the LLM critic still finds blockers on strict goals across all domains. Deterministic precondition closer and auto-repair (v0.2.0) partially address this, but strict mode = escalation for non-trivial plans.
-- **TUI / studio / IDE surfaces** — deferred to v0.3.0.
-- **Backstage developer portal plugin** — deferred to v0.3.0.
-- **Adaptive revision cap** — detect strict goals and reduce cap to 1, saving LLM calls.
-- **Local model support for planner** — Qwen3-4B can produce valid JSON; critic role still too weak.
+The authoritative register of known failure modes and load-bearing assumptions — each classified as an intentional trade-off or a claim still needing evidence — lives in [docs/reference/failure-modes.md](docs/reference/failure-modes.md). Summary:
+
+- **Planner capability gap** — strict mode = escalation for non-trivial plans (intentional posture; see register F-01).
+- **Local model support for planner** — Qwen3-4B JSON valid; critic role still too weak (F-09).
+- **TUI / studio / IDE surfaces** — deferred to v0.3.0 (F-11).
+- **Backstage developer portal plugin** — deferred to v0.3.0 (F-12).
+- **Adaptive revision cap** — detect strict goals and reduce cap to 1, saving LLM calls (F-10).
 
 See [CHANGELOG.md](CHANGELOG.md) for full details.
 

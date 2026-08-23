@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 from ..gates.base import BaseGate
 from ..reason_codes import IRREVERSIBLE_INVARIANT_BLOCKED
-from ..schema.plan import PlanVersion, Task
+from ..schema.plan import Dependency, PlanVersion, Task
 from ..types import Finding, Severity
 
 
@@ -89,7 +89,8 @@ class IrreversibleInvariantGate(BaseGate):
                             message=(
                                 f"Irreversible step {task.id!r} (critical risk, high blast radius) "
                                 f"requires rollback and verified precondition, "
-                                f"but has: rollback={has_rollback}, verification={has_verification}, "
+                                f"but has: rollback={has_rollback}, "
+                                f"verification={has_verification}, "
                                 f"precondition={has_precondition}"
                             ),
                         )
@@ -148,7 +149,73 @@ def generate_boundary_cases() -> list[BoundaryCase]:
         tasks=[high_task], dependencies=[],
     )
 
+    verified_deploy = {
+        "id": "t1", "description": "deploy service", "action": "deploy",
+        "target": "prod", "risk_class": "high", "blast_radius": "high",
+        "rollback": {"trigger": "fail", "action": "revert", "safety_guard": "backup"},
+        "verification": {"what": "health", "how": "check", "expected": "pass"},
+        "parallel_group": "g1",
+    }
+    racing_sibling = {
+        "id": "t2", "description": "rotate credentials", "action": "rotate",
+        "risk_class": "medium", "blast_radius": "medium",
+        "parallel_group": "g1",
+    }
+
+    def _sibling_plan(target: str) -> PlanVersion:
+        sibling = dict(racing_sibling)
+        sibling["target"] = target
+        return PlanVersion(
+            id=f"boundary-verification-{target}", goal_id="test", version=1,
+            tasks=[Task.model_validate(verified_deploy), Task.model_validate(sibling)],
+            dependencies=[],
+        )
+
+    guarded_migrate = {
+        "id": "t1", "description": "migrate schema", "action": "migrate",
+        "target": "db", "risk_class": "high", "blast_radius": "high",
+        "rollback": {"trigger": "fail", "action": "revert", "safety_guard": "backup"},
+        "verification": {"what": "schema", "how": "check", "expected": "v2"},
+    }
+
+    def _consumer_plan(verified: bool) -> PlanVersion:
+        consumer: dict[str, object] = {
+            "id": "t2", "description": "seed reference data", "action": "insert",
+            "target": "db", "risk_class": "medium", "blast_radius": "medium",
+        }
+        if verified:
+            consumer["verification"] = {"what": "rows", "how": "count", "expected": "n"}
+        return PlanVersion(
+            id=f"boundary-post-consumed-{verified}", goal_id="test", version=1,
+            tasks=[Task.model_validate(guarded_migrate), Task.model_validate(consumer)],
+            dependencies=[Dependency(from_task="t1", to_task="t2")],
+        )
+
     return [
+        BoundaryCase(
+            case_id="credible-rollback-vs-post-consumed-window",
+            description=(
+                "Consumer of a rollback-guarded high-risk mutation verifies "
+                "its own result vs consumes bare inside the write→rollback "
+                "window — single-fact (verification) diff"
+            ),
+            plan_a=_consumer_plan(True),
+            plan_b=_consumer_plan(False),
+            expected_blocker_family="weak_rollback",
+            expected_reason_code="rollback_post_consumed",
+        ),
+        BoundaryCase(
+            case_id="verifies-before-consume-vs-consumes-before-verified",
+            description=(
+                "Parallel sibling targets a disjoint resource vs the same "
+                "resource as a verified high-risk mutation — single-fact "
+                "(target) diff"
+            ),
+            plan_a=_sibling_plan("replica"),
+            plan_b=_sibling_plan("prod"),
+            expected_blocker_family="unsafe_sequencing",
+            expected_reason_code="verification_after_consumer",
+        ),
         BoundaryCase(
             case_id="optional-step-vs-required-dependency",
             description="Optional step vs required dependency — single-fact diff",

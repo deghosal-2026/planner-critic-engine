@@ -37,11 +37,16 @@ class EscalationManager:
 
     Args:
         store: The plan store that persists escalations, plans, and findings.
+        approving_authority: Optional bound principal (from an
+            :class:`~planner_critic.schema.acceptance.AcceptanceContract`).
+            When set, ``resolve`` requires a matching ``principal`` — the
+            authority is pinned at bind time and cannot drift mid-run.
     """
 
-    def __init__(self, store: PlanStore) -> None:
-        """Bind the manager to its backing store."""
+    def __init__(self, store: PlanStore, approving_authority: str | None = None) -> None:
+        """Bind the manager to its backing store and optional bound authority."""
         self._store = store
+        self._approving_authority = approving_authority
 
     def create(self, escalation: Escalation) -> Escalation:
         """Validate precision contract and persist an open escalation.
@@ -93,6 +98,7 @@ class EscalationManager:
         escalation_id: str,
         decision: Literal["approved", "denied"],
         note: str = "",
+        principal: str | None = None,
     ) -> Escalation:
         """Record a human decision against an open escalation.
 
@@ -100,13 +106,22 @@ class EscalationManager:
             escalation_id: Which escalation to resolve.
             decision: The human's decision (``approved`` or ``denied``).
             note: Optional resolution text recorded in the plan history.
+            principal: Who is resolving. Required to match the bound
+                approving authority when one was configured.
 
         Returns:
             The resolved escalation (status + timestamp updated).
 
         Raises:
             ValueError: When the escalation is unknown or already resolved.
+            PermissionError: When a bound approving authority exists and
+                ``principal`` does not match it.
         """
+        if self._approving_authority is not None and principal != self._approving_authority:
+            raise PermissionError(
+                f"principal {principal!r} is not the bound approving authority "
+                f"{self._approving_authority!r}"
+            )
         escalation = self._get_by_id(escalation_id)
         if escalation.status != "open":
             raise ValueError(f"escalation {escalation_id!r} is already resolved")

@@ -22,6 +22,16 @@ MISSING_VERIFICATION: Literal["missing_verification"] = "missing_verification"
 MISSING_ROLLBACK: Literal["missing_rollback"] = "missing_rollback"
 UNVERIFIED_PRECONDITION: Literal["unverified_precondition"] = "unverified_precondition"
 UNSAFE_PARALLELIZATION: Literal["unsafe_parallelization"] = "unsafe_parallelization"
+VERIFICATION_AFTER_CONSUMER: Literal["verification_after_consumer"] = (
+    "verification_after_consumer"
+)
+ROLLBACK_UNREACHABLE: Literal["rollback_unreachable"] = "rollback_unreachable"
+ROLLBACK_SELF_DEPENDENT: Literal["rollback_self_dependent"] = "rollback_self_dependent"
+ROLLBACK_INCONSISTENT_STATE: Literal["rollback_inconsistent_state"] = (
+    "rollback_inconsistent_state"
+)
+ROLLBACK_POST_CONSUMED: Literal["rollback_post_consumed"] = "rollback_post_consumed"
+FAMILY_HISTOGRAM_CYCLING: Literal["family_histogram_cycling"] = "family_histogram_cycling"
 
 # --- Deterministic auto-fix codes (PRD §2.6, M2) ------------------------------
 AUTO_REPAIRED_ORDERING: Literal["auto_repaired_ordering"] = "auto_repaired_ordering"
@@ -206,6 +216,12 @@ ReasonCode: TypeAlias = Literal[
     "missing_rollback",
     "unverified_precondition",
     "unsafe_parallelization",
+    "verification_after_consumer",
+    "rollback_unreachable",
+    "rollback_self_dependent",
+    "rollback_inconsistent_state",
+    "rollback_post_consumed",
+    "family_histogram_cycling",
     "auto_repaired_ordering",
     "auto_closed_precondition",
     "plan_oscillation_detected",
@@ -298,6 +314,33 @@ REASON_CODE_DESCRIPTIONS: dict[ReasonCode, str] = {
     MISSING_ROLLBACK: "A high-blast-radius step lacks a rollback step",
     UNVERIFIED_PRECONDITION: "A precondition does not reference an established earlier fact",
     UNSAFE_PARALLELIZATION: "Tasks in one parallel_group break concurrency safety",
+    VERIFICATION_AFTER_CONSUMER: (
+        "A consumer of a verified high-risk mutation runs before that "
+        "mutation's verification point, making the verification vacuous"
+    ),
+    ROLLBACK_UNREACHABLE: (
+        "A high-risk task claims a rollback but its action has no automated "
+        "inverse, so the rollback path cannot execute"
+    ),
+    ROLLBACK_SELF_DEPENDENT: (
+        "A guarded task's own preconditions claim establishment by the task "
+        "itself — a circular basis for the step and its rollback"
+    ),
+    ROLLBACK_INCONSISTENT_STATE: (
+        "A later task's precondition fact is established by a rollback-guarded "
+        "task, and the later task can neither verify nor undo: restoring "
+        "pre-write state silently invalidates its basis"
+    ),
+    ROLLBACK_POST_CONSUMED: (
+        "A consumer runs inside a producer's write→rollback window with no "
+        "verification or rollback of its own — a rollback would erase state "
+        "the consumer already used (dual-write window)"
+    ),
+    FAMILY_HISTOGRAM_CYCLING: (
+        "The blocker-family histogram repeats at lag ≥ 2 while consecutive "
+        "revisions differ — the planner is reshuffling between defective "
+        "shapes, not repairing"
+    ),
     AUTO_REPAIRED_ORDERING: "Auto-repaired task ordering to satisfy hard-dependency precedences",
     AUTO_CLOSED_PRECONDITION: "Auto-closed a precondition gap from a template match",
     PLAN_OSCILLATION_DETECTED: "Plan oscillates between two structural signatures — no convergence",

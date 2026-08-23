@@ -131,4 +131,8 @@ def test_c30_reason_code_catalog_sweep() -> None:
     if uncovered:
         msg = f"C30: reason codes never produced: {sorted(uncovered)}"
         print(f"WARNING: {msg}")
-    assert len(uncovered) <= 90, f"Expected at most 90 codes, uncovered: {uncovered}"
+    # 0.2.1-M11 added six codes (verification_after_consumer,
+    # rollback_unreachable/self_dependent/inconsistent_state/post_consumed,
+    # family_histogram_cycling); each is covered by its own dedicated test
+    # module, not by this single-run corpus sweep.
+    assert len(uncovered) <= 96, f"Expected at most 96 codes, uncovered: {uncovered}"

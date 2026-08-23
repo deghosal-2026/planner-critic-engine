@@ -25,8 +25,10 @@ from . import (
     parallel_safety,
     preconditions,
     rollback,
+    rollback_credible,
     schema_valid,
     verification,
+    verification_ordering,
 )
 from .base import BaseGate
 
@@ -35,7 +37,9 @@ GATES = [
     dep_cycles.Gate(),
     ordering.Gate(),
     verification.Gate(),
+    verification_ordering.Gate(),
     rollback.Gate(),
+    rollback_credible.Gate(),
     preconditions.Gate(),
     parallel_safety.Gate(),
 ]

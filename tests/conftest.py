@@ -41,6 +41,8 @@ def make_goal(
 def make_task(
     task_id: str,
     *,
+    action: str = "do",
+    target: str | None = None,
     risk_class: str = "medium",
     blast_radius: str = "medium",
     verification: dict | None = None,
@@ -53,8 +55,8 @@ def make_task(
         {
             "id": task_id,
             "description": f"task {task_id}",
-            "action": "do",
-            "target": task_id,
+            "action": action,
+            "target": target if target is not None else task_id,
             "risk_class": risk_class,
             "blast_radius": blast_radius,
             "verification": verification,
