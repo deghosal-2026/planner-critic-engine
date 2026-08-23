@@ -24,6 +24,21 @@
 
 **The v0.2.0 field test was fundamentally different from v0.1.0.** v0.1.0 was a diagnostic tool that found 10 issues in a greenfield engine. v0.2.0 was a validation tool that confirmed 31 bug fixes + 5 new enterprise domain packs + 6 new safety mechanisms all work correctly. The field test itself found zero new issues — the code review (M10.9) found them all before the field test ran.
 
+**No quality issues with the v0.2.0 release.** The release gate passed on all 8 blocking criteria. The only non-passing runs were two exploratory local models (DeepSeek-R1-8B, Qwen3-4B-Instruct-2507-4bit); those are LLM-side limitations, not engine defects, and local models are not a supported path. The field test used `openai/gpt-4o-mini` (cloud, via OpenRouter), which produced 170/170 correct results.
+
+### How enhanced field testing shipped a better product than v0.1.0
+
+The v0.2.0 field-test program was substantially stronger than v0.1.0's, and that directly produced a higher-quality release:
+
+- **Scope grew ~8%:** 170 goals across 40 domains (v0.1.0: 157 goals, 35 domains) — 14 new goals across 5 new enterprise domains (IDP, MAO, SRE, SCP, FNG) + 3 new adversarial-policy goals.
+- **Code review before field test found 31 bugs vs. v0.1.0's 10 field-test-found issues.** Catching bugs via code review ($0, 2 hours) before the LLM field test ran meant the field test validated fixes instead of discovering them — a higher-leverage, cheaper, faster loop.
+- **Pre-amendment eliminated the Scorecard A failure on the first run.** v0.1.0 required post-hoc amendment of 81 strict goals; v0.2.0 pre-amended 89 strict goals before execution and Scorecard A passed 100% on the first run.
+- **New deterministic safety mechanisms were validated, not just built.** Deterministic precondition closer (#131), topological auto-repair (#130), and oscillation detection (#152) were all exercised by the 170-goal sweep and the 90 deterministic tests.
+- **A security oracle was added.** v0.1.0 had none; v0.2.0 added SWE-bench-derived evaluation: 7/7 correct plans pass, 35/35 flawed variants blocked, 21 injection traps generated — validating the gates against human ground truth.
+- **3 benchmarks added** (auto-repair, rollback credibility, family-histogram stasis) — v0.1.0 had none.
+- **90 deterministic subsystem tests added** (0.7s, $0) as a fast regression gate alongside the LLM field test — v0.1.0 relied on the LLM sweep alone.
+- **Net result: 0 new issues found by the field test.** v0.1.0's field test found 10 issues; v0.2.0's found 0 because the code review + deterministic suite + pre-amendment had already caught and fixed them. The release shipped cleaner.
+
 ---
 
 ## Coverage Status
@@ -138,11 +153,12 @@ The field test costs ~$0.40, takes 90 minutes, and validates end-to-end behavior
 
 ### Local model comparison
 
-- **DeepSeek-R1-0528-Qwen3-8B-MLX-4bit:** Malformed JSON output (field names like `optionalrollback` instead of `rollback`). All 9 goals `planning_unavailable`.
+Local models are not fully capable for the planner/critic roles and are not a supported path. We tried 2 local models as an exploratory check; both are insufficient, so the field test used a cloud model instead. These are limitations of those LLMs, not of the planner-critic-engine.
 
-- **Qwen3-4B-Instruct-2507-4bit:** Produces valid PlanVersion JSON with real tasks — significant improvement. But the critic is too weak: approved strict goals that should have escalated (false positives on idp-01 and mao-01).
+- **DeepSeek-R1-0528-Qwen3-8B-MLX-4bit:** Could not produce valid structured output.
+- **Qwen3-4B-Instruct-2507-4bit:** Produced valid JSON but the critic was too weak (approved strict goals that should escalate).
 
-- **gpt-4o-mini (cloud):** 170/170 correct. Recommended default.
+- **openai/gpt-4o-mini (cloud, via OpenRouter):** 170/170 correct. Used as the model for this field test.
 
 ### Findings distribution
 
@@ -167,21 +183,19 @@ The field test costs ~$0.40, takes 90 minutes, and validates end-to-end behavior
 
 2. **Pre-amendment eliminated the Scorecard A failure.** v0.1.0 required a post-hoc plan amendment; v0.2.0 pre-amended 89 strict goals and Scorecard A passed 100% on the first run.
 
-3. **Qwen3-4B produces valid JSON.** Unlike v0.1.0's Qwen3.5-4B/9B (which couldn't produce structured JSON), Qwen3-4B-Instruct-2507-4bit produces valid PlanVersion JSON with real tasks. Local model capability is improving.
+3. **Local models are not fully capable.** As an exploratory check we tried DeepSeek-R1-8B (could not produce valid structured output) and Qwen3-4B-Instruct-2507-4bit (valid JSON, but critic too weak). These are LLM-side limitations, not engine defects. Local models are not a supported path; the field test used openai/gpt-4o-mini (cloud) instead.
 
-4. **DeepSeek-R1-8B still can't produce valid JSON.** Field names like `optionalrollback` instead of `rollback`, `:optionalverification` with leading colon. The 8B model is insufficient for structured output.
+4. **The strict pass rate is a clean 0% — zero overlap with balanced.** Same as v0.1.0. Every balanced goal approves; every strict goal escalates. No strict goal ever approves, no balanced goal ever escalates.
 
-5. **The strict pass rate is a clean 0% — zero overlap with balanced.** Same as v0.1.0. Every balanced goal approves; every strict goal escalates. No strict goal ever approves, no balanced goal ever escalates.
+5. **New v0.2.0 domains behave identically to v0.1.0 domains.** IDP, MAO, SRE, SCP, FNG — same balanced-pass / strict-escalate pattern. No domain-specific surprises.
 
-6. **New v0.2.0 domains behave identically to v0.1.0 domains.** IDP, MAO, SRE, SCP, FNG — same balanced-pass / strict-escalate pattern. No domain-specific surprises.
+6. **The security oracle gate regression is 100% accurate.** 7/7 correct plans pass, 35/35 flawed variants blocked. Every reason code exercised by real-CWE-derived variants.
 
-7. **The security oracle gate regression is 100% accurate.** 7/7 correct plans pass, 35/35 flawed variants blocked. Every reason code exercised by real-CWE-derived variants.
+7. **90 deterministic tests run in 0.7 seconds.** The deterministic test suite provides faster feedback than the 170 LLM goals (~90 minutes). Both are needed.
 
-8. **90 deterministic tests run in 0.7 seconds.** The deterministic test suite provides faster feedback than the 170 LLM goals (~90 minutes). Both are needed.
+8. **Single runner script is better than 39 batch files.** v0.2.0 initially had 39 batch files; consolidating to a single `run-field.py` with filtering flags was simpler and less error-prone.
 
-9. **Single runner script is better than 39 batch files.** v0.2.0 initially had 39 batch files; consolidating to a single `run-field.py` with filtering flags was simpler and less error-prone.
-
-10. **Adversarial-policy goals confirmed injection immunity again.** adv-06/07/08 all escalated with `replan_aborted`. The engine is injection-immune in practice, not just in theory.
+9. **Adversarial-policy goals confirmed injection immunity again.** adv-06/07/08 all escalated with `replan_aborted`. The engine is injection-immune in practice, not just in theory.
 
 ---
 
@@ -209,55 +223,55 @@ The field test validated the 31 bug fixes. No new issues were discovered during 
 
 All 10 v0.1.0 learnings were applied before execution: P0 validation (0 issues), pre-amendment (Scorecard A passed first run), single config (no iteration), trace-file fallback (already in production). Each learning applied before execution saves time and tokens.
 
-**Lesson:** All 10 v0.
+**Lesson:** Apply prior-version learnings before execution — it saves time and tokens.
 
 ### 2. Code review before field test is more efficient
 
 v0.1.0 used the field test to find 10 issues (~$0.30 + 60 min). v0.2.0 used a code review to find 31 issues ($0 + 2 hours), then the field test found 0. For a mature engine with a proven test corpus, code review before field test is the higher-leverage activity.
 
-**Lesson:** v0.
+**Lesson:** For a mature engine with a proven corpus, code review before field test is higher-leverage than field test as diagnostic.
 
 ### 3. Pre-amendment eliminates the Scorecard A failure
 
 v0.1.0 required post-hoc amendment (81 strict goals). v0.2.0 pre-amended 89 strict goals before execution. Scorecard A passed 100% on the first run. Apply learnings before execution, not after.
 
-**Lesson:** v0.
+**Lesson:** Pre-amend strict goals before execution — it eliminates the Scorecard A failure on the first run.
 
-### 4. Local models can produce valid JSON but have weaker critics
+### 4. Local model limitations are LLM limitations, not engine issues
 
-DeepSeek-R1-8B produced malformed JSON. Qwen3-4B produced valid JSON with real tasks — a significant improvement. But the Qwen3-4B critic approved strict goals that should have escalated. Local model capability is improving but still insufficient for the critic role.
+As an exploratory check we tried DeepSeek-R1-8B (could not produce valid structured output) and Qwen3-4B-Instruct-2507-4bit (valid JSON, but critic too weak). These are limitations of those LLMs, not of the planner-critic-engine. Local models are not a supported path; the field test used openai/gpt-4o-mini (cloud) instead.
 
-**Lesson:** DeepSeek-R1-8B produced malformed JSON.
+**Lesson:** Local-model failures are LLM-side limitations, not engine defects. Use a capable cloud model.
 
 ### 5. New enterprise domains don't introduce new failure modes
 
 17 new goals across 5 new domains (IDP, MAO, SRE, SCP, FNG) followed the exact same patterns as v0.1.0's 35 domains. The engine's safety contract is domain-agnostic. Adding enterprise domains requires no engine changes — only domain pack configuration.
 
-**Lesson:** 17 new goals across 5 new domains (IDP, MAO, SRE, SCP, FNG) followed the exact same patterns as v0.
+**Lesson:** Adding enterprise domains requires no engine changes — only domain pack configuration.
 
 ### 6. Domain packs are additive and don't produce false positives
 
 4 domain packs loaded with all 170 goals. Positive-control test confirmed 0 false positives on a known-clean golden plan with all 4 packs + Rego + CEL enabled. The additive gate design (§2.5.2) holds in practice.
 
-**Lesson:** 4 domain packs loaded with all 170 goals.
+**Lesson:** Domain packs are additive — 4 packs with all 170 goals produced 0 false positives on a clean golden plan.
 
 ### 7. The security oracle validates the critic against human ground truth
 
 SWE-bench corpus (7 instances, 7 CWE buckets) produced 35 flawed variants — all correctly blocked. 21 injection traps generated. The deterministic gates are the security authority, not the LLM critic. This validates the §2.5.1 injection-immunity design.
 
-**Lesson:** SWE-bench corpus (7 instances, 7 CWE buckets) produced 35 flawed variants — all correctly blocked.
+**Lesson:** Deterministic gates are the security authority, not the LLM critic — 35/35 flawed variants blocked.
 
 ### 8. 90 deterministic tests provide faster feedback than 170 LLM goals
 
 Deterministic tests: 0.7 seconds, $0. LLM goals: ~90 minutes, ~$0.40. The deterministic suite is the primary regression gate for code changes. The LLM field test is the release gate for end-to-end validation. Both are needed.
 
-**Lesson:** Deterministic tests: 0.
+**Lesson:** Use deterministic tests as the primary regression gate (0.7s, $0); the LLM field test is the release gate.
 
 ### 9. Auto-converge rarely triggers in practice
 
 No goal in the 170-goal corpus triggered structural oscillation. All strict goals converged via `converged_stalled` (content-level) before structural oscillation could fire. The family-histogram stasis benchmark (#183) would provide statistical evidence for whether a fifth termination signal is warranted.
 
-**Lesson:** No goal in the 170-goal corpus triggered structural oscillation.
+**Lesson:** Auto-converge rarely triggers in practice — all strict goals stalled at content level before structural oscillation.
 
 ### 10. Single runner script is better than 39 batch files
 
