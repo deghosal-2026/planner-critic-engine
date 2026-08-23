@@ -27,9 +27,7 @@ class PreconditionLedger:
         self._entries: dict[str, LedgerEntry] = {}
         self._diagnostics: list[dict[str, Any]] = []
 
-    def mark_satisfied(
-        self, key: str, task_id: str, verified_by: str | None = None
-    ) -> None:
+    def mark_satisfied(self, key: str, task_id: str, verified_by: str | None = None) -> None:
         now = datetime.now(UTC)
         self._entries[key] = LedgerEntry(
             satisfied=True,

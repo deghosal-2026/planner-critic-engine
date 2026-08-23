@@ -7,6 +7,7 @@ import threading
 import urllib.request
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -23,12 +24,12 @@ def mcp_server() -> Iterator[MCPHTTPServer]:
     server.shutdown()
 
 
-def _get(url: str) -> tuple[int, dict]:
+def _get(url: str) -> tuple[int, dict[str, Any]]:
     with urllib.request.urlopen(url, timeout=5) as resp:
         return resp.status, json.loads(resp.read())
 
 
-def _post(url: str, payload: dict) -> tuple[int, dict]:
+def _post(url: str, payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     req = urllib.request.Request(
         url,
         data=json.dumps(payload).encode(),

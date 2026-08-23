@@ -27,24 +27,32 @@ def build_eval_parser() -> argparse.ArgumentParser:
         "--corpus-dir",
         default=str(
             Path(__file__).resolve().parent.parent.parent.parent
-            / "docs" / "field-test" / "corpus" / "swebench-security"
+            / "docs"
+            / "field-test"
+            / "corpus"
+            / "swebench-security"
         ),
         help="Path to the corpus directory",
     )
     swebench.add_argument(
-        "--instance-ids", nargs="*", default=None,
+        "--instance-ids",
+        nargs="*",
+        default=None,
         help="Specific instance IDs to evaluate (default: all)",
     )
     swebench.add_argument(
-        "--report-dir", default=None,
+        "--report-dir",
+        default=None,
         help="Directory to write report JSON (default: print to stdout)",
     )
     swebench.add_argument(
-        "--adversarial", action="store_true",
+        "--adversarial",
+        action="store_true",
         help="Run adversarial injection harness after oracle eval",
     )
     swebench.add_argument(
-        "--regression", action="store_true",
+        "--regression",
+        action="store_true",
         help="Run deterministic-gate regression against the corpus",
     )
     return parser
@@ -63,23 +71,33 @@ def _run_regression_eval(corpus_dir: str) -> dict[str, Any]:
         for i, variant in enumerate(artifact.variants):
             findings = run_deterministic_gates(variant)
             blockers = [f for f in findings if f.severity is Severity.BLOCKER]
-            expected = str(artifact.variant_expected[i]) if i < len(artifact.variant_expected) else ""
-            label = artifact.variant_labels[i] if i < len(artifact.variant_labels) else f"variant-{i}"
-            variant_results.append({
-                "label": label,
-                "expected_reason_code": expected,
-                "blocker_count": len(blockers),
-                "blocker_reason_codes": [str(f.reason_code) for f in blockers],
-                "passed": any(str(f.reason_code) == expected for f in blockers) if expected else len(blockers) == 0,
-            })
+            expected = (
+                str(artifact.variant_expected[i]) if i < len(artifact.variant_expected) else ""
+            )
+            label = (
+                artifact.variant_labels[i] if i < len(artifact.variant_labels) else f"variant-{i}"
+            )
+            variant_results.append(
+                {
+                    "label": label,
+                    "expected_reason_code": expected,
+                    "blocker_count": len(blockers),
+                    "blocker_reason_codes": [str(f.reason_code) for f in blockers],
+                    "passed": any(str(f.reason_code) == expected for f in blockers)
+                    if expected
+                    else len(blockers) == 0,
+                }
+            )
 
-        results.append({
-            "instance_id": inst.instance_id,
-            "correct_passes": len(correct_blockers) == 0,
-            "correct_blocker_count": len(correct_blockers),
-            "variant_count": len(artifact.variants),
-            "variants": variant_results,
-        })
+        results.append(
+            {
+                "instance_id": inst.instance_id,
+                "correct_passes": len(correct_blockers) == 0,
+                "correct_blocker_count": len(correct_blockers),
+                "variant_count": len(artifact.variants),
+                "variants": variant_results,
+            }
+        )
 
     total = len(results)
     correct_pass = sum(1 for r in results if r["correct_passes"])
@@ -111,12 +129,21 @@ def run_eval(argv: list[str]) -> int:
         if args.regression:
             print("\n--- Deterministic Gate Regression ---")
             reg_results = _run_regression_eval(args.corpus_dir)
-            print(f"Correct plans passing: {reg_results['correct_plans_pass']}/{reg_results['correct_plans_total']}")
-            print(f"Flawed variants blocked: {reg_results['variants_passed']}/{reg_results['variants_total']}")
+            print(
+                f"Correct plans passing: {reg_results['correct_plans_pass']}"
+                f"/{reg_results['correct_plans_total']}"
+            )
+            print(
+                f"Flawed variants blocked: {reg_results['variants_passed']}"
+                f"/{reg_results['variants_total']}"
+            )
             for r in reg_results["results"]:
                 for v in r["variants"]:
                     status = "PASS" if v["passed"] else "FAIL"
-                    print(f"  [{status}] {r['instance_id']}: {v['label']} -> {v['blocker_reason_codes']}")
+                    print(
+                        f"  [{status}] {r['instance_id']}: {v['label']} "
+                        f"-> {v['blocker_reason_codes']}"
+                    )
             if args.report_dir:
                 report_path = Path(args.report_dir) / "regression-report.json"
                 report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -128,6 +155,7 @@ def run_eval(argv: list[str]) -> int:
             print("  (requires configured planner+critic roles; use scripted roles for hermetic)")
             print("  Use OracleEvalHarness or run_injection_harness() directly for full eval.")
             from ..eval.injection import generate_traps
+
             instances = load_all_instances(args.corpus_dir)
             if args.instance_ids:
                 instances = [i for i in instances if i.instance_id in args.instance_ids]

@@ -9,6 +9,7 @@ output cannot clear a gate blocker. The gate is code, not model output.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, cast
 
 import yaml
 
@@ -25,10 +26,10 @@ from planner_critic.schema.plan import PlanVersion
 FIXTURE = Path(__file__).parent / "fixtures" / "adversarial_goal.yaml"
 
 
-def _fixture() -> dict:
+def _fixture() -> dict[str, Any]:
     """Load the adversarial-goal fixture."""
     with FIXTURE.open() as fh:
-        return yaml.safe_load(fh)
+        return cast("dict[str, Any]", yaml.safe_load(fh))
 
 
 def _adversarial_goal() -> Goal:

@@ -93,6 +93,7 @@ class TestDiagnose:
 
     def test_format_human_output(self) -> None:
         from planner_critic.cli.diagnose import _format_human
+
         trace = _trace(outcome="missing_rollback")
         diag = _diagnose_trace(trace)
         output = _format_human(diag)
@@ -102,6 +103,7 @@ class TestDiagnose:
 
     def test_format_markdown_output(self) -> None:
         from planner_critic.cli.diagnose import _format_markdown
+
         trace = _trace(outcome="missing_rollback")
         diag = _diagnose_trace(trace)
         output = _format_markdown(diag)

@@ -4,6 +4,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import ClassVar
 
 from planner_critic.reason_codes import (
     AMBIGUOUS_REPLAN_ESCALATED,
@@ -47,15 +48,26 @@ class RunBudget:
 
     def record_spend(self, usd: float) -> None:
         self._cumulative_spend_usd += usd
-        if self.run_max_budget_usd is not None and self._cumulative_spend_usd > self.run_max_budget_usd:
+        if (
+            self.run_max_budget_usd is not None
+            and self._cumulative_spend_usd > self.run_max_budget_usd
+        ):
             self._exceeded = RUN_BUDGET_EXCEEDED
-            logger.info("run budget: spend $%.4f exceeds ceiling $%.4f", self._cumulative_spend_usd, self.run_max_budget_usd)
+            logger.info(
+                "run budget: spend $%.4f exceeds ceiling $%.4f",
+                self._cumulative_spend_usd,
+                self.run_max_budget_usd,
+            )
 
     def record_replan(self) -> None:
         self._cascading_depth += 1
         if self.run_max_depth is not None and self._cascading_depth > self.run_max_depth:
             self._exceeded = RUN_DEPTH_EXCEEDED
-            logger.info("run budget: cascading depth %d exceeds ceiling %d", self._cascading_depth, self.run_max_depth)
+            logger.info(
+                "run budget: cascading depth %d exceeds ceiling %d",
+                self._cascading_depth,
+                self.run_max_depth,
+            )
 
     def check_timeout(self) -> str | None:
         if self.run_max_time is None:
@@ -63,7 +75,9 @@ class RunBudget:
         elapsed = time.monotonic() - self._started_at
         if elapsed > self.run_max_time:
             self._exceeded = RUN_TIMEOUT
-            logger.info("run budget: elapsed %.1fs exceeds ceiling %.1fs", elapsed, self.run_max_time)
+            logger.info(
+                "run budget: elapsed %.1fs exceeds ceiling %.1fs", elapsed, self.run_max_time
+            )
             return RUN_TIMEOUT
         return None
 
@@ -75,7 +89,7 @@ class RunBudget:
 
 
 class ReplanClassifier:
-    TRANSIENT_CODES: set[str] = {
+    TRANSIENT_CODES: ClassVar[set[str]] = {
         "timeout",
         "rate_limit",
         "network_error",
@@ -84,7 +98,7 @@ class ReplanClassifier:
         "429",
         "503",
     }
-    DETERMINISTIC_CODES: set[str] = {
+    DETERMINISTIC_CODES: ClassVar[set[str]] = {
         "precondition_drift",
         "schema_mismatch",
         "missing_dependency",
@@ -98,9 +112,7 @@ class ReplanClassifier:
         self.step_max_retries = step_max_retries
         self._step_retries: dict[str, int] = {}
 
-    def classify(
-        self, trace: ExecutionTrace
-    ) -> FailureClass:
+    def classify(self, trace: ExecutionTrace) -> FailureClass:
         err = (trace.outcome or "").lower().strip()
         if any(code in err for code in self.TRANSIENT_CODES):
             retries = self._step_retries.get(trace.task_id, 0) + 1

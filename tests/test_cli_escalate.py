@@ -10,6 +10,7 @@ hermetic CLI path).
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -21,7 +22,7 @@ from planner_critic.types import Escalation
 
 
 @pytest.fixture
-def db(tmp_path) -> str:
+def db(tmp_path: Path) -> str:
     """A fresh SQLite store path per test."""
     return str(tmp_path / "plans.db")
 
@@ -36,7 +37,7 @@ def _open_escalation(plan: PlanVersion, question: str = "proceed with this plan?
     )
 
 
-def test_escalate_list_shows_open(db: str, capsys: pytest.CaptureFixture) -> None:
+def test_escalate_list_shows_open(db: str, capsys: pytest.CaptureFixture[str]) -> None:
     """``escalate list`` prints open escalations with their question."""
     store = SQLiteStore(db)
     store.put_plan_version(make_plan(plan_id="plan-1", version=1))
@@ -49,13 +50,13 @@ def test_escalate_list_shows_open(db: str, capsys: pytest.CaptureFixture) -> Non
     assert "proceed with this plan?" in out
 
 
-def test_escalate_list_empty(db: str, capsys: pytest.CaptureFixture) -> None:
+def test_escalate_list_empty(db: str, capsys: pytest.CaptureFixture[str]) -> None:
     """An empty store reports no escalations."""
     assert main(["escalate", "--store", db, "list"]) == 0
     assert "no escalations" in capsys.readouterr().out.lower()
 
 
-def test_escalate_approve_resolves(db: str, capsys: pytest.CaptureFixture) -> None:
+def test_escalate_approve_resolves(db: str, capsys: pytest.CaptureFixture[str]) -> None:
     """Approve records the decision against the escalation."""
     store = SQLiteStore(db)
     plan = make_plan(plan_id="plan-1", version=1)
@@ -68,13 +69,14 @@ def test_escalate_approve_resolves(db: str, capsys: pytest.CaptureFixture) -> No
     assert "approved" in out
 
     reopened = SQLiteStore(db)
-    assert reopened.get_escalation("plan-1") is not None
-    assert reopened.get_escalation("plan-1").status == "approved"
-    assert reopened.get_escalation("plan-1").resolution == "go"
+    escalation = reopened.get_escalation("plan-1")
+    assert escalation is not None
+    assert escalation.status == "approved"
+    assert escalation.resolution == "go"
     reopened.close()
 
 
-def test_escalate_deny(db: str, capsys: pytest.CaptureFixture) -> None:
+def test_escalate_deny(db: str, capsys: pytest.CaptureFixture[str]) -> None:
     """Deny records a denied decision."""
     store = SQLiteStore(db)
     plan = make_plan(plan_id="plan-1", version=1)
@@ -84,12 +86,14 @@ def test_escalate_deny(db: str, capsys: pytest.CaptureFixture) -> None:
 
     assert main(["escalate", "--store", db, "deny", "esc:plan-1:1", "--note", "no"]) == 0
     reopened = SQLiteStore(db)
-    assert reopened.get_escalation("plan-1").status == "denied"
+    escalation = reopened.get_escalation("plan-1")
+    assert escalation is not None
+    assert escalation.status == "denied"
     reopened.close()
 
 
 def test_escalate_patch_revises_and_recritiques(
-    db: str, tmp_path, capsys: pytest.CaptureFixture
+    db: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """``approve --patch <json>`` stores revision N+1 and re-critiques it."""
     store = SQLiteStore(db)
@@ -129,18 +133,20 @@ def test_escalate_patch_revises_and_recritiques(
     assert latest is not None
     assert latest.version == 2
     assert latest.parent_version == "plan-1"
-    assert reopened.get_escalation("plan-1").status == "approved"
+    escalation = reopened.get_escalation("plan-1")
+    assert escalation is not None
+    assert escalation.status == "approved"
     reopened.close()
 
 
-def test_escalate_unknown_id_fails(db: str, capsys: pytest.CaptureFixture) -> None:
+def test_escalate_unknown_id_fails(db: str, capsys: pytest.CaptureFixture[str]) -> None:
     """Resolving a never-created escalation fails the command."""
     assert main(["escalate", "--store", db, "approve", "esc:ghost"]) != 0
     assert "failed" in capsys.readouterr().out
 
 
 def test_escalate_patch_missing_file_fails(
-    db: str, tmp_path, capsys: pytest.CaptureFixture
+    db: str, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """A missing patch file fails the command cleanly."""
     store = SQLiteStore(db)

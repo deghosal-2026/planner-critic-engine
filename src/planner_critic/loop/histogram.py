@@ -60,6 +60,13 @@ def detect_histogram_cycling(
 ) -> bool:
     """True when the final histogram repeats at some lag ≥ 2 within reach.
 
+    A **progress guard** is built in (#229): when the newest revision reduced
+    total blocker mass versus its predecessor, a lag-p repeat is legitimate
+    bimodal alternation on an improving trajectory — analysis/code work types
+    alternating defect families while the planner converges — and never
+    fires. Flat-mass repeats still fire; that ambiguity (alternation with no
+    measurable progress) stays fail-safe escalate-only by design.
+
     Args:
         histograms: Per-revision histograms in revision order (most recent
             last).
@@ -68,16 +75,18 @@ def detect_histogram_cycling(
 
     Returns:
         True when the newest histogram equals a histogram exactly ``p``
-        revisions back (``2 ≤ p ≤ max_lag``) *and* differs from the
-        immediately previous one — change-with-repeat, i.e. cycling rather
-        than stasis or progress. Fewer than ``max_lag + 1`` entries never
-        fires.
+        revisions back (``2 ≤ p ≤ max_lag``), differs from the immediately
+        previous one, and shows no mass improvement over that previous one.
+        Fewer than ``max_lag + 1`` entries never fires.
     """
     if len(histograms) < max_lag + 1:
         return False
     latest = histograms[-1]
-    if latest == histograms[-2]:
+    previous = histograms[-2]
+    if latest == previous:
         return False
+    if sum(count for _, count in latest) < sum(count for _, count in previous):
+        return False  # progress guard (#229): still repairing, not reshuffling
     # Lag p compares the newest entry against exactly p revisions back.
     return any(latest == histograms[-1 - p] for p in range(2, max_lag + 1))
 

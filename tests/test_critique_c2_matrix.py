@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pytest
 
+from conftest import ScriptedPlanner, make_plan, make_task
 from planner_critic.critique.critic import LLMCritic
 from planner_critic.llm.base import Completion, Message, ToolSchema
 from planner_critic.loop import LoopConfig, run_loop
@@ -64,9 +65,7 @@ def _load_goal(goal_file: str) -> Goal:
     return Goal.model_validate(json.loads(path.read_text()))
 
 
-def _scripted_clean_planner():
-    from conftest import ScriptedPlanner, make_plan, make_task
-
+def _scripted_clean_planner() -> ScriptedPlanner:
     return ScriptedPlanner(
         [
             make_plan(

@@ -11,7 +11,8 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from conftest import ScriptedCritic, ScriptedPlanner, make_goal, make_plan, make_task
+from conftest import Draft, ScriptedCritic, ScriptedPlanner, make_goal, make_plan, make_task
+from planner_critic.escalation import EscalationManager
 from planner_critic.loop import LoopConfig, run_loop
 from planner_critic.schema.acceptance import (
     AcceptanceContract,
@@ -20,7 +21,8 @@ from planner_critic.schema.acceptance import (
     revise_contract,
 )
 from planner_critic.schema.goal import RiskTolerance
-from planner_critic.types import Severity
+from planner_critic.store import InMemoryStore
+from planner_critic.types import Escalation, Severity
 
 
 class TestBindAndHash:
@@ -30,7 +32,7 @@ class TestBindAndHash:
         c2 = bind_acceptance(goal, approving_authority="team-lead")
         assert c1.content_hash == c2.content_hash
         with pytest.raises(ValidationError):  # frozen model
-            c1.approving_authority = "someone-else"  # type: ignore[misc]
+            c1.approving_authority = "someone-else"
 
     def test_hash_changes_when_criteria_change(self) -> None:
         goal = make_goal(tolerance=RiskTolerance.BALANCED)
@@ -55,8 +57,12 @@ class TestEvaluate:
         goal = make_goal(tolerance=RiskTolerance.BALANCED)
         contract = bind_acceptance(goal, approving_authority="engine")
         warning = Finding(
-            id="w1", version=1, severity=Severity.WARNING,
-            reason_code="llm_risk", message="x", heuristic_family=None,
+            id="w1",
+            version=1,
+            severity=Severity.WARNING,
+            reason_code="llm_risk",
+            message="x",
+            heuristic_family=None,
         )
         ok, _ = evaluate_contract([warning], contract)
         assert ok is True
@@ -67,8 +73,12 @@ class TestEvaluate:
         goal = make_goal(tolerance=RiskTolerance.STRICT)
         contract = bind_acceptance(goal, approving_authority="engine")
         warning = Finding(
-            id="w1", version=1, severity=Severity.WARNING,
-            reason_code="llm_risk", message="x", heuristic_family=None,
+            id="w1",
+            version=1,
+            severity=Severity.WARNING,
+            reason_code="llm_risk",
+            message="x",
+            heuristic_family=None,
         )
         ok, _ = evaluate_contract([warning], contract)
         assert ok is False
@@ -77,7 +87,7 @@ class TestEvaluate:
 class TestLoopBinding:
     def test_run_loop_uses_bound_contract_not_ambient_posture(self) -> None:
         """A strict-bound contract governs even when the goal says balanced."""
-        plans = [make_plan(tasks=[make_task("t1")])]
+        plans: list[Draft] = [make_plan(tasks=[make_task("t1")])]
         result = run_loop(
             make_goal(tolerance=RiskTolerance.BALANCED),
             ScriptedPlanner(plans),
@@ -104,7 +114,7 @@ class TestLoopBinding:
             reason_code="llm_risk",
             message="advisory noise",
         )
-        plans = [make_plan(tasks=[make_task("t1")])]
+        plans: list[Draft] = [make_plan(tasks=[make_task("t1")])]
         result = run_loop(
             make_goal(tolerance=RiskTolerance.BALANCED),
             ScriptedPlanner(plans),
@@ -118,18 +128,14 @@ class TestLoopBinding:
 
 
 class TestAuthorityEnforcement:
-    def _manager_with_open_escalation(self, authority: str | None) -> tuple:
-        from planner_critic.escalation import EscalationManager
-        from planner_critic.store import InMemoryStore
-        from planner_critic.types import Escalation
-
+    def _manager_with_open_escalation(
+        self, authority: str | None
+    ) -> tuple[EscalationManager, Escalation]:
         store = InMemoryStore()
         plan = make_plan(tasks=[make_task("t1")])
         store.put_plan_version(plan)
         manager = EscalationManager(store, approving_authority=authority)
-        esc = manager.create(
-            Escalation(id="e1", plan_id=plan.id, version=1, question="proceed?")
-        )
+        esc = manager.create(Escalation(id="e1", plan_id=plan.id, version=1, question="proceed?"))
         return manager, esc
 
     def test_wrong_principal_cannot_resolve(self) -> None:

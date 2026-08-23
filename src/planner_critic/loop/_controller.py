@@ -39,7 +39,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Literal, cast
 
-from ..approval import ApprovalGate, meets_threshold, resolve_threshold
+from ..approval import ApprovalGate, meets_threshold
 from ..critique.diff import scope_between
 from ..critique.mode import CriticMode, should_invoke_llm
 from ..gates import run_deterministic_gates
@@ -243,7 +243,9 @@ def _escalate(
     )
 
 
-def _build_auto_converged_plan(current_plan: PlanVersion, prior_plan: PlanVersion | None) -> PlanVersion | None:
+def _build_auto_converged_plan(
+    current_plan: PlanVersion, prior_plan: PlanVersion | None
+) -> PlanVersion | None:
     """Merge non-oscillating tasks into a single stable plan.
 
     When the loop detects structural oscillation, this function builds a
@@ -272,11 +274,17 @@ def _build_auto_converged_plan(current_plan: PlanVersion, prior_plan: PlanVersio
         return None
 
     stable_ids = {t.id for t in stable_tasks}
-    stable_deps = [d for d in current_plan.dependencies if d.from_task in stable_ids and d.to_task in stable_ids]
-    return current_plan.model_copy(update={
-        "tasks": stable_tasks,
-        "dependencies": stable_deps,
-    })
+    stable_deps = [
+        d
+        for d in current_plan.dependencies
+        if d.from_task in stable_ids and d.to_task in stable_ids
+    ]
+    return current_plan.model_copy(
+        update={
+            "tasks": stable_tasks,
+            "dependencies": stable_deps,
+        }
+    )
 
 
 def _compose_question(goal: Goal, blockers: list[Finding], reason: ReasonCode) -> str:
@@ -415,8 +423,11 @@ def _run(
             run_budget_hit = run_budget and run_budget.check()
             if run_budget_hit:
                 return _escalate(
-                    goal, plan, gate_findings,
-                    cast("ReasonCode", run_budget_hit), revision,
+                    goal,
+                    plan,
+                    gate_findings,
+                    cast("ReasonCode", run_budget_hit),
+                    revision,
                 )
             if revision < config.revision_cap:
                 plan = _revise_or_raise(
@@ -508,9 +519,7 @@ def _run(
                             ),
                         ),
                     ]
-                    threshold_ok, thresholds = evaluate_contract(
-                        merged_findings, contract
-                    )
+                    threshold_ok, thresholds = evaluate_contract(merged_findings, contract)
                     if threshold_ok:
                         approved = approval.approve(merged, thresholds)
                         return LoopResult(

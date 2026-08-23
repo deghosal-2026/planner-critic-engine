@@ -17,6 +17,15 @@ for (peterbuildssecure / kenielzep97 threads):
 * **underclaim_approvals** — defect-plan trials with zero blockers at all,
   i.e. plans balanced tolerance would have approved.
 
+**Measurement class (#231):** this harness measures *critic-vs-reality* —
+seeded known defects judged against pre-registered expectations. Its
+complement, :mod:`planner_critic.drift`, measures critic-vs-guardrail
+disagreement (raw vs normalized severity). The two are paired, not
+redundant: an origin misclassification (family AND severity wrong from the
+start) is invisible to drift metrics, while a guardrail override is
+invisible here. A zero on either alone is not a safety result; report them
+together.
+
 Dry-run/hermetic usage: pass any scripted :class:`CriticRole` (tests do).
 A live run is the same call with a registry-backed critic; budget caps stay
 with the caller's provider config.
@@ -34,8 +43,7 @@ from .label_migration import BoundaryCase, generate_boundary_cases
 def _verdict_signature(findings: list[Finding]) -> frozenset[tuple[str, str]]:
     """Trial verdict signature: {(family-or-code, severity), …}."""
     return frozenset(
-        (str(f.heuristic_family) if f.heuristic_family else str(f.reason_code),
-         str(f.severity))
+        (str(f.heuristic_family) if f.heuristic_family else str(f.reason_code), str(f.severity))
         for f in findings
     )
 
@@ -118,9 +126,7 @@ def run_live_boundary_cases(
         "cases_evaluated": len(boundary_cases),
         "trials_per_plan": trials,
         "label_flip_rate": label_flips / total_groups,
-        "family_migration_rate": (
-            migrated_trials / plan_b_trials if plan_b_trials else 0.0
-        ),
+        "family_migration_rate": (migrated_trials / plan_b_trials if plan_b_trials else 0.0),
         "evidence_drift_rate": drifts / total_groups,
         "underclaim_approvals": underclaim_approvals,
         "cases": case_records,

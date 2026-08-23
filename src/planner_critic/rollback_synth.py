@@ -47,10 +47,20 @@ _DETERMINISTIC_INVERSIONS: dict[str, str] = {
 }
 
 #: Actions whose undo requires a snapshot restore (create, migrate, etc).
-_SNAPSHOT_RESTORE_ACTIONS = frozenset({
-    "create", "migrate", "transform", "update", "replace", "enable", "insert",
-    "provision", "deploy", "apply",
-})
+_SNAPSHOT_RESTORE_ACTIONS = frozenset(
+    {
+        "create",
+        "migrate",
+        "transform",
+        "update",
+        "replace",
+        "enable",
+        "insert",
+        "provision",
+        "deploy",
+        "apply",
+    }
+)
 
 #: Actions that cannot be undone automatically.
 _NON_REVERSIBLE_ACTIONS = frozenset({"publish", "destroy", "commit"})
@@ -162,47 +172,55 @@ def _invert_task(
     if rev is None:
         reason_code = ROLLBACK_NON_REVERSIBLE_STEP_SKIPPED
         return (
-            Task.model_validate({
-                "id": f"rollback:{task.id}",
-                "description": f"rollback of {task.id}",
-                "action": "sys.noop",
-                "target": task.target,
-                "risk_class": "low",
-            }),
+            Task.model_validate(
+                {
+                    "id": f"rollback:{task.id}",
+                    "description": f"rollback of {task.id}",
+                    "action": "sys.noop",
+                    "target": task.target,
+                    "risk_class": "low",
+                }
+            ),
             reason_code,
         )
     if rev is Reversibility.NON_REVERSIBLE:
         reason_code = ROLLBACK_NON_REVERSIBLE_STEP_SKIPPED
         return (
-            Task.model_validate({
-                "id": f"rollback:{task.id}",
-                "description": f"rollback of {task.id}",
-                "action": "sys.noop",
-                "target": task.target,
-                "risk_class": "low",
-            }),
+            Task.model_validate(
+                {
+                    "id": f"rollback:{task.id}",
+                    "description": f"rollback of {task.id}",
+                    "action": "sys.noop",
+                    "target": task.target,
+                    "risk_class": "low",
+                }
+            ),
             reason_code,
         )
     if rev is Reversibility.DETERMINISTIC:
         inverse = _DETERMINISTIC_INVERSIONS.get(task.action, "sys.noop")
         return (
-            Task.model_validate({
-                "id": f"rollback:{task.id}",
-                "description": f"rollback of {task.id}",
-                "action": inverse,
-                "target": task.target,
-                "risk_class": "low",
-            }),
+            Task.model_validate(
+                {
+                    "id": f"rollback:{task.id}",
+                    "description": f"rollback of {task.id}",
+                    "action": inverse,
+                    "target": task.target,
+                    "risk_class": "low",
+                }
+            ),
             "",
         )
     return (
-        Task.model_validate({
-            "id": f"rollback:{task.id}",
-            "description": f"rollback of {task.id}",
-            "action": "restore_snapshot",
-            "target": task.target,
-            "risk_class": "low",
-        }),
+        Task.model_validate(
+            {
+                "id": f"rollback:{task.id}",
+                "description": f"rollback of {task.id}",
+                "action": "restore_snapshot",
+                "target": task.target,
+                "risk_class": "low",
+            }
+        ),
         "",
     )
 
@@ -296,9 +314,7 @@ class InverseRollbackSynthesizer:
             dependencies=rollback_deps,
         )
 
-    def build_partial_rollback(
-        self, plan: PlanVersion, failed_step: str
-    ) -> PlanVersion:
+    def build_partial_rollback(self, plan: PlanVersion, failed_step: str) -> PlanVersion:
         """Build a rollback limited to steps completed before ``failed_step``.
 
         Args:

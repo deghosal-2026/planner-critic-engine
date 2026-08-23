@@ -87,8 +87,10 @@ def run_corpus(argv: list[str]) -> int:
         print(f"CWE:         {inst.cwe} ({inst.cwe_bucket.value})")
         print(f"Class:       {inst.vulnerability_class}")
         print(f"License:     {inst.license}")
-        print(f"Signal:      {inst.expected_critic_signal.value if inst.expected_critic_signal else '—'}")
-        print(f"Reason codes: {', '.join(inst.expected_reason_codes) if inst.expected_reason_codes else '—'}")
+        signal = inst.expected_critic_signal.value if inst.expected_critic_signal else "—"
+        print(f"Signal:      {signal}")
+        codes = ", ".join(inst.expected_reason_codes) if inst.expected_reason_codes else "—"
+        print(f"Reason codes: {codes}")
         print(f"\nIssue:\n{inst.issue_description}")
         print(f"\nGoal:\n{inst.goal_text}")
         print(f"\nGround truth:\n{inst.ground_truth_summary}")

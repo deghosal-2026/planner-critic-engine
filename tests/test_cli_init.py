@@ -36,7 +36,7 @@ def test_init_writes_demo_goal(tmp_path: Path) -> None:
     assert goal.id == "quickstart"
 
 
-def test_init_prints_plan_hint(tmp_path: Path, capsys) -> None:
+def test_init_prints_plan_hint(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """init tells the user the next command: `plancritic plan`."""
     rc = run_init(["--dir", str(tmp_path)])
     assert rc == 0

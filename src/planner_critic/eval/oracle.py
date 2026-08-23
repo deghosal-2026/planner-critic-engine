@@ -140,8 +140,7 @@ class OracleEvalHarness:
             if code in covered_expected_codes:
                 continue
             if not any(
-                isinstance(f.reason_code, str) and f.reason_code == code
-                for f in result.findings
+                isinstance(f.reason_code, str) and f.reason_code == code for f in result.findings
             ):
                 missed.append(
                     Finding(
@@ -161,8 +160,7 @@ class OracleEvalHarness:
             missed=missed,
             spurious=spurious,
             plan_tasks=(
-                [{"id": t.id, "action": t.action, "target": t.target}
-                 for t in result.plan.tasks]
+                [{"id": t.id, "action": t.action, "target": t.target} for t in result.plan.tasks]
                 if result.plan
                 else []
             ),

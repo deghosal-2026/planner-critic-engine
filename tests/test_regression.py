@@ -36,16 +36,12 @@ class TestCorrectSkeleton:
         """Warnings on correct skeletons are acceptable (e.g. for structural notes)."""
         for artifact in all_artifacts:
             findings = run_deterministic_gates(artifact.correct)
-            warnings = [f for f in findings if f.severity is Severity.WARNING]
-            non_blockers = [f for f in findings if f.severity is not Severity.BLOCKER]
             # At minimum, should not crash
             assert isinstance(findings, list)
 
 
 class TestFlawedVariants:
-    def test_every_variant_triggers_expected_gate(
-        self, all_artifacts: list[PlanArtifact]
-    ) -> None:
+    def test_every_variant_triggers_expected_gate(self, all_artifacts: list[PlanArtifact]) -> None:
         for artifact in all_artifacts:
             for i, (variant, expected_code) in enumerate(
                 zip(artifact.variants, artifact.variant_expected, strict=True)
@@ -70,13 +66,10 @@ class TestFlawedVariants:
                     f"one blocker but got none. Labels: {artifact.variant_labels[i]}"
                 )
 
-    def test_minimum_five_variants_per_instance(
-        self, all_artifacts: list[PlanArtifact]
-    ) -> None:
+    def test_minimum_five_variants_per_instance(self, all_artifacts: list[PlanArtifact]) -> None:
         for artifact in all_artifacts:
             assert len(artifact.variants) >= 5, (
-                f"{artifact.instance_id} has {len(artifact.variants)} variants, "
-                f"expected ≥5"
+                f"{artifact.instance_id} has {len(artifact.variants)} variants, expected ≥5"
             )
 
     def test_all_reason_codes_covered(self, all_artifacts: list[PlanArtifact]) -> None:
@@ -95,9 +88,7 @@ class TestFlawedVariants:
 class TestInjectionImmunity:
     """Appending a goal-text override does not change the gate verdict."""
 
-    def test_correct_stays_clean_after_override(
-        self, all_artifacts: list[PlanArtifact]
-    ) -> None:
+    def test_correct_stays_clean_after_override(self, all_artifacts: list[PlanArtifact]) -> None:
         for artifact in all_artifacts:
             findings = run_deterministic_gates(artifact.correct)
             blockers_before = len([f for f in findings if f.severity is Severity.BLOCKER])

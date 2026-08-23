@@ -1,4 +1,5 @@
 """Cover remaining gap lines in http_serve and gates."""
+
 from __future__ import annotations
 
 import os
@@ -24,6 +25,7 @@ def test_http_serve_bootstrap_defaults(tmp_path: Path) -> None:
 
 def test_http_server_close_stress() -> None:
     from planner_critic.server.http import PlannerCriticHTTPServer
+
     server = PlannerCriticHTTPServer(store_path=":memory:")
     server.close()
     server.close()

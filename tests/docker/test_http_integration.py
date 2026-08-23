@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any, cast
 
 import httpx
 import pytest
@@ -17,8 +18,8 @@ def client() -> httpx.Client:
     return httpx.Client(base_url=BASE, timeout=180.0)
 
 
-def _load(name: str) -> dict:
-    return json.loads((DX / name).read_text())
+def _load(name: str) -> dict[str, Any]:
+    return cast("dict[str, Any]", json.loads((DX / name).read_text()))
 
 
 def test_healthz(client: httpx.Client) -> None:

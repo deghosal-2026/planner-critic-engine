@@ -129,36 +129,61 @@ def generate_boundary_cases() -> list[BoundaryCase]:
     Returns:
         A list of boundary-case pairs.
     """
-    base_task = Task.model_validate({
-        "id": "t1", "description": "apply change", "action": "fix",
-        "target": "service", "risk_class": "low", "blast_radius": "low",
-    })
+    base_task = Task.model_validate(
+        {
+            "id": "t1",
+            "description": "apply change",
+            "action": "fix",
+            "target": "service",
+            "risk_class": "low",
+            "blast_radius": "low",
+        }
+    )
     base_plan = PlanVersion(
-        id="boundary-base", goal_id="test", version=1,
-        tasks=[base_task], dependencies=[],
+        id="boundary-base",
+        goal_id="test",
+        version=1,
+        tasks=[base_task],
+        dependencies=[],
     )
 
-    high_task = Task.model_validate({
-        "id": "t1", "description": "apply change", "action": "fix",
-        "target": "service", "risk_class": "high", "blast_radius": "high",
-        "rollback": {"trigger": "fail", "action": "revert", "safety_guard": "backup"},
-        "verification": {"what": "check", "how": "manual", "expected": "pass"},
-    })
+    high_task = Task.model_validate(
+        {
+            "id": "t1",
+            "description": "apply change",
+            "action": "fix",
+            "target": "service",
+            "risk_class": "high",
+            "blast_radius": "high",
+            "rollback": {"trigger": "fail", "action": "revert", "safety_guard": "backup"},
+            "verification": {"what": "check", "how": "manual", "expected": "pass"},
+        }
+    )
     high_plan = PlanVersion(
-        id="boundary-high", goal_id="test", version=1,
-        tasks=[high_task], dependencies=[],
+        id="boundary-high",
+        goal_id="test",
+        version=1,
+        tasks=[high_task],
+        dependencies=[],
     )
 
     verified_deploy = {
-        "id": "t1", "description": "deploy service", "action": "deploy",
-        "target": "prod", "risk_class": "high", "blast_radius": "high",
+        "id": "t1",
+        "description": "deploy service",
+        "action": "deploy",
+        "target": "prod",
+        "risk_class": "high",
+        "blast_radius": "high",
         "rollback": {"trigger": "fail", "action": "revert", "safety_guard": "backup"},
         "verification": {"what": "health", "how": "check", "expected": "pass"},
         "parallel_group": "g1",
     }
     racing_sibling = {
-        "id": "t2", "description": "rotate credentials", "action": "rotate",
-        "risk_class": "medium", "blast_radius": "medium",
+        "id": "t2",
+        "description": "rotate credentials",
+        "action": "rotate",
+        "risk_class": "medium",
+        "blast_radius": "medium",
         "parallel_group": "g1",
     }
 
@@ -166,32 +191,116 @@ def generate_boundary_cases() -> list[BoundaryCase]:
         sibling = dict(racing_sibling)
         sibling["target"] = target
         return PlanVersion(
-            id=f"boundary-verification-{target}", goal_id="test", version=1,
+            id=f"boundary-verification-{target}",
+            goal_id="test",
+            version=1,
             tasks=[Task.model_validate(verified_deploy), Task.model_validate(sibling)],
             dependencies=[],
         )
 
     guarded_migrate = {
-        "id": "t1", "description": "migrate schema", "action": "migrate",
-        "target": "db", "risk_class": "high", "blast_radius": "high",
+        "id": "t1",
+        "description": "migrate schema",
+        "action": "migrate",
+        "target": "db",
+        "risk_class": "high",
+        "blast_radius": "high",
         "rollback": {"trigger": "fail", "action": "revert", "safety_guard": "backup"},
         "verification": {"what": "schema", "how": "check", "expected": "v2"},
     }
 
     def _consumer_plan(verified: bool) -> PlanVersion:
         consumer: dict[str, object] = {
-            "id": "t2", "description": "seed reference data", "action": "insert",
-            "target": "db", "risk_class": "medium", "blast_radius": "medium",
+            "id": "t2",
+            "description": "seed reference data",
+            "action": "insert",
+            "target": "db",
+            "risk_class": "medium",
+            "blast_radius": "medium",
         }
         if verified:
             consumer["verification"] = {"what": "rows", "how": "count", "expected": "n"}
         return PlanVersion(
-            id=f"boundary-post-consumed-{verified}", goal_id="test", version=1,
+            id=f"boundary-post-consumed-{verified}",
+            goal_id="test",
+            version=1,
             tasks=[Task.model_validate(guarded_migrate), Task.model_validate(consumer)],
             dependencies=[Dependency(from_task="t1", to_task="t2")],
         )
 
+    # Triplet (#230): consequences key on the verification's data subject,
+    # not position alone. Each pair flips exactly one fact — the subject —
+    # while holding position constant.
+    producer = {
+        "id": "t1",
+        "description": "migrate schema",
+        "action": "migrate",
+        "target": "db",
+        "risk_class": "high",
+        "blast_radius": "high",
+        "rollback": {"trigger": "fail", "action": "revert", "safety_guard": "backup"},
+        "verification": {"what": "schema v2", "how": "check", "expected": "applied"},
+    }
+
+    def _subject_pair(subject_what: str, correct_side: str) -> tuple[PlanVersion, PlanVersion]:
+        """Build (correct-side clean, wrong-side blocked) twin plans."""
+
+        def make(position: str, plan_suffix: str) -> PlanVersion:
+            checker = {
+                "id": "t2",
+                "description": f"verify {subject_what}",
+                "action": "verify",
+                "target": "db",
+                "risk_class": "medium",
+                "blast_radius": "medium",
+                "verification": {"what": subject_what, "how": "inspect", "expected": "ok"},
+            }
+            tasks = (
+                [Task.model_validate(checker), Task.model_validate(producer)]
+                if position == "before"
+                else [Task.model_validate(producer), Task.model_validate(checker)]
+            )
+            return PlanVersion(
+                id=f"boundary-subject-{plan_suffix}",
+                goal_id="test",
+                version=1,
+                tasks=tasks,
+                dependencies=[Dependency(from_task="t1", to_task="t2")],
+            )
+
+        if correct_side == "before":
+            return make("before", "ok"), make("after", "bad")
+        return make("after", "ok"), make("before", "bad")
+
+    pre_ok, pre_bad = _subject_pair("pre-state: backup snapshot present", "before")
+    out_ok, out_bad = _subject_pair("row count", "after")
+
     return [
+        BoundaryCase(
+            case_id="triplet-pre-state-before-mutate",
+            description=(
+                "Pre-state check: correct placement is BEFORE the mutate. "
+                "plan_a passes (early constraint read); plan_b runs the same "
+                "check after the mutate, where it reads a replaced world."
+            ),
+            plan_a=pre_ok,
+            plan_b=pre_bad,
+            expected_blocker_family="unsafe_sequencing",
+            expected_reason_code="verification_after_consumer",
+        ),
+        BoundaryCase(
+            case_id="triplet-output-after-mutate",
+            description=(
+                "Output check: correct placement is AFTER the mutate. "
+                "plan_a passes (pinned anti-over-correction guarantee); "
+                "plan_b moves it before the mutate, where it asserts facts "
+                "about state the mutation will replace."
+            ),
+            plan_a=out_ok,
+            plan_b=out_bad,
+            expected_blocker_family="unsafe_sequencing",
+            expected_reason_code="verification_after_consumer",
+        ),
         BoundaryCase(
             case_id="credible-rollback-vs-post-consumed-window",
             description=(
@@ -228,22 +337,46 @@ def generate_boundary_cases() -> list[BoundaryCase]:
             case_id="rollback-improvement-vs-no-viable-rollback",
             description="Rollback improvement vs no viable rollback — single-fact diff",
             plan_a=PlanVersion(
-                id="boundary-rollback-ok", goal_id="test", version=1,
-                tasks=[Task.model_validate({
-                    "id": "t1", "description": "deploy", "action": "deploy",
-                    "target": "prod", "risk_class": "high", "blast_radius": "high",
-                    "rollback": {"trigger": "fail", "action": "revert", "safety_guard": "backup"},
-                    "verification": {"what": "health", "how": "check", "expected": "pass"},
-                })],
+                id="boundary-rollback-ok",
+                goal_id="test",
+                version=1,
+                tasks=[
+                    Task.model_validate(
+                        {
+                            "id": "t1",
+                            "description": "deploy",
+                            "action": "deploy",
+                            "target": "prod",
+                            "risk_class": "high",
+                            "blast_radius": "high",
+                            "rollback": {
+                                "trigger": "fail",
+                                "action": "revert",
+                                "safety_guard": "backup",
+                            },
+                            "verification": {"what": "health", "how": "check", "expected": "pass"},
+                        }
+                    )
+                ],
                 dependencies=[],
             ),
             plan_b=PlanVersion(
-                id="boundary-rollback-missing", goal_id="test", version=1,
-                tasks=[Task.model_validate({
-                    "id": "t1", "description": "deploy", "action": "deploy",
-                    "target": "prod", "risk_class": "high", "blast_radius": "high",
-                    "verification": {"what": "health", "how": "check", "expected": "pass"},
-                })],
+                id="boundary-rollback-missing",
+                goal_id="test",
+                version=1,
+                tasks=[
+                    Task.model_validate(
+                        {
+                            "id": "t1",
+                            "description": "deploy",
+                            "action": "deploy",
+                            "target": "prod",
+                            "risk_class": "high",
+                            "blast_radius": "high",
+                            "verification": {"what": "health", "how": "check", "expected": "pass"},
+                        }
+                    )
+                ],
                 dependencies=[],
             ),
             expected_blocker_family="weak_rollback",

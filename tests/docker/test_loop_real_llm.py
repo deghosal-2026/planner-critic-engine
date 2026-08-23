@@ -31,7 +31,7 @@ import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import pytest
@@ -46,7 +46,7 @@ REQUEST_TIMEOUT = 300.0
 
 def _load(name: str) -> dict[str, Any]:
     """Load a JSON fixture from tests/docker/fixtures/."""
-    return json.loads((DX / name).read_text())
+    return cast("dict[str, Any]", json.loads((DX / name).read_text()))
 
 
 def _save_evidence(label: str, goal: dict[str, Any], body: dict[str, Any]) -> None:
@@ -108,7 +108,7 @@ def _post_plan(goal: dict[str, Any], label: str) -> dict[str, Any]:
         file=sys.stderr,
         flush=True,
     )
-    return data
+    return cast("dict[str, Any]", data)
 
 
 # ---------------------------------------------------------------------------

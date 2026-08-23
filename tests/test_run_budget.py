@@ -51,21 +51,30 @@ class TestReplanClassifier:
     def test_transient_error_returns_transient(self) -> None:
         classifier = ReplanClassifier()
         trace = ExecutionTrace(
-            id="trace-1", plan_id="plan-1", task_id="task-1", outcome="timeout",
+            id="trace-1",
+            plan_id="plan-1",
+            task_id="task-1",
+            outcome="timeout",
         )
         assert classifier.classify(trace) is FailureClass.TRANSIENT
 
     def test_deterministic_error_returns_deterministic(self) -> None:
         classifier = ReplanClassifier()
         trace = ExecutionTrace(
-            id="trace-1", plan_id="plan-1", task_id="task-1", outcome="precondition_drift",
+            id="trace-1",
+            plan_id="plan-1",
+            task_id="task-1",
+            outcome="precondition_drift",
         )
         assert classifier.classify(trace) is FailureClass.DETERMINISTIC
 
     def test_ambiguous_error_returns_ambiguous(self) -> None:
         classifier = ReplanClassifier()
         trace = ExecutionTrace(
-            id="trace-1", plan_id="plan-1", task_id="task-1", outcome="unknown_error_42",
+            id="trace-1",
+            plan_id="plan-1",
+            task_id="task-1",
+            outcome="unknown_error_42",
         )
         assert classifier.classify(trace) is FailureClass.AMBIGUOUS
 
@@ -73,7 +82,10 @@ class TestReplanClassifier:
         classifier = ReplanClassifier(step_max_retries=2)
         for _ in range(3):
             trace = ExecutionTrace(
-                id="trace-x", plan_id="plan-1", task_id="task-1", outcome="timeout",
+                id="trace-x",
+                plan_id="plan-1",
+                task_id="task-1",
+                outcome="timeout",
             )
             classifier.classify(trace)
         assert classifier.check_step_retry_exceeded("task-1")
@@ -82,7 +94,10 @@ class TestReplanClassifier:
         classifier = ReplanClassifier(step_max_retries=3)
         for _ in range(2):
             trace = ExecutionTrace(
-                id="trace-x", plan_id="plan-1", task_id="task-1", outcome="timeout",
+                id="trace-x",
+                plan_id="plan-1",
+                task_id="task-1",
+                outcome="timeout",
             )
             classifier.classify(trace)
         assert not classifier.check_step_retry_exceeded("task-1")
@@ -92,23 +107,52 @@ class TestReplanClassifier:
         results: list[FailureClass] = []
         for _ in range(2):
             trace = ExecutionTrace(
-                id="trace-x", plan_id="plan-1", task_id="task-1", outcome="rate_limit",
+                id="trace-x",
+                plan_id="plan-1",
+                task_id="task-1",
+                outcome="rate_limit",
             )
             results.append(classifier.classify(trace))
         assert results[-1] is FailureClass.AMBIGUOUS
 
     def test_transient_codes(self) -> None:
-        for code in ["timeout", "rate_limit", "network_error", "connection_reset", "service_unavailable", "429", "503"]:
+        for code in [
+            "timeout",
+            "rate_limit",
+            "network_error",
+            "connection_reset",
+            "service_unavailable",
+            "429",
+            "503",
+        ]:
             classifier = ReplanClassifier()
             trace = ExecutionTrace(
-                id="trace-x", plan_id="plan-1", task_id="task-1", outcome=code,
+                id="trace-x",
+                plan_id="plan-1",
+                task_id="task-1",
+                outcome=code,
             )
-            assert classifier.classify(trace) is FailureClass.TRANSIENT, f"{code} should be transient"
+            assert classifier.classify(trace) is FailureClass.TRANSIENT, (
+                f"{code} should be transient"
+            )
 
     def test_deterministic_codes(self) -> None:
-        for code in ["precondition_drift", "schema_mismatch", "missing_dependency", "invalid_config", "auth_failure", "permission_denied", "not_found"]:
+        for code in [
+            "precondition_drift",
+            "schema_mismatch",
+            "missing_dependency",
+            "invalid_config",
+            "auth_failure",
+            "permission_denied",
+            "not_found",
+        ]:
             classifier = ReplanClassifier()
             trace = ExecutionTrace(
-                id="trace-x", plan_id="plan-1", task_id="task-1", outcome=code,
+                id="trace-x",
+                plan_id="plan-1",
+                task_id="task-1",
+                outcome=code,
             )
-            assert classifier.classify(trace) is FailureClass.DETERMINISTIC, f"{code} should be deterministic"
+            assert classifier.classify(trace) is FailureClass.DETERMINISTIC, (
+                f"{code} should be deterministic"
+            )

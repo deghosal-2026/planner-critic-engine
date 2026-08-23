@@ -321,7 +321,7 @@ class PlannerCriticMCPServer:
 
     def _build_engine(self, goal: Goal) -> Engine:
         """Build an Engine from configured roles or provider config.
-        
+
         When explicit roles are provided (planner + critic), they are used
         directly and cached across requests. When roles are built from config,
         the planner is cached (goal-agnostic) but the critic is rebuilt per

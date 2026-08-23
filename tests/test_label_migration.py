@@ -53,11 +53,16 @@ class TestBuildConfusionMatrix:
 
 class TestIrreversibleInvariantGate:
     def test_critical_high_without_rollback_blocked(self) -> None:
-        task = Task.model_validate({
-            "id": "t1", "description": "drop table", "action": "drop",
-            "target": "production", "risk_class": "critical",
-            "blast_radius": "high",
-        })
+        task = Task.model_validate(
+            {
+                "id": "t1",
+                "description": "drop table",
+                "action": "drop",
+                "target": "production",
+                "risk_class": "critical",
+                "blast_radius": "high",
+            }
+        )
         plan = PlanVersion(id="p1", goal_id="g1", version=1, tasks=[task])
         gate = IrreversibleInvariantGate()
         findings = gate.run(plan)
@@ -65,48 +70,73 @@ class TestIrreversibleInvariantGate:
         assert findings[0].severity is Severity.BLOCKER
 
     def test_critical_high_with_rollback_and_precondition_passes(self) -> None:
-        task = Task.model_validate({
-            "id": "t1", "description": "drop table", "action": "drop",
-            "target": "production", "risk_class": "critical",
-            "blast_radius": "high",
-            "rollback": {"trigger": "verification_fails", "action": "revert",
-                         "safety_guard": "backup_confirmed"},
-            "preconditions": [{
-                "description": "backup verified",
-                "fact": "backup_exists",
-                "established_by": "env:backup_status",
-            }],
-        })
+        task = Task.model_validate(
+            {
+                "id": "t1",
+                "description": "drop table",
+                "action": "drop",
+                "target": "production",
+                "risk_class": "critical",
+                "blast_radius": "high",
+                "rollback": {
+                    "trigger": "verification_fails",
+                    "action": "revert",
+                    "safety_guard": "backup_confirmed",
+                },
+                "preconditions": [
+                    {
+                        "description": "backup verified",
+                        "fact": "backup_exists",
+                        "established_by": "env:backup_status",
+                    }
+                ],
+            }
+        )
         plan = PlanVersion(id="p1", goal_id="g1", version=1, tasks=[task])
         gate = IrreversibleInvariantGate()
         findings = gate.run(plan)
         assert len(findings) == 0
 
     def test_critical_high_with_verification_and_precondition_passes(self) -> None:
-        task = Task.model_validate({
-            "id": "t1", "description": "modify schema", "action": "alter",
-            "target": "db", "risk_class": "critical",
-            "blast_radius": "high",
-            "verification": {"what": "schema applied", "how": "check", "expected": "match"},
-            "rollback": {"trigger": "verification_fails", "action": "revert",
-                         "safety_guard": "backup_confirmed"},
-            "preconditions": [{
-                "description": "schema backup verified",
-                "fact": "backup_exists",
-                "established_by": "env:backup_status",
-            }],
-        })
+        task = Task.model_validate(
+            {
+                "id": "t1",
+                "description": "modify schema",
+                "action": "alter",
+                "target": "db",
+                "risk_class": "critical",
+                "blast_radius": "high",
+                "verification": {"what": "schema applied", "how": "check", "expected": "match"},
+                "rollback": {
+                    "trigger": "verification_fails",
+                    "action": "revert",
+                    "safety_guard": "backup_confirmed",
+                },
+                "preconditions": [
+                    {
+                        "description": "schema backup verified",
+                        "fact": "backup_exists",
+                        "established_by": "env:backup_status",
+                    }
+                ],
+            }
+        )
         plan = PlanVersion(id="p1", goal_id="g1", version=1, tasks=[task])
         gate = IrreversibleInvariantGate()
         findings = gate.run(plan)
         assert len(findings) == 0
 
     def test_low_risk_not_affected(self) -> None:
-        task = Task.model_validate({
-            "id": "t1", "description": "add comment", "action": "add",
-            "target": "code", "risk_class": "low",
-            "blast_radius": "low",
-        })
+        task = Task.model_validate(
+            {
+                "id": "t1",
+                "description": "add comment",
+                "action": "add",
+                "target": "code",
+                "risk_class": "low",
+                "blast_radius": "low",
+            }
+        )
         plan = PlanVersion(id="p1", goal_id="g1", version=1, tasks=[task])
         gate = IrreversibleInvariantGate()
         findings = gate.run(plan)

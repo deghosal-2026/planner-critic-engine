@@ -33,15 +33,10 @@ class GracePeriodGate(BaseGate):
         has_notify = any(t.action in NOTIFY_ACTIONS for t in plan.tasks)
         has_wait = any(t.action in WAIT_ACTIONS for t in plan.tasks)
         for task in plan.tasks:
-            if task.action in DELETE_ACTIONS and not (
-                has_snapshot and has_notify and has_wait
-            ):
+            if task.action in DELETE_ACTIONS and not (has_snapshot and has_notify and has_wait):
                 findings.append(
                     Finding(
-                        id=(
-                            f"finops_grace_period:"
-                            f"{plan.id}:{plan.version}:{task.id}"
-                        ),
+                        id=(f"finops_grace_period:{plan.id}:{plan.version}:{task.id}"),
                         task_id=task.id,
                         version=plan.version,
                         severity=Severity.BLOCKER,
@@ -78,7 +73,8 @@ class BudgetBoundaryGate(BaseGate):
         for task in plan.tasks:
             if task.action in ("scale_up", "scale_out", "provision", "add_capacity"):
                 scale_up_tasks += 1
-                # Parse cost from target if numeric; otherwise skip (cost metadata deferred to v0.3.0)
+                # Parse cost from target if numeric; otherwise skip
+                # (cost metadata deferred to v0.3.0)
                 try:
                     spend += float(task.target or 0)
                 except ValueError:
@@ -95,7 +91,8 @@ class BudgetBoundaryGate(BaseGate):
                         severity=Severity.WARNING,
                         reason_code=FINOPS_BUDGET_BOUNDARY_BREACHED,
                         message=(
-                            f"{scale_up_tasks} scale-up action(s) without cost data or executive override"
+                            f"{scale_up_tasks} scale-up action(s) without cost "
+                            "data or executive override"
                         ),
                     )
                 )
@@ -110,9 +107,7 @@ class BudgetBoundaryGate(BaseGate):
                             f"scale-up spend {spend:.0f} exceeds localized cap "
                             f"{self.budget_cap:.0f} without executive override"
                         ),
-                        suggested_fix=(
-                            "Add an executive_override step or stay within the cap"
-                        ),
+                        suggested_fix=("Add an executive_override step or stay within the cap"),
                     )
                 )
         return findings

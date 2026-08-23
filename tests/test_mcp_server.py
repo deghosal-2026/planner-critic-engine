@@ -11,6 +11,7 @@ Covers:
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -21,7 +22,7 @@ from planner_critic.types import Escalation
 
 
 @pytest.fixture
-def store_path(tmp_path) -> str:
+def store_path(tmp_path: Path) -> str:
     """A fresh SQLite store path per test."""
     return str(tmp_path / "plans.db")
 

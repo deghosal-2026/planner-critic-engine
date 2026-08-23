@@ -17,8 +17,9 @@ from planner_critic.types import Severity
 
 
 def _task(tid: str, **kw: object) -> Task:
-    return Task.model_validate({"id": tid, "description": f"task {tid}",
-                                "action": "do", "target": tid, **kw})
+    return Task.model_validate(
+        {"id": tid, "description": f"task {tid}", "action": "do", "target": tid, **kw}
+    )
 
 
 def _clean_plan() -> PlanVersion:
@@ -38,8 +39,13 @@ class TestPackShape:
 
     def test_precondition_catalog(self) -> None:
         cat = FinOpsDomainPack().precondition_catalog
-        for key in ("snapshot_created", "owner_notified", "grace_period_elapsed",
-                    "budget_within_cap", "spend_forecast_checked"):
+        for key in (
+            "snapshot_created",
+            "owner_notified",
+            "grace_period_elapsed",
+            "budget_within_cap",
+            "spend_forecast_checked",
+        ):
             assert key in cat
 
     def test_critic_prompt_present(self) -> None:
@@ -63,28 +69,37 @@ class TestGracePeriodGate:
         assert self.GATE.run(_clean_plan()) == []
 
     def test_delete_with_full_grace_period_passes(self) -> None:
-        plan = make_plan(tasks=[
-            _task("snap", action="snapshot", target="db"),
-            _task("notify", action="notify_owner", target="db"),
-            _task("wait", action="wait_grace_period", target="7d"),
-            _task("delete", action="delete", target="db"),
-        ])
+        plan = make_plan(
+            tasks=[
+                _task("snap", action="snapshot", target="db"),
+                _task("notify", action="notify_owner", target="db"),
+                _task("wait", action="wait_grace_period", target="7d"),
+                _task("delete", action="delete", target="db"),
+            ]
+        )
         assert self.GATE.run(plan) == []
 
     def test_instant_delete_blocked(self) -> None:
-        findings = self.GATE.run(make_plan(tasks=[
-            _task("delete", action="delete", target="db"),
-        ]))
+        findings = self.GATE.run(
+            make_plan(
+                tasks=[
+                    _task("delete", action="delete", target="db"),
+                ]
+            )
+        )
         assert any(f.severity is Severity.BLOCKER for f in findings)
 
     def test_delete_with_snapshot_but_no_wait_blocked(self) -> None:
-        findings = self.GATE.run(make_plan(tasks=[
-            _task("snap", action="snapshot", target="db"),
-            _task("notify", action="notify_owner", target="db"),
-            _task("delete", action="delete", target="db"),
-        ]))
-        assert any(f.reason_code == "finops_delete_without_grace_period"
-                   for f in findings)
+        findings = self.GATE.run(
+            make_plan(
+                tasks=[
+                    _task("snap", action="snapshot", target="db"),
+                    _task("notify", action="notify_owner", target="db"),
+                    _task("delete", action="delete", target="db"),
+                ]
+            )
+        )
+        assert any(f.reason_code == "finops_delete_without_grace_period" for f in findings)
 
 
 class TestBudgetBoundaryGate:
@@ -94,36 +109,43 @@ class TestBudgetBoundaryGate:
         assert FinOpsDomainPack().gate_evaluators[1].run(_clean_plan()) == []
 
     def test_scale_within_cap_passes(self) -> None:
-        plan = make_plan(tasks=[
-            _task("check", action="check_budget", target="1000"),
-            _task("scale", action="scale_up", target="500"),
-        ])
+        plan = make_plan(
+            tasks=[
+                _task("check", action="check_budget", target="1000"),
+                _task("scale", action="scale_up", target="500"),
+            ]
+        )
         assert FinOpsDomainPack(budget_cap=2000).gate_evaluators[1].run(plan) == []
 
     def test_scale_beyond_cap_blocked(self) -> None:
-        plan = make_plan(tasks=[
-            _task("check", action="check_budget", target="1000"),
-            _task("scale", action="scale_up", target="1500"),
-        ])
+        plan = make_plan(
+            tasks=[
+                _task("check", action="check_budget", target="1000"),
+                _task("scale", action="scale_up", target="1500"),
+            ]
+        )
         findings = FinOpsDomainPack(budget_cap=1000).gate_evaluators[1].run(plan)
-        assert any(f.reason_code == "finops_budget_boundary_breached"
-                   for f in findings)
+        assert any(f.reason_code == "finops_budget_boundary_breached" for f in findings)
 
     def test_scale_beyond_cap_with_override_passes(self) -> None:
-        plan = make_plan(tasks=[
-            _task("check", action="check_budget", target="1000"),
-            _task("override", action="executive_override", target="budget"),
-            _task("scale", action="scale_up", target="1500"),
-        ])
+        plan = make_plan(
+            tasks=[
+                _task("check", action="check_budget", target="1000"),
+                _task("override", action="executive_override", target="budget"),
+                _task("scale", action="scale_up", target="1500"),
+            ]
+        )
         assert FinOpsDomainPack(budget_cap=1000).gate_evaluators[1].run(plan) == []
 
     def test_default_cap_used_when_no_arg(self) -> None:
         """Without a budget_cap arg, the pack uses its default cap (100k)."""
         pack = FinOpsDomainPack()
-        plan = make_plan(tasks=[
-            _task("check", action="check_budget", target="100000"),
-            _task("scale", action="scale_up", target="50000"),
-        ])
+        plan = make_plan(
+            tasks=[
+                _task("check", action="check_budget", target="100000"),
+                _task("scale", action="scale_up", target="50000"),
+            ]
+        )
         assert pack.gate_evaluators[1].run(plan) == []
 
 
@@ -133,10 +155,8 @@ class TestManifestLoading:
     MANIFEST = {
         "name": "finops",
         "gates": [
-            {"module": "planner_critic.domains.finops.gates",
-             "class": "GracePeriodGate"},
-            {"module": "planner_critic.domains.finops.gates",
-             "class": "BudgetBoundaryGate"},
+            {"module": "planner_critic.domains.finops.gates", "class": "GracePeriodGate"},
+            {"module": "planner_critic.domains.finops.gates", "class": "BudgetBoundaryGate"},
         ],
         "preconditions": {"snapshot_created": "Snapshot exists"},
         "critic_prompt": "Audit from a cost perspective.\n",

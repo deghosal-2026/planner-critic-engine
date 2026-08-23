@@ -198,7 +198,10 @@ def run_plan(argv: list[str]) -> int:
             resolver = PostureResolver.from_yaml(args.posture_rules_file)
             resolved = resolver.resolve(goal.risk_tolerance)
             goal = goal.model_copy(update={"risk_tolerance": resolved.posture})
-            print(f"posture resolved: {resolved.posture.value} ({resolved.context_signal or 'fallback'})")
+            print(
+                f"posture resolved: {resolved.posture.value} "
+                f"({resolved.context_signal or 'fallback'})"
+            )
         except Exception as err:
             print(f"failed to resolve posture: {err}")
             return 1

@@ -33,7 +33,12 @@ def build_templates_parser() -> argparse.ArgumentParser:
     add.add_argument("--description", default=None, help="Task description")
     add.add_argument("--action", default="do", help="Action for the injected step")
     add.add_argument("--target", default=None, help="Target for the injected step")
-    add.add_argument("--risk-class", default="low", choices=["low", "medium", "high", "critical"], help="Risk class")
+    add.add_argument(
+        "--risk-class",
+        default="low",
+        choices=["low", "medium", "high", "critical"],
+        help="Risk class",
+    )
     test = sub.add_parser("test", help="Dry-run the closer against a sample plan")
     test.add_argument("name", help="Template name")
     test.add_argument("plan_file", help="Path to a PlanVersion JSON file")
@@ -89,6 +94,7 @@ def run_templates(argv: list[str]) -> int:
 
         from ..gates import run_deterministic_gates
         from ..loop.autofix import apply_precondition_closer
+
         gate_findings = run_deterministic_gates(plan)
         closed_plan, findings = apply_precondition_closer(plan, gate_findings)
         if closed_plan is None:

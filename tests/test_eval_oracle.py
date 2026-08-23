@@ -13,9 +13,7 @@ from planner_critic.eval.oracle import EvalScorecard, InstanceResult, OracleEval
 
 class TestInstanceResult:
     def test_counts(self) -> None:
-        result = InstanceResult(
-            instance_id="TEST-001", cwe="CWE-79", cwe_bucket="XSS"
-        )
+        result = InstanceResult(instance_id="TEST-001", cwe="CWE-79", cwe_bucket="XSS")
         assert result.aligned_count == 0
         assert result.missed_count == 0
         assert result.spurious_count == 0
@@ -38,9 +36,7 @@ class TestEvalScorecard:
         assert scorecard.accuracy == 0.0
 
     def test_to_dict_structure(self) -> None:
-        scorecard = EvalScorecard(
-            total_instances=3, total_aligned=5, total_missed=2
-        )
+        scorecard = EvalScorecard(total_instances=3, total_aligned=5, total_missed=2)
         scorecard.compute()
         d = scorecard.to_dict()
         assert d["total_instances"] == 3
@@ -99,8 +95,12 @@ class TestSaveReport:
         scorecard.compute()
         results = [
             InstanceResult(
-                instance_id="TEST-001", cwe="CWE-79", cwe_bucket="XSS",
-                aligned=[], missed=[], spurious=[],
+                instance_id="TEST-001",
+                cwe="CWE-79",
+                cwe_bucket="XSS",
+                aligned=[],
+                missed=[],
+                spurious=[],
             )
         ]
         out = tmp_path / "detailed.json"
@@ -113,6 +113,7 @@ class TestSaveReport:
 class TestHarnessRunAllWithFilter:
     def test_run_all_with_instance_filter(self) -> None:
         from conftest import ScriptedCritic, ScriptedPlanner, make_plan, make_task
+
         planner = ScriptedPlanner([make_plan(tasks=[make_task("t1")])])
         critic = ScriptedCritic([[]])
         harness = OracleEvalHarness(planner, critic)

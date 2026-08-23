@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
+from pathlib import Path
 
 import httpx
 import pytest
@@ -73,14 +74,14 @@ def test_provider_failure_types_are_fail_closed() -> None:
 # --- Registry (F-21, F-23) --------------------------------------------------
 
 
-def test_registry_empty_when_config_absent(tmp_path) -> None:
+def test_registry_empty_when_config_absent(tmp_path: Path) -> None:
     """A missing config file yields an empty registry, not a crash."""
     registry = ProviderRegistry.load(tmp_path / "nope.toml")
     assert registry.providers == {}
     assert registry.roles == {}
 
 
-def test_registry_skips_malformed_entries(tmp_path, caplog) -> None:
+def test_registry_skips_malformed_entries(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     """Malformed provider/role entries are skipped with a warning, not a crash."""
     bad = tmp_path / "bad.toml"
     bad.write_text('[providers]\nfoo = "not-a-table"\n\n[roles]\nplanner = 42\n')
@@ -90,7 +91,7 @@ def test_registry_skips_malformed_entries(tmp_path, caplog) -> None:
     assert "malformed" in caplog.text
 
 
-def test_registry_add_save_load_round_trip(tmp_path) -> None:
+def test_registry_add_save_load_round_trip(tmp_path: Path) -> None:
     """A provider added + saved survives a reload (config persistence)."""
     path = tmp_path / "plancritic.toml"
     registry = ProviderRegistry.load(path)
@@ -113,7 +114,7 @@ def test_registry_add_save_load_round_trip(tmp_path) -> None:
     assert reloaded.roles == {"planner": "local"}
 
 
-def test_registry_remove_unbinds_roles(tmp_path) -> None:
+def test_registry_remove_unbinds_roles(tmp_path: Path) -> None:
     """Removing a provider also clears its role bindings."""
     path = tmp_path / "plancritic.toml"
     registry = ProviderRegistry.load(path)
@@ -123,7 +124,7 @@ def test_registry_remove_unbinds_roles(tmp_path) -> None:
     assert not registry.remove("local")
 
 
-def test_registry_roles_survive_save(tmp_path) -> None:
+def test_registry_roles_survive_save(tmp_path: Path) -> None:
     """Role→provider mapping persists through a save/reload."""
     path = tmp_path / "plancritic.toml"
     registry = ProviderRegistry.load(path)
@@ -135,7 +136,7 @@ def test_registry_roles_survive_save(tmp_path) -> None:
     assert reloaded.roles["critic"] == "c"
 
 
-def test_registry_round_trip_handles_api_key(tmp_path) -> None:
+def test_registry_round_trip_handles_api_key(tmp_path: Path) -> None:
     """An api-key-bearing provider round-trips with the key intact."""
     path = tmp_path / "plancritic.toml"
     registry = ProviderRegistry.load(path)
@@ -147,7 +148,7 @@ def test_registry_round_trip_handles_api_key(tmp_path) -> None:
     assert reloaded.providers["openai"].api_key == "sk-secret"
 
 
-def test_get_provider_materializes_transport(tmp_path) -> None:
+def test_get_provider_materializes_transport(tmp_path: Path) -> None:
     """get_provider constructs a configured OpenAI-compatible transport."""
     registry = ProviderRegistry.load(tmp_path / "plancritic.toml")
     registry.add("local", base_url="http://x/v1", model="m", role="planner")
@@ -163,7 +164,7 @@ def test_get_provider_unbound_role_fails_closed() -> None:
         registry.get_provider("planner")
 
 
-def test_get_provider_unknown_reference_fails_closed(tmp_path) -> None:
+def test_get_provider_unknown_reference_fails_closed(tmp_path: Path) -> None:
     """A role pointing at a missing provider raises PlanningError."""
     registry = ProviderRegistry.load(tmp_path / "x.toml")
     registry.roles["planner"] = "ghost"
@@ -179,7 +180,7 @@ def test_default_roles_are_planner_and_critic() -> None:
 # --- OpenAI-compatible transport (F-22) -------------------------------------
 
 
-def _mock_client(json_payload: dict, status: int = 200) -> httpx.Client:
+def _mock_client(json_payload: dict[str, object], status: int = 200) -> httpx.Client:
     """Build an httpx Client with a fixed JSON response."""
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -318,7 +319,11 @@ def test_enforcer_retries_bad_json_then_succeeds() -> None:
     calls = {"n": 0}
 
     class FlakyProvider(FakeProvider):
-        def complete(self, messages, tool_schemas=()):
+        def complete(
+            self,
+            messages: Sequence[Message],
+            tool_schemas: Sequence[ToolSchema] = (),
+        ) -> Completion:
             calls["n"] += 1
             if calls["n"] == 1:
                 return Completion(content="not json", finish_reason="stop")
@@ -335,7 +340,11 @@ def test_enforcer_retries_schema_mismatch_then_succeeds() -> None:
     calls = {"n": 0}
 
     class WrongFirst(FakeProvider):
-        def complete(self, messages, tool_schemas=()):
+        def complete(
+            self,
+            messages: Sequence[Message],
+            tool_schemas: Sequence[ToolSchema] = (),
+        ) -> Completion:
             calls["n"] += 1
             if calls["n"] == 1:
                 return Completion(content='{"not_a_plan": true}', finish_reason="stop")
@@ -365,7 +374,7 @@ def test_enforcer_tolerates_markdown_fences() -> None:
     assert enforcer.complete([Message(role="user", content="plan")], PlanVersion).id == "p"
 
 
-def _json(data: dict) -> str:
+def _json(data: dict[str, object]) -> str:
     """Render a dict as compact JSON."""
     return json.dumps(data)
 
@@ -378,7 +387,7 @@ def _valid_plan_json() -> str:
 # --- providers CLI (F-21) ----------------------------------------------------
 
 
-def test_providers_cli_add_persists(tmp_path, capsys) -> None:
+def test_providers_cli_add_persists(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``providers add`` writes the config file for a later reload."""
     from planner_critic.cli.providers import run_providers
 
@@ -404,7 +413,9 @@ def test_providers_cli_add_persists(tmp_path, capsys) -> None:
     assert ProviderRegistry.load(config).roles["planner"] == "local"
 
 
-def test_providers_cli_list_shows_roles_and_providers(tmp_path, capsys) -> None:
+def test_providers_cli_list_shows_roles_and_providers(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """``providers list`` renders role bindings and provider definitions."""
     from planner_critic.cli.providers import run_providers
 
@@ -419,7 +430,7 @@ def test_providers_cli_list_shows_roles_and_providers(tmp_path, capsys) -> None:
     assert "local: openai-compatible @ http://x/v1 [m]" in out
 
 
-def test_providers_cli_rm_removes(tmp_path, capsys) -> None:
+def test_providers_cli_rm_removes(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``providers rm`` removes a provider and persists the change."""
     from planner_critic.cli.providers import run_providers
 
@@ -433,7 +444,9 @@ def test_providers_cli_rm_removes(tmp_path, capsys) -> None:
     assert "local" not in ProviderRegistry.load(config).providers
 
 
-def test_providers_cli_rm_missing_is_nonzero(tmp_path, capsys) -> None:
+def test_providers_cli_rm_missing_is_nonzero(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """Removing a nonexistent provider fails with a nonzero exit code."""
     from planner_critic.cli.providers import run_providers
 

@@ -20,8 +20,11 @@ def test_escalation_required_exception() -> None:
 
 def test_escalation_required_with_findings() -> None:
     finding = Finding(
-        id="f1", version=1, severity=Severity.BLOCKER,
-        reason_code="missing_rollback", message="missing rollback",
+        id="f1",
+        version=1,
+        severity=Severity.BLOCKER,
+        reason_code="missing_rollback",
+        message="missing rollback",
     )
     exc = EscalationRequired("blocked", reason_code="gate_failure", findings=[finding])
     assert len(exc.findings) == 1
@@ -87,7 +90,7 @@ def test_escalate_decorator_passes_through() -> None:
 
 def test_escalate_requires_handler() -> None:
     with pytest.raises(TypeError):
-        escalate()  # type: ignore[call-arg]
+        escalate()
 
 
 def test_guardrail_dry_run_via_kwargs() -> None:

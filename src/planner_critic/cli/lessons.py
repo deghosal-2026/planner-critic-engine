@@ -18,10 +18,14 @@ def build_lessons_parser() -> argparse.ArgumentParser:
 
     propose = sub.add_parser("propose", help="Propose standing-rule candidates from corpus misses")
     propose.add_argument("--corpus-dir", default=None, help="Corpus directory")
-    propose.add_argument("--instance-ids", nargs="*", default=None, help="Filter to specific instances")
+    propose.add_argument(
+        "--instance-ids", nargs="*", default=None, help="Filter to specific instances"
+    )
 
     list_parser = sub.add_parser("list", help="List proposed/promoted standing rules")
-    list_parser.add_argument("--status", default=None, choices=["proposed", "promoted"], help="Filter by status")
+    list_parser.add_argument(
+        "--status", default=None, choices=["proposed", "promoted"], help="Filter by status"
+    )
 
     promote = sub.add_parser("promote", help="Promote a standing rule to the heuristic pack")
     promote.add_argument("rule_id", help="Rule ID to promote")
@@ -36,7 +40,10 @@ def run_lessons(argv: list[str]) -> int:
     if args.lessons_command == "propose":
         corpus_dir = args.corpus_dir or str(
             Path(__file__).resolve().parent.parent.parent.parent
-            / "docs" / "field-test" / "corpus" / "swebench-security"
+            / "docs"
+            / "field-test"
+            / "corpus"
+            / "swebench-security"
         )
         instances = load_all_instances(corpus_dir)
         if args.instance_ids:
@@ -45,7 +52,9 @@ def run_lessons(argv: list[str]) -> int:
         registry = StandingRuleRegistry()
         total = 0
         for inst in instances:
-            bucket = inst.cwe_bucket.value if hasattr(inst.cwe_bucket, 'value') else str(inst.cwe_bucket)
+            bucket = (
+                inst.cwe_bucket.value if hasattr(inst.cwe_bucket, "value") else str(inst.cwe_bucket)
+            )
             codes = inst.expected_reason_codes or []
             proposed = registry.propose_from_misses(
                 cwe_bucket=bucket,
@@ -56,7 +65,10 @@ def run_lessons(argv: list[str]) -> int:
 
         print(f"Proposed {total} new standing-rule candidates from {len(instances)} instances.")
         for rule in registry.list_rules(status="proposed"):
-            print(f"  {rule.rule_id} ({rule.cwe_bucket}, {rule.pattern}) — coverage={rule.coverage_count}")
+            print(
+                f"  {rule.rule_id} ({rule.cwe_bucket}, {rule.pattern})"
+                f" — coverage={rule.coverage_count}"
+            )
         return 0
 
     if args.lessons_command == "list":

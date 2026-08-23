@@ -11,11 +11,13 @@ swapped without changing the protocol.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 
 from conftest import hard_dep, make_plan, make_task
-from planner_critic.store.base import InMemoryStore, PlanDiff, StoreUnavailable
+from planner_critic.store.base import InMemoryStore, PlanDiff, PlanStore, StoreUnavailable
 from planner_critic.store.replan_trace import ReplanLink
 from planner_critic.store.sqlite import SQLiteStore
 from planner_critic.store.versions import (
@@ -185,7 +187,7 @@ def test_store_unavailable_is_catchable() -> None:
 
 
 @pytest.fixture
-def sqlite_store(tmp_path) -> SQLiteStore:
+def sqlite_store(tmp_path: Path) -> SQLiteStore:
     """A SQLite store on a temp-file database."""
     return SQLiteStore(tmp_path / "store.db")
 
@@ -263,7 +265,7 @@ def test_sqlite_link(sqlite_store: SQLiteStore) -> None:
     assert row is not None
 
 
-def test_sqlite_persists_across_reopen(tmp_path) -> None:
+def test_sqlite_persists_across_reopen(tmp_path: Path) -> None:
     """Data survives closing and reopening the database file."""
     path = tmp_path / "store.db"
     store = SQLiteStore(path)
@@ -294,7 +296,7 @@ PROTOCOL_STORES = [InMemoryStore, lambda: SQLiteStore(":memory:")]
 
 
 @pytest.mark.parametrize("factory", PROTOCOL_STORES, ids=["in-memory", "sqlite"])
-def test_protocol_conformance_latest_and_diff(factory) -> None:
+def test_protocol_conformance_latest_and_diff(factory: Callable[[], PlanStore]) -> None:
     """Every PlanStore implementation honors the same protocol surface."""
     store = factory()
     store.put_plan_version(make_plan(plan_id="p", version=1, tasks=[make_task("t1")]))
@@ -306,8 +308,9 @@ def test_protocol_conformance_latest_and_diff(factory) -> None:
             tasks=[make_task("t1"), make_task("t2")],
         )
     )
-    assert store.get_plan("p") is not None
-    assert store.get_plan("p").version == 2
+    latest = store.get_plan("p")
+    assert latest is not None
+    assert latest.version == 2
     diff = store.diff("p", 1, 2)
     assert isinstance(diff, PlanDiff)
     assert diff.added_task_ids == ["t2"]
@@ -320,7 +323,7 @@ def test_protocol_conformance_latest_and_diff(factory) -> None:
     store.link("p", 2, "t")
     if isinstance(store, InMemoryStore):
         assert store._links == {("p", 2, "t")}
-    else:
+    elif isinstance(store, SQLiteStore):
         assert store._fetchone("SELECT 1 FROM links LIMIT 1") is not None
 
     # replan link conformance
@@ -336,14 +339,14 @@ def test_protocol_conformance_latest_and_diff(factory) -> None:
 # --- Schema versioning + migrate (F-27) -------------------------------------
 
 
-def test_fresh_db_is_migrated_to_latest(tmp_path) -> None:
+def test_fresh_db_is_migrated_to_latest(tmp_path: Path) -> None:
     """Opening a store migrates a fresh DB to the latest schema version."""
     store = SQLiteStore(tmp_path / "store.db")
     assert current_schema_version(store._conn) == SCHEMA_VERSION
     store.close()
 
 
-def test_reopen_is_idempotent(tmp_path) -> None:
+def test_reopen_is_idempotent(tmp_path: Path) -> None:
     """Reopening an already-migrated DB applies nothing new."""
     path = tmp_path / "store.db"
     first = SQLiteStore(path)
@@ -353,7 +356,7 @@ def test_reopen_is_idempotent(tmp_path) -> None:
     second.close()
 
 
-def test_revert_then_remigrate(tmp_path) -> None:
+def test_revert_then_remigrate(tmp_path: Path) -> None:
     """Reversible: revert drops the ledger, remigrate restores it."""
 
     path = tmp_path / "store.db"
@@ -374,7 +377,7 @@ def test_revert_then_remigrate(tmp_path) -> None:
     store.close()
 
 
-def test_revert_to_zero_is_destructive_and_remigrate_restores_schema(tmp_path) -> None:
+def test_revert_to_zero_is_destructive_and_remigrate_restores_schema(tmp_path: Path) -> None:
     """Reverting to v0 drops data (documented down); remigrate restores schema."""
     path = tmp_path / "store.db"
     store = SQLiteStore(path)
@@ -391,7 +394,7 @@ def test_revert_to_zero_is_destructive_and_remigrate_restores_schema(tmp_path) -
     store.close()
 
 
-def test_migrate_up_preserves_old_data(tmp_path) -> None:
+def test_migrate_up_preserves_old_data(tmp_path: Path) -> None:
     """Migrating up keeps previously stored data readable (F-27, PRD 08)."""
     path = tmp_path / "store.db"
     store = SQLiteStore(path)
@@ -405,7 +408,7 @@ def test_migrate_up_preserves_old_data(tmp_path) -> None:
     store.close()
 
 
-def test_apply_migrations_refuses_target_below_current(tmp_path) -> None:
+def test_apply_migrations_refuses_target_below_current(tmp_path: Path) -> None:
     """Migrating up to a version below the current one is refused."""
     import pytest as pt
 
@@ -415,7 +418,7 @@ def test_apply_migrations_refuses_target_below_current(tmp_path) -> None:
     store.close()
 
 
-def test_migrate_cli_up_and_revert(tmp_path, capsys) -> None:
+def test_migrate_cli_up_and_revert(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``plancritic migrate`` prints schema version and reverts on demand."""
     from planner_critic.cli.migrate import run_migrate
 
@@ -429,7 +432,9 @@ def test_migrate_cli_up_and_revert(tmp_path, capsys) -> None:
     assert "reverted to schema v0" in out
 
 
-def test_migrate_cli_failure_returns_nonzero(tmp_path, capsys) -> None:
+def test_migrate_cli_failure_returns_nonzero(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """A bad store path fails the command without a traceback."""
     from planner_critic.cli.migrate import run_migrate
 
@@ -437,7 +442,7 @@ def test_migrate_cli_failure_returns_nonzero(tmp_path, capsys) -> None:
     assert "migrate failed" in capsys.readouterr().out
 
 
-def test_revert_target_above_current_is_refused(tmp_path) -> None:
+def test_revert_target_above_current_is_refused(tmp_path: Path) -> None:
     """Reverting to a version above current is refused (StoreUnavailable)."""
     store = SQLiteStore(tmp_path / "store.db")
     with pytest.raises(StoreUnavailable):
@@ -445,7 +450,9 @@ def test_revert_target_above_current_is_refused(tmp_path) -> None:
     store.close()
 
 
-def test_apply_migration_failure_raises_unavailable(tmp_path, monkeypatch) -> None:
+def test_apply_migration_failure_raises_unavailable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A failing migration surfaces StoreUnavailable and rolls back."""
 
     from planner_critic.store import versions as versions_mod
@@ -465,7 +472,9 @@ def test_apply_migration_failure_raises_unavailable(tmp_path, monkeypatch) -> No
     store.close()
 
 
-def test_revert_migration_failure_raises_unavailable(tmp_path, monkeypatch) -> None:
+def test_revert_migration_failure_raises_unavailable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A failing revert surfaces StoreUnavailable."""
 
     from planner_critic.store import versions as versions_mod

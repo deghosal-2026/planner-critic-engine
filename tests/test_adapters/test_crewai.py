@@ -8,9 +8,10 @@ from planner_critic.adapters.crewai import PlanAwareTaskInterceptor, TaskNotInPl
 from planner_critic.approval import ApprovalGate, resolve_threshold
 from planner_critic.schema.goal import RiskTolerance
 from planner_critic.schema.plan import Task
+from planner_critic.types import ApprovedPlan
 
 
-def _make_approved_plan(*, task_descriptions=None):
+def _make_approved_plan(*, task_descriptions: list[str] | None = None) -> ApprovedPlan:
     if task_descriptions is None:
         task_descriptions = ["Deploy service", "Run migration"]
     tasks = [
@@ -23,39 +24,39 @@ def _make_approved_plan(*, task_descriptions=None):
 
 
 class TestPlanAwareTaskInterceptor:
-    def test_verify_matching_task_succeeds(self):
+    def test_verify_matching_task_succeeds(self) -> None:
         approved = _make_approved_plan()
         interceptor = PlanAwareTaskInterceptor(approved)
 
         assert interceptor.verify_task("Deploy service") is True
 
-    def test_verify_nonmatching_task_raises(self):
+    def test_verify_nonmatching_task_raises(self) -> None:
         approved = _make_approved_plan()
         interceptor = PlanAwareTaskInterceptor(approved)
 
         with pytest.raises(TaskNotInPlanError):
             interceptor.verify_task("Nonexistent task")
 
-    def test_verify_substring_match_succeeds(self):
+    def test_verify_substring_match_succeeds(self) -> None:
         approved = _make_approved_plan()
         interceptor = PlanAwareTaskInterceptor(approved)
 
         assert interceptor.verify_task("Deploy") is True
 
-    def test_before_execution_matching(self):
+    def test_before_execution_matching(self) -> None:
         approved = _make_approved_plan()
         interceptor = PlanAwareTaskInterceptor(approved)
 
         interceptor.before_execution("Run migration")
 
-    def test_before_execution_nonmatching_raises(self):
+    def test_before_execution_nonmatching_raises(self) -> None:
         approved = _make_approved_plan()
         interceptor = PlanAwareTaskInterceptor(approved)
 
         with pytest.raises(TaskNotInPlanError):
             interceptor.before_execution("Unknown operation")
 
-    def test_with_audit_trail(self):
+    def test_with_audit_trail(self) -> None:
         approved = _make_approved_plan()
         audit = AuditTrail()
         interceptor = PlanAwareTaskInterceptor(approved, audit=audit)
@@ -68,7 +69,7 @@ class TestPlanAwareTaskInterceptor:
         assert last.event == "re_gate_check"
         assert last.details.get("found") is True
 
-    def test_audit_records_not_found(self):
+    def test_audit_records_not_found(self) -> None:
         approved = _make_approved_plan()
         audit = AuditTrail()
         interceptor = PlanAwareTaskInterceptor(approved, audit=audit)

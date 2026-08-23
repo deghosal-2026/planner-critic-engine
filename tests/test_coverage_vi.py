@@ -35,8 +35,9 @@ def test_fastapi_healthz() -> None:
     from planner_critic.server.http import create_fastapi_app
 
     app = create_fastapi_app(":memory:")
+    assert app is not None
 
-    async def run():
+    async def run() -> None:
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app), base_url="http://test"
         ) as c:
@@ -52,8 +53,9 @@ def test_fastapi_plans_empty() -> None:
     from planner_critic.server.http import create_fastapi_app
 
     app = create_fastapi_app(":memory:")
+    assert app is not None
 
-    async def run():
+    async def run() -> None:
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app), base_url="http://test"
         ) as c:
@@ -68,8 +70,9 @@ def test_fastapi_escalations_empty() -> None:
     from planner_critic.server.http import create_fastapi_app
 
     app = create_fastapi_app(":memory:")
+    assert app is not None
 
-    async def run():
+    async def run() -> None:
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app), base_url="http://test"
         ) as c:

@@ -16,6 +16,8 @@ call with a registry-backed CriticRole.
 
 from __future__ import annotations
 
+from typing import cast
+
 from planner_critic.eval.label_migration import generate_boundary_cases
 from planner_critic.eval.live_boundary import run_live_boundary_cases
 from planner_critic.roles import CriticRole
@@ -72,8 +74,8 @@ class TestRunLiveBoundaryCases:
 
     def test_migrating_critic_detects_flips_and_underclaims(self) -> None:
         report = run_live_boundary_cases(_MigratingCritic(), trials=4)
-        assert report["label_flip_rate"] > 0.0
-        assert report["underclaim_approvals"] > 0
+        assert cast("float", report["label_flip_rate"]) > 0.0
+        assert cast("int", report["underclaim_approvals"]) > 0
 
     def test_evidence_drift_captured_from_explanations(self) -> None:
         class DriftingCritic(_SteadyCritic):

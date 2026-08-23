@@ -8,6 +8,8 @@ Three gaps from the 0.1.0 report:
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from conftest import make_goal, make_plan, make_task
 from planner_critic.estimate import estimate_complexity
 from planner_critic.reason_codes import ALL_REASON_CODES
@@ -59,7 +61,7 @@ def _make_plan_with_parallel(plan_id: str = "k8s-01") -> PlanVersion:
     )
 
 
-def test_c15_replay_sqlite_returns_non_empty_trace(tmp_path) -> None:
+def test_c15_replay_sqlite_returns_non_empty_trace(tmp_path: Path) -> None:
     """C15: replay against a SQLite store returns all revisions with findings."""
     store = SQLiteStore(str(tmp_path / "c15.db"))
     plan = make_plan(plan_id="p-c15", version=1, tasks=[make_task("t0")])

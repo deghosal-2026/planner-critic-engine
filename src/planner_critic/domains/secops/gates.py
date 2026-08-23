@@ -124,7 +124,7 @@ class LeastPrivilegeGate(BaseGate):
 
 def _match_broad_target(target: str, broad: str) -> bool:
     """Match a broad target against a resource name.
-    
+
     Uses anchored matching: ``*`` matches any target ending with ``:*`` or ``:*/*``,
     ``all`` matches exactly, ``everything`` matches exactly,
     ``arn:aws:iam::*`` matches any IAM account root.
@@ -136,7 +136,9 @@ def _match_broad_target(target: str, broad: str) -> bool:
     if broad == "everything":
         return target == "everything"
     if broad == "arn:aws:iam::*":
-        return target == "arn:aws:iam::*" or (target.startswith("arn:aws:iam::") and target.endswith(":root"))
+        return target == "arn:aws:iam::*" or (
+            target.startswith("arn:aws:iam::") and target.endswith(":root")
+        )
     return False
 
 

@@ -24,7 +24,9 @@ class EscalationRequired(Exception):
     inspect why the gate blocked execution.
     """
 
-    def __init__(self, message: str, reason_code: str = "", findings: list[Finding] | None = None) -> None:
+    def __init__(
+        self, message: str, reason_code: str = "", findings: list[Finding] | None = None
+    ) -> None:
         super().__init__(message)
         self.reason_code = reason_code
         self.findings = findings or []
@@ -179,11 +181,25 @@ def _make_goal(
 ) -> Goal:
     from .schema.goal import Budget
     from .schema.goal import Constraints as GoalConstraints
+
     rt = RiskTolerance(risk_tolerance)
     c = GoalConstraints()
     if constraints:
-        budget = Budget(**{k: v for k, v in constraints.items() if k in ("max_tokens", "max_calls", "max_revisions")})
-        c = GoalConstraints(budget=budget, **{k: v for k, v in constraints.items() if k not in ("max_tokens", "max_calls", "max_revisions")})
+        budget = Budget(
+            **{
+                k: v
+                for k, v in constraints.items()
+                if k in ("max_tokens", "max_calls", "max_revisions")
+            }
+        )
+        c = GoalConstraints(
+            budget=budget,
+            **{
+                k: v
+                for k, v in constraints.items()
+                if k not in ("max_tokens", "max_calls", "max_revisions")
+            },
+        )
     return Goal(
         id=f"guardrail-{hash(description) & 0xFFFFFFFF:08x}",
         description=description,
@@ -217,16 +233,26 @@ def _make_engine(
             self._enforcer = StructuredEnforcer(self._provider)
 
         def decompose(self, goal: Goal) -> PlanVersion:
-            return self._enforcer.complete([
-                Message(role="system", content=self._PROMPT),
-                Message(role="user", content=f"Goal: {goal.description}"),
-            ], PlanVersion)
+            return self._enforcer.complete(
+                [
+                    Message(role="system", content=self._PROMPT),
+                    Message(role="user", content=f"Goal: {goal.description}"),
+                ],
+                PlanVersion,
+            )
 
         def revise(self, plan: PlanVersion, findings: list[Finding]) -> PlanVersion:
-            return self._enforcer.complete([
-                Message(role="system", content=self._PROMPT + " Revise based on findings."),
-                Message(role="user", content=f"Plan: {plan.model_dump_json()}\nFindings: {[f.model_dump() for f in findings]}"),
-            ], PlanVersion)
+            findings_dump = [f.model_dump() for f in findings]
+            return self._enforcer.complete(
+                [
+                    Message(role="system", content=self._PROMPT + " Revise based on findings."),
+                    Message(
+                        role="user",
+                        content=(f"Plan: {plan.model_dump_json()}\nFindings: {findings_dump}"),
+                    ),
+                ],
+                PlanVersion,
+            )
 
     class _SimpleCritic(CriticRole):
         def __init__(self) -> None:
@@ -240,18 +266,27 @@ def _make_engine(
 
 def _get_default_provider() -> Any:
     from .llm.registry import ProviderRegistry
+
     try:
         registry = ProviderRegistry.load()
         provider = registry.get_provider("planner")
         if provider is not None:
             return provider
-    except Exception:
+    except Exception:  # noqa: S110 - any registry failure falls through to the fake provider
         pass
     from .llm.base import Completion, Message
+
     class _FakeProvider:
         name = "fake"
         base_url = ""
         model = "fake"
-        def complete(self, messages: list[Message], tool_schemas: list[Any] = []) -> Completion:
-            return Completion(content='{"id":"plan","goal_id":"g","version":1,"tasks":[],"dependencies":[]}')
+
+        def complete(
+            self, messages: list[Message], tool_schemas: list[Any] | None = None
+        ) -> Completion:
+            del messages, tool_schemas
+            return Completion(
+                content='{"id":"plan","goal_id":"g","version":1,"tasks":[],"dependencies":[]}'
+            )
+
     return _FakeProvider()

@@ -13,25 +13,30 @@ def _rego_policies_from_dir(pol_dir: Path) -> list[PolicyEngine]:
     gates: list[PolicyEngine] = []
     for entry in sorted(pol_dir.iterdir()):
         if entry.suffix == ".rego":
-            gates.append(RegoGate(
-                name=entry.stem,
-                module=entry,
-                query="data.test.violation",
-            ))
+            gates.append(
+                RegoGate(
+                    name=entry.stem,
+                    module=entry,
+                    query="data.test.violation",
+                )
+            )
         elif entry.suffix in (".yaml", ".yml"):
             import yaml
+
             try:
                 data = yaml.safe_load(entry.read_text())
                 if isinstance(data, dict) and data.get("kind") == "Policy":
                     expr = data.get("cel", "")
                     if expr:
-                        gates.append(CelGate(
-                            name=data.get("name", entry.stem),
-                            expression=expr,
-                            severity=data.get("severity", "blocker"),
-                            message=data.get("message"),
-                        ))
-            except Exception:
+                        gates.append(
+                            CelGate(
+                                name=data.get("name", entry.stem),
+                                expression=expr,
+                                severity=data.get("severity", "blocker"),
+                                message=data.get("message"),
+                            )
+                        )
+            except Exception:  # noqa: S110  # best-effort gate load must not abort
                 pass
     return gates
 
@@ -71,11 +76,17 @@ def run_policy(argv: list[str]) -> int:
             print(f"error: not found: {args.path}", file=sys.stderr)
             return 1
         try:
-            policies = _rego_policies_from_dir(path) if path.is_dir() else [CelGate(
-                name=path.stem,
-                expression=path.read_text().strip(),
-                severity="blocker",
-            )]
+            policies = (
+                _rego_policies_from_dir(path)
+                if path.is_dir()
+                else [
+                    CelGate(
+                        name=path.stem,
+                        expression=path.read_text().strip(),
+                        severity="blocker",
+                    )
+                ]
+            )
             for p in policies:
                 print(f"Registered policy: {p.name}")
         except Exception as err:
@@ -87,11 +98,17 @@ def run_policy(argv: list[str]) -> int:
         try:
             pol_path = Path(args.name)
             if pol_path.exists():
-                policies = _rego_policies_from_dir(pol_path) if pol_path.is_dir() else [CelGate(
-                    name=pol_path.stem,
-                    expression=pol_path.read_text().strip(),
-                    severity="blocker",
-                )]
+                policies = (
+                    _rego_policies_from_dir(pol_path)
+                    if pol_path.is_dir()
+                    else [
+                        CelGate(
+                            name=pol_path.stem,
+                            expression=pol_path.read_text().strip(),
+                            severity="blocker",
+                        )
+                    ]
+                )
             else:
                 policies = [p for p in BUILTIN_POLICIES if p.name == args.name]
                 if not policies:

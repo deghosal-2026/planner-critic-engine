@@ -15,13 +15,15 @@ def test_escalation_required() -> None:
 
 
 def test_escalation_required_with_findings() -> None:
-    from typing import cast
-
-    from planner_critic.reason_codes import ReasonCode
     from planner_critic.types import Finding, Severity
-    f = Finding(id="f1", version=1, severity=Severity.BLOCKER,
-                reason_code=cast("ReasonCode", "missing_rollback"),
-                message="no rollback")
+
+    f = Finding(
+        id="f1",
+        version=1,
+        severity=Severity.BLOCKER,
+        reason_code="missing_rollback",
+        message="no rollback",
+    )
     e = EscalationRequired("blocked", reason_code="gate_violation", findings=[f])
     assert len(e.findings) == 1
     assert e.findings[0].reason_code == "missing_rollback"
@@ -35,6 +37,7 @@ def test_precondition_drift() -> None:
 
 def test_make_goal_balanced() -> None:
     from planner_critic.schema.goal import RiskTolerance
+
     goal = _make_goal("test goal", "balanced", None)
     assert goal.description == "test goal"
     assert goal.risk_tolerance is RiskTolerance.BALANCED
@@ -42,6 +45,7 @@ def test_make_goal_balanced() -> None:
 
 def test_make_goal_strict() -> None:
     from planner_critic.schema.goal import RiskTolerance
+
     goal = _make_goal("strict goal", "strict", None)
     assert goal.risk_tolerance is RiskTolerance.STRICT
 
@@ -54,6 +58,7 @@ def test_make_goal_with_constraints() -> None:
 def test_escalate_decorator() -> None:
     def handler() -> str:
         return "handled"
+
     wrapped = escalate(handler)
     assert wrapped is handler
     assert wrapped() == "handled"
@@ -66,15 +71,19 @@ def test_escalate_decorator_no_args_raises() -> None:
 
 def test_get_docstring() -> None:
     from planner_critic.guardrail import _get_docstring
+
     def foo() -> None:
         """Some docstring."""
+
     assert _get_docstring(foo) == "Some docstring."
 
 
 def test_get_docstring_none() -> None:
     from planner_critic.guardrail import _get_docstring
+
     def bar() -> None:
         pass
+
     assert _get_docstring(bar) is None
 
 

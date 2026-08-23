@@ -36,12 +36,30 @@ def build_check_parser() -> argparse.ArgumentParser:
         add_help=False,
     )
     parser.add_argument("plan_file", help="Path to a PlanVersion JSON file")
-    parser.add_argument("--domain", default=None, help="Load gates from a domain pack by name or manifest path")
-    parser.add_argument("--policies-dir", default=None, help="Directory containing .rego policy files")
-    parser.add_argument("--enforcement", default="strict", choices=["strict", "permissive", "dry_run"], help="Gate enforcement mode")
-    parser.add_argument("--context", action="append", default=[], help="Key=value execution context (repeatable)")
-    parser.add_argument("--fail-on-severity", default="high", choices=["low", "medium", "high", "critical", "blocker", "warning"], help="Minimum severity to yield non-zero exit")
-    parser.add_argument("--output", default="text", choices=["text", "json", "yaml"], help="Output format")
+    parser.add_argument(
+        "--domain", default=None, help="Load gates from a domain pack by name or manifest path"
+    )
+    parser.add_argument(
+        "--policies-dir", default=None, help="Directory containing .rego policy files"
+    )
+    parser.add_argument(
+        "--enforcement",
+        default="strict",
+        choices=["strict", "permissive", "dry_run"],
+        help="Gate enforcement mode",
+    )
+    parser.add_argument(
+        "--context", action="append", default=[], help="Key=value execution context (repeatable)"
+    )
+    parser.add_argument(
+        "--fail-on-severity",
+        default="high",
+        choices=["low", "medium", "high", "critical", "blocker", "warning"],
+        help="Minimum severity to yield non-zero exit",
+    )
+    parser.add_argument(
+        "--output", default="text", choices=["text", "json", "yaml"], help="Output format"
+    )
     return parser
 
 
@@ -59,6 +77,7 @@ def run_check(argv: list[str]) -> int:
     if args.domain:
         try:
             from ..domains.base import DomainPack
+
             domain_path = Path(args.domain)
             pack: DomainPack
             if domain_path.exists():
@@ -92,6 +111,7 @@ def run_check(argv: list[str]) -> int:
             elif entry.suffix in (".yaml", ".yml"):
                 try:
                     import yaml
+
                     data = yaml.safe_load(entry.read_text())
                     if isinstance(data, dict) and data.get("kind") == "Policy":
                         expr = data.get("cel", "")
@@ -103,7 +123,7 @@ def run_check(argv: list[str]) -> int:
                                 message=data.get("message"),
                             )
                             extra_policies.append(policy)
-                except Exception:
+                except Exception:  # noqa: S110  # best-effort policy load must not abort
                     pass
 
     if not has_domain and not args.policies_dir:
@@ -113,15 +133,23 @@ def run_check(argv: list[str]) -> int:
     for policy in extra_policies:
         try:
             findings.extend(policy.evaluate(plan))
-        except Exception:
+        except Exception:  # noqa: S110  # policy evaluation must not crash the CLI
             pass
 
-    sev_map = {"low": Severity.INFO, "medium": Severity.WARNING, "high": Severity.BLOCKER, "critical": Severity.BLOCKER, "blocker": Severity.BLOCKER, "warning": Severity.WARNING}
+    sev_map = {
+        "low": Severity.INFO,
+        "medium": Severity.WARNING,
+        "high": Severity.BLOCKER,
+        "critical": Severity.BLOCKER,
+        "blocker": Severity.BLOCKER,
+        "warning": Severity.WARNING,
+    }
     fail_sev = sev_map.get(args.fail_on_severity, Severity.BLOCKER)
     passed, failures = _gate_verdict(findings, fail_sev)
 
     if args.output == "json":
         import json as _json
+
         output = {
             "plan": plan.id,
             "version": plan.version,
@@ -141,6 +169,7 @@ def run_check(argv: list[str]) -> int:
         print(_json.dumps(output, indent=2))
     elif args.output == "yaml":
         import yaml as _yaml
+
         output = {
             "plan": plan.id,
             "version": plan.version,
@@ -168,7 +197,9 @@ def run_check(argv: list[str]) -> int:
             print("All gates PASSED")
         else:
             for f in findings:
-                status = "FAILED" if f.severity in (Severity.BLOCKER, Severity.WARNING) else "PASSED"
+                status = (
+                    "FAILED" if f.severity in (Severity.BLOCKER, Severity.WARNING) else "PASSED"
+                )
                 sev = f.severity.value.upper()
                 print(f"  Gate: {f.reason_code:<45s} {status:>8s}  ({sev})")
                 if f.task_id:
@@ -178,7 +209,10 @@ def run_check(argv: list[str]) -> int:
                     print(f"    Fix: {f.suggested_fix}")
                 print()
         if failures:
-            print(f"Result: FAILED ({len(failures)} gate violation(s) at or above {sev_label} severity)")
+            print(
+                f"Result: FAILED ({len(failures)} gate violation(s) "
+                f"at or above {sev_label} severity)"
+            )
         else:
             print("Result: PASSED")
 

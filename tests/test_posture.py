@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
+from contextlib import AbstractContextManager
 
 import pytest
 
@@ -92,7 +94,9 @@ class TestPostureResolver:
 
     def test_regex_pattern_in_rule(self) -> None:
         resolver = PostureResolver(
-            rules=[PostureRule(match={"git_branch": "re:feature/.*"}, posture=RiskTolerance.PERMISSIVE)]
+            rules=[
+                PostureRule(match={"git_branch": "re:feature/.*"}, posture=RiskTolerance.PERMISSIVE)
+            ]
         )
         with _env(PC_GIT_BRANCH="feature/add-auth"):
             result = resolver.resolve(RiskTolerance.STRICT)
@@ -137,28 +141,31 @@ class TestRiskTolerancePermissive:
         assert RiskTolerance.PERMISSIVE.value == "permissive"
 
     def test_permissive_is_distinct(self) -> None:
-        assert RiskTolerance.PERMISSIVE is not RiskTolerance.STRICT
-        assert RiskTolerance.PERMISSIVE is not RiskTolerance.BALANCED
+        strict: RiskTolerance = RiskTolerance.STRICT
+        balanced: RiskTolerance = RiskTolerance.BALANCED
+        assert RiskTolerance.PERMISSIVE is not strict
+        assert RiskTolerance.PERMISSIVE is not balanced
 
 
 @pytest.fixture(autouse=True)
-def _auto_clean_env() -> ...:
+def _auto_clean_env() -> Iterator[None]:
     keys = ["ENV", "PC_ENV", "PC_GIT_BRANCH", "PC_TERRAFORM_WORKSPACE", "PC_K8S_NAMESPACE"]
     saved = {k: os.environ.get(k) for k in keys}
     yield
     for k in keys:
-        if saved[k] is None:
+        value = saved[k]
+        if value is None:
             os.environ.pop(k, None)
         else:
-            os.environ[k] = saved[k]
+            os.environ[k] = value
 
 
-def _env(**kwargs: str) -> ...:
+def _env(**kwargs: str) -> AbstractContextManager[None]:
     """Context manager to temporarily set then restore env vars."""
 
-    class _EnvCtx:
+    class _EnvCtx(AbstractContextManager[None]):
         def __enter__(self2) -> None:
-            self2._saved = {}
+            self2._saved: dict[str, str | None] = {}
             for k, v in kwargs.items():
                 self2._saved[k] = os.environ.get(k)
                 os.environ[k] = v

@@ -18,10 +18,14 @@ def build_quota_parser() -> argparse.ArgumentParser:
     list_parser.add_argument("--domain", default=None, help="Domain name")
 
     set_parser = sub.add_parser("set", help="Set a quota value")
-    set_parser.add_argument("key", choices=[
-        "max_resource_changes", "max_destructive_actions",
-        "max_database_alterations",
-    ])
+    set_parser.add_argument(
+        "key",
+        choices=[
+            "max_resource_changes",
+            "max_destructive_actions",
+            "max_database_alterations",
+        ],
+    )
     set_parser.add_argument("value", type=int)
     set_parser.add_argument("--domain", default=None)
 
@@ -66,6 +70,7 @@ def run_quota(argv: list[str]) -> int:
             return 1
 
         from ..quota import BlastRadiusQuotaGate
+
         gate = BlastRadiusQuotaGate(config)
         findings = gate.run(plan)
 

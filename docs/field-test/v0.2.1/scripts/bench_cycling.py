@@ -20,6 +20,7 @@ Usage:
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 from planner_critic.loop.histogram import (
@@ -177,5 +178,56 @@ def run() -> dict:
     return report
 
 
+def self_test() -> dict:
+    """Synthetic scenarios pinning the detector's boundary (#229).
+
+    Runs without traces: exercises detect_histogram_cycling directly on the
+    two community-specified sequences plus the existing controls.
+    """
+    from planner_critic.loop.histogram import FamilyHistogram
+    from planner_critic.types import HeuristicFamily
+
+    def h(family: str, count: int) -> FamilyHistogram:
+        return ((family, count),)
+
+    scenarios: list[dict] = []
+
+    def check(name: str, seq: list[FamilyHistogram], expect_fire: bool) -> None:
+        fired = any(
+            detect_histogram_cycling(seq[:i], max_lag=2) for i in range(len(seq) + 1)
+        )
+        scenarios.append({
+            "scenario": name,
+            "expected_fire": expect_fire,
+            "fired": fired,
+            "pass": fired == expect_fire,
+        })
+
+    r, u = HeuristicFamily.RISK.value, HeuristicFamily.UNVERIFIED_DEPENDENCIES.value
+    m = HeuristicFamily.MISSING_STEPS.value
+
+    # Defective reshuffling: exact lag-2 repeat at constant mass.
+    check("defective-flat-mass-cycler", [h(r, 1), h(m, 1), h(r, 1), h(m, 1)], True)
+    # Legitimate bimodal alternation with repair progress (#229).
+    check(
+        "legitimate-bimodal-declining-mass",
+        [h(r, 2), h(u, 3), h(r, 1), h(u, 2), h(r, 1)],
+        False,
+    )
+    # Stasis is a different signal (#183).
+    check("stasis", [h(r, 1), h(r, 1), h(r, 1)], False)
+    # Monotone progress, never repeating.
+    check("monotone-progress", [h(r, 3), h(m, 2), h(u, 1)], False)
+
+    passed = all(s["pass"] for s in scenarios)
+    report = {"mode": "self-test", "scenarios": scenarios, "all_pass": passed}
+    print(json.dumps(report, indent=2))
+    print("\nSELF-TEST PASS" if passed else "\nSELF-TEST FAIL")
+    return report
+
+
 if __name__ == "__main__":
-    run()
+    if "--self-test" in sys.argv:
+        self_test()
+    else:
+        run()

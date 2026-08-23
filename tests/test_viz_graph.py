@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import cast
 
 from conftest import hard_dep, make_plan, make_task
 from planner_critic.viz.graph import to_json, to_mermaid
@@ -45,9 +46,11 @@ def test_json_structure() -> None:
     data = to_json(plan)
     assert data["plan_id"] == "p1"
     assert data["version"] == 2
-    assert len(data["nodes"]) == 2
-    assert data["edges"][0]["from"] == "t1"
-    assert data["edges"][0]["to"] == "t2"
+    nodes = cast("list[object]", data["nodes"])
+    edges = cast("list[dict[str, object]]", data["edges"])
+    assert len(nodes) == 2
+    assert edges[0]["from"] == "t1"
+    assert edges[0]["to"] == "t2"
 
 
 def test_json_round_trips() -> None:

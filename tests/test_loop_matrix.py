@@ -10,6 +10,7 @@ loop correctness and determinism (F-74, M1 success metric).
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -23,25 +24,27 @@ from conftest import (
     make_task,
 )
 from planner_critic.loop import LoopConfig, run_loop
+from planner_critic.roles import CriticRole
 from planner_critic.schema.goal import Budget, Constraints, Goal, RiskTolerance
-from planner_critic.types import Severity
+from planner_critic.schema.plan import PlanVersion
+from planner_critic.types import Finding, Severity
 
 MATRIX_PATH = Path(__file__).parent / "fixtures" / "loop_matrix.yaml"
 
 
-def _clean_plan() -> object:
+def _clean_plan() -> PlanVersion:
     """The 'clean' draft: passes every deterministic gate."""
     return make_plan()
 
 
-def _dirty_plan() -> object:
+def _dirty_plan() -> PlanVersion:
     """The 'dirty' draft: high-risk task with no verification/rollback."""
     return make_plan(tasks=[make_task("t1", risk_class="critical")])
 
 
 #: Sentinels for critic scripts, resolved to concrete finding lists.
-CRITIC_SCRIPTS: dict[str, list[list[object]]] = {
-    "quiet": [[]],  # type: ignore[list-item]
+CRITIC_SCRIPTS: dict[str, list[list[Finding]]] = {
+    "quiet": [[]],
     "warning_only": [[finding("t1", "unsafe_ordering", severity=Severity.WARNING)]],
     "blocker": [[finding("t1", "missing_verification")]],
     "warning_then_blocker": [
@@ -53,10 +56,10 @@ CRITIC_SCRIPTS: dict[str, list[list[object]]] = {
     ],
 }
 
-DRAFTS: dict[str, object] = {"clean": _clean_plan(), "dirty": _dirty_plan()}
+DRAFTS: dict[str, PlanVersion] = {"clean": _clean_plan(), "dirty": _dirty_plan()}
 
 
-def _load_matrix() -> list[dict]:
+def _load_matrix() -> list[dict[str, Any]]:
     """Load and validate the matrix document."""
     data = yaml.safe_load(MATRIX_PATH.read_text())
     scenarios = data["scenarios"]
@@ -68,7 +71,7 @@ MATRIX = _load_matrix()
 
 
 @pytest.mark.parametrize("cell", MATRIX, ids=[c["id"] for c in MATRIX])
-def test_matrix_cell(cell: dict) -> None:
+def test_matrix_cell(cell: dict[str, Any]) -> None:
     """Run one matrix cell and assert the exact termination."""
     goal_kwargs = dict(cell["goal"])
     tolerance = RiskTolerance(goal_kwargs.pop("tolerance", "balanced"))
@@ -80,22 +83,22 @@ def test_matrix_cell(cell: dict) -> None:
         constraints=Constraints(budget=Budget(**budget_kwargs)),
     )
 
-    drafts = [DRAFTS[d] for d in cell["planner_drafts"]]  # type: ignore[misc]
-    planner = ScriptedPlanner(drafts)  # type: ignore[arg-type]
+    planner = ScriptedPlanner([DRAFTS[d] for d in cell["planner_drafts"]])
 
-    critic_revisions: list[list[object]] = []
+    critic_revisions: list[list[Finding]] = []
     for label in cell["critic"]:
-        critic_revisions.extend(CRITIC_SCRIPTS[label])  # type: ignore[arg-type]
-    if all(len(rev) == 0 for rev in critic_revisions):  # type: ignore[arg-type]
+        critic_revisions.extend(CRITIC_SCRIPTS[label])
+    critic: CriticRole
+    if all(len(rev) == 0 for rev in critic_revisions):
         critic = EmptyCritic()
     else:
-        critic = ScriptedCritic(critic_revisions)  # type: ignore[arg-type]
+        critic = ScriptedCritic(critic_revisions)
 
     config = LoopConfig(
-        mode=cell.get("mode", "deterministic-first"),  # type: ignore[arg-type]
+        mode=cell.get("mode", "deterministic-first"),
         revision_cap=int(cell.get("revision_cap", 3)),
     )
-    result = run_loop(goal, planner, critic, config)  # type: ignore[arg-type]
+    result = run_loop(goal, planner, critic, config)
 
     expected = cell["expect"]
     assert result.status == expected["status"], cell

@@ -328,7 +328,7 @@ def test_handle_request_generic_error(server: PlannerCriticHTTPServer) -> None:
     resp = server.handle_request("GET", "/plans")
     assert resp["status"] == 500
     assert "RuntimeError" in resp["error"]
-    server._route = original
+    server.__dict__["_route"] = original
 
 
 def test_create_fastapi_app_missing() -> None:

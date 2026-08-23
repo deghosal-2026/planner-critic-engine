@@ -22,6 +22,22 @@ Under those semantics two deterministic cases make the verification vacuous:
 Both fire as a gate-layer BLOCKER with reason code
 :data:`~planner_critic.reason_codes.VERIFICATION_AFTER_CONSUMER` — the LLM
 critic never votes on it, closing the under-claim direction at this seam.
+
+**Data-subject contract (#230).** Consequences key on what the consumer's
+verification reads, not on position alone:
+
+* subject = **pre-state** (derivation convention: ``what`` begins with
+  ``"pre-state"``) → must run BEFORE the mutate. Placed there, it is
+  legitimate and never flagged — this is the guarantee that stops the gate
+  from training users into moving every check early. Placed after, it reads
+  a world the mutation already replaced → flagged.
+* subject = **output** (default) → must run after; consumers running before
+  the mutate are flagged as above.
+
+v0.3.0 evolution: optional ``subject: Literal["pre_state", "output"] | None``
+on ``VerificationStep`` replaces the prose-prefix derivation. The field is
+optional with default ``None`` = current derived behavior; plan-store
+round-trip is lossless because older serialized plans simply omit it.
 """
 
 from __future__ import annotations
@@ -35,6 +51,23 @@ from .base import BaseGate
 def _is_high_blast(task: Task) -> bool:
     """True when the task is high-risk by risk_class or blast_radius."""
     return task.risk_class.is_high_risk or task.blast_radius in ("high", "critical")
+
+
+_PRE_STATE_PREFIX = "pre-state"
+
+
+def _is_pre_state_check(task: Task) -> bool:
+    """True when the consumer's verification reads pre-mutation constraints.
+
+    Derivation convention (#230) until ``VerificationStep`` grows an optional
+    ``subject`` discriminator (v0.3.0): a ``what`` beginning with
+    ``"pre-state"`` marks a check that reads constraints existing before the
+    mutation — rollback preconditions, invariants. Everything else is an
+    output check by default.
+    """
+    if task.verification is None:
+        return False
+    return task.verification.what.strip().lower().startswith(_PRE_STATE_PREFIX)
 
 
 class Gate(BaseGate):
@@ -60,16 +93,34 @@ class Gate(BaseGate):
             if not _is_high_blast(producer) or producer.verification is None:
                 continue
 
-            # Hard-dependency consumers positioned before their verified
-            # producer consumed pre-mutation state.
+            # Hard-dependency consumers of the verified mutation, keyed on
+            # the consumer's data subject (#230):
+            #   * pre-state check placed before the mutate → legitimate,
+            #     never flagged (the anti-over-correction guarantee);
+            #   * pre-state check placed after the mutate → stale: it reads
+            #     a world the mutation already replaced;
+            #   * output check before the mutate → consumed unverified state.
             for dep in plan.dependencies:
                 if dep.from_task != producer.id or dep.kind.value != "hard":
                     continue
                 consumer_id = dep.to_task
                 if consumer_id not in id_to_index:
                     continue
-                if id_to_index[consumer_id] < id_to_index[producer.id]:
-                    findings.append(self._finding(plan, consumer_id, producer.id))
+                consumer_index = id_to_index[consumer_id]
+                producer_index = id_to_index[producer.id]
+                consumer = plan.tasks[consumer_index]
+                pre_state = _is_pre_state_check(consumer)
+                if consumer_index < producer_index and not pre_state:
+                    findings.append(self._finding(plan, consumer_id, producer_id=producer.id))
+                elif consumer_index > producer_index and pre_state:
+                    findings.append(
+                        self._finding(
+                            plan,
+                            consumer_id,
+                            producer_id=producer.id,
+                            detail="pre-state check ran after the mutation",
+                        )
+                    )
 
             # Same-group siblings racing the same target may complete before
             # the producer's verification executes.

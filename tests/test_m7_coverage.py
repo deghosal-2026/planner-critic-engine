@@ -13,6 +13,7 @@ def _plan() -> PlanVersion:
 
 def test_cli_imports() -> None:
     from planner_critic._cli import _SUBCOMMANDS
+
     assert "check" in _SUBCOMMANDS
     assert "domains" in _SUBCOMMANDS
     assert "policy" in _SUBCOMMANDS
@@ -24,12 +25,14 @@ def test_cli_imports() -> None:
 
 def test_cli_help() -> None:
     from planner_critic._cli import main
+
     code = main([])
     assert code == 0
 
 
 def test_check_with_policies_dir() -> None:
     from planner_critic.cli.check import run_check
+
     with tempfile.TemporaryDirectory() as tmp:
         tmpdir = Path(tmp)
         plan_path = tmpdir / "plan.json"
@@ -49,6 +52,7 @@ severity: blocker
 
 def test_check_with_domain_pack_manifest() -> None:
     from planner_critic.cli.check import run_check
+
     with tempfile.TemporaryDirectory() as tmp:
         tmpdir = Path(tmp)
         plan_path = tmpdir / "plan.json"
@@ -65,6 +69,7 @@ preconditions: {}
 
 def test_check_with_invalid_domain() -> None:
     from planner_critic.cli.check import run_check
+
     with tempfile.TemporaryDirectory() as tmp:
         plan_path = Path(tmp) / "plan.json"
         plan_path.write_text(_plan().model_dump_json())
@@ -74,24 +79,28 @@ def test_check_with_invalid_domain() -> None:
 
 def test_domains_show_nonexistent() -> None:
     from planner_critic.cli.domains import run_domains
+
     code = run_domains(["show", "nonexistent"])
     assert code == 1
 
 
 def test_domains_add_nonexistent() -> None:
     from planner_critic.cli.domains import run_domains
+
     code = run_domains(["add", "/nonexistent.yaml"])
     assert code == 1
 
 
 def test_policy_add_nonexistent() -> None:
     from planner_critic.cli.policy import run_policy
+
     code = run_policy(["add", "/nonexistent"])
     assert code == 1
 
 
 def test_templates_test_nonexistent() -> None:
     from planner_critic.cli.templates import run_templates
+
     with tempfile.TemporaryDirectory() as tmp:
         plan_path = Path(tmp) / "plan.json"
         plan_path.write_text(_plan().model_dump_json())
@@ -101,18 +110,23 @@ def test_templates_test_nonexistent() -> None:
 
 def test_templates_add() -> None:
     from planner_critic.cli.templates import run_templates
-    code = run_templates(["add", "my-template", "--pattern", "backup", "--description", "Back up data"])
+
+    code = run_templates(
+        ["add", "my-template", "--pattern", "backup", "--description", "Back up data"]
+    )
     assert code == 0
 
 
 def test_diagnose_nonexistent_file() -> None:
     from planner_critic.cli.diagnose import run_diagnose
+
     code = run_diagnose(["/nonexistent/trace.json"])
     assert code == 1
 
 
 def test_diagnose_empty_trace_list() -> None:
     from planner_critic.cli.diagnose import run_diagnose
+
     with tempfile.TemporaryDirectory() as tmp:
         trace_path = Path(tmp) / "trace.json"
         trace_path.write_text("[]")
@@ -122,6 +136,7 @@ def test_diagnose_empty_trace_list() -> None:
 
 def test_policy_test_nonexistent() -> None:
     from planner_critic.cli.policy import run_policy
+
     with tempfile.TemporaryDirectory() as tmp:
         plan_path = Path(tmp) / "plan.json"
         plan_path.write_text(_plan().model_dump_json())
@@ -135,6 +150,7 @@ def test_guardrail_module_imports() -> None:
         guardrail,
         re_gate,
     )
+
     assert callable(guardrail)
     assert callable(re_gate)
     assert callable(escalate)

@@ -252,7 +252,7 @@ class TestPlanningErrors:
 
         goal = make_goal()
         planner = ScriptedPlanner([_dirty_plan()])
-        result = run_loop(goal, planner, BadCritic())  # type: ignore[arg-type]
+        result = run_loop(goal, planner, BadCritic())
         assert not result.is_approved
         assert result.status == "escalated"
 

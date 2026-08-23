@@ -71,7 +71,10 @@ def test_run_quickstart_writes_temp_project_and_fails_closed_on_provider(
     assert "planning failed" in out
 
 
-def test_quickstart_subcommand_is_registered(tmp_path: Path, capsys) -> None:
+def test_quickstart_subcommand_is_registered(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """``plancritic quickstart`` is wired into the root CLI."""
     assert "quickstart" in _cli._SUBCOMMANDS
     rc = _cli.main(

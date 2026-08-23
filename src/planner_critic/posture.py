@@ -49,6 +49,7 @@ class PostureResolver:
     @classmethod
     def from_yaml(cls, path: str) -> PostureResolver:
         import yaml
+
         with open(path) as f:
             data = yaml.safe_load(f)
         return cls.from_dict(data["posture_rules"])
@@ -80,12 +81,14 @@ def _collect_context() -> dict[str, str]:
     if not branch:
         try:
             result = subprocess.run(
-                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                capture_output=True, text=True, timeout=2,
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],  # noqa: S607  # intentional PATH lookup
+                capture_output=True,
+                text=True,
+                timeout=2,
             )
             if result.returncode == 0:
                 branch = result.stdout.strip()
-        except Exception:
+        except Exception:  # noqa: S110  # git absence must not break posture resolution
             pass
     ctx["git_branch"] = branch
     workspace = os.environ.get("PC_TERRAFORM_WORKSPACE", "")
@@ -97,7 +100,7 @@ def _collect_context() -> dict[str, str]:
             val = func()
             if val is not None:
                 ctx[key] = val
-        except Exception:
+        except Exception:  # noqa: S110  # optional context probes are best-effort
             pass
     return ctx
 

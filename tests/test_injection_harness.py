@@ -27,10 +27,8 @@ class TestRunInjectionHarness:
         planner = ScriptedPlanner([make_plan(tasks=[make_task("t1")])])
         critic = ScriptedCritic([[]])
 
-        results = run_injection_harness(
-            planner, critic, instance_ids=["CWE-079-001"]
-        )
-        # 1 instance × 3 trap types = 3 traps
+        results = run_injection_harness(planner, critic, instance_ids=["CWE-079-001"])
+        # 1 instance x 3 trap types = 3 traps
         assert len(results) == 3
         for r in results:
             assert "CWE-079-001" in r.trap.trap_id

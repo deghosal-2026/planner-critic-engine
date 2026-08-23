@@ -23,7 +23,7 @@ class CWEBucket(StrEnum):
     AUTHENTICATION = "AUTH"
     DESERIALIZATION = "DESERIALIZATION"
     SSRF = "SSRF"
-    SECRET_HANDLING = "SECRETS"
+    SECRET_HANDLING = "SECRETS"  # noqa: S105  # CWE bucket label, not a credential
 
 
 CWE_LABELS: dict[CWEBucket, set[str]] = {

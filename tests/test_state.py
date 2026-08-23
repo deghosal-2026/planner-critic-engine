@@ -35,9 +35,7 @@ class TestStateView:
         assert view.is_stale(current)
 
     def test_is_stale_timestamp_mismatch(self) -> None:
-        old = StateSnapshot(
-            version="v1", captured_at=datetime(2024, 1, 1, tzinfo=UTC), snapshot={}
-        )
+        old = StateSnapshot(version="v1", captured_at=datetime(2024, 1, 1, tzinfo=UTC), snapshot={})
         current = StateSnapshot(
             version="v1", captured_at=datetime(2024, 6, 1, tzinfo=UTC), snapshot={}
         )

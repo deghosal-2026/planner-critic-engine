@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 import yaml
@@ -300,10 +301,10 @@ def test_heuristic_only_never_invokes_llm() -> None:
 _SEEDED = Path(__file__).parent / "fixtures" / "seeded_goals.yaml"
 
 
-def _seeded_fixture() -> dict:
+def _seeded_fixture() -> dict[str, Any]:
     """Load the seeded-goals fixture once."""
     with _SEEDED.open() as fh:
-        return yaml.safe_load(fh)
+        return cast("dict[str, Any]", yaml.safe_load(fh))
 
 
 def _critic_for(goal: Goal, provider: LLMProvider) -> LLMCritic:

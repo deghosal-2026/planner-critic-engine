@@ -9,6 +9,8 @@ original → partial → replan → completion.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from conftest import make_plan
@@ -134,7 +136,7 @@ def test_full_lineage_reconstructable(store: InMemoryStore) -> None:
 
 
 @pytest.fixture
-def sqlite_store(tmp_path) -> SQLiteStore:
+def sqlite_store(tmp_path: Path) -> SQLiteStore:
     return SQLiteStore(tmp_path / "store.db")
 
 
@@ -160,7 +162,7 @@ def test_sqlite_replan_link_round_trip(sqlite_store: SQLiteStore) -> None:
     assert children[0].version == 2
 
 
-def test_sqlite_replan_link_persists_across_reopen(tmp_path) -> None:
+def test_sqlite_replan_link_persists_across_reopen(tmp_path: Path) -> None:
     """Replan link data survives store close + reopen."""
     path = tmp_path / "store.db"
     store = SQLiteStore(path)

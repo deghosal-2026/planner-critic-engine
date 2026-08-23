@@ -20,7 +20,7 @@ def test_fastapi_all_endpoints() -> None:
     app = create_fastapi_app(":memory:")
     assert app is not None
 
-    async def run():
+    async def run() -> None:
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app), base_url="http://test"
         ) as c:

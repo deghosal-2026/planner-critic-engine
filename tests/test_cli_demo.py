@@ -36,14 +36,20 @@ def test_demo_defaults_to_packaged_goal() -> None:
     assert Path(args.goal).is_file()
 
 
-def test_run_demo_returns_one_on_invalid_goal(tmp_path: Path, capsys) -> None:
+def test_run_demo_returns_one_on_invalid_goal(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """A missing goal file fails closed with exit code 1."""
     rc = run_demo(["--goal", str(tmp_path / "nope.json")])
     assert rc == 1
     assert "is not a valid Goal" in capsys.readouterr().out
 
 
-def test_run_demo_returns_zero_and_prints_story(tmp_path: Path, capsys) -> None:
+def test_run_demo_returns_zero_and_prints_story(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """A valid corpus goal runs the full hermetic story to exit code 0."""
     store = tmp_path / "plans.db"
     rc = run_demo(["--goal", str(MIGRATION), "--store", str(store)])
@@ -55,7 +61,9 @@ def test_run_demo_returns_zero_and_prints_story(tmp_path: Path, capsys) -> None:
 
 
 def test_run_demo_store_unavailable_falls_back(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """A down store warns and continues in memory (side-channel §7.2)."""
 
@@ -71,7 +79,7 @@ def test_run_demo_store_unavailable_falls_back(
     assert "continuing in memory" in capsys.readouterr().out
 
 
-def test_demo_subcommand_is_registered(tmp_path: Path, capsys) -> None:
+def test_demo_subcommand_is_registered(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``plancritic demo`` is wired into the root CLI."""
     assert "demo" in _cli._SUBCOMMANDS
     rc = _cli.main(["demo", "--goal", str(MIGRATION), "--store", str(tmp_path / "p.db")])
@@ -86,7 +94,10 @@ def test_demo_parser_accepts_json_format(tmp_path: Path) -> None:
     assert args.format == "json"
 
 
-def test_run_demo_json_produces_machine_readable_record(tmp_path: Path, capsys) -> None:
+def test_run_demo_json_produces_machine_readable_record(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """``--format json`` emits a parseable, structured demo record (exit 0)."""
     import json
 
@@ -103,7 +114,10 @@ def test_run_demo_json_produces_machine_readable_record(tmp_path: Path, capsys) 
     assert "graph TD" in record["graph"]
 
 
-def test_run_demo_json_no_graph_drops_mermaid(tmp_path: Path, capsys) -> None:
+def test_run_demo_json_no_graph_drops_mermaid(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """``--format json --no-graph`` yields a record without the graph field."""
     import json
 

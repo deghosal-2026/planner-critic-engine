@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 TRACE_DIR = Path(__file__).parents[1] / "docs" / "field-test" / "reports" / "0.1.0" / "full-sweep"
 
@@ -41,7 +42,7 @@ _SPECIFIC_PATTERNS = [
 ]
 
 
-def _load_traces() -> list[dict]:
+def _load_traces() -> list[dict[str, Any]]:
     traces = []
     for path in TRACE_DIR.rglob("**/trace.json"):
         try:
@@ -93,7 +94,7 @@ def _is_actionable(message: str) -> bool:
     return any(kw in msg for kw in actionable_keywords)
 
 
-def audit_traces() -> dict:
+def audit_traces() -> dict[str, Any]:
     """Run the Q3 finding-quality audit over all stored traces."""
     traces = _load_traces()
     total_findings = 0
@@ -102,8 +103,8 @@ def audit_traces() -> dict:
     actionable_count = 0
     task_linked_count = 0
     noise_examples: list[tuple[str, str, str]] = []
-    domain_stats: dict[str, dict] = {}
-    severity_stats: dict[str, dict] = {}
+    domain_stats: dict[str, dict[str, int]] = {}
+    severity_stats: dict[str, dict[str, int]] = {}
 
     for trace in traces:
         goal_id = trace.get("goal_id", "unknown")

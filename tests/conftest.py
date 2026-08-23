@@ -45,10 +45,10 @@ def make_task(
     target: str | None = None,
     risk_class: str = "medium",
     blast_radius: str = "medium",
-    verification: dict | None = None,
-    rollback: dict | None = None,
+    verification: dict[str, object] | None = None,
+    rollback: dict[str, object] | None = None,
     parallel_group: str | None = None,
-    preconditions: list[dict] | None = None,
+    preconditions: list[dict[str, object]] | None = None,
 ) -> Task:
     """Build a task with explicit but convenient defaults."""
     return Task.model_validate(

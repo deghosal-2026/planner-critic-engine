@@ -29,13 +29,14 @@ from planner_critic.reason_codes import (
     ROLLBACK_SELF_DEPENDENT,
     ROLLBACK_UNREACHABLE,
 )
+from planner_critic.schema.plan import Task
 from planner_critic.types import Severity
 
-_RB = {"trigger": "fail", "action": "revert", "safety_guard": "backup"}
-_VERIF = {"what": "health", "how": "check", "expected": "pass"}
+_RB: dict[str, object] = {"trigger": "fail", "action": "revert", "safety_guard": "backup"}
+_VERIF: dict[str, object] = {"what": "health", "how": "check", "expected": "pass"}
 
 
-def _high(task_id: str, *, action: str = "migrate") -> object:
+def _high(task_id: str, *, action: str = "migrate") -> Task:
     """High-risk task carrying a rollback (the gate's subject)."""
     return make_task(task_id, action=action, risk_class="high", blast_radius="high", rollback=_RB)
 
@@ -43,7 +44,7 @@ def _high(task_id: str, *, action: str = "migrate") -> object:
 class TestRollbackCredibleGate:
     def test_non_reversible_action_flagged(self) -> None:
         """publish/destroy/commit have no automated inverse — rollback cannot run."""
-        plan = make_plan(tasks=[_high("t1", action="publish")])  # type: ignore[arg-type]
+        plan = make_plan(tasks=[_high("t1", action="publish")])
         findings = [
             f for f in run_deterministic_gates(plan) if f.reason_code == ROLLBACK_UNREACHABLE
         ]
@@ -53,7 +54,7 @@ class TestRollbackCredibleGate:
     def test_reversible_action_clean(self) -> None:
         """Actions with an inverse (or snapshot restore) keep their rollback."""
         for action in ("migrate", "create", "update"):
-            plan = make_plan(tasks=[_high("t1", action=action)])  # type: ignore[arg-type]
+            plan = make_plan(tasks=[_high("t1", action=action)])
             assert ROLLBACK_UNREACHABLE not in {
                 f.reason_code for f in run_deterministic_gates(plan)
             }, action
@@ -84,7 +85,7 @@ class TestRollbackCredibleGate:
                 {"description": "schema migrated", "fact": "schema_v2", "established_by": "t1"}
             ],
         )
-        plan = make_plan(tasks=[_high("t1"), consumer])  # type: ignore[arg-type]
+        plan = make_plan(tasks=[_high("t1"), consumer])
         findings = [
             f for f in run_deterministic_gates(plan) if f.reason_code == ROLLBACK_INCONSISTENT_STATE
         ]
@@ -95,7 +96,7 @@ class TestRollbackCredibleGate:
         """Hard-dep consumer inside the write→rollback window, bare."""
         consumer = make_task("t2")
         plan = make_plan(
-            tasks=[_high("t1"), consumer],  # type: ignore[arg-type]
+            tasks=[_high("t1"), consumer],
             dependencies=[hard_dep("t1", "t2")],
         )
         findings = [
@@ -108,7 +109,7 @@ class TestRollbackCredibleGate:
         """A consumer that verifies re-establishes validity after any restore."""
         consumer = make_task("t2", verification=_VERIF)
         plan = make_plan(
-            tasks=[_high("t1"), consumer],  # type: ignore[arg-type]
+            tasks=[_high("t1"), consumer],
             dependencies=[hard_dep("t1", "t2")],
         )
         codes = {f.reason_code for f in run_deterministic_gates(plan)}

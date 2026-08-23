@@ -207,10 +207,7 @@ def build_init_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--template",
         default=None,
-        help=(
-            "Scaffold a golden-path template: "
-            + ", ".join(TEMPLATE_NAMES)
-        ),
+        help=("Scaffold a golden-path template: " + ", ".join(TEMPLATE_NAMES)),
     )
     parser.add_argument(
         "--list-templates",
@@ -237,9 +234,7 @@ def run_init(argv: list[str]) -> int:
         return 0
 
     if args.template:
-        return run_init_template(
-            args.dir, args.template, force=args.force, inject=args.inject
-        )
+        return run_init_template(args.dir, args.template, force=args.force, inject=args.inject)
 
     target = Path(args.dir).resolve()
 

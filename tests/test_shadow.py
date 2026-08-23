@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from conftest import (
     EmptyCritic,
     ScriptedCritic,
@@ -13,12 +15,13 @@ from conftest import (
 )
 from planner_critic.loop import LoopConfig
 from planner_critic.schema.goal import RiskTolerance
+from planner_critic.schema.plan import PlanVersion
 from planner_critic.shadow import run_shadow
 from planner_critic.store.sqlite import SQLiteStore
-from planner_critic.types import Severity
+from planner_critic.types import Finding, Severity
 
 
-def _clean_plan():
+def _clean_plan() -> PlanVersion:
     """A gate-clean, approval-ready plan."""
     return make_plan(
         tasks=[
@@ -31,7 +34,7 @@ def _clean_plan():
     )
 
 
-def _blocker():
+def _blocker() -> Finding:
     """A blocker finding for the strict-tolerance shadow escalation."""
     return finding("t1", "unsafe_ordering", severity=Severity.BLOCKER)
 
@@ -56,7 +59,7 @@ def test_shadow_does_not_gate_approval() -> None:
     assert result.is_approved  # observe mode: same decision, no enforcement
 
 
-def test_shadow_records_escalation_to_store(tmp_path) -> None:
+def test_shadow_records_escalation_to_store(tmp_path: Path) -> None:
     """A shadow escalation is persisted and diffable via the store."""
     store = SQLiteStore(tmp_path / "store.db")
     goal = make_goal(tolerance=RiskTolerance.STRICT)
@@ -73,7 +76,7 @@ def test_shadow_records_escalation_to_store(tmp_path) -> None:
     store.close()
 
 
-def test_shadow_records_approved_plan_to_store(tmp_path) -> None:
+def test_shadow_records_approved_plan_to_store(tmp_path: Path) -> None:
     """An approved shadow plan is persisted to the store."""
     store = SQLiteStore(tmp_path / "store.db")
     goal = make_goal()

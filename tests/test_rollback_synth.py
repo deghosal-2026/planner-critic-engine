@@ -21,8 +21,9 @@ from planner_critic.types import Severity
 
 
 def _task(tid: str, action: str = "do", **kw: object) -> Task:
-    return Task.model_validate({"id": tid, "description": f"task {tid}",
-                                "action": action, "target": tid, **kw})
+    return Task.model_validate(
+        {"id": tid, "description": f"task {tid}", "action": action, "target": tid, **kw}
+    )
 
 
 class TestActionInversionRegistry:

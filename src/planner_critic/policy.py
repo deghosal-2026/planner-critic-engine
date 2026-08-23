@@ -287,19 +287,28 @@ BUILTIN_POLICIES: list[PolicyEngine] = [
     ),
     CelGate(
         name="no_unsafe_ordering",
-        expression="not any(d.get('kind') == 'hard' and d['from_task'] == d['to_task'] for d in dependencies)",
+        expression=(
+            "not any(d.get('kind') == 'hard'"
+            " and d['from_task'] == d['to_task'] for d in dependencies)"
+        ),
         severity="blocker",
         message="Self-referencing dependency detected",
     ),
     CelGate(
         name="high_risk_has_rollback",
-        expression="all(t.get('rollback') is not None for t in tasks if t.get('risk_class') in ('high', 'critical'))",
+        expression=(
+            "all(t.get('rollback') is not None for t in tasks"
+            " if t.get('risk_class') in ('high', 'critical'))"
+        ),
         severity="blocker",
         message="High-risk tasks must have a rollback step",
     ),
     CelGate(
         name="high_risk_has_verification",
-        expression="all(t.get('verification') is not None for t in tasks if t.get('risk_class') in ('high', 'critical'))",
+        expression=(
+            "all(t.get('verification') is not None for t in tasks"
+            " if t.get('risk_class') in ('high', 'critical'))"
+        ),
         severity="blocker",
         message="High-risk tasks must have a verification step",
     ),

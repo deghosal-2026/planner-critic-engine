@@ -118,10 +118,7 @@ class TestRunInitWithTemplateFlag:
     def test_inject_with_force_overwrites(self, tmp_project: Path) -> None:
         """--inject combined with --force overwrites existing files."""
         run_init(["--dir", str(tmp_project), "--template", "custom"])
-        rc = run_init(
-            ["--dir", str(tmp_project), "--template", "custom",
-             "--inject", "--force"]
-        )
+        rc = run_init(["--dir", str(tmp_project), "--template", "custom", "--inject", "--force"])
         assert rc == 0
 
 

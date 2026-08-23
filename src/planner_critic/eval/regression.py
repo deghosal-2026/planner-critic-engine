@@ -42,9 +42,17 @@ def _make_task(
         "blast_radius": blast_radius,
     }
     if has_verification:
-        task_data["verification"] = {"what": "security fix applied correctly", "how": "manual_review", "expected": "pass"}
+        task_data["verification"] = {
+            "what": "security fix applied correctly",
+            "how": "manual_review",
+            "expected": "pass",
+        }
     if has_rollback:
-        task_data["rollback"] = {"trigger": "verification_fails", "action": "revert", "safety_guard": "backup_confirmed"}
+        task_data["rollback"] = {
+            "trigger": "verification_fails",
+            "action": "revert",
+            "safety_guard": "backup_confirmed",
+        }
     if preconditions:
         task_data["preconditions"] = preconditions
     return Task.model_validate(task_data)
@@ -252,13 +260,15 @@ def generate_artifact(instance: SecurityInstance) -> PlanArtifact:
                         f"{prefix}_apply_fix",
                         risk_class="low",
                         blast_radius="low",
-preconditions=[
-                        {
-                            "description": "Security review must be approved before applying fix",
-                            "fact": "security_review_approved",
-                            "established_by": None,
-                        }
-                    ],
+                        preconditions=[
+                            {
+                                "description": (
+                                    "Security review must be approved before applying fix"
+                                ),
+                                "fact": "security_review_approved",
+                                "established_by": None,
+                            }
+                        ],
                     ),
                 ],
             }

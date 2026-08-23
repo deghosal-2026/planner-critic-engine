@@ -58,7 +58,7 @@ class TestGoalSchema:
         """A goal is immutable after construction."""
         goal = make_goal()
         with pytest.raises(ValidationError):
-            goal.description = "mutated"  # type: ignore[misc]
+            goal.description = "mutated"
 
 
 class TestPlanSchema:
@@ -152,7 +152,7 @@ class TestPlanSchema:
         """A PlanVersion cannot be mutated after construction."""
         plan = make_plan()
         with pytest.raises(ValidationError):
-            plan.version = 99  # type: ignore[misc]
+            plan.version = 99
 
     def test_created_at_required_and_preserved(self) -> None:
         """created_at survives round-trip (is not silently reset)."""

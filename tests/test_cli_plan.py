@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
 
 from planner_critic.cli.plan import build_plan_parser, run_plan
-from planner_critic.llm.base import Completion
+from planner_critic.llm.base import Completion, Message, ToolSchema
 from planner_critic.schema.goal import Goal
 from planner_critic.schema.plan import PlanVersion
 
@@ -109,7 +110,7 @@ def test_run_plan_config_load_failure(tmp_path: Path, capsys: pytest.CaptureFixt
 def test_cli_planner_uses_no_think_and_structured_example_prompt() -> None:
     """The real CLI planner prompt carries the no-think + schema-shape guidance."""
     from planner_critic.cli.plan import _CLIPlanner
-    from planner_critic.llm.base import Completion, Message, ToolSchema
+    from planner_critic.llm.base import Completion
     from planner_critic.schema.plan import PlanVersion
 
     class CaptureProvider:
@@ -191,10 +192,14 @@ def _cli_plan_from_supported(plan: PlanVersion) -> PlanVersion:
         base_url = "http://fake.local"
         model = "fake-model"
 
-        def complete(self, messages, tool_schemas=()):
+        def complete(
+            self,
+            messages: Sequence[Message],
+            tool_schemas: Sequence[ToolSchema] = (),
+        ) -> Completion:
             return Completion(content=json.dumps(plan.to_dict()), finish_reason="stop")
 
-    planner = _CLIPlanner(CaptureProvider())  # type: ignore[arg-type]
+    planner = _CLIPlanner(CaptureProvider())
     goal = Goal.model_validate({"id": "g1", "description": "Ship a service"})
     produced = planner.decompose(goal)
     # Re-validate through the typed schema to prove structural fidelity.

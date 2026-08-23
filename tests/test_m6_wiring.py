@@ -21,7 +21,9 @@ class TestM6Wiring:
         goal = make_goal(tolerance=RiskTolerance.BALANCED)
         budget = RunBudget(run_max_budget_usd=100.0)
         result = run_loop(
-            goal=goal, planner=planner, critic=critic,
+            goal=goal,
+            planner=planner,
+            critic=critic,
             config=LoopConfig(mode="deterministic-first", revision_cap=2),
             run_budget=budget,
         )
@@ -34,7 +36,9 @@ class TestM6Wiring:
         critic = EmptyCritic()
         goal = make_goal(tolerance=RiskTolerance.BALANCED)
         result = run_loop(
-            goal=goal, planner=planner, critic=critic,
+            goal=goal,
+            planner=planner,
+            critic=critic,
             config=LoopConfig(mode="deterministic-first", revision_cap=1),
             precondition_ledger=ledger,
         )
@@ -47,9 +51,12 @@ class TestM6Wiring:
         goal = make_goal(tolerance=RiskTolerance.BALANCED)
         budget = RunBudget(run_max_depth=5)
         result = run_loop(
-            goal=goal, planner=planner, critic=critic,
+            goal=goal,
+            planner=planner,
+            critic=critic,
             config=LoopConfig(mode="deterministic-first", revision_cap=2),
-            run_budget=budget, precondition_ledger=ledger,
+            run_budget=budget,
+            precondition_ledger=ledger,
         )
         assert result.status == "approved"
 
@@ -60,7 +67,9 @@ class TestM6Wiring:
         budget = RunBudget(run_max_time=0.001)
         time.sleep(0.005)
         result = run_loop(
-            goal=goal, planner=planner, critic=critic,
+            goal=goal,
+            planner=planner,
+            critic=critic,
             config=LoopConfig(mode="deterministic-first", revision_cap=2),
             run_budget=budget,
         )

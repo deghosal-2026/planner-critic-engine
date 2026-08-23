@@ -66,7 +66,9 @@ class SecretsRedactor:
             matches = list(pattern.finditer(result))
             if not matches:
                 continue
-            placeholder = PLACEHOLDER_PII if name in ("email", "phone", "ssn") else PLACEHOLDER_REDACT
+            placeholder = (
+                PLACEHOLDER_PII if name in ("email", "phone", "ssn") else PLACEHOLDER_REDACT
+            )
             self._audits.append(
                 RedactionAudit(
                     pattern=name,
@@ -77,9 +79,9 @@ class SecretsRedactor:
             for m in reversed(matches):
                 if self._mode is RedactMode.HASH:
                     secret_hash = hashlib.sha256(m.group().encode()).hexdigest()[:16]
-                    result = result[:m.start()] + secret_hash + result[m.end():]
+                    result = result[: m.start()] + secret_hash + result[m.end() :]
                 else:
-                    result = result[:m.start()] + placeholder + result[m.end():]
+                    result = result[: m.start()] + placeholder + result[m.end() :]
         return result
 
     def audits(self) -> list[RedactionAudit]:
@@ -95,11 +97,15 @@ class SecretsRedactor:
             if isinstance(value, str):
                 result[key] = self.redact(value, surface=f"{surface}.{key}" if surface else key)
             elif isinstance(value, dict):
-                result[key] = self.redact_dict(value, surface=f"{surface}.{key}" if surface else key)
+                result[key] = self.redact_dict(
+                    value, surface=f"{surface}.{key}" if surface else key
+                )
             elif isinstance(value, list):
                 result[key] = [
-                    self.redact_dict(v, surface=f"{surface}.{key}[i]") if isinstance(v, dict)
-                    else self.redact(str(v), surface=f"{surface}.{key}[i]") if isinstance(v, str)
+                    self.redact_dict(v, surface=f"{surface}.{key}[i]")
+                    if isinstance(v, dict)
+                    else self.redact(str(v), surface=f"{surface}.{key}[i]")
+                    if isinstance(v, str)
                     else v
                     for i, v in enumerate(value)
                 ]

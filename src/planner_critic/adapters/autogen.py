@@ -17,13 +17,13 @@ from __future__ import annotations
 
 import logging
 
-logger = logging.getLogger(__name__)
-
 from ..engine import Engine
 from ..loop import LoopResult
 from ..schema.goal import Goal
 from ..schema.plan import PlanVersion, Task
 from ._audit import AuditEvent, AuditTrail
+
+logger = logging.getLogger(__name__)
 
 
 class PlanNotApprovedError(RuntimeError):
@@ -77,7 +77,9 @@ class AutoGenAdapter:
         if self._audit is not None:
             status = "approved" if result.is_approved else "escalated"
             self._audit.record(
-                AuditEvent("autogen", f"plan_{status}", plan_id=result.plan.id if result.plan else None)
+                AuditEvent(
+                    "autogen", f"plan_{status}", plan_id=result.plan.id if result.plan else None
+                )
             )
 
         if not result.is_approved:
@@ -119,7 +121,9 @@ class AutoGenAdapter:
 
         if self._audit is not None:
             self._audit.record(
-                AuditEvent("autogen", "re_gate_check", plan_id=plan.plan.id, details={"task_id": step_id})
+                AuditEvent(
+                    "autogen", "re_gate_check", plan_id=plan.plan.id, details={"task_id": step_id}
+                )
             )
 
         if step.preconditions:
@@ -140,7 +144,9 @@ class AutoGenAdapter:
         return None
 
     def _check_precondition(self, precondition: object) -> bool:
-        logger.warning("re-gate: precondition check for %r is not implemented — always passing", precondition)
+        logger.warning(
+            "re-gate: precondition check for %r is not implemented — always passing", precondition
+        )
         return True
 
     def escalation_message(self) -> str | None:

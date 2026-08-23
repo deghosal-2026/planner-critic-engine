@@ -26,16 +26,17 @@ from planner_critic.reason_codes import (
     UNSAFE_ORDERING,
     VERIFICATION_AFTER_CONSUMER,
 )
+from planner_critic.schema.plan import Task
 from planner_critic.types import Severity
 
-_VERIFIED_HIGH = {
+_VERIFIED_HIGH: dict[str, object] = {
     "trigger": "fail",
     "action": "revert",
     "safety_guard": "backup",
 }
 
 
-def _high_mutate(task_id: str, *, parallel_group: str | None = None):
+def _high_mutate(task_id: str, *, parallel_group: str | None = None) -> Task:
     """High-risk mutate carrying verification (and rollback)."""
     return make_task(
         task_id,
@@ -55,8 +56,7 @@ class TestVerificationOrderingGate:
             dependencies=[hard_dep("deploy", "consume")],
         )
         findings = [
-            f for f in run_deterministic_gates(plan)
-            if f.reason_code == VERIFICATION_AFTER_CONSUMER
+            f for f in run_deterministic_gates(plan) if f.reason_code == VERIFICATION_AFTER_CONSUMER
         ]
         assert len(findings) == 1
         assert findings[0].severity is Severity.BLOCKER
@@ -91,8 +91,7 @@ class TestVerificationOrderingGate:
             ],
         )
         findings = [
-            f for f in run_deterministic_gates(plan)
-            if f.reason_code == VERIFICATION_AFTER_CONSUMER
+            f for f in run_deterministic_gates(plan) if f.reason_code == VERIFICATION_AFTER_CONSUMER
         ]
         assert len(findings) == 1
         assert findings[0].task_id == "rotate"
@@ -144,6 +143,94 @@ class TestGateRegistration:
         names = [g.name for g in GATES]
         assert "verification_ordering" in names
         assert names.index("verification_ordering") == names.index("verification_present") + 1
+
+
+class TestDataSubjectTriplet:
+    """#230: consequences key on the verification's data subject, not position.
+
+    Convention until the v0.3.0 optional `subject` field: a consumer's
+    verification whose ``what`` begins with ``pre-state`` reads constraints
+    that exist before the mutation — it belongs BEFORE the mutate. Anything
+    else is an output check and belongs after. Both directions are enforced;
+    correct-side placements in both classes stay silent.
+    """
+
+    PRE = "pre-state: backup snapshot present"
+
+    def _producer(self, task_id: str = "deploy") -> Task:
+        return make_task(
+            task_id,
+            risk_class="high",
+            blast_radius="high",
+            verification={"what": "health", "how": "check", "expected": "pass"},
+            rollback={"trigger": "fail", "action": "revert", "safety_guard": "backup"},
+        )
+
+    def test_member1_pre_state_before_mutate_passes(self) -> None:
+        """A pre-state check ordered before the mutate is correctly placed."""
+        plan = make_plan(
+            tasks=[
+                make_task(
+                    "verify_backup",
+                    verification={"what": self.PRE, "how": "list", "expected": "present"},
+                ),
+                self._producer(),
+            ],
+            dependencies=[hard_dep("deploy", "verify_backup")],
+        )
+        codes = {f.reason_code for f in run_deterministic_gates(plan)}
+        assert VERIFICATION_AFTER_CONSUMER not in codes
+
+    def test_member2_pre_state_after_mutate_blocked(self) -> None:
+        """The same pre-state check run after the mutate verifies nothing."""
+        plan = make_plan(
+            tasks=[
+                self._producer(),
+                make_task(
+                    "verify_backup_late",
+                    verification={"what": self.PRE, "how": "list", "expected": "present"},
+                ),
+            ],
+            dependencies=[hard_dep("deploy", "verify_backup_late")],
+        )
+        codes = {f.reason_code for f in run_deterministic_gates(plan)}
+        assert VERIFICATION_AFTER_CONSUMER in codes
+
+    def test_member3_output_check_after_mutate_passes_pinned(self) -> None:
+        """Output checks after the mutate stay legitimate — anti-regression pin."""
+        plan = make_plan(
+            tasks=[
+                self._producer(),
+                make_task(
+                    "consume_output",
+                    verification={"what": "row count", "how": "query", "expected": "n"},
+                ),
+            ],
+            dependencies=[hard_dep("deploy", "consume_output")],
+        )
+        assert VERIFICATION_AFTER_CONSUMER not in {
+            f.reason_code for f in run_deterministic_gates(plan)
+        }
+
+    def test_triplet_registered_as_boundary_cases(self) -> None:
+        """Both subject-flip pairs join the label-migration corpus."""
+        cases = {c.case_id: c for c in generate_boundary_cases()}
+        assert "triplet-pre-state-before-mutate" in cases
+        assert "triplet-output-after-mutate" in cases
+
+    def test_triplet_pairs_block_exactly_the_wrong_side(self) -> None:
+        """Each pair: correct-side plan clean, wrong-side plan blocked."""
+        cases = {c.case_id: c for c in generate_boundary_cases()}
+        for case_id in (
+            "triplet-pre-state-before-mutate",
+            "triplet-output-after-mutate",
+        ):
+            case = cases[case_id]
+            assert not VerificationOrderingGate().run(case.plan_a), case_id
+            blocked = VerificationOrderingGate().run(case.plan_b)
+            assert blocked and all(f.reason_code == VERIFICATION_AFTER_CONSUMER for f in blocked), (
+                case_id
+            )
 
 
 class TestBoundaryCase:

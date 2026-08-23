@@ -12,7 +12,7 @@ from planner_critic.types import Finding, Severity
 
 
 class TestPlanGuardrail:
-    def test_check_approves_plan(self, empty_critic):
+    def test_check_approves_plan(self, empty_critic: EmptyCritic) -> None:
         planner = ScriptedPlanner([make_plan()])
         engine = Engine(planner, empty_critic, LoopConfig(mode="deterministic-first"))
         guardrail = PlanGuardrail(engine, make_goal())
@@ -22,7 +22,7 @@ class TestPlanGuardrail:
         assert result.is_approved
         assert result.approved_plan is not None
 
-    def test_check_raises_when_not_approved(self):
+    def test_check_raises_when_not_approved(self) -> None:
         planner = ScriptedPlanner([make_plan()])
         blocker = Finding(
             id="f:1",
@@ -39,14 +39,14 @@ class TestPlanGuardrail:
         with pytest.raises(PlanNotApprovedError):
             guardrail.check()
 
-    def test_result_property_before_check(self):
+    def test_result_property_before_check(self) -> None:
         planner = ScriptedPlanner([make_plan()])
         engine = Engine(planner, EmptyCritic(), LoopConfig(mode="deterministic-first"))
         guardrail = PlanGuardrail(engine, make_goal())
 
         assert guardrail.result is None
 
-    def test_result_property_after_check(self, empty_critic):
+    def test_result_property_after_check(self, empty_critic: EmptyCritic) -> None:
         planner = ScriptedPlanner([make_plan()])
         engine = Engine(planner, empty_critic, LoopConfig(mode="deterministic-first"))
         guardrail = PlanGuardrail(engine, make_goal())
@@ -54,7 +54,7 @@ class TestPlanGuardrail:
         result = guardrail.check()
         assert guardrail.result is result
 
-    def test_check_caches_result(self, empty_critic):
+    def test_check_caches_result(self, empty_critic: EmptyCritic) -> None:
         planner = ScriptedPlanner([make_plan()])
         engine = Engine(planner, empty_critic, LoopConfig(mode="deterministic-first"))
         guardrail = PlanGuardrail(engine, make_goal())
@@ -63,7 +63,7 @@ class TestPlanGuardrail:
         result2 = guardrail.check()
         assert result1 is result2
 
-    def test_with_audit(self, empty_critic):
+    def test_with_audit(self, empty_critic: EmptyCritic) -> None:
         planner = ScriptedPlanner([make_plan()])
         engine = Engine(planner, empty_critic, LoopConfig(mode="deterministic-first"))
         audit = AuditTrail()

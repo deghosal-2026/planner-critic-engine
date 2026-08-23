@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import threading
+from collections.abc import Sequence
+from pathlib import Path
 
 import pytest
 
 from conftest import EmptyCritic, ScriptedPlanner, make_goal, make_plan, make_task
 from planner_critic.engine import Engine
+from planner_critic.llm.base import Completion, Message, ToolSchema
 from planner_critic.loop import LoopConfig
 from planner_critic.store.sqlite import SQLiteStore
 from planner_critic.types import PlanningError
@@ -21,7 +24,9 @@ def test_fail_closed_provider_failure_is_recorded() -> None:
         base_url = "http://x"
         model = "x"
 
-        def complete(self, messages, tool_schemas=()):
+        def complete(
+            self, messages: Sequence[Message], tool_schemas: Sequence[ToolSchema] = ()
+        ) -> Completion:
             raise ValueError("simulated provider failure")
 
     from planner_critic.cli.plan import _CLIPlanner
@@ -37,7 +42,7 @@ def test_fail_closed_provider_failure_is_recorded() -> None:
         assert "simulated provider failure" in str(e)
 
 
-def test_concurrent_plan_writes_no_store_corruption(tmp_path) -> None:
+def test_concurrent_plan_writes_no_store_corruption(tmp_path: Path) -> None:
     """D: 5 concurrent goal plans from separate threads — no corruption."""
     import concurrent.futures
 
@@ -82,7 +87,7 @@ def test_concurrent_plan_writes_no_store_corruption(tmp_path) -> None:
     assert expected.issubset(plan_ids), f"missing plans: {expected - plan_ids}"
 
 
-def test_concurrent_store_reads_no_exceptions(tmp_path) -> None:
+def test_concurrent_store_reads_no_exceptions(tmp_path: Path) -> None:
     """D: each thread opens its own SQLite connection — no cross-thread errors."""
     store_path = str(tmp_path / "concurrent_read.db")
     store = SQLiteStore(store_path)

@@ -53,7 +53,8 @@ class BlastRadiusQuotaGate(BaseGate):
     name: str = "blast_radius_quota"
 
     def __init__(
-        self, config: BlastRadiusQuotaConfig,
+        self,
+        config: BlastRadiusQuotaConfig,
         posture: RiskTolerance = RiskTolerance.BALANCED,
     ) -> None:
         self._config = config
@@ -72,7 +73,9 @@ class BlastRadiusQuotaGate(BaseGate):
 
             if action_lower in _DESTRUCTIVE_ACTIONS:
                 destructive_count += 1
-            is_db_target = "schema" in target_lower or "database" in target_lower or "db" in target_lower
+            is_db_target = (
+                "schema" in target_lower or "database" in target_lower or "db" in target_lower
+            )
             if is_db_target and action_lower in _DB_ALTERATIVE_ACTIONS:
                 db_alterations += 1
 
@@ -94,7 +97,9 @@ class BlastRadiusQuotaGate(BaseGate):
             target_for_cluster = (task.target or "").lower()
             for cluster in self._config.restricted_clusters:
                 cluster_lower = cluster.lower()
-                if target_for_cluster == cluster_lower or target_for_cluster.endswith(f"-{cluster_lower}"):
+                if target_for_cluster == cluster_lower or target_for_cluster.endswith(
+                    f"-{cluster_lower}"
+                ):
                     is_strict = self._posture is RiskTolerance.STRICT
                     findings.append(
                         Finding(
@@ -107,7 +112,10 @@ class BlastRadiusQuotaGate(BaseGate):
                         )
                     )
 
-        if self._config.max_resource_changes is not None and resource_count > self._config.max_resource_changes:
+        if (
+            self._config.max_resource_changes is not None
+            and resource_count > self._config.max_resource_changes
+        ):
             findings.append(
                 Finding(
                     id="quota:max_resource_changes",
@@ -122,7 +130,10 @@ class BlastRadiusQuotaGate(BaseGate):
                 )
             )
 
-        if self._config.max_destructive_actions is not None and destructive_count > self._config.max_destructive_actions:
+        if (
+            self._config.max_destructive_actions is not None
+            and destructive_count > self._config.max_destructive_actions
+        ):
             findings.append(
                 Finding(
                     id="quota:max_destructive_actions",
@@ -132,12 +143,16 @@ class BlastRadiusQuotaGate(BaseGate):
                     reason_code=BLAST_RADIUS_QUOTA_BREACH,
                     message=(
                         f"Plan has {destructive_count} destructive actions, "
-                        f"exceeds quota max_destructive_actions={self._config.max_destructive_actions}"
+                        f"exceeds quota max_destructive_actions="
+                        f"{self._config.max_destructive_actions}"
                     ),
                 )
             )
 
-        if self._config.max_database_alterations is not None and db_alterations > self._config.max_database_alterations:
+        if (
+            self._config.max_database_alterations is not None
+            and db_alterations > self._config.max_database_alterations
+        ):
             findings.append(
                 Finding(
                     id="quota:max_database_alterations",
@@ -147,7 +162,8 @@ class BlastRadiusQuotaGate(BaseGate):
                     reason_code=BLAST_RADIUS_QUOTA_BREACH,
                     message=(
                         f"Plan has {db_alterations} database alterations, "
-                        f"exceeds quota max_database_alterations={self._config.max_database_alterations}"
+                        f"exceeds quota max_database_alterations="
+                        f"{self._config.max_database_alterations}"
                     ),
                 )
             )

@@ -64,7 +64,7 @@ class TestStandingRuleRegistry:
 
     def test_propose_dedup_reuses_existing(self) -> None:
         registry = StandingRuleRegistry()
-        first = registry.propose_from_misses(
+        _ = registry.propose_from_misses(
             cwe_bucket="XSS",
             instance_ids=["CWE-079-001"],
             missed_reason_codes=["missing_verification"],
@@ -121,11 +121,13 @@ class TestStandingRuleRegistry:
     def test_coverage_count_increments(self) -> None:
         registry = StandingRuleRegistry()
         registry.propose_from_misses(
-            cwe_bucket="XSS", instance_ids=["CWE-079-001"],
+            cwe_bucket="XSS",
+            instance_ids=["CWE-079-001"],
             missed_reason_codes=["missing_verification"],
         )
         registry.propose_from_misses(
-            cwe_bucket="XSS", instance_ids=["CWE-079-002"],
+            cwe_bucket="XSS",
+            instance_ids=["CWE-079-002"],
             missed_reason_codes=["missing_verification"],
         )
         rules = registry.list_rules()

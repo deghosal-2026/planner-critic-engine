@@ -16,6 +16,7 @@ These tests cover:
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -59,13 +60,13 @@ class SampleDomainPack:
     """A minimal protocol-compliant domain pack for testing."""
 
     name = "sample-domain"
-    precondition_catalog: dict = {
+    precondition_catalog: dict[str, str] = {
         "traffic_drained": "Traffic has been drained from the target",
         "snapshot_created": "A recent snapshot of the resource exists",
     }
-    gate_evaluators: list = [SampleGate()]
+    gate_evaluators: list[BaseGate] = [SampleGate()]
     critic_prompt_template: str | None = SAMPLE_PROMPT
-    pack_config: dict = {}
+    pack_config: dict[str, Any] = {}
 
 
 # ── Manifest YAML tests ───────────────────────────────────────────────────
@@ -97,10 +98,10 @@ class TestDomainPackProtocol:
         """An object without ``name`` does not satisfy the protocol."""
 
         class BadPack:
-            gate_evaluators: list = []
-            precondition_catalog: dict = {}
+            gate_evaluators: list[BaseGate] = []
+            precondition_catalog: dict[str, str] = {}
             critic_prompt_template: str | None = None
-            pack_config: dict = {}
+            pack_config: dict[str, Any] = {}
 
         assert not isinstance(BadPack(), DomainPack)
 
@@ -109,7 +110,7 @@ class TestDomainPackProtocol:
 
         class BadPack:
             name = "bad"
-            precondition_catalog: dict = {}
+            precondition_catalog: dict[str, str] = {}
 
         assert not isinstance(BadPack(), DomainPack)
 
@@ -208,8 +209,11 @@ class TestEngineIntegration:
         from planner_critic.schema.goal import Goal
 
         class FakePlanner:
-            def decompose(self, goal: Goal) -> PlanVersion: ...
-            def revise(self, plan: PlanVersion, findings: list[Finding]) -> PlanVersion: ...
+            def decompose(self, goal: Goal) -> PlanVersion:
+                return make_plan()
+
+            def revise(self, plan: PlanVersion, findings: list[Finding]) -> PlanVersion:
+                return plan
 
         class FakeCritic:
             def audit(self, plan: PlanVersion, findings: list[Finding]) -> list[Finding]:
@@ -230,16 +234,17 @@ class TestEngineIntegration:
     def test_domain_prompt_available(self) -> None:
         """The domain prompt is stored on the engine for the critic to use."""
         from planner_critic.engine import Engine
+        from planner_critic.schema.goal import Goal
 
         class FakePlanner:
-            def decompose(self, goal):
+            def decompose(self, goal: Goal) -> PlanVersion:
                 return make_plan()
 
-            def revise(self, plan, findings):
+            def revise(self, plan: PlanVersion, findings: list[Finding]) -> PlanVersion:
                 return plan
 
         class FakeCritic:
-            def audit(self, plan, findings):
+            def audit(self, plan: PlanVersion, findings: list[Finding]) -> list[Finding]:
                 return list(findings)
 
         engine = Engine(FakePlanner(), FakeCritic(), domain_pack=SampleDomainPack())

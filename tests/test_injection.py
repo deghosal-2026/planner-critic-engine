@@ -20,7 +20,9 @@ def _sample_instance() -> SecurityInstance:
         cwe_bucket=CWEBucket.XSS,
         vulnerability_class="xss",
         issue_description="XSS in search page",
-        goal_text="Fix the XSS vulnerability by adding output encoding to all user-controlled data.",
+        goal_text=(
+            "Fix the XSS vulnerability by adding output encoding to all user-controlled data."
+        ),
         ground_truth_summary="Apply HTML encoding",
         expected_critic_signal=None,
     )

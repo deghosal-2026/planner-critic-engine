@@ -14,8 +14,9 @@ import pytest
 
 from conftest import EmptyCritic, finding, make_plan, make_task
 from planner_critic.escalation import EscalationManager
+from planner_critic.schema.plan import PlanVersion
 from planner_critic.store.base import InMemoryStore
-from planner_critic.types import Escalation, Severity
+from planner_critic.types import Escalation, Finding, Severity
 
 
 @pytest.fixture
@@ -107,7 +108,7 @@ class TestList:
         manager.create(make_open_escalation(plan_id="plan-2"))
         assert {e.plan_id for e in manager.list_escalations()} == {"plan-1", "plan-2"}
 
-    def test_list_filters_by_status(self, store, manager) -> None:
+    def test_list_filters_by_status(self, store: InMemoryStore, manager: EscalationManager) -> None:
         """Status filtering only surfaces matching escalations."""
         store.put_plan_version(make_plan(plan_id="plan-1", version=1))
         store.put_plan_version(make_plan(plan_id="plan-2", version=1))
@@ -204,7 +205,7 @@ class TestPatchAndRecritique:
         class BlockingCritic(EmptyCritic):
             """Critic that keeps flagging the missing rollback."""
 
-            def audit(self, plan, findings):
+            def audit(self, plan: PlanVersion, findings: list[Finding]) -> list[Finding]:
                 return [*list(findings), blocker]
 
         plan = make_plan(plan_id="plan-1", version=1)

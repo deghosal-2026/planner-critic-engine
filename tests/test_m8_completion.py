@@ -25,16 +25,27 @@ class TestM8ConfigSurfaces:
         assert "allow_failure" in content
 
     def test_d26_design_doc_exists(self) -> None:
-        path = Path(__file__).resolve().parent.parent / "docs" / "design" / "integration-surfaces-design.md"
+        path = (
+            Path(__file__).resolve().parent.parent
+            / "docs"
+            / "design"
+            / "integration-surfaces-design.md"
+        )
         assert path.exists()
 
 
 class TestSlackEscalation:
     def test_event_build_with_all_fields(self) -> None:
         event = EscalationEvent(
-            escalation_id="e1", plan_id="p1", reason_code="unsafe_ordering",
-            question="Reordering needed?", severity="warning", environment="staging",
-            service="payments", summary="Deploy schema change", backstage_url="https://x",
+            escalation_id="e1",
+            plan_id="p1",
+            reason_code="unsafe_ordering",
+            question="Reordering needed?",
+            severity="warning",
+            environment="staging",
+            service="payments",
+            summary="Deploy schema change",
+            backstage_url="https://x",
         )
         formatter = SlackFormatter("https://hooks.slack.com/x")
         payload = formatter.format_event(event)

@@ -15,8 +15,11 @@ def _finding(
     family: HeuristicFamily | None = HeuristicFamily.MISSING_STEPS,
 ) -> Finding:
     return Finding(
-        id="f1", version=1, severity=sev,
-        reason_code=LLM_MISSING_STEPS, message="test",
+        id="f1",
+        version=1,
+        severity=sev,
+        reason_code=LLM_MISSING_STEPS,
+        message="test",
         heuristic_family=family,
         raw_severity=raw,
         normalized_severity=sev,
@@ -25,9 +28,13 @@ def _finding(
 
 def _deterministic_finding() -> Finding:
     from planner_critic.reason_codes import MISSING_ROLLBACK
+
     return Finding(
-        id="f1", version=1, severity=Severity.BLOCKER,
-        reason_code=MISSING_ROLLBACK, message="test",
+        id="f1",
+        version=1,
+        severity=Severity.BLOCKER,
+        reason_code=MISSING_ROLLBACK,
+        message="test",
         heuristic_family=None,
     )
 
@@ -58,11 +65,16 @@ class TestComputeDrift:
 
     def test_legacy_finding_no_raw(self) -> None:
         from planner_critic.reason_codes import LLM_RISK
+
         f = Finding(
-            id="f1", version=1, severity=Severity.WARNING,
-            reason_code=LLM_RISK, message="test",
+            id="f1",
+            version=1,
+            severity=Severity.WARNING,
+            reason_code=LLM_RISK,
+            message="test",
             heuristic_family=HeuristicFamily.RISK,
-            raw_severity=None, normalized_severity=None,
+            raw_severity=None,
+            normalized_severity=None,
         )
         result = compute_drift(f)
         assert result.raw_severity is Severity.WARNING

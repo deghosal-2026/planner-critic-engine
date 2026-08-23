@@ -12,11 +12,15 @@ network is involved. The MCP adapter is exercised through the MCP server's
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 
 from conftest import EmptyCritic, ScriptedPlanner, make_goal, make_plan, make_task
 from planner_critic.adapters._audit import AuditEvent, AuditTrail
+from planner_critic.engine import Engine
+from planner_critic.schema.goal import Goal
 
 GOALS = [
     ("ci-01", make_goal(goal_id="ci-01", description="multistage pipeline")),
@@ -25,11 +29,10 @@ GOALS = [
 
 
 @pytest.fixture
-def engine_factory():
+def engine_factory() -> Callable[[str], Engine]:
     """Factory for an engine that approves immediately with a stable plan."""
 
-    def _build(goal_id: str) -> object:
-        from planner_critic.engine import Engine
+    def _build(goal_id: str) -> Engine:
         from planner_critic.loop import LoopConfig
 
         planner = ScriptedPlanner([make_plan(goal_id=goal_id, tasks=[make_task("t1")])])
@@ -39,7 +42,9 @@ def engine_factory():
 
 
 @pytest.mark.parametrize("goal_id,goal", GOALS)
-def test_raw_python_adapter_c12(engine_factory, goal_id, goal) -> None:
+def test_raw_python_adapter_c12(
+    engine_factory: Callable[[str], Engine], goal_id: str, goal: Goal
+) -> None:
     """C12: raw Python adapter approves a valid plan for each goal."""
     from planner_critic.adapters.python import plan
 
@@ -49,7 +54,7 @@ def test_raw_python_adapter_c12(engine_factory, goal_id, goal) -> None:
     assert result.approved_plan.plan.goal_id == goal_id
 
 
-def test_langgraph_adapter_gates_execution(engine_factory) -> None:
+def test_langgraph_adapter_gates_execution(engine_factory: Callable[[str], Engine]) -> None:
     """C12: LangGraph ApprovalHook approves an approved plan and blocks without one."""
     from planner_critic.adapters.langgraph import ApprovalHook, PlanNotApprovedError
 
@@ -63,7 +68,7 @@ def test_langgraph_adapter_gates_execution(engine_factory) -> None:
         empty.check()
 
 
-def test_crewai_adapter_sets_step_in_plan(engine_factory) -> None:
+def test_crewai_adapter_sets_step_in_plan(engine_factory: Callable[[str], Engine]) -> None:
     """C12: CrewAI interceptor verifies a task exists in the approved plan."""
     from planner_critic.adapters.crewai import PlanAwareTaskInterceptor, TaskNotInPlanError
 
@@ -77,7 +82,7 @@ def test_crewai_adapter_sets_step_in_plan(engine_factory) -> None:
         interceptor.verify_task("no such task exists in the plan")
 
 
-def test_openai_agents_guardrail_approves(engine_factory) -> None:
+def test_openai_agents_guardrail_approves(engine_factory: Callable[[str], Engine]) -> None:
     """C12: OpenAI Agents PlanGuardrail gates on approval."""
     from planner_critic.adapters.openai_agents import PlanGuardrail
 
@@ -87,7 +92,7 @@ def test_openai_agents_guardrail_approves(engine_factory) -> None:
     assert guardrail.check() is result  # cached
 
 
-def test_pydantic_ai_guard_approves(engine_factory) -> None:
+def test_pydantic_ai_guard_approves(engine_factory: Callable[[str], Engine]) -> None:
     """C12: PydanticAI ApprovalGuard gates on approval."""
     from planner_critic.adapters.pydantic_ai import ApprovalGuard
 
@@ -97,7 +102,7 @@ def test_pydantic_ai_guard_approves(engine_factory) -> None:
     assert guard.guard(None) is result  # cached
 
 
-def test_mcp_tool_plans_with_scripted_roles(tmp_path) -> None:
+def test_mcp_tool_plans_with_scripted_roles(tmp_path: Path) -> None:
     """C12: MCP adapter plans the goal, producing an approved result."""
     from planner_critic.loop import LoopConfig
     from planner_critic.server.mcp import PlannerCriticMCPServer
@@ -117,7 +122,7 @@ def test_mcp_tool_plans_with_scripted_roles(tmp_path) -> None:
     assert result["result"]["approved_plan"]["plan"]["goal_id"] == "ci-01"
 
 
-def test_c28_audit_trail_distinct_adapters(tmp_path) -> None:
+def test_c28_audit_trail_distinct_adapters(tmp_path: Path) -> None:
     """C28: distinct per-adapter audit entries are queryable in one trail."""
 
     trail = AuditTrail()

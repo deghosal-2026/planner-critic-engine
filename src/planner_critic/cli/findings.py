@@ -14,9 +14,13 @@ def build_findings_parser() -> argparse.ArgumentParser:
         add_help=False,
     )
     parser.add_argument("plan_id", help="Plan id to query findings for")
-    parser.add_argument("--version", type=int, default=None, help="Revision number (default: latest)")
+    parser.add_argument(
+        "--version", type=int, default=None, help="Revision number (default: latest)"
+    )
     parser.add_argument("--store", default=".plancritic/plans.db", help="SQLite store path")
-    parser.add_argument("--include-raw", action="store_true", help="Show raw_severity and drift_delta")
+    parser.add_argument(
+        "--include-raw", action="store_true", help="Show raw_severity and drift_delta"
+    )
     parser.add_argument("--output", default="text", choices=["text", "json"], help="Output format")
     return parser
 
@@ -34,7 +38,10 @@ def run_findings(argv: list[str]) -> int:
     try:
         plan = store.get_plan(args.plan_id, args.version)
         if plan is None:
-            print(f"plan {args.plan_id!r} not found" + (f" (version {args.version})" if args.version else ""))
+            print(
+                f"plan {args.plan_id!r} not found"
+                + (f" (version {args.version})" if args.version else "")
+            )
             return 1
 
         version = args.version if args.version is not None else plan.version
@@ -53,7 +60,9 @@ def run_findings(argv: list[str]) -> int:
                 }
                 if args.include_raw:
                     entry["raw_severity"] = f.raw_severity.value if f.raw_severity else None
-                    entry["normalized_severity"] = f.normalized_severity.value if f.normalized_severity else None
+                    entry["normalized_severity"] = (
+                        f.normalized_severity.value if f.normalized_severity else None
+                    )
                     entry["drift_delta"] = f.drift_delta
                 output.append(entry)
             print(json.dumps(output, indent=2))
@@ -64,7 +73,8 @@ def run_findings(argv: list[str]) -> int:
                 family = f" [{f.heuristic_family.value}]" if f.heuristic_family else ""
                 line = f"  [{sev}]{family} {f.reason_code}: {f.message} (task={f.task_id})"
                 if args.include_raw and f.raw_severity is not None:
-                    drift = f" (raw: {f.raw_severity.value} -> norm: {f.normalized_severity.value if f.normalized_severity else '?'}, delta={f.drift_delta})"
+                    norm = f.normalized_severity.value if f.normalized_severity else "?"
+                    drift = f" (raw: {f.raw_severity.value} -> norm: {norm}, delta={f.drift_delta})"
                     line += drift
                 print(line)
 

@@ -22,6 +22,7 @@ from planner_critic.llm.base import Completion, Message, ToolSchema
 from planner_critic.loop import LoopConfig, run_loop
 from planner_critic.reason_codes import BUDGET_EXCEEDED, REVISION_CAP_REACHED
 from planner_critic.schema.goal import Budget, Constraints, Goal, RiskTolerance
+from planner_critic.schema.plan import PlanVersion
 
 
 class FakeCriticProvider:
@@ -46,7 +47,7 @@ class FakeCriticProvider:
         return Completion(content=self.content, finish_reason="stop")
 
 
-def _clean_plan():
+def _clean_plan() -> PlanVersion:
     """A gate-clean, approval-ready plan."""
     return make_plan(
         tasks=[
@@ -59,7 +60,7 @@ def _clean_plan():
     )
 
 
-def _dirty_plan():
+def _dirty_plan() -> PlanVersion:
     """A gate-blocking plan: critical-risk task with no safety steps."""
     return make_plan(tasks=[make_task("t1", risk_class="critical")])
 
@@ -169,7 +170,11 @@ def test_e2e_cap_escalates_with_pending_warnings() -> None:
     class DistinctProvider(FakeCriticProvider):
         """Return a warning against a distinct task per call (avoid stall)."""
 
-        def complete(self, messages, tool_schemas=()):
+        def complete(
+            self,
+            messages: Sequence[Message],
+            tool_schemas: Sequence[ToolSchema] = (),
+        ) -> Completion:
             self.calls += 1
             return Completion(
                 content=_finding_json(

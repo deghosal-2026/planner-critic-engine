@@ -81,13 +81,15 @@ class Finding(BaseModel):
     message: str = Field(description="Human-readable description of the problem")
     suggested_fix: str | None = Field(default=None, description="Optional suggested remediation")
     raw_severity: Severity | None = Field(
-        default=None, description="Severity assigned by the LLM critic (None for legacy/deterministic)"
+        default=None,
+        description="Severity assigned by the LLM critic (None for legacy/deterministic)",
     )
     normalized_severity: Severity | None = Field(
         default=None, description="Severity after frozenset guardrail enforcement (None for legacy)"
     )
     drift_delta: int = Field(
-        default=0, description="normalized_severity - raw_severity (negative = downgrade, zero = no drift)"
+        default=0,
+        description="normalized_severity - raw_severity (negative = downgrade, zero = no drift)",
     )
 
     def __str__(self) -> str:

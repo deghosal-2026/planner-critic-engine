@@ -7,10 +7,11 @@ from planner_critic.loop import LoopConfig, run_loop
 from planner_critic.loop.budget import SpendState
 from planner_critic.reason_codes import BUDGET_EXCEEDED, CONVERGED_STALLED, REGRESSION_THRASHING
 from planner_critic.schema.goal import Budget, Constraints, Goal, RiskTolerance
+from planner_critic.schema.plan import PlanVersion
 from planner_critic.types import Finding, Severity
 
 
-def _clean_plan():
+def _clean_plan() -> PlanVersion:
     return make_plan(
         tasks=[
             make_task(
@@ -20,7 +21,7 @@ def _clean_plan():
     )
 
 
-def _dirty_plan():
+def _dirty_plan() -> PlanVersion:
     return make_plan(tasks=[make_task("t1", risk_class="critical")])
 
 

@@ -30,10 +30,14 @@ def _plan_fingerprint(plan: PlanVersion) -> str:
     Returns:
         A canonical string identifying the plan's structure.
     """
-    tasks = ",".join(sorted(
-        f"{task.id}:{task.action}:{task.risk_class.value}:{task.blast_radius}:{task.verification is not None}:{task.rollback is not None}"
-        for task in plan.tasks
-    ))
+    tasks = ",".join(
+        sorted(
+            f"{task.id}:{task.action}:{task.risk_class.value}"
+            f":{task.blast_radius}:{task.verification is not None}"
+            f":{task.rollback is not None}"
+            for task in plan.tasks
+        )
+    )
     deps = ",".join(sorted(f"{d.from_task}>{d.to_task}" for d in plan.dependencies))
     branches = ",".join(sorted(f"{b.id}:{sorted(b.tasks)}:{b.join}" for b in plan.branches))
     return f"{tasks}|{deps}|{branches}"

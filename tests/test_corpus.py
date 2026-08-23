@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
 import pytest
 
@@ -26,6 +27,7 @@ class TestCWEBucket:
 
     def test_all_buckets_have_cwe_labels(self) -> None:
         from planner_critic.corpus.types import CWE_LABELS
+
         for bucket in CWEBucket:
             assert bucket in CWE_LABELS
             assert len(CWE_LABELS[bucket]) >= 1
@@ -90,17 +92,13 @@ class TestCorpusManifest:
 
 class TestCorpusLoader:
     def test_load_manifest(self) -> None:
-        manifest = load_corpus_manifest(
-            "docs/field-test/corpus/swebench-security"
-        )
+        manifest = load_corpus_manifest("docs/field-test/corpus/swebench-security")
         assert manifest is not None
         assert manifest.name == "swebench-security"
         assert manifest.instance_count == 7
 
     def test_load_all_instances(self) -> None:
-        instances = load_all_instances(
-            "docs/field-test/corpus/swebench-security"
-        )
+        instances = load_all_instances("docs/field-test/corpus/swebench-security")
         assert len(instances) == 7
         ids = {inst.instance_id for inst in instances}
         assert "CWE-079-001" in ids
@@ -112,17 +110,13 @@ class TestCorpusLoader:
         assert "CWE-798-001" in ids
 
     def test_load_instance(self) -> None:
-        inst = load_instance(
-            "docs/field-test/corpus/swebench-security", "CWE-079-001"
-        )
+        inst = load_instance("docs/field-test/corpus/swebench-security", "CWE-079-001")
         assert inst is not None
         assert inst.cwe == "CWE-79"
         assert inst.cwe_bucket is CWEBucket.XSS
 
     def test_load_instance_not_found(self) -> None:
-        inst = load_instance(
-            "docs/field-test/corpus/swebench-security", "NONEXISTENT"
-        )
+        inst = load_instance("docs/field-test/corpus/swebench-security", "NONEXISTENT")
         assert inst is None
 
     def test_list_instances_returns_metadata(self) -> None:
@@ -132,9 +126,7 @@ class TestCorpusLoader:
         assert all("cwe_bucket" in r for r in rows)
 
     def test_cwe_buckets_covered(self) -> None:
-        instances = load_all_instances(
-            "docs/field-test/corpus/swebench-security"
-        )
+        instances = load_all_instances("docs/field-test/corpus/swebench-security")
         buckets = {inst.cwe_bucket for inst in instances}
         assert CWEBucket.XSS in buckets
         assert CWEBucket.SQL_INJECTION in buckets
@@ -145,16 +137,12 @@ class TestCorpusLoader:
         assert CWEBucket.SECRET_HANDLING in buckets
 
     def test_all_instances_have_goal_text(self) -> None:
-        instances = load_all_instances(
-            "docs/field-test/corpus/swebench-security"
-        )
+        instances = load_all_instances("docs/field-test/corpus/swebench-security")
         for inst in instances:
             assert inst.goal_text, f"{inst.instance_id} missing goal_text"
 
     def test_all_instances_have_expected_signal(self) -> None:
-        instances = load_all_instances(
-            "docs/field-test/corpus/swebench-security"
-        )
+        instances = load_all_instances("docs/field-test/corpus/swebench-security")
         for inst in instances:
             assert inst.expected_critic_signal is not None, (
                 f"{inst.instance_id} missing expected_critic_signal"
@@ -170,6 +158,7 @@ class TestLoaderCoverage:
 
     def test_compute_sha256_returns_hex(self) -> None:
         from planner_critic.corpus.loader import _compute_sha256
+
         digest = _compute_sha256({"key": "value"})
         assert isinstance(digest, str)
         assert len(digest) == 64
@@ -179,7 +168,7 @@ class TestLoaderCoverage:
         manifest = load_corpus_manifest("/nonexistent/path")
         assert manifest is None
 
-    def test_load_all_instances_nonexistent_instances_dir(self, tmp_path) -> None:
+    def test_load_all_instances_nonexistent_instances_dir(self, tmp_path: Path) -> None:
         instances = load_all_instances(str(tmp_path))
         assert instances == []
 

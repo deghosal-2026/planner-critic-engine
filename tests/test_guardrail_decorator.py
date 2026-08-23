@@ -20,9 +20,11 @@ def test_guardrail_approved_executes_func() -> None:
 
     with patch("planner_critic.guardrail._make_engine") as mock_engine:
         mock_engine.return_value.plan.return_value = fake_result
+
         @guardrail(goal="test goal")
         def my_func() -> str:
             return "executed"
+
         assert my_func() == "executed"
 
 
@@ -35,9 +37,11 @@ def test_guardrail_escalated_raises() -> None:
 
     with patch("planner_critic.guardrail._make_engine") as mock_engine:
         mock_engine.return_value.plan.return_value = fake_result
+
         @guardrail(goal="test goal")
         def my_func() -> str:
             return "should not run"
+
         with pytest.raises(EscalationRequired) as exc:
             my_func()
         assert "budget_exceeded" in str(exc.value)
@@ -53,9 +57,11 @@ def test_guardrail_dry_run_executes_despite_escalation() -> None:
 
     with patch("planner_critic.guardrail._make_engine") as mock_engine:
         mock_engine.return_value.plan.return_value = fake_result
+
         @guardrail(goal="test goal", dry_run=True)
         def my_func() -> str:
             return "ran anyway"
+
         assert my_func() == "ran anyway"
 
 
@@ -65,9 +71,13 @@ def test_guardrail_on_escalate_callback() -> None:
     fake_result.is_approved = False
     fake_result.reason_code = "revision_cap_reached"
     fake_result.findings = [
-        Finding(id="f1", version=1, severity=Severity.BLOCKER,
-                reason_code=cast("Any", "missing_rollback"),
-                message="no rollback"),
+        Finding(
+            id="f1",
+            version=1,
+            severity=Severity.BLOCKER,
+            reason_code=cast("Any", "missing_rollback"),
+            message="no rollback",
+        ),
     ]
 
     callback_results: list[tuple[str, list[Finding]]] = []
@@ -78,9 +88,11 @@ def test_guardrail_on_escalate_callback() -> None:
 
     with patch("planner_critic.guardrail._make_engine") as mock_engine:
         mock_engine.return_value.plan.return_value = fake_result
+
         @guardrail(goal="test", on_escalate=handler)
         def my_func() -> str:
             return "should not run"
+
         result = my_func()
         assert result == "handled"
         assert len(callback_results) == 1

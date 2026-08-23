@@ -90,7 +90,12 @@ class TestBlastRadiusQuotaGate:
     def test_db_alterations_breach(self) -> None:
         config = BlastRadiusQuotaConfig(max_database_alterations=1)
         gate = BlastRadiusQuotaGate(config)
-        plan = _plan([_task("t1", action="migrate", target="db-schema"), _task("t2", action="drop", target="database-users")])
+        plan = _plan(
+            [
+                _task("t1", action="migrate", target="db-schema"),
+                _task("t2", action="drop", target="database-users"),
+            ]
+        )
         findings = gate.run(plan)
         blockers = [f for f in findings if f.severity is Severity.BLOCKER]
         assert len(blockers) == 1

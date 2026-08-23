@@ -14,6 +14,8 @@ These tests pin the four guarantees in the issue:
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import pytest
 
 from conftest import (
@@ -32,7 +34,7 @@ from planner_critic.loop.oscillation import (
 )
 from planner_critic.schema.goal import RiskTolerance
 from planner_critic.schema.plan import Dependency, DependencyKind, PlanVersion
-from planner_critic.types import Severity
+from planner_critic.types import Finding, Severity
 
 PLAN_OSCILLATION_DETECTED = "plan_oscillation_detected"
 AUTO_CONVERGE_PARTIAL_APPROVAL = "auto_converge_partial_approval"
@@ -83,7 +85,12 @@ class TestOscillationDetection:
     def test_oscillation_detected_at_window(self) -> None:
         """Two structural shapes alternating in K=4 window triggers oscillation."""
         plans = _structurally_distinct_plans(2)  # [p0, p1]
-        drafts = [plans[0], plans[1], plans[0], plans[1]]
+        drafts: list[PlanVersion | Callable[[PlanVersion, list[Finding]], PlanVersion]] = [
+            plans[0],
+            plans[1],
+            plans[0],
+            plans[1],
+        ]
         planner = ScriptedPlanner(drafts)
         # Each round: critic returns a warning under strict so approval fails
         findings_list = [
@@ -101,7 +108,9 @@ class TestOscillationDetection:
 
     def test_no_false_positive_on_converging_plans(self) -> None:
         """Four distinctly-shaped plans do not trigger oscillation."""
-        drafts = _structurally_distinct_plans(4)  # 4 plans, each unique structure
+        drafts: list[PlanVersion | Callable[[PlanVersion, list[Finding]], PlanVersion]] = list(
+            _structurally_distinct_plans(4)
+        )  # 4 plans, each unique structure
         planner = ScriptedPlanner(drafts)
         findings_list = [
             [finding(f"t{i}", "unsafe_ordering", severity=Severity.WARNING)] for i in range(1, 5)
@@ -119,7 +128,12 @@ class TestOscillationDetection:
     def test_larger_window_requires_more_revisions(self) -> None:
         """With K=6 and 4 alternating revisions, oscillation cannot be detected."""
         plans = _structurally_distinct_plans(2)
-        drafts = [plans[0], plans[1], plans[0], plans[1]]
+        drafts: list[PlanVersion | Callable[[PlanVersion, list[Finding]], PlanVersion]] = [
+            plans[0],
+            plans[1],
+            plans[0],
+            plans[1],
+        ]
         planner = ScriptedPlanner(drafts)
         findings_list = [
             [finding(f"t{i}", "unsafe_ordering", severity=Severity.WARNING)] for i in range(1, 5)

@@ -13,13 +13,14 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 TRACE_DIR = Path(__file__).parents[1] / "docs" / "field-test" / "reports" / "0.1.0" / "full-sweep"
 PLACEHOLDER_TOKENS = re.compile(r"\b(TBD|TODO|FIXME|XXXX|\.\.\.|lorem|ipsum)\b", re.I)
 FORWARD_REF = re.compile(r"as described in (later|subsequent|following)|see step|see below", re.I)
 
 
-def _load_approved_plans() -> list[tuple[str, dict]]:
+def _load_approved_plans() -> list[tuple[str, dict[str, Any]]]:
     """Load all approved plan traces."""
     plans = []
     for path in TRACE_DIR.rglob("**/trace.json"):
@@ -32,7 +33,7 @@ def _load_approved_plans() -> list[tuple[str, dict]]:
     return plans
 
 
-def _is_grounded(precondition: dict, task_ids: set[str]) -> bool:
+def _is_grounded(precondition: dict[str, Any], task_ids: set[str]) -> bool:
     """Check if a precondition's established_by is valid."""
     eb = precondition.get("established_by")
     if eb is None:
@@ -50,7 +51,7 @@ def _has_forward_ref(description: str) -> bool:
     return bool(FORWARD_REF.search(description))
 
 
-def audit_executor_usability() -> dict:
+def audit_executor_usability() -> dict[str, Any]:
     """Run the Q4 executor-usability audit over all approved plan traces."""
     plans = _load_approved_plans()
     total_plans = len(plans)
@@ -60,8 +61,8 @@ def audit_executor_usability() -> dict:
     plans_with_placeholder = 0
     plans_with_forward_ref = 0
     plans_with_bad_precondition = 0
-    gap_inventory: list[dict] = []
-    per_plan_verdicts: list[dict] = []
+    gap_inventory: list[dict[str, Any]] = []
+    per_plan_verdicts: list[dict[str, Any]] = []
 
     for goal_id, plan in plans:
         tasks = plan.get("tasks", [])

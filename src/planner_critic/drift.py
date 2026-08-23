@@ -36,22 +36,36 @@ def compute_drift(finding: Finding) -> Finding:
     norm_val = severity_map.get(norm, 1)
     drift_delta = norm_val - raw_val
 
-    return finding.model_copy(update={
-        "raw_severity": raw,
-        "normalized_severity": norm,
-        "drift_delta": drift_delta,
-    })
+    return finding.model_copy(
+        update={
+            "raw_severity": raw,
+            "normalized_severity": norm,
+            "drift_delta": drift_delta,
+        }
+    )
 
 
 def compute_drift_summary(findings: list[Finding]) -> dict[str, Any]:
     """Compute a drift summary for a list of findings.
 
+    **Measurement class (#231):** this summary measures critic-vs-guardrail
+    disagreement — it only sees a defect when raw and normalized severity
+    differ, i.e. when the guardrail overrode the critic. A critic that
+    misclassifies family AND severity at origin produces raw == normalized,
+    so every field here reads zero for it. ``critical_underclaims`` is
+    therefore never a clean bill on its own; its fixed interpretation
+    travels alongside it in ``critical_underclaims_interpretation``. For
+    reality-keyed measurement (seeded known defects vs expected verdicts)
+    use :mod:`planner_critic.eval.live_boundary`, and report the two
+    together.
+
     Args:
         findings: The findings to analyze.
 
     Returns:
-        A dict with drift metrics: total_findings, drifted_count, downgrade_rate,
-        per_family_breakdown, critical_underclaims.
+        A dict with drift metrics: total_findings, drifted_count,
+        downgrade_rate, per_family, critical_underclaims, underclaim_findings,
+        and ``critical_underclaims_interpretation``.
     """
     total = len(findings)
     drifted = [f for f in findings if f.drift_delta < 0]
@@ -71,11 +85,14 @@ def compute_drift_summary(findings: list[Finding]) -> dict[str, Any]:
         family_breakdown[family]["total"] += 1
 
     underclaims = [
-        f for f in findings
-        if f.raw_severity is not None and f.raw_severity is Severity.BLOCKER
+        f
+        for f in findings
+        if f.raw_severity is not None
+        and f.raw_severity is Severity.BLOCKER
         and f.normalized_severity is not None
         and SEVERITY_MAP.get(Severity.BLOCKER, 2) > SEVERITY_MAP.get(f.normalized_severity, 1)
-        and f.heuristic_family and f.heuristic_family.value in ("risk", "missing_steps")
+        and f.heuristic_family
+        and f.heuristic_family.value in ("risk", "missing_steps")
     ]
 
     return {
@@ -85,6 +102,13 @@ def compute_drift_summary(findings: list[Finding]) -> dict[str, Any]:
         "per_family": family_breakdown,
         "critical_underclaims": len(underclaims),
         "underclaim_findings": [f.id for f in underclaims],
+        "critical_underclaims_interpretation": (
+            "zero means the guardrail never overrode the critic — it says "
+            "nothing about defects misclassified at origin (family and "
+            "severity wrong from the start are invisible here). Pair with "
+            "the live boundary runner (critic-vs-reality) before calling "
+            "this a clean bill."
+        ),
     }
 
 

@@ -20,10 +20,17 @@ from planner_critic.types import Finding, Severity
 
 MANIFEST_ACTIONS = frozenset({"edit_manifest", "edit_dependency", "add_dependency"})
 LOCKFILE_ACTIONS = frozenset({"regenerate_lockfile", "update_lockfile", "install"})
-LOCKFILE_TARGETS = frozenset({
-    "package-lock.json", "yarn.lock", "poetry.lock", "Pipfile.lock",
-    "Cargo.lock", "go.sum", "composer.lock",
-})
+LOCKFILE_TARGETS = frozenset(
+    {
+        "package-lock.json",
+        "yarn.lock",
+        "poetry.lock",
+        "Pipfile.lock",
+        "Cargo.lock",
+        "go.sum",
+        "composer.lock",
+    }
+)
 
 
 class TransitiveLockingGate(BaseGate):
@@ -34,29 +41,22 @@ class TransitiveLockingGate(BaseGate):
     def run(self, plan: PlanVersion) -> list[Finding]:
         findings: list[Finding] = []
         has_regen = any(
-            t.action in LOCKFILE_ACTIONS
-            or any(tg in (t.target or "") for tg in LOCKFILE_TARGETS)
+            t.action in LOCKFILE_ACTIONS or any(tg in (t.target or "") for tg in LOCKFILE_TARGETS)
             for t in plan.tasks
         )
         for task in plan.tasks:
             if task.action in MANIFEST_ACTIONS and not has_regen:
                 findings.append(
                     Finding(
-                        id=(
-                            f"supply_chain_transitive_locking:"
-                            f"{plan.id}:{plan.version}:{task.id}"
-                        ),
+                        id=(f"supply_chain_transitive_locking:{plan.id}:{plan.version}:{task.id}"),
                         task_id=task.id,
                         version=plan.version,
                         severity=Severity.BLOCKER,
                         reason_code=SUPPLY_CHAIN_LOCKFILE_NOT_REGENERATED,
                         message=(
-                            f"manifest edit {task.id!r} has no prior lockfile "
-                            f"regeneration step"
+                            f"manifest edit {task.id!r} has no prior lockfile regeneration step"
                         ),
-                        suggested_fix=(
-                            "Add a regenerate_lockfile step after the manifest edit"
-                        ),
+                        suggested_fix=("Add a regenerate_lockfile step after the manifest edit"),
                     )
                 )
         return findings
@@ -70,12 +70,10 @@ class BreakingChangeGate(BaseGate):
     def run(self, plan: PlanVersion) -> list[Finding]:
         findings: list[Finding] = []
         has_migration = any(
-            t.action in ("run_migration", "write_migration", "migrate")
-            for t in plan.tasks
+            t.action in ("run_migration", "write_migration", "migrate") for t in plan.tasks
         )
         has_linter = any(
-            t.action in ("run_linter", "lint") or t.action.endswith("_lint")
-            for t in plan.tasks
+            t.action in ("run_linter", "lint") or t.action.endswith("_lint") for t in plan.tasks
         )
         for task in plan.tasks:
             if task.action in ("bump_major", "breaking_change") and not (
@@ -83,10 +81,7 @@ class BreakingChangeGate(BaseGate):
             ):
                 findings.append(
                     Finding(
-                        id=(
-                            f"supply_chain_breaking_change:"
-                            f"{plan.id}:{plan.version}:{task.id}"
-                        ),
+                        id=(f"supply_chain_breaking_change:{plan.id}:{plan.version}:{task.id}"),
                         task_id=task.id,
                         version=plan.version,
                         severity=Severity.BLOCKER,
@@ -96,8 +91,7 @@ class BreakingChangeGate(BaseGate):
                             f"migration script or linter check"
                         ),
                         suggested_fix=(
-                            "Add run_migration and run_linter steps "
-                            "before the major bump deploy"
+                            "Add run_migration and run_linter steps before the major bump deploy"
                         ),
                     )
                 )
@@ -111,14 +105,8 @@ class ArtifactIntegrityGate(BaseGate):
 
     def run(self, plan: PlanVersion) -> list[Finding]:
         findings: list[Finding] = []
-        has_sign = any(
-            t.action in ("sign_artifact", "sign", "cosign")
-            for t in plan.tasks
-        )
-        has_sbom = any(
-            t.action in ("generate_sbom", "generate_bom", "sbom")
-            for t in plan.tasks
-        )
+        has_sign = any(t.action in ("sign_artifact", "sign", "cosign") for t in plan.tasks)
+        has_sbom = any(t.action in ("generate_sbom", "generate_bom", "sbom") for t in plan.tasks)
         for task in plan.tasks:
             if task.action not in ("deploy", "release", "publish"):
                 continue
@@ -133,13 +121,8 @@ class ArtifactIntegrityGate(BaseGate):
                         version=plan.version,
                         severity=Severity.BLOCKER,
                         reason_code=SUPPLY_CHAIN_UNSIGNED_ARTIFACT,
-                        message=(
-                            f"deploy step {task.id!r} references an "
-                            f"unsigned artifact"
-                        ),
-                        suggested_fix=(
-                            "Add a sign_artifact step before deploy"
-                        ),
+                        message=(f"deploy step {task.id!r} references an unsigned artifact"),
+                        suggested_fix=("Add a sign_artifact step before deploy"),
                     )
                 )
             if not has_sbom:
@@ -153,12 +136,8 @@ class ArtifactIntegrityGate(BaseGate):
                         version=plan.version,
                         severity=Severity.BLOCKER,
                         reason_code=SUPPLY_CHAIN_MISSING_SBOM,
-                        message=(
-                            f"deploy step {task.id!r} has no generated SBOM"
-                        ),
-                        suggested_fix=(
-                            "Add a generate_sbom step before deploy"
-                        ),
+                        message=(f"deploy step {task.id!r} has no generated SBOM"),
+                        suggested_fix=("Add a generate_sbom step before deploy"),
                     )
                 )
         return findings

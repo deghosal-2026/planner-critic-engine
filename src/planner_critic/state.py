@@ -76,7 +76,12 @@ class ResourceLock:
 
 
 class StateLock:
-    def __init__(self, strategy: LockStrategy = LockStrategy.WAIT, lock_timeout: float = 30.0, wait_deadline: float = 30.0) -> None:
+    def __init__(
+        self,
+        strategy: LockStrategy = LockStrategy.WAIT,
+        lock_timeout: float = 30.0,
+        wait_deadline: float = 30.0,
+    ) -> None:
         self._strategy = strategy
         self._lock_timeout = lock_timeout
         self._wait_deadline = wait_deadline
@@ -103,6 +108,7 @@ class StateLock:
             if self._strategy is LockStrategy.WAIT:
                 self._lock_obj.release()
                 import time as _time
+
                 deadline = _time.monotonic() + self._wait_deadline
                 while _time.monotonic() < deadline:
                     _time.sleep(0.5)

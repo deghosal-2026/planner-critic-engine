@@ -139,5 +139,3 @@ def test_probe_edge_cases() -> None:
 
     result4 = run_probe(ProbeRequest(kind="deploy_status", query="bad{{json", expected="x"))
     assert result4.ok is False
-
-

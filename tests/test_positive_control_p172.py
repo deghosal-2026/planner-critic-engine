@@ -15,7 +15,7 @@ from planner_critic.schema.plan import PlanVersion
 from planner_critic.types import Severity
 
 
-def _golden_plan():
+def _golden_plan() -> PlanVersion:
     """A plan with every safety measure in place — no seeded flaws."""
     return PlanVersion.model_validate(
         {

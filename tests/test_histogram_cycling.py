@@ -14,6 +14,7 @@ and structural oscillation (#152) all stay silent on the same trace.
 from __future__ import annotations
 
 from planner_critic.loop.histogram import (
+    FamilyHistogram,
     compute_family_histogram,
     detect_histogram_cycling,
 )
@@ -36,7 +37,7 @@ def _llm_blocker(family: HeuristicFamily, task_id: str = "t1") -> Finding:
     )
 
 
-def _hist(*families: HeuristicFamily) -> tuple:
+def _hist(*families: HeuristicFamily) -> FamilyHistogram:
     """Canonical histogram for one revision from its family multiset."""
     return compute_family_histogram([_llm_blocker(f) for f in families])
 
@@ -44,19 +45,29 @@ def _hist(*families: HeuristicFamily) -> tuple:
 class TestComputeFamilyHistogram:
     def test_counts_blocker_families(self) -> None:
         h = compute_family_histogram(
-            [_llm_blocker(HeuristicFamily.RISK), _llm_blocker(HeuristicFamily.RISK),
-             _llm_blocker(HeuristicFamily.MISSING_STEPS)]
+            [
+                _llm_blocker(HeuristicFamily.RISK),
+                _llm_blocker(HeuristicFamily.RISK),
+                _llm_blocker(HeuristicFamily.MISSING_STEPS),
+            ]
         )
         assert h == (("missing_steps", 1), ("risk", 2))
 
     def test_excludes_warnings_and_gate_findings(self) -> None:
         warning = Finding(
-            id="w", version=1, severity=Severity.WARNING,
-            reason_code="llm_risk", message="x", heuristic_family=HeuristicFamily.RISK,
+            id="w",
+            version=1,
+            severity=Severity.WARNING,
+            reason_code="llm_risk",
+            message="x",
+            heuristic_family=HeuristicFamily.RISK,
         )
         gate = Finding(
-            id="g", version=1, severity=Severity.BLOCKER,
-            reason_code="unsafe_ordering", message="x",
+            id="g",
+            version=1,
+            severity=Severity.BLOCKER,
+            reason_code="unsafe_ordering",
+            message="x",
         )
         assert compute_family_histogram([warning, gate]) == ()
 
@@ -92,10 +103,54 @@ class TestDetectHistogramCycling:
 
     def test_respects_max_lag(self) -> None:
         """Period-3 repeat only fires when max_lag reaches 3."""
-        a, b, c = (_hist(HeuristicFamily.RISK), _hist(HeuristicFamily.MISSING_STEPS),
-                   _hist(HeuristicFamily.WEAK_ROLLBACK))
+        a, b, c = (
+            _hist(HeuristicFamily.RISK),
+            _hist(HeuristicFamily.MISSING_STEPS),
+            _hist(HeuristicFamily.WEAK_ROLLBACK),
+        )
         assert detect_histogram_cycling([a, b, c, a], max_lag=2) is False
         assert detect_histogram_cycling([a, b, c, a], max_lag=3) is True
+
+
+class TestLegitimateAlternationGuard:
+    """#229: declining-mass bimodal alternation is progress, not reshuffling.
+
+    A goal that legitimately interleaves two work types produces alternating
+    family emphases while the total blocker load shrinks cycle over cycle.
+    Every prefix of such a sequence must stay silent — the planner is
+    repairing on a bimodal rhythm, not thrashing.
+    """
+
+    @staticmethod
+    def _declining_bimodal() -> list[FamilyHistogram]:
+        r2 = compute_family_histogram(
+            [_llm_blocker(HeuristicFamily.RISK), _llm_blocker(HeuristicFamily.RISK)]
+        )
+        u3 = compute_family_histogram(
+            [_llm_blocker(HeuristicFamily.UNVERIFIED_DEPENDENCIES) for _ in range(3)]
+        )
+        r1 = compute_family_histogram([_llm_blocker(HeuristicFamily.RISK)])
+        u2 = compute_family_histogram(
+            [
+                _llm_blocker(HeuristicFamily.UNVERIFIED_DEPENDENCIES),
+                _llm_blocker(HeuristicFamily.UNVERIFIED_DEPENDENCIES),
+            ]
+        )
+        # r1 repeats exactly at lag 2 while total blocker mass trends down
+        # 5 → 3 → 2 → 1: alternation WITH repair progress.
+        return [r2, u3, r1, u2, r1]
+
+    def test_declining_mass_stays_silent_through_every_prefix(self) -> None:
+        histograms = self._declining_bimodal()
+        for i in range(len(histograms) + 1):
+            assert detect_histogram_cycling(histograms[:i], max_lag=2) is False, (
+                f"fired at prefix length {i} on a strictly improving sequence"
+            )
+
+    def test_flat_mass_defective_cycler_still_fires(self) -> None:
+        """Constant-mass cycling remains the signal's target (documented ambiguity)."""
+        a, b = _hist(HeuristicFamily.RISK), _hist(HeuristicFamily.MISSING_STEPS)
+        assert detect_histogram_cycling([a, b, a, b], max_lag=2) is True
 
 
 class TestReasonCodeCatalog:
@@ -108,14 +163,16 @@ class TestReasonCodeCatalog:
 class TestControllerIntegration:
     def test_pure_llm_cycler_escalates_with_cycling_code(self) -> None:
         """Alternating LLM-family mixes over distinct structures trips ONLY this signal."""
-        from conftest import ScriptedCritic, ScriptedPlanner, make_goal, make_plan, make_task
+        from conftest import Draft, ScriptedCritic, ScriptedPlanner, make_goal, make_plan, make_task
         from planner_critic.loop import LoopConfig, run_loop
         from planner_critic.schema.goal import RiskTolerance
 
-        plans = []
+        plans: list[Draft] = []
         for i in range(6):
-            tasks = [make_task(f"t{j}", verification={"what": "x", "how": "y", "expected": "z"})
-                     for j in range(1, i + 3)]
+            tasks = [
+                make_task(f"t{j}", verification={"what": "x", "how": "y", "expected": "z"})
+                for j in range(1, i + 3)
+            ]
             plans.append(make_plan(plan_id=f"plan-{i}", tasks=tasks))
 
         even = [_llm_blocker(HeuristicFamily.RISK)]
@@ -139,12 +196,14 @@ class TestControllerIntegration:
 
         p0 = make_plan(plan_id="p0", tasks=[make_task("t1")])
         p1 = make_plan(plan_id="p1", tasks=[make_task("t1"), make_task("t2")])
-        critic = ScriptedCritic([
-            [_llm_blocker(HeuristicFamily.RISK)],
-            [_llm_blocker(HeuristicFamily.MISSING_STEPS)],
-            [_llm_blocker(HeuristicFamily.RISK)],
-            [_llm_blocker(HeuristicFamily.MISSING_STEPS)],
-        ])
+        critic = ScriptedCritic(
+            [
+                [_llm_blocker(HeuristicFamily.RISK)],
+                [_llm_blocker(HeuristicFamily.MISSING_STEPS)],
+                [_llm_blocker(HeuristicFamily.RISK)],
+                [_llm_blocker(HeuristicFamily.MISSING_STEPS)],
+            ]
+        )
         result = run_loop(
             make_goal(tolerance=RiskTolerance.STRICT),
             ScriptedPlanner([p0, p1, p0, p1]),

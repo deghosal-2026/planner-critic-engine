@@ -225,7 +225,8 @@ class SQLiteStore(PlanStore):
     def get_plan_signatures(self, plan_id: str) -> list[tuple[int, str]]:
         """Fetch all stored signatures for a plan, newest first."""
         rows = self._fetchall(
-            "SELECT version, signature FROM plan_signatures WHERE plan_id = ? ORDER BY version DESC",
+            "SELECT version, signature FROM plan_signatures "
+            "WHERE plan_id = ? ORDER BY version DESC",
             (plan_id,),
         )
         return [(int(r["version"]), str(r["signature"])) for r in rows]

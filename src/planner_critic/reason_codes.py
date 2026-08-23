@@ -22,14 +22,10 @@ MISSING_VERIFICATION: Literal["missing_verification"] = "missing_verification"
 MISSING_ROLLBACK: Literal["missing_rollback"] = "missing_rollback"
 UNVERIFIED_PRECONDITION: Literal["unverified_precondition"] = "unverified_precondition"
 UNSAFE_PARALLELIZATION: Literal["unsafe_parallelization"] = "unsafe_parallelization"
-VERIFICATION_AFTER_CONSUMER: Literal["verification_after_consumer"] = (
-    "verification_after_consumer"
-)
+VERIFICATION_AFTER_CONSUMER: Literal["verification_after_consumer"] = "verification_after_consumer"
 ROLLBACK_UNREACHABLE: Literal["rollback_unreachable"] = "rollback_unreachable"
 ROLLBACK_SELF_DEPENDENT: Literal["rollback_self_dependent"] = "rollback_self_dependent"
-ROLLBACK_INCONSISTENT_STATE: Literal["rollback_inconsistent_state"] = (
-    "rollback_inconsistent_state"
-)
+ROLLBACK_INCONSISTENT_STATE: Literal["rollback_inconsistent_state"] = "rollback_inconsistent_state"
 ROLLBACK_POST_CONSUMED: Literal["rollback_post_consumed"] = "rollback_post_consumed"
 FAMILY_HISTOGRAM_CYCLING: Literal["family_histogram_cycling"] = "family_histogram_cycling"
 
@@ -62,9 +58,7 @@ SUPPLY_CHAIN_BREAKING_CHANGE_WITHOUT_MIGRATION: Literal[
 SUPPLY_CHAIN_UNSIGNED_ARTIFACT: Literal["supply_chain_unsigned_artifact"] = (
     "supply_chain_unsigned_artifact"
 )
-SUPPLY_CHAIN_MISSING_SBOM: Literal["supply_chain_missing_sbom"] = (
-    "supply_chain_missing_sbom"
-)
+SUPPLY_CHAIN_MISSING_SBOM: Literal["supply_chain_missing_sbom"] = "supply_chain_missing_sbom"
 FINOPS_DELETE_WITHOUT_GRACE_PERIOD: Literal["finops_delete_without_grace_period"] = (
     "finops_delete_without_grace_period"
 )
@@ -118,17 +112,11 @@ LLM_WEAK_ROLLBACK: Literal["llm_weak_rollback"] = "llm_weak_rollback"
 SECURITY_CRITIC_ALIGNED: Literal["security_critic_aligned"] = "security_critic_aligned"
 SECURITY_CRITIC_MISSED: Literal["security_critic_missed"] = "security_critic_missed"
 SECURITY_CRITIC_SPURIOUS: Literal["security_critic_spurious"] = "security_critic_spurious"
-SECURITY_INJECTION_BLOCKED: Literal["security_injection_blocked"] = (
-    "security_injection_blocked"
-)
-SECURITY_INJECTION_BYPASSED: Literal["security_injection_bypassed"] = (
-    "security_injection_bypassed"
-)
+SECURITY_INJECTION_BLOCKED: Literal["security_injection_blocked"] = "security_injection_blocked"
+SECURITY_INJECTION_BYPASSED: Literal["security_injection_bypassed"] = "security_injection_bypassed"
 STANDING_RULE_PROPOSED: Literal["standing_rule_proposed"] = "standing_rule_proposed"
 STANDING_RULE_PROMOTED: Literal["standing_rule_promoted"] = "standing_rule_promoted"
-LABEL_MIGRATION_DETECTED: Literal["label_migration_detected"] = (
-    "label_migration_detected"
-)
+LABEL_MIGRATION_DETECTED: Literal["label_migration_detected"] = "label_migration_detected"
 BOUNDARY_CASE_FLIP: Literal["boundary_case_flip"] = "boundary_case_flip"
 IRREVERSIBLE_INVARIANT_BLOCKED: Literal["irreversible_invariant_blocked"] = (
     "irreversible_invariant_blocked"
@@ -143,12 +131,8 @@ TRANSIENT_RETRY_TRIGGERED: Literal["transient_retry_triggered"] = "transient_ret
 DETERMINISTIC_REPLAN_TRIGGERED: Literal["deterministic_replan_triggered"] = (
     "deterministic_replan_triggered"
 )
-AMBIGUOUS_REPLAN_ESCALATED: Literal["ambiguous_replan_escalated"] = (
-    "ambiguous_replan_escalated"
-)
-STEP_RETRY_BUDGET_EXCEEDED: Literal["step_retry_budget_exceeded"] = (
-    "step_retry_budget_exceeded"
-)
+AMBIGUOUS_REPLAN_ESCALATED: Literal["ambiguous_replan_escalated"] = "ambiguous_replan_escalated"
+STEP_RETRY_BUDGET_EXCEEDED: Literal["step_retry_budget_exceeded"] = "step_retry_budget_exceeded"
 STATE_VIEW_STALE: Literal["state_view_stale"] = "state_view_stale"
 RESOURCE_LOCKED_BY_CONCURRENT_EXECUTION: Literal["resource_locked_by_concurrent_execution"] = (
     "resource_locked_by_concurrent_execution"
@@ -159,7 +143,7 @@ CONCURRENT_RESOURCE_CONFLICT: Literal["concurrent_resource_conflict"] = (
 FINDING_DRIFT_STORED: Literal["finding_drift_stored"] = "finding_drift_stored"
 DRIFT_ALERT_TRIGGERED: Literal["drift_alert_triggered"] = "drift_alert_triggered"
 
-# --- M9 scale-validation reason codes (§3.36–§3.40) --------------------------
+# --- M9 scale-validation reason codes (§3.36-§3.40) --------------------------
 IDP_RBAC_BROAD_ROLE: Literal["idp_rbac_broad_role"] = "idp_rbac_broad_role"
 IDP_MISSING_CORPORATE_METADATA: Literal["idp_missing_corporate_metadata"] = (
     "idp_missing_corporate_metadata"
@@ -206,7 +190,7 @@ BLAST_RADIUS_RESTRICTED_CLUSTER: Literal["blast_radius_restricted_cluster"] = (
 BLAST_RADIUS_RESTRICTED_ACTION: Literal["blast_radius_restricted_action"] = (
     "blast_radius_restricted_action"
 )
-SECRET_REDACTED: Literal["secret_redacted"] = "secret_redacted"
+SECRET_REDACTED: Literal["secret_redacted"] = "secret_redacted"  # noqa: S105  # reason-code label, not a credential
 
 ReasonCode: TypeAlias = Literal[
     "plan_schema_invalid",
@@ -381,30 +365,58 @@ REASON_CODE_DESCRIPTIONS: dict[ReasonCode, str] = {
     LLM_UNVERIFIED_DEPENDENCIES: "LLM critic: a step depends on a fact never established earlier",
     LLM_WEAK_ROLLBACK: "LLM critic: a high-blast-radius step lacks sound rollback coverage",
     SECURITY_CRITIC_ALIGNED: "Security oracle: critic finding aligns with ground-truth patch",
-    SECURITY_CRITIC_MISSED: "Security oracle: critic missed a finding the ground-truth patch addresses",
-    SECURITY_CRITIC_SPURIOUS: "Security oracle: critic reported a finding not supported by ground truth",
+    SECURITY_CRITIC_MISSED: (
+        "Security oracle: critic missed a finding the ground-truth patch addresses"
+    ),
+    SECURITY_CRITIC_SPURIOUS: (
+        "Security oracle: critic reported a finding not supported by ground truth"
+    ),
     SECURITY_INJECTION_BLOCKED: "Security oracle: an injection attempt was correctly blocked",
     SECURITY_INJECTION_BYPASSED: "Security oracle: an injection attempt bypassed the critic",
-    STANDING_RULE_PROPOSED: "Standing rule: a candidate rule was proposed from missed-critique analysis",
+    STANDING_RULE_PROPOSED: (
+        "Standing rule: a candidate rule was proposed from missed-critique analysis"
+    ),
     STANDING_RULE_PROMOTED: "Standing rule: a candidate rule was promoted to the heuristic pack",
-    LABEL_MIGRATION_DETECTED: "Label-migration: a model-chosen severity family differs from the normalized family",
-    BOUNDARY_CASE_FLIP: "Label-migration: a boundary case flipped the verdict from blocker to non-blocker",
-    IRREVERSIBLE_INVARIANT_BLOCKED: "Irreversible invariant: an irreversible step without verified precondition was blocked",
+    LABEL_MIGRATION_DETECTED: (
+        "Label-migration: a model-chosen severity family differs from the normalized family"
+    ),
+    BOUNDARY_CASE_FLIP: (
+        "Label-migration: a boundary case flipped the verdict from blocker to non-blocker"
+    ),
+    IRREVERSIBLE_INVARIANT_BLOCKED: (
+        "Irreversible invariant: an irreversible step without verified precondition was blocked"
+    ),
     POSTURE_RESOLVED: "Posture resolved from context rules or fallback to goal posture",
     RUN_BUDGET_EXCEEDED: "Run-level spend ceiling (run_max_budget_usd) exceeded",
     RUN_DEPTH_EXCEEDED: "Cascading replan depth (run_max_depth) exceeded",
     RUN_TIMEOUT: "Run-level wall-clock timeout (run_max_time) exceeded",
-    TRANSIENT_RETRY_TRIGGERED: "Transient execution failure — retrying with backoff, not replanning",
+    TRANSIENT_RETRY_TRIGGERED: (
+        "Transient execution failure — retrying with backoff, not replanning"
+    ),
     DETERMINISTIC_REPLAN_TRIGGERED: "Deterministic execution failure — triggering a replan (F-16)",
-    AMBIGUOUS_REPLAN_ESCALATED: "Execution failure could be transient or deterministic — escalated to human",
+    AMBIGUOUS_REPLAN_ESCALATED: (
+        "Execution failure could be transient or deterministic — escalated to human"
+    ),
     STEP_RETRY_BUDGET_EXCEEDED: "Per-step retry budget (step_max_retries) exceeded — escalated",
-    STATE_VIEW_STALE: "State snapshot taken at approval time diverged from live state — re-gate triggered",
-    RESOURCE_LOCKED_BY_CONCURRENT_EXECUTION: "Resource is locked by concurrent agent execution — plan must wait or escalate",
-    CONCURRENT_RESOURCE_CONFLICT: "Plan targets a resource currently locked by another execution — blocker",
-    FINDING_DRIFT_STORED: "Finding stored with dual severity (raw + normalized) for drift observability",
+    STATE_VIEW_STALE: (
+        "State snapshot taken at approval time diverged from live state — re-gate triggered"
+    ),
+    RESOURCE_LOCKED_BY_CONCURRENT_EXECUTION: (
+        "Resource is locked by concurrent agent execution — plan must wait or escalate"
+    ),
+    CONCURRENT_RESOURCE_CONFLICT: (
+        "Plan targets a resource currently locked by another execution — blocker"
+    ),
+    FINDING_DRIFT_STORED: (
+        "Finding stored with dual severity (raw + normalized) for drift observability"
+    ),
     DRIFT_ALERT_TRIGGERED: "Drift z-score exceeded 2-sigma threshold for a heuristic family",
-    PRECONDITION_REDUNDANTLY_RE_INJECTED: "LLM re-injected a precondition the ledger shows as already satisfied",
-    PRECONDITION_DROPPED_FROM_COMPACTION: "LLM dropped a precondition the ledger shows as satisfied — compaction likely",
+    PRECONDITION_REDUNDANTLY_RE_INJECTED: (
+        "LLM re-injected a precondition the ledger shows as already satisfied"
+    ),
+    PRECONDITION_DROPPED_FROM_COMPACTION: (
+        "LLM dropped a precondition the ledger shows as satisfied — compaction likely"
+    ),
     BLAST_RADIUS_QUOTA_BREACH: "Plan exceeds a blast-radius quota (resource/action count limit)",
     BLAST_RADIUS_RESTRICTED_CLUSTER: "Plan targets a restricted cluster — escalation required",
     BLAST_RADIUS_RESTRICTED_ACTION: "Plan includes a restricted action — escalation required",
@@ -414,7 +426,9 @@ REASON_CODE_DESCRIPTIONS: dict[ReasonCode, str] = {
     IDP_QUOTA_BREACH: "IDP: plan exceeds shared-node resource quota",
     IDP_NOISY_NEIGHBOR_RISK: "IDP: plan risks noisy-neighbor interference on shared resources",
     MULTI_AGENT_CYCLIC_HANDOFF: "MAO: cross-agent dependency graph contains a cycle",
-    MULTI_AGENT_UNVERIFIED_STATE_SIGNAL: "MAO: agent starts before predecessor's state signal verified",
+    MULTI_AGENT_UNVERIFIED_STATE_SIGNAL: (
+        "MAO: agent starts before predecessor's state signal verified"
+    ),
     MULTI_AGENT_ROLLBACK_UNSYNCHRONIZED: "MAO: distributed rollback steps are not synchronized",
     SRE_BLAST_RADIUS_EXCEEDED: "SRE: instant drain exceeds blast-radius cap (max 25% rolling)",
     SRE_MISSING_INTER_BATCH_HEALTHCHECK: "SRE: batch drain missing inter-batch health check probe",

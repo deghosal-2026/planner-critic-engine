@@ -1,7 +1,7 @@
 """Standing-rule promotion from missed-critique analysis (M5, #127).
 
 Consumes missed records from the oracle eval harness and proposes candidate
-deterministic standing rules derived from (CWE × patch-pattern). High-trust
+deterministic standing rules derived from (CWE x patch-pattern). High-trust
 misses (directly linked to ground truth) can be promoted to heuristic-pack
 rules with full provenance.
 """
@@ -27,7 +27,7 @@ class StandingRule:
         reason_code: The reason code the rule should produce.
         trust: ``high`` (from oracle eval misses) or ``low`` (from stub exec).
         source_instance_ids: Corpus instances that generated this miss.
-        coverage_count: Number of times this (CWE × pattern) was seen.
+        coverage_count: Number of times this (CWE x pattern) was seen.
         status: ``proposed`` or ``promoted`` (once committed to pack).
         promoted_at: When the rule was promoted.
         provenance: Free-form provenance data.

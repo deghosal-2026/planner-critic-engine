@@ -9,7 +9,9 @@ from planner_critic.eval.label_migration import generate_boundary_cases
 from planner_critic.eval.regression import generate_artifact
 from planner_critic.gates import run_deterministic_gates
 
-CORPUS_DIR = str(Path(__file__).resolve().parent.parent / "docs" / "field-test" / "corpus" / "swebench-security")
+CORPUS_DIR = str(
+    Path(__file__).resolve().parent.parent / "docs" / "field-test" / "corpus" / "swebench-security"
+)
 
 
 class TestEvalRegressionCLI:
@@ -71,11 +73,14 @@ class TestRegressionArtifact:
             for i, variant in enumerate(artifact.variants):
                 findings = run_deterministic_gates(variant)
                 blockers = [f for f in findings if f.severity.value == "blocker"]
-                expected = artifact.variant_expected[i] if i < len(artifact.variant_expected) else ""
+                expected = (
+                    artifact.variant_expected[i] if i < len(artifact.variant_expected) else ""
+                )
                 if expected:
-                    assert any(
-                        str(f.reason_code) == str(expected) for f in blockers
-                    ), f"{inst.instance_id} variant {i} expected {expected} but got {[str(f.reason_code) for f in blockers]}"
+                    assert any(str(f.reason_code) == str(expected) for f in blockers), (
+                        f"{inst.instance_id} variant {i} expected {expected} "
+                        f"but got {[str(f.reason_code) for f in blockers]}"
+                    )
 
 
 def test_eval_parser_builds() -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 from conftest import EmptyCritic, ScriptedPlanner, make_goal, make_plan, make_task
 from planner_critic.forensics import MissedCritique, analyze_failure
@@ -116,11 +117,11 @@ def test_c19_http_check_probe() -> None:
     from http.server import BaseHTTPRequestHandler, HTTPServer
 
     class OKHandler(BaseHTTPRequestHandler):
-        def do_GET(self):
+        def do_GET(self) -> None:
             self.send_response(200)
             self.end_headers()
 
-        def log_message(self, *a, **k):
+        def log_message(self, *args: object, **kwargs: object) -> None:
             pass
 
     server = HTTPServer(("127.0.0.1", 0), OKHandler)
@@ -157,7 +158,7 @@ def test_c19_deploy_status_probe() -> None:
     assert result.matched is True
 
 
-def test_c24_schema_migration_lossless(tmp_path) -> None:
+def test_c24_schema_migration_lossless(tmp_path: Path) -> None:
     import sqlite3
 
     conn = sqlite3.connect(str(tmp_path / "migrate.db"))

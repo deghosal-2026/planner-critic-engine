@@ -40,10 +40,7 @@ class SchemaPreVerificationGate(BaseGate):
             if task.action in DESTRUCTIVE_QUERIES and not (has_backup and has_verified):
                 findings.append(
                     Finding(
-                        id=(
-                            f"data_eng_schema_pre_verification:"
-                            f"{plan.id}:{plan.version}:{task.id}"
-                        ),
+                        id=(f"data_eng_schema_pre_verification:{plan.id}:{plan.version}:{task.id}"),
                         task_id=task.id,
                         version=plan.version,
                         severity=Severity.BLOCKER,
@@ -80,12 +77,9 @@ class SLAWindowGate(BaseGate):
                         severity=Severity.BLOCKER,
                         reason_code=DATA_ENG_MIGRATION_OUTSIDE_MAINTENANCE_WINDOW,
                         message=(
-                            f"migration step {task.id!r} runs outside an "
-                            f"active maintenance window"
+                            f"migration step {task.id!r} runs outside an active maintenance window"
                         ),
-                        suggested_fix=(
-                            "Add a maintenance_window step before the migration"
-                        ),
+                        suggested_fix=("Add a maintenance_window step before the migration"),
                     )
                 )
         return findings
@@ -111,10 +105,7 @@ class DualWriteGate(BaseGate):
                         version=plan.version,
                         severity=Severity.BLOCKER,
                         reason_code=DATA_ENG_MIGRATION_WITHOUT_DUAL_WRITE,
-                        message=(
-                            f"live migration {task.id!r} has no dual-write "
-                            f"enabled"
-                        ),
+                        message=(f"live migration {task.id!r} has no dual-write enabled"),
                         suggested_fix="Add an enable_dual_write step",
                     )
                 )
@@ -126,9 +117,7 @@ class DualWriteGate(BaseGate):
                         version=plan.version,
                         severity=Severity.BLOCKER,
                         reason_code=DATA_ENG_MIGRATION_WITHOUT_FALLBACK,
-                        message=(
-                            f"live migration {task.id!r} has no fallback path"
-                        ),
+                        message=(f"live migration {task.id!r} has no fallback path"),
                         suggested_fix="Add a define_fallback step",
                     )
                 )

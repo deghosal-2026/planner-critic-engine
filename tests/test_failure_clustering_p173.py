@@ -14,11 +14,12 @@ from __future__ import annotations
 import json
 from collections import Counter, defaultdict
 from pathlib import Path
+from typing import Any
 
 TRACE_DIR = Path(__file__).parents[1] / "results" / "0.2.0" / "openai-openai-gpt-4o-mini"
 
 
-def _load_failures() -> list[dict]:
+def _load_failures() -> list[dict[str, Any]]:
     failures = []
     for path in TRACE_DIR.rglob("**/trace.json"):
         try:
@@ -43,7 +44,7 @@ def _load_failures() -> list[dict]:
     return failures
 
 
-def cluster_failures() -> dict:
+def cluster_failures() -> dict[str, Any]:
     """Cluster the failures by domain and reason code."""
     failures = _load_failures()
     total_blockers = len(failures)

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from planner_critic._cli import main
 
 
-def test_cli_version(capsys: pytest.CaptureFixture) -> None:
+def test_cli_version(capsys: pytest.CaptureFixture[str]) -> None:
     """``plancritic --version`` prints the package version and exits 0."""
     from planner_critic import __version__
 
@@ -17,7 +19,7 @@ def test_cli_version(capsys: pytest.CaptureFixture) -> None:
     assert __version__ in capsys.readouterr().out
 
 
-def test_cli_no_command_prints_help(capsys: pytest.CaptureFixture) -> None:
+def test_cli_no_command_prints_help(capsys: pytest.CaptureFixture[str]) -> None:
     """No subcommand prints the help and exits 0."""
     assert main([]) == 0
     out = capsys.readouterr().out
@@ -27,14 +29,14 @@ def test_cli_no_command_prints_help(capsys: pytest.CaptureFixture) -> None:
     assert "providers" in out
 
 
-def test_cli_migrate_dispatches(tmp_path, capsys: pytest.CaptureFixture) -> None:
+def test_cli_migrate_dispatches(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """The migrate subcommand dispatches through the top-level entry point."""
     db = tmp_path / "plans.db"
     assert main(["migrate", "--path", str(db)]) == 0
     assert "schema at v" in capsys.readouterr().out
 
 
-def test_cli_providers_add_dispatches(tmp_path, capsys: pytest.CaptureFixture) -> None:
+def test_cli_providers_add_dispatches(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """The providers subcommand dispatches through the top-level entry point."""
     config = tmp_path / "plancritic.toml"
     assert (

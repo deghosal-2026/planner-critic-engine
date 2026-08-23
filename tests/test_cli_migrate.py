@@ -13,6 +13,8 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+import pytest
+
 from planner_critic.cli.migrate import run_migrate
 from planner_critic.schema.plan import PlanVersion
 from planner_critic.store.versions import (
@@ -86,7 +88,7 @@ def test_migrate_revert_is_lossless_and_reappliable(tmp_path: Path) -> None:
         conn.close()
 
 
-def test_migrate_cli_revert_flag(tmp_path: Path, capsys) -> None:
+def test_migrate_cli_revert_flag(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``migrate --revert`` returns to an earlier schema and prints it."""
     store_path = str(tmp_path / "plans.db")
     assert run_migrate(["--path", store_path]) == 0

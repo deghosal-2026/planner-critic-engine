@@ -53,7 +53,7 @@ def test_run_critique_invalid_json(tmp_path: Path) -> None:
     assert rc == 1
 
 
-def test_run_critique_clean_plan_passes(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+def test_run_critique_clean_plan_passes(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """A valid plan with no issues passes deterministic gates."""
     plan_file = _make_plan_file(tmp_path)
     rc = run_critique([str(plan_file), "--store", str(tmp_path / "store.db")])
@@ -62,7 +62,7 @@ def test_run_critique_clean_plan_passes(tmp_path: Path, capsys: pytest.CaptureFi
     assert "no findings" in out
 
 
-def test_run_critique_flags_blockers(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+def test_run_critique_flags_blockers(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """A plan with bad preconditions is flagged."""
     plan_file = _make_plan_file(
         tmp_path,
@@ -107,7 +107,7 @@ def test_run_critique_stores_findings(tmp_path: Path) -> None:
 
 
 def test_run_critique_plan_validation_failure(
-    tmp_path: Path, capsys: pytest.CaptureFixture
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Invalid plan JSON returns exit code 1 (line 38-40)."""
     plan_file = tmp_path / "plan.json"
@@ -117,7 +117,7 @@ def test_run_critique_plan_validation_failure(
     assert "plan validation failed" in capsys.readouterr().out
 
 
-def test_run_critique_store_failure(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+def test_run_critique_store_failure(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """Store failure prints a warning (line 55-56)."""
     plan_file = _make_plan_file(tmp_path)
     rc = run_critique([str(plan_file), "--store", "/nonexistent_dir/bad.db"])

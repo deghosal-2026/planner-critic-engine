@@ -9,6 +9,7 @@ still contains the approved plan.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 import pytest
 
@@ -23,12 +24,13 @@ from conftest import (
 )
 from planner_critic.loop import run_loop
 from planner_critic.schema.goal import RiskTolerance
+from planner_critic.schema.plan import PlanVersion
 from planner_critic.store.base import StoreUnavailable
 from planner_critic.store.sqlite import SQLiteStore
 from planner_critic.types import ExecutionTrace, Severity
 
 
-def _approved_plan():
+def _approved_plan() -> PlanVersion:
     """A gate-clean, single-task plan that passes deterministic gates."""
     return make_plan(
         plan_id="plan-1",
@@ -43,7 +45,7 @@ def _approved_plan():
     )
 
 
-def test_loop_run_round_trips_through_sqlite_store(tmp_path) -> None:
+def test_loop_run_round_trips_through_sqlite_store(tmp_path: Path) -> None:
     """A full loop run persists its plan+findings and reads back losslessly."""
     store = SQLiteStore(tmp_path / "store.db")
     goal = make_goal(goal_id="goal-1", tolerance=RiskTolerance.BALANCED)
@@ -62,7 +64,7 @@ def test_loop_run_round_trips_through_sqlite_store(tmp_path) -> None:
     store.close()
 
 
-def test_loop_run_persists_escalation_and_trace(tmp_path) -> None:
+def test_loop_run_persists_escalation_and_trace(tmp_path: Path) -> None:
     """Escalation + execution-trace records round-trip through the store."""
     store = SQLiteStore(tmp_path / "store.db")
     goal = make_goal(goal_id="goal-1", tolerance=RiskTolerance.STRICT)
@@ -87,7 +89,7 @@ def test_loop_run_persists_escalation_and_trace(tmp_path) -> None:
 
 
 def test_side_channel_store_down_warns_and_continues(
-    tmp_path, caplog: pytest.LogCaptureFixture
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     """Store unavailable → warn + continue: the loop result is still usable."""
     store = SQLiteStore(tmp_path / "store.db")

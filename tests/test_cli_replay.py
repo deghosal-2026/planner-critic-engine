@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from planner_critic.cli.replay import build_replay_parser, run_replay
-from planner_critic.schema.plan import PlanVersion
+from planner_critic.schema.plan import PlanVersion, Task
 from planner_critic.store.sqlite import SQLiteStore
 
 
@@ -20,13 +20,13 @@ def _seed_replay(store_path: str, plan_id: str = "plan-a") -> None:
             goal_id="goal-1",
             version=1,
             tasks=[
-                {
-                    "id": "t1",
-                    "description": "task t1",
-                    "action": "do",
-                    "target": "t1",
-                    "preconditions": [],
-                }
+                Task(
+                    id="t1",
+                    description="task t1",
+                    action="do",
+                    target="t1",
+                    preconditions=[],
+                )
             ],
             dependencies=[],
             branches=[],
@@ -38,20 +38,20 @@ def _seed_replay(store_path: str, plan_id: str = "plan-a") -> None:
             goal_id="goal-1",
             version=2,
             tasks=[
-                {
-                    "id": "t1",
-                    "description": "task t1",
-                    "action": "do",
-                    "target": "t1",
-                    "preconditions": [],
-                },
-                {
-                    "id": "t2",
-                    "description": "task t2",
-                    "action": "do",
-                    "target": "t2",
-                    "preconditions": [],
-                },
+                Task(
+                    id="t1",
+                    description="task t1",
+                    action="do",
+                    target="t1",
+                    preconditions=[],
+                ),
+                Task(
+                    id="t2",
+                    description="task t2",
+                    action="do",
+                    target="t2",
+                    preconditions=[],
+                ),
             ],
             dependencies=[],
             branches=[],
@@ -68,7 +68,7 @@ def test_build_replay_parser() -> None:
     assert parser.prog == "plancritic replay"
 
 
-def test_replay_success_text(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+def test_replay_success_text(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """Replay prints version history in text format."""
     store_path = str(tmp_path / "store.db")
     _seed_replay(store_path)
@@ -79,7 +79,7 @@ def test_replay_success_text(tmp_path: Path, capsys: pytest.CaptureFixture) -> N
     assert "v2:" in out
 
 
-def test_replay_success_json(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+def test_replay_success_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """Replay with --format json outputs JSON."""
     store_path = str(tmp_path / "store.db")
     _seed_replay(store_path)
@@ -90,7 +90,7 @@ def test_replay_success_json(tmp_path: Path, capsys: pytest.CaptureFixture) -> N
     assert len(data["steps"]) == 2
 
 
-def test_replay_with_step(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+def test_replay_with_step(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """Replay with --step limits the number of revisions."""
     store_path = str(tmp_path / "store.db")
     _seed_replay(store_path)
@@ -101,7 +101,7 @@ def test_replay_with_step(tmp_path: Path, capsys: pytest.CaptureFixture) -> None
     assert "v2:" not in out
 
 
-def test_replay_unknown_plan(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+def test_replay_unknown_plan(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """Replaying an unknown plan prints 'no history'."""
     store_path = str(tmp_path / "store.db")
     SQLiteStore(store_path).close()
@@ -110,14 +110,17 @@ def test_replay_unknown_plan(tmp_path: Path, capsys: pytest.CaptureFixture) -> N
     assert "no history" in capsys.readouterr().out
 
 
-def test_replay_store_failure(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+def test_replay_store_failure(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """Replay with an unreachable store returns exit code 1."""
     rc = run_replay(["--store", "/nonexistent_dir/store.db", "plan-a"])
     assert rc == 1
     assert "replay failed" in capsys.readouterr().out
 
 
-def test_replay_top_level_cli_walks_all_revisions(tmp_path: Path, capsys) -> None:
+def test_replay_top_level_cli_walks_all_revisions(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """C22: ``plancritic replay`` via top-level main walks every stored
     revision with per-revision findings (no empty-trace pass*)."""
     import json as jsonlib

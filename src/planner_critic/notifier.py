@@ -116,11 +116,20 @@ class SlackFormatter:
         self.channel = channel
 
     def format_event(self, event: EscalationEvent) -> dict[str, Any]:
-        color = "#FF0000" if event.severity == "blocker" else "#FFA500" if event.severity == "warning" else "#36A64F"
+        color = (
+            "#FF0000"
+            if event.severity == "blocker"
+            else "#FFA500"
+            if event.severity == "warning"
+            else "#36A64F"
+        )
         blocks: list[dict[str, Any]] = [
             {
                 "type": "header",
-                "text": {"type": "plain_text", "text": f"🚨 Plan Escalation: {event.escalation_id}"},
+                "text": {
+                    "type": "plain_text",
+                    "text": f"🚨 Plan Escalation: {event.escalation_id}",
+                },
             },
             {
                 "type": "section",
@@ -131,10 +140,18 @@ class SlackFormatter:
                     {"type": "mrkdwn", "text": f"*Reason:*\n{event.reason_code}"},
                 ],
             },
-            {"type": "section", "text": {"type": "mrkdwn", "text": f"*Question:*\n{event.question}"}},
+            {
+                "type": "section",
+                "text": {"type": "mrkdwn", "text": f"*Question:*\n{event.question}"},
+            },
         ]
         if event.summary:
-            blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": f"*Plan Summary:*\n{event.summary}"}})
+            blocks.append(
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": f"*Plan Summary:*\n{event.summary}"},
+                }
+            )
 
         actions: list[dict[str, Any]] = [
             {
@@ -153,12 +170,14 @@ class SlackFormatter:
             },
         ]
         if event.backstage_url:
-            actions.append({
-                "type": "button",
-                "text": {"type": "plain_text", "text": "🔍 Review in Backstage"},
-                "url": event.backstage_url,
-                "action_id": f"review_{event.escalation_id}",
-            })
+            actions.append(
+                {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "🔍 Review in Backstage"},
+                    "url": event.backstage_url,
+                    "action_id": f"review_{event.escalation_id}",
+                }
+            )
         blocks.append({"type": "actions", "elements": actions})
 
         payload: dict[str, Any] = {"blocks": blocks, "attachments": [{"color": color}]}
@@ -168,6 +187,7 @@ class SlackFormatter:
 
     def deliver(self, payload: dict[str, Any]) -> NotificationResult:
         import httpx
+
         try:
             resp = httpx.post(self.webhook_url, json=payload, timeout=10)
             return NotificationResult(
@@ -181,16 +201,22 @@ class SlackFormatter:
 
     def verify_signature(self, timestamp: str, body: str, signature: str) -> bool:
         if not self.signing_secret:
-            logger.warning("SlackFormatter: no signing_secret configured — callbacks accepted without verification!")
+            logger.warning(
+                "SlackFormatter: no signing_secret configured — "
+                "callbacks accepted without verification!"
+            )
             return False
         if abs(time.time() - float(timestamp)) > 300:
             return False
         sig_basestring = f"v0:{timestamp}:{body}"
-        expected = "v0=" + hmac.new(
-            self.signing_secret.encode(),
-            sig_basestring.encode(),
-            hashlib.sha256,
-        ).hexdigest()
+        expected = (
+            "v0="
+            + hmac.new(
+                self.signing_secret.encode(),
+                sig_basestring.encode(),
+                hashlib.sha256,
+            ).hexdigest()
+        )
         return hmac.compare_digest(expected, signature)
 
 
@@ -205,39 +231,78 @@ class TeamsFormatter:
         self.webhook_url = webhook_url
 
     def format_event(self, event: EscalationEvent) -> dict[str, Any]:
-        color = "attention" if event.severity == "blocker" else "warning" if event.severity == "warning" else "good"
+        color = (
+            "attention"
+            if event.severity == "blocker"
+            else "warning"
+            if event.severity == "warning"
+            else "good"
+        )
         return {
             "type": "message",
-            "attachments": [{
-                "contentType": "application/vnd.microsoft.card.adaptive",
-                "content": {
-                    "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
-                    "type": "AdaptiveCard",
-                    "version": "1.4",
-                    "body": [
-                        {"type": "TextBlock", "size": "Large", "weight": "Bolder", "text": f"Plan Escalation: {event.escalation_id}"},
-                        {"type": "FactSet", "facts": [
-                            {"title": "Severity", "value": event.severity},
-                            {"title": "Environment", "value": event.environment},
-                            {"title": "Service", "value": event.service},
-                            {"title": "Reason", "value": event.reason_code},
-                        ]},
-                        {"type": "TextBlock", "text": f"**Question:** {event.question}", "wrap": True},
-                        *([{"type": "TextBlock", "text": f"**Summary:** {event.summary}", "wrap": True}] if event.summary else []),
-                    ],
-                    "actions": [
-                        {"type": "Action.Http", "title": "✅ Approve", "method": "POST",
-                         "url": f"/v1/escalations/{event.escalation_id}/approve"},
-                        {"type": "Action.Http", "title": "❌ Deny", "method": "POST",
-                         "url": f"/v1/escalations/{event.escalation_id}/deny"},
-                    ],
-                    "msteams": {"color": color},
-                },
-            }],
+            "attachments": [
+                {
+                    "contentType": "application/vnd.microsoft.card.adaptive",
+                    "content": {
+                        "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                        "type": "AdaptiveCard",
+                        "version": "1.4",
+                        "body": [
+                            {
+                                "type": "TextBlock",
+                                "size": "Large",
+                                "weight": "Bolder",
+                                "text": f"Plan Escalation: {event.escalation_id}",
+                            },
+                            {
+                                "type": "FactSet",
+                                "facts": [
+                                    {"title": "Severity", "value": event.severity},
+                                    {"title": "Environment", "value": event.environment},
+                                    {"title": "Service", "value": event.service},
+                                    {"title": "Reason", "value": event.reason_code},
+                                ],
+                            },
+                            {
+                                "type": "TextBlock",
+                                "text": f"**Question:** {event.question}",
+                                "wrap": True,
+                            },
+                            *(
+                                [
+                                    {
+                                        "type": "TextBlock",
+                                        "text": f"**Summary:** {event.summary}",
+                                        "wrap": True,
+                                    }
+                                ]
+                                if event.summary
+                                else []
+                            ),
+                        ],
+                        "actions": [
+                            {
+                                "type": "Action.Http",
+                                "title": "✅ Approve",
+                                "method": "POST",
+                                "url": f"/v1/escalations/{event.escalation_id}/approve",
+                            },
+                            {
+                                "type": "Action.Http",
+                                "title": "❌ Deny",
+                                "method": "POST",
+                                "url": f"/v1/escalations/{event.escalation_id}/deny",
+                            },
+                        ],
+                        "msteams": {"color": color},
+                    },
+                }
+            ],
         }
 
     def deliver(self, payload: dict[str, Any]) -> NotificationResult:
         import httpx
+
         try:
             resp = httpx.post(self.webhook_url, json=payload, timeout=10)
             return NotificationResult(
@@ -276,6 +341,7 @@ class WebhookFormatter:
 
     def deliver(self, payload: dict[str, Any]) -> NotificationResult:
         import httpx
+
         try:
             resp = httpx.post(self.webhook_url, json=payload, timeout=10)
             return NotificationResult(
@@ -329,15 +395,27 @@ class Notifier:
                     result = formatter.deliver(payload)
                     results.append(result)
                     if result.success:
-                        logger.info("notifier: %s delivered %s (attempt %d)", name, event.escalation_id, attempt + 1)
+                        logger.info(
+                            "notifier: %s delivered %s (attempt %d)",
+                            name,
+                            event.escalation_id,
+                            attempt + 1,
+                        )
                         break
-                    logger.warning("notifier: %s delivery failed (attempt %d): %s", name, attempt + 1, result.error)
+                    logger.warning(
+                        "notifier: %s delivery failed (attempt %d): %s",
+                        name,
+                        attempt + 1,
+                        result.error,
+                    )
                     if attempt < max_retries - 1:
-                        time.sleep(2 ** attempt)
+                        time.sleep(2**attempt)
                 except Exception as err:
                     logger.error("notifier: %s exception (attempt %d): %s", name, attempt + 1, err)
                     if attempt == max_retries - 1:
-                        results.append(NotificationResult(surface=name, success=False, error=str(err)))
+                        results.append(
+                            NotificationResult(surface=name, success=False, error=str(err))
+                        )
         return results
 
 
