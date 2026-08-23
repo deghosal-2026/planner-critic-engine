@@ -1,0 +1,194 @@
+{
+  "dimension": "core-api",
+  "goal_id": "flc-02-config-drift-remediation",
+  "duration_seconds": 7.17,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "flc-02-config-drift-remediation-plan",
+    "goal_id": "flc-02-config-drift-remediation",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:52:11.002555Z",
+    "tasks": [
+      {
+        "id": "detect_drift",
+        "description": "Detect configuration drift across hosts",
+        "action": "noop",
+        "target": "puppet",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "number of drifted hosts",
+          "how": "check output logs",
+          "expected": "15% or less drifted hosts"
+        },
+        "rollback": {
+          "trigger": "drift detection fails",
+          "action": "revert to last known good configuration",
+          "safety_guard": "verify last known configuration integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "classify_drift",
+        "description": "Classify the type of drift detected",
+        "action": "classify",
+        "target": "drift_types",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "drift must be detected",
+            "fact": "drift_detected",
+            "established_by": "detect_drift",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "auto_remediate",
+        "description": "Automatically remediate drift in staged batches",
+        "action": "remediate",
+        "target": "hosts",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service state after remediation",
+          "how": "run service health checks",
+          "expected": "all services should be running"
+        },
+        "rollback": {
+          "trigger": "remediation causes downtime",
+          "action": "revert last configuration update",
+          "safety_guard": "monitor service uptime"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "generate_report",
+        "description": "Generate a drift report summarizing the operation",
+        "action": "report",
+        "target": "drift_summary",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "remediation must be complete",
+            "fact": "remediation_successful",
+            "established_by": "auto_remediate",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "detect_drift",
+        "to_task": "classify_drift",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "classify_drift",
+        "to_task": "auto_remediate",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "auto_remediate",
+        "to_task": "generate_report",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:classify_drift",
+      "task_id": "classify_drift",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The classification of drift is attempted before verifying that drift detection succeeded.",
+      "suggested_fix": "Ensure that 'classify_drift' only runs after confirming 'detect_drift' has successfully detected some drift.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:classify_drift",
+      "task_id": "classify_drift",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "There are no rollback steps defined for 'classify_drift', which may leave the process vulnerable to failure.",
+      "suggested_fix": "Add a rollback action to revert changes if classification fails.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:auto_remediate",
+      "task_id": "auto_remediate",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Auto-remediation is set to occur before confirming the types of drift through classification.",
+      "suggested_fix": "Ensure that 'auto_remediate' only executes after 'classify_drift'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:generate_report",
+      "task_id": "generate_report",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The 'generate_report' task lacks verification and rollback steps, which may introduce issues if generated report is incomplete or incorrect.",
+      "suggested_fix": "Implement verification of report quality and a rollback step if report generation fails.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

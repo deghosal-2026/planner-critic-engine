@@ -1,0 +1,342 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-01-p0-incident",
+  "duration_seconds": 58.79,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 4
+  },
+  "plan": {
+    "id": "plan-ir-01-p0-incident-r4",
+    "goal_id": "ir-01-p0-incident",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-ir-01-p0-incident-r3",
+    "created_at": "2026-08-23T06:44:20.465552Z",
+    "tasks": [
+      {
+        "id": "page_on_call",
+        "description": "Page on-call via PagerDuty",
+        "action": "page",
+        "target": "PagerDuty",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PagerDuty is operational",
+            "fact": "pagerduty_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "diagnose_cause",
+        "description": "Diagnose the cause of the issue (disk full)",
+        "action": "diagnose",
+        "target": "DB",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DB is reachable",
+            "fact": "db_healthy",
+            "established_by": "page_on_call",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "diagnosis result",
+          "how": "run query to check disk usage",
+          "expected": "disk usage exceeds threshold"
+        },
+        "rollback": {
+          "trigger": "diagnosis incorrect",
+          "action": "revert to last known config",
+          "safety_guard": "verify previous config integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_user_confirmation",
+        "description": "Verify user confirmation for volume enlargement",
+        "action": "verify",
+        "target": "user confirmation",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "diagnosis confirms disk full",
+            "fact": "diagnosis_disk_full",
+            "established_by": "diagnose_cause",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "user confirmation",
+          "how": "check user acknowledgement",
+          "expected": "user has confirmed volume enlargement"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "notify user for confirmation again",
+          "safety_guard": "monitor confirmation status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "confirm_user_confirmation",
+        "description": "Confirm that user has provided the needed confirmation",
+        "action": "confirm",
+        "target": "user confirmation",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "user confirmation requested",
+            "fact": "user_confirmation_requested",
+            "established_by": "verify_user_confirmation",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "confirmation status",
+          "how": "check confirmation flag",
+          "expected": "user confirmation is received"
+        },
+        "rollback": {
+          "trigger": "confirmation not received",
+          "action": "issue reminder for confirmation",
+          "safety_guard": "track reminder issuance"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "enlarge_volume",
+        "description": "Enlarge the volume of the DB",
+        "action": "enlarge",
+        "target": "DB volume",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "user confirmation for volume enlargement",
+            "fact": "user_confirmation",
+            "established_by": "confirm_user_confirmation",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "volume size",
+          "how": "run AWS CLI to check volume size",
+          "expected": "volume size increased"
+        },
+        "rollback": {
+          "trigger": "enlargement fails",
+          "action": "shrink to previous volume size",
+          "safety_guard": "confirm backup before shrinking and verify database state integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "restart_replica",
+        "description": "Restart the database replica",
+        "action": "restart",
+        "target": "DB replica",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "volume enlargement is successful",
+            "fact": "volume_enlarged",
+            "established_by": "enlarge_volume",
+            "probe": null
+          },
+          {
+            "description": "volume enlargement is verified",
+            "fact": "volume_enlargement_verified",
+            "established_by": "enlarge_volume",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replica status",
+          "how": "run MySQL client to check replica state",
+          "expected": "replica is operational"
+        },
+        "rollback": {
+          "trigger": "restart fails",
+          "action": "restart previous replica",
+          "safety_guard": "verify previous state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_replication_lag",
+        "description": "Verify replication lag returns to zero",
+        "action": "verify",
+        "target": "replication lag",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "replica restart is successful",
+            "fact": "replica_running",
+            "established_by": "restart_replica",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replication lag",
+          "how": "check replication status",
+          "expected": "replication lag is zero"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "write_postmortem",
+        "description": "Write postmortem of the incident",
+        "action": "write",
+        "target": "postmortem",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "replication lag is verified",
+            "fact": "replication_lag_zero",
+            "established_by": "verify_replication_lag",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "postmortem completeness",
+          "how": "review all previous task outcomes",
+          "expected": "all findings documented correctly"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "page_on_call",
+        "to_task": "diagnose_cause",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "diagnose_cause",
+        "to_task": "verify_user_confirmation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_user_confirmation",
+        "to_task": "confirm_user_confirmation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "confirm_user_confirmation",
+        "to_task": "enlarge_volume",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "enlarge_volume",
+        "to_task": "restart_replica",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "restart_replica",
+        "to_task": "verify_replication_lag",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_replication_lag",
+        "to_task": "write_postmortem",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unverified_dependencies:enlarge_volume",
+      "task_id": "enlarge_volume",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'enlarge_volume' depends on 'user_confirmation' which may not be confirmed yet.",
+      "suggested_fix": "Ensure that 'confirm_user_confirmation' is completed and verified before executing 'enlarge_volume'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:restart_replica",
+      "task_id": "restart_replica",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'restart_replica' is sequenced to run before verifying if the volume enlargement was successful.",
+      "suggested_fix": "Restructure the sequence to ensure 'enlarge_volume' is successful before 'restart_replica' is executed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:missing_steps:verify_replication_lag",
+      "task_id": "verify_replication_lag",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding a verification step to ensure data integrity after restarting the replica before checking replication lag.",
+      "suggested_fix": "Insert a task to verify database state integrity post-restart.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-01-p0-incident:4:4",
+    "plan_id": "plan-ir-01-p0-incident-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unverified_dependencies:enlarge_volume",
+    "question": "Plan for goal 'ir-01-p0-incident' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

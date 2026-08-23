@@ -1,0 +1,268 @@
+{
+  "dimension": "core-api",
+  "goal_id": "idp-01-rbac-boundary",
+  "duration_seconds": 53.76,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 4
+  },
+  "plan": {
+    "id": "plan-idp-01-rbac-boundary-r4",
+    "goal_id": "idp-01-rbac-boundary",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-idp-01-rbac-boundary-r3",
+    "created_at": "2026-08-23T06:43:04.742197Z",
+    "tasks": [
+      {
+        "id": "ensure_k8s_health",
+        "description": "Ensure the Kubernetes cluster is healthy and reachable",
+        "action": "check cluster health",
+        "target": "k8s_cluster",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Kubernetes cluster health",
+          "how": "kubectl cluster-info",
+          "expected": "k8s cluster is reachable"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "check_network_access",
+        "description": "Check network access to the Kubernetes API",
+        "action": "ping API",
+        "target": "k8s_api",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "API accessibility",
+          "how": "curl -k https://k8s-api:6443",
+          "expected": "successful API response"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create_namespace",
+        "description": "Create a namespace for the new service",
+        "action": "kubectl create namespace",
+        "target": "new-service-namespace",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "namespace created",
+          "how": "kubectl get namespaces",
+          "expected": "new-service-namespace"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create_service_account",
+        "description": "Create a ServiceAccount for the new service",
+        "action": "kubectl create serviceaccount",
+        "target": "new-service-account",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Namespace is created",
+            "fact": "namespace_created",
+            "established_by": "create_namespace",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service account exists",
+          "how": "kubectl get serviceaccount -n new-service-namespace",
+          "expected": "new-service-account"
+        },
+        "rollback": {
+          "trigger": "service account creation fails",
+          "action": "delete namespace if empty",
+          "safety_guard": "verify namespace has no resources"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_service_account",
+        "description": "Verify the ServiceAccount creation",
+        "action": "check service account health",
+        "target": "new-service-account",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ServiceAccount is created",
+            "fact": "service_account_created",
+            "established_by": "create_service_account",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service account is created",
+          "how": "kubectl get serviceaccount -n new-service-namespace",
+          "expected": "service account exists"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "attach_rbac_roles",
+        "description": "Attach least-privilege RBAC roles to the ServiceAccount",
+        "action": "kubectl apply rbac",
+        "target": "rbac-roles",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ServiceAccount is verified as created",
+            "fact": "service_account_verified",
+            "established_by": "verify_service_account",
+            "probe": null
+          },
+          {
+            "description": "ServiceAccount and RBAC roles are in expected state",
+            "fact": "service_account_state_verified",
+            "established_by": "verify_service_account",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "RBAC roles attached correctly",
+          "how": "kubectl get rolebindings -n new-service-namespace",
+          "expected": "roles are least-privilege"
+        },
+        "rollback": {
+          "trigger": "RBAC roles attachment fails",
+          "action": "restore previous RBAC configuration",
+          "safety_guard": "verify previous RBAC configuration"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "ensure_k8s_health",
+        "to_task": "check_network_access",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check_network_access",
+        "to_task": "create_namespace",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_namespace",
+        "to_task": "create_service_account",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_service_account",
+        "to_task": "verify_service_account",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_service_account",
+        "to_task": "attach_rbac_roles",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:create_service_account",
+      "task_id": "create_service_account",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'create_service_account' is sequenced before verifying the creation of the namespace.",
+      "suggested_fix": "Ensure 'create_namespace' is completed and verified before proceeding to 'create_service_account'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:verify_service_account",
+      "task_id": "verify_service_account",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'verify_service_account' is sequenced immediately following 'create_service_account', which may not verify if the service account was created successfully.",
+      "suggested_fix": "Reorder tasks to ensure the service account is confirmed as created before verifying its state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:attach_rbac_roles",
+      "task_id": "attach_rbac_roles",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'attach_rbac_roles' depends on a fact that has not been established by earlier tasks regarding the state of the ServiceAccount.",
+      "suggested_fix": "Include a verification step for the ServiceAccount before proceeding to 'attach_rbac_roles'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:weak_rollback:attach_rbac_roles",
+      "task_id": "attach_rbac_roles",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback procedure for 'attach_rbac_roles' does not adequately account for potential inconsistencies during RBAC attachment.",
+      "suggested_fix": "Enhance the rollback strategy to handle all scenarios that might leave the RBAC configuration in an undesirable state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:idp-01-rbac-boundary:4:4",
+    "plan_id": "plan-idp-01-rbac-boundary-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:create_service_account",
+    "question": "Plan for goal 'idp-01-rbac-boundary' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": false,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

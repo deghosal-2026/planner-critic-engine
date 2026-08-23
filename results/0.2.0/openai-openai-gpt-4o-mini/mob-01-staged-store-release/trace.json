@@ -1,0 +1,307 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mob-01-staged-store-release",
+  "duration_seconds": 14.24,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "mob-01-staged-store-release-v1",
+    "goal_id": "mob-01-staged-store-release",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:43:30.814738Z",
+    "tasks": [
+      {
+        "id": "beta-testing",
+        "description": "Conduct beta testing with 100 users",
+        "action": "deploy_beta",
+        "target": "TestFlight",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "beta environment is set up",
+            "fact": "beta_env_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rollout-android-5",
+        "description": "Start staged rollout on Google Play (5%)",
+        "action": "rollout",
+        "target": "PlayStore",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "previous rollout completed successfully",
+            "fact": "beta_testing_complete",
+            "established_by": "beta-testing",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "crash rate and ANR rate",
+          "how": "analyze Firebase Crashlytics data",
+          "expected": "crash rate < 1%"
+        },
+        "rollback": {
+          "trigger": "high crash rate detected",
+          "action": "pull rollout",
+          "safety_guard": "monitor crash analytics"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rollout-android-10",
+        "description": "Increase staged rollout on Google Play (10%)",
+        "action": "rollout",
+        "target": "PlayStore",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "5% rollout is stable",
+            "fact": "rollout_5_stable",
+            "established_by": "rollout-android-5",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "crash rate and ANR rate",
+          "how": "analyze Firebase Crashlytics data",
+          "expected": "crash rate < 1%"
+        },
+        "rollback": {
+          "trigger": "high crash rate detected",
+          "action": "pull rollout",
+          "safety_guard": "monitor crash analytics"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rollout-android-50",
+        "description": "Increase staged rollout on Google Play (50%)",
+        "action": "rollout",
+        "target": "PlayStore",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "10% rollout is stable",
+            "fact": "rollout_10_stable",
+            "established_by": "rollout-android-10",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "crash rate and ANR rate",
+          "how": "analyze Firebase Crashlytics data",
+          "expected": "crash rate < 1%"
+        },
+        "rollback": {
+          "trigger": "high crash rate detected",
+          "action": "pull rollout",
+          "safety_guard": "monitor crash analytics"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rollout-android-100",
+        "description": "Complete rollout on Google Play (100%)",
+        "action": "rollout",
+        "target": "PlayStore",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "50% rollout is stable",
+            "fact": "rollout_50_stable",
+            "established_by": "rollout-android-50",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "crash rate and ANR rate",
+          "how": "analyze Firebase Crashlytics data",
+          "expected": "crash rate < 1%"
+        },
+        "rollback": {
+          "trigger": "high crash rate detected",
+          "action": "pull rollout",
+          "safety_guard": "monitor crash analytics"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor-android",
+        "description": "Monitor Android rollout performance",
+        "action": "monitor",
+        "target": "FirebaseCrashlytics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "100% rollout completed",
+            "fact": "rollout_100_complete",
+            "established_by": "rollout-android-100",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rollout-ios",
+        "description": "Start phased release on App Store over 7 days",
+        "action": "rollout",
+        "target": "AppStore",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Android rollout is stable",
+            "fact": "android_rollout_stable",
+            "established_by": "monitor-android",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "App Store review status",
+          "how": "check App Store Connect",
+          "expected": "release approved and live"
+        },
+        "rollback": {
+          "trigger": "App Store review fails",
+          "action": "pull release from App Store",
+          "safety_guard": "confirm user impact"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "beta-testing",
+        "to_task": "rollout-android-5",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rollout-android-5",
+        "to_task": "rollout-android-10",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rollout-android-10",
+        "to_task": "rollout-android-50",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rollout-android-50",
+        "to_task": "rollout-android-100",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rollout-android-100",
+        "to_task": "monitor-android",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor-android",
+        "to_task": "rollout-ios",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unverified_dependencies:beta-testing",
+      "task_id": "beta-testing",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'beta-testing' relies on the prerequisite 'beta_env_ready' without verification of the environment setup.",
+      "suggested_fix": "Ensure 'beta_env_ready' is confirmed before proceeding with beta testing.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:rollout-android-5",
+      "task_id": "rollout-android-5",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'rollout-android-5' is sequenced before confirming successful completion of 'beta-testing'.",
+      "suggested_fix": "Only proceed to 'rollout-android-5' once 'beta-testing' has been verified to be complete.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:rollout-android-100",
+      "task_id": "rollout-android-100",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for 'rollout-android-100' lacks specifics on ensuring user impact is minimal during pullback.",
+      "suggested_fix": "Enhance rollback plan with a clear communication strategy for users in case of a pullback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:rollout-ios",
+      "task_id": "rollout-ios",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The plan does not explicitly include verification steps for iOS rollout performance post-release.",
+      "suggested_fix": "Include monitoring tasks to assess the performance of the iOS rollout after the phased release is initiated.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

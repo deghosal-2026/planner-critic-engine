@@ -1,0 +1,231 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-02-cert-manager",
+  "duration_seconds": 22.2,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-plat-02-cert-manager-r2",
+    "goal_id": "plat-02-cert-manager",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plat-02-cert-manager",
+    "created_at": "2026-08-23T06:50:28.850495Z",
+    "tasks": [
+      {
+        "id": "install-helm",
+        "description": "Install cert-manager Helm chart",
+        "action": "install",
+        "target": "cert-manager",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "check installation",
+          "how": "helm list",
+          "expected": "cert-manager listed"
+        },
+        "rollback": {
+          "trigger": "install fails",
+          "action": "uninstall cert-manager",
+          "safety_guard": "check for remaining resources"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-clusterissuers",
+        "description": "Configure ClusterIssuers for Let's Encrypt",
+        "action": "configure",
+        "target": "ClusterIssuers",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "check ClusterIssuers",
+          "how": "kubectl get clusterissuers",
+          "expected": "both production and staging issuers present"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "revert to previous config",
+          "safety_guard": "verify previous configuration is applied"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create-certificates",
+        "description": "Create Certificate resources for all ingress-enabled services",
+        "action": "create",
+        "target": "Certificates",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "check certificates",
+          "how": "kubectl get certificates",
+          "expected": "all ingress-enabled services have certificates"
+        },
+        "rollback": {
+          "trigger": "creation fails",
+          "action": "delete all certificates",
+          "safety_guard": "check for existing certificates"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "validate-auto-renewal",
+        "description": "Validate auto-renewal by checking certificate age and renewal events",
+        "action": "validate",
+        "target": "certificate renewal",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "check certificate age and renewal events",
+          "how": "kubectl describe certificates",
+          "expected": "certificates are renewed as expected"
+        },
+        "rollback": {
+          "trigger": "validation fails",
+          "action": "notify on-call team",
+          "safety_guard": "ensure system is intact"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-tls-handshake",
+        "description": "Verify end-to-end TLS handshake from external test endpoints",
+        "action": "verify",
+        "target": "TLS connectivity",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "check TLS handshake",
+          "how": "curl -v https://<external-endpoint>",
+          "expected": "successful TLS handshake"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "reconfigure ingress",
+          "safety_guard": "ensure alternative access is available"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "install-helm",
+        "to_task": "configure-clusterissuers",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-clusterissuers",
+        "to_task": "create-certificates",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create-certificates",
+        "to_task": "validate-auto-renewal",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "validate-auto-renewal",
+        "to_task": "verify-tls-handshake",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:configure-clusterissuers",
+      "task_id": "configure-clusterissuers",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'configure-clusterissuers' is scheduled before the completion of its hard prerequisite task 'install-helm'.",
+      "suggested_fix": "Ensure 'install-helm' is completed before starting 'configure-clusterissuers'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:create-certificates",
+      "task_id": "create-certificates",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'create-certificates' is scheduled before the completion of its hard prerequisite task 'configure-clusterissuers'.",
+      "suggested_fix": "Ensure 'configure-clusterissuers' is completed before starting 'create-certificates'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:validate-auto-renewal",
+      "task_id": "validate-auto-renewal",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'validate-auto-renewal' is scheduled before the completion of its hard prerequisite task 'create-certificates'.",
+      "suggested_fix": "Ensure 'create-certificates' is completed before starting 'validate-auto-renewal'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:verify-tls-handshake",
+      "task_id": "verify-tls-handshake",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'verify-tls-handshake' is scheduled before the completion of its hard prerequisite task 'validate-auto-renewal'.",
+      "suggested_fix": "Ensure 'validate-auto-renewal' is completed before starting 'verify-tls-handshake'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:plat-02-cert-manager:2:2",
+    "plan_id": "plan-plat-02-cert-manager-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:configure-clusterissuers",
+    "question": "Plan for goal 'plat-02-cert-manager' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,279 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-05-chaos-experiment",
+  "duration_seconds": 49.95,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 4
+  },
+  "plan": {
+    "id": "plan-obs-05-chaos-experiment-r4",
+    "goal_id": "obs-05-chaos-experiment",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-obs-05-chaos-experiment-r3",
+    "created_at": "2026-08-23T06:48:07.682537Z",
+    "tasks": [
+      {
+        "id": "inject-chaos",
+        "description": "Inject pod-kill chaos for inventory service",
+        "action": "inject",
+        "target": "pod-kill",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "pod status",
+          "how": "check Prometheus metrics",
+          "expected": "pods restored to running status"
+        },
+        "rollback": {
+          "trigger": "chaos not effective",
+          "action": "remove chaos injection",
+          "safety_guard": "verify no pods in chaos state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "confirm-chaos-injection",
+        "description": "Confirm chaos injection success",
+        "action": "check",
+        "target": "chaos_injected",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "chaos injection executed",
+            "fact": "chaos_injected_confirmed",
+            "established_by": "inject-chaos",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "chaos injected status",
+          "how": "check logs for chaos injection confirmation",
+          "expected": "chaos_injected is true"
+        },
+        "rollback": {
+          "trigger": "chaos injection not confirmed",
+          "action": "revert chaos settings",
+          "safety_guard": "verify chaos not injected"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "observe-recovery",
+        "description": "Observe recovery time from the chaos event",
+        "action": "observe",
+        "target": "recovery-time",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "chaos injection confirmed",
+            "fact": "chaos_injected",
+            "established_by": "confirm-chaos-injection",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "recovery time",
+          "how": "log recovery time duration",
+          "expected": "recovery time recorded"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-replica-count",
+        "description": "Verify rollback to original replica count",
+        "action": "check",
+        "target": "replica-count",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replica count",
+          "how": "run kubectl get deployment",
+          "expected": "original replica count"
+        },
+        "rollback": {
+          "trigger": "replica count incorrect",
+          "action": "scale replicas manually",
+          "safety_guard": "monitor deployment status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-deployment-stability",
+        "description": "Verify deployment stability after scaling",
+        "action": "check",
+        "target": "deployment-status",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "replicas scaled manually",
+            "fact": "replicas_scaled",
+            "established_by": "verify-replica-count",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment status",
+          "how": "run kubectl get deployment",
+          "expected": "deployment is stable"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "generate-report",
+        "description": "Generate chaos report with recovery metrics",
+        "action": "generate",
+        "target": "chaos-report",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "recovery time observed",
+            "fact": "recovery_time_recorded",
+            "established_by": "observe-recovery",
+            "probe": null
+          },
+          {
+            "description": "replica count verified",
+            "fact": "replica_count_verified",
+            "established_by": "verify-replica-count",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "chaos report accuracy",
+          "how": "review generated report",
+          "expected": "report accurately reflects recovery metrics"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "inject-chaos",
+        "to_task": "confirm-chaos-injection",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "confirm-chaos-injection",
+        "to_task": "observe-recovery",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "observe-recovery",
+        "to_task": "verify-replica-count",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-replica-count",
+        "to_task": "verify-deployment-stability",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-replica-count",
+        "to_task": "generate-report",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unverified_dependencies:observe-recovery",
+      "task_id": "observe-recovery",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'observe-recovery' task depends on 'chaos_injected' being confirmed, but this task cannot be validated directly as it does not verify 'chaos_injected' before execution.",
+      "suggested_fix": "Add a hard dependency or verification step to ensure 'chaos_injected' is confirmed before 'observe-recovery' runs.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:missing_steps:verify-replica-count",
+      "task_id": "verify-replica-count",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The 'verify-replica-count' task lacks a verification of the expected original replica count, which could lead to incorrect assumptions.",
+      "suggested_fix": "Include a step to verify the original replica count before confirming.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:missing_steps:generate-report",
+      "task_id": "generate-report",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The 'generate-report' task does not check for the stability of the deployment after verifying the replica count.",
+      "suggested_fix": "Add a verification step to confirm deployment stability before generating the report.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:generate-report",
+      "task_id": "generate-report",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'generate-report' task relies on facts established in previous tasks but does not confirm their successful execution or existence.",
+      "suggested_fix": "Ensure verification of both 'recovery_time_recorded' and 'replica_count_verified' before proceeding with report generation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:obs-05-chaos-experiment:4:4",
+    "plan_id": "plan-obs-05-chaos-experiment-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unverified_dependencies:observe-recovery",
+    "question": "Plan for goal 'obs-05-chaos-experiment' cannot be approved: blockers remain (llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

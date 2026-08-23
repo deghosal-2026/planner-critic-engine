@@ -1,0 +1,292 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-08-active-active",
+  "duration_seconds": 42.25,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-k8s-08-active-active-r3",
+    "goal_id": "k8s-08-active-active",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-k8s-08-active-active-r2",
+    "created_at": "2026-08-23T06:59:03.367808Z",
+    "tasks": [
+      {
+        "id": "deploy-us-east",
+        "description": "Deploy Kubernetes stack in us-east-1",
+        "action": "deploy",
+        "target": "k8s-us-east",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "kubectl is configured correctly",
+            "fact": "kubectl_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment status",
+          "how": "check kubectl rollout status",
+          "expected": "success"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "destroy us-east deployment",
+          "safety_guard": "verify existing state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy-eu-west",
+        "description": "Deploy Kubernetes stack in eu-west-1",
+        "action": "deploy",
+        "target": "k8s-eu-west",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "kubectl is configured correctly",
+            "fact": "kubectl_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment status",
+          "how": "check kubectl rollout status",
+          "expected": "success"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "destroy eu-west deployment",
+          "safety_guard": "verify existing state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-replication",
+        "description": "Configure PostgreSQL replication with pglogical",
+        "action": "configure",
+        "target": "pg_replication",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PostgreSQL clusters are up",
+            "fact": "pg_clusters_healthy",
+            "established_by": "deploy-us-east",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replication status",
+          "how": "check pglogical status",
+          "expected": "replication active"
+        },
+        "rollback": {
+          "trigger": "replication fails",
+          "action": "revert pglogical configuration",
+          "safety_guard": "check replication health"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup-global-routing",
+        "description": "Set up global traffic routing through AWS Global Accelerator",
+        "action": "configure",
+        "target": "aws_global_accelerator",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AWS credentials are configured",
+            "fact": "aws_credentials_configured",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "global routing is validated",
+            "fact": "global_routing_active",
+            "established_by": "configure-replication",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "global routing status",
+          "how": "check AWS Global Accelerator status",
+          "expected": "active"
+        },
+        "rollback": {
+          "trigger": "setup fails",
+          "action": "destroy global routing setup",
+          "safety_guard": "check routing integrity"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "validate-traffic-distribution",
+        "description": "Validate traffic distribution across regions",
+        "action": "validate",
+        "target": "traffic_distribution",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "global routing is set up",
+            "fact": "global_routing_active",
+            "established_by": "setup-global-routing",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic distribution status",
+          "how": "evaluate traffic metrics",
+          "expected": "distribution validated"
+        },
+        "rollback": {
+          "trigger": "validation fails",
+          "action": "revert traffic configuration",
+          "safety_guard": "check previous distribution state"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "simulate-failure",
+        "description": "Simulate a region-level failure for us-east-1",
+        "action": "simulate",
+        "target": "us-east-failure",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "traffic distribution is validated",
+            "fact": "traffic_validated",
+            "established_by": "validate-traffic-distribution",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic distribution during failure",
+          "how": "monitor traffic metrics",
+          "expected": "eu-west absorbs 100%"
+        },
+        "rollback": {
+          "trigger": "failure simulation incomplete",
+          "action": "restore us-east deployment",
+          "safety_guard": "verify health checks"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy-us-east",
+        "to_task": "configure-replication",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-eu-west",
+        "to_task": "configure-replication",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-replication",
+        "to_task": "setup-global-routing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup-global-routing",
+        "to_task": "validate-traffic-distribution",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "validate-traffic-distribution",
+        "to_task": "simulate-failure",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unverified_dependencies:setup-global-routing",
+      "task_id": "setup-global-routing",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The setup-global-routing task depends on global routing being validated, but there is no verification of the global routing setup before this step.",
+      "suggested_fix": "Add additional verification to ensure that global routing is indeed validated before proceeding with the setup.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:validate-traffic-distribution",
+      "task_id": "validate-traffic-distribution",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "validate-traffic-distribution task depends on global routing being set up, yet there is no confirmation that the global routing setup was successful after the previous task.",
+      "suggested_fix": "Ensure that setup-global-routing includes a verification step to confirm that the configuration is active before proceeding to validate traffic distribution.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:simulate-failure",
+      "task_id": "simulate-failure",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The simulate-failure task relies on traffic distribution being validated, but there is a lack of verification that the traffic distribution was successfully validated after the previous task.",
+      "suggested_fix": "Include a verification step in validate-traffic-distribution to confirm that traffic metrics have been evaluated before allowing the simulate-failure task to execute.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-08-active-active:3:3",
+    "plan_id": "plan-k8s-08-active-active-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unverified_dependencies:setup-global-routing",
+    "question": "Plan for goal 'k8s-08-active-active' cannot be approved: blockers remain (llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

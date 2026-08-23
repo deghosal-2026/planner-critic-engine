@@ -1,0 +1,246 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-08-log-retention-tiering",
+  "duration_seconds": 11.14,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "obs-08-log-retention-tiering-plan",
+    "goal_id": "obs-08-log-retention-tiering",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:48:37.750033Z",
+    "tasks": [
+      {
+        "id": "classify_logs",
+        "description": "Classify log types by retention requirement",
+        "action": "classify",
+        "target": "logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "log ingestion must be configured",
+            "fact": "ingestion_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_ilm",
+        "description": "Configure ILM policies for log tiering",
+        "action": "configure",
+        "target": "ILM",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Log classification must be completed",
+            "fact": "logs_classified",
+            "established_by": "classify_logs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "ILM policy correctness",
+          "how": "run ILM policy validation tool",
+          "expected": "no errors in policy"
+        },
+        "rollback": {
+          "trigger": "ILM misconfiguration detected",
+          "action": "restore previous ILM configuration",
+          "safety_guard": "verify backup of previous ILM"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "set_deletion_schedules",
+        "description": "Set up deletion schedules based on retention requirements",
+        "action": "schedule",
+        "target": "deletion",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ILM policies must be configured",
+            "fact": "ILM_configured",
+            "established_by": "configure_ilm",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_retention",
+        "description": "Verify retention policies are enforced",
+        "action": "verify",
+        "target": "retention",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Deletion schedules must be set",
+            "fact": "deletion_schedules_set",
+            "established_by": "set_deletion_schedules",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "enforcement of retention policies",
+          "how": "check logs against retention requirements",
+          "expected": "all logs meet retention criteria"
+        },
+        "rollback": {
+          "trigger": "policy enforcement failure",
+          "action": "reapply retention policies",
+          "safety_guard": "check system status before reapplying"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_storage",
+        "description": "Monitor storage usage and performance",
+        "action": "monitor",
+        "target": "storage",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Retention policies must be verified",
+            "fact": "retention_verified",
+            "established_by": "verify_retention",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "classify_logs",
+        "to_task": "configure_ilm",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_ilm",
+        "to_task": "set_deletion_schedules",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set_deletion_schedules",
+        "to_task": "verify_retention",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_retention",
+        "to_task": "monitor_storage",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unverified_dependencies:configure_ilm",
+      "task_id": "configure_ilm",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Dependency on logs_classified is unverified; if log ingestion isn't correctly configured, ILM policies cannot be set accurately.",
+      "suggested_fix": "Ensure ingestion_configured is verified before executing configure_ilm.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:set_deletion_schedules",
+      "task_id": "set_deletion_schedules",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "ILM policies must be configured but there is no verification that this prerequisite is met; misconfiguration could lead to retention violations.",
+      "suggested_fix": "Add verification for ILM policy correctness before executing set_deletion_schedules.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:verify_retention",
+      "task_id": "verify_retention",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Deletion schedules must be set without verification of their actual successful application, leading to potential enforcement failures.",
+      "suggested_fix": "Add a verification step to confirm deletion schedules are correctly applied before executing verify_retention.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:configure_ilm",
+      "task_id": "configure_ilm",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for ILM misconfiguration relies on restoring previous config, but lacks a definitive method to ensure the restoration is correct.",
+      "suggested_fix": "Implement a verification step post-rollback to ensure previous settings are accurately restored.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:verify_retention",
+      "task_id": "verify_retention",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for policy enforcement failure is a reapplication of policies, which does not guarantee that the system returns to an error-free state.",
+      "suggested_fix": "Include a verification step to ensure the latest policies are correctly enforced after reapplication.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

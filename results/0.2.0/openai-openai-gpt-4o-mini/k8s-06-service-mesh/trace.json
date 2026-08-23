@@ -1,0 +1,307 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-06-service-mesh",
+  "duration_seconds": 43.88,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-k8s-06-service-mesh-r3",
+    "goal_id": "k8s-06-service-mesh",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-k8s-06-service-mesh-r2",
+    "created_at": "2026-08-23T06:57:33.796054Z",
+    "tasks": [
+      {
+        "id": "label-namespace",
+        "description": "Label the namespace for automatic sidecar injection",
+        "action": "label",
+        "target": "namespace",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "namespace is reachable",
+            "fact": "namespace_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "namespace labels",
+          "how": "check namespace configuration",
+          "expected": "label includes sidecar-injection"
+        },
+        "rollback": {
+          "trigger": "labeling fails",
+          "action": "remove namespace label",
+          "safety_guard": "verify namespace is unlabelled"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "route-traffic-1pct",
+        "description": "Route 1% of traffic through the service mesh",
+        "action": "apply",
+        "target": "VirtualService",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Istio is installed and configured",
+            "fact": "istio_installed",
+            "established_by": "label-namespace",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic routing success",
+          "how": "ensure 1% traffic is routed",
+          "expected": "traffic routed successfully"
+        },
+        "rollback": {
+          "trigger": "routing fails",
+          "action": "remove VirtualService and revert changes",
+          "safety_guard": "verify traffic routing to original state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "observe-1pct",
+        "description": "Observe latency, error rate, and resource overhead for 1% traffic",
+        "action": "monitor",
+        "target": "metrics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "1% traffic is routed",
+            "fact": "traffic_routed_1pct",
+            "established_by": "route-traffic-1pct",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic metrics",
+          "how": "monitor latency and error rates",
+          "expected": "no significant issues detected"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "route-traffic-50pct",
+        "description": "Ramp up to 50% traffic through the service mesh",
+        "action": "apply",
+        "target": "VirtualService",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "1% traffic is successfully observed",
+            "fact": "traffic_routed_1pct",
+            "established_by": "observe-1pct",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic distribution",
+          "how": "monitor traffic metrics",
+          "expected": "50% of traffic through mesh"
+        },
+        "rollback": {
+          "trigger": "routing fails",
+          "action": "remove VirtualService and revert changes",
+          "safety_guard": "verify traffic routing to original state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "observe-50pct",
+        "description": "Observe latency, error rate, and resource overhead for 50% traffic",
+        "action": "monitor",
+        "target": "metrics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "50% traffic is routed",
+            "fact": "traffic_routed_50pct",
+            "established_by": "route-traffic-50pct",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic metrics",
+          "how": "monitor latency and error rates",
+          "expected": "no significant issues detected"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rollback",
+        "description": "Rollback if latency or error rate thresholds are breached",
+        "action": "rollback",
+        "target": "namespace and deployments",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "monitoring indicates issues",
+            "fact": "issues_detected",
+            "established_by": "observe-50pct",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment state and metrics",
+          "how": "check deployment and monitor metrics",
+          "expected": "Deployments rolled back and metrics return to baseline"
+        },
+        "rollback": {
+          "trigger": "latency increases above threshold or error rate rises",
+          "action": "remove namespace label and patch deployments",
+          "safety_guard": "validate deployments are rolled back to original state"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "finalize",
+        "description": "Decommission legacy sidecar-free Deployments after 100% traffic routed",
+        "action": "remove",
+        "target": "legacy deployments",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "100% traffic is routed through the mesh",
+            "fact": "traffic_routed_100pct",
+            "established_by": "route-traffic-50pct",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service availability",
+          "how": "check traffic routing and service dependencies",
+          "expected": "services remain available after decommissioning"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "label-namespace",
+        "to_task": "route-traffic-1pct",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "route-traffic-1pct",
+        "to_task": "observe-1pct",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "observe-1pct",
+        "to_task": "route-traffic-50pct",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "route-traffic-50pct",
+        "to_task": "observe-50pct",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "observe-50pct",
+        "to_task": "rollback",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rollback",
+        "to_task": "finalize",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:route-traffic-1pct",
+      "task_id": "route-traffic-1pct",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'route-traffic-1pct' is ordered before the prerequisite task 'label-namespace' has confirmed that the namespace is labeled for sidecar injection.",
+      "suggested_fix": "Ensure task 'label-namespace' is completed and verified before proceeding to 'route-traffic-1pct'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:weak_rollback:rollback",
+      "task_id": "rollback",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'rollback' lacks a sound rollback strategy since it assumes the removal of the namespace label and patching of all deployments without confirming the state of the system beforehand.",
+      "suggested_fix": "Implement additional checks to verify that the rollback actions can be completed safely to restore the system to its original state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:route-traffic-50pct",
+      "task_id": "route-traffic-50pct",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'route-traffic-50pct' is dependent on verification of 'observe-1pct' but does not verify if traffic is successfully at 1% before ramping up to 50%.",
+      "suggested_fix": "Add a verification step after 'observe-1pct' to confirm that the desired 1% traffic is being routed before starting 'route-traffic-50pct'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-06-service-mesh:3:3",
+    "plan_id": "plan-k8s-06-service-mesh-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:route-traffic-1pct",
+    "question": "Plan for goal 'k8s-06-service-mesh' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

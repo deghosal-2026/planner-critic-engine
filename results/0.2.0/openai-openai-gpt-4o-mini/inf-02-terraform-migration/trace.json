@@ -1,0 +1,204 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-02-terraform-migration",
+  "duration_seconds": 18.34,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-inf-02-terraform-migration-r2",
+    "goal_id": "inf-02-terraform-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "inf-02-terraform-migration",
+    "created_at": "2026-08-23T06:49:37.538675Z",
+    "tasks": [
+      {
+        "id": "initialize",
+        "description": "Initialize Terraform configuration",
+        "action": "terraform init",
+        "target": "terraform",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Terraform CLI is installed",
+            "fact": "terraform_installed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "plan",
+        "description": "Create an execution plan for migrating state",
+        "action": "terraform plan",
+        "target": "terraform",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Initialization is complete",
+            "fact": "terraform_initialized",
+            "established_by": "initialize",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "execution plan output",
+          "how": "check for errors or warnings",
+          "expected": "no errors"
+        },
+        "rollback": {
+          "trigger": "plan fails",
+          "action": "revert changes",
+          "safety_guard": "verify configuration integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "apply",
+        "description": "Apply the Terraform plan to migrate the state",
+        "action": "terraform apply -auto-approve",
+        "target": "terraform",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Plan is successful",
+            "fact": "plan_successful",
+            "established_by": "plan",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "state in S3",
+          "how": "check S3 for state file",
+          "expected": "state file exists"
+        },
+        "rollback": {
+          "trigger": "apply fails",
+          "action": "restore previous state",
+          "safety_guard": "ensure backup is valid"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify",
+        "description": "Verify the state migration",
+        "action": "check state integrity",
+        "target": "terraform",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Apply is completed without errors",
+            "fact": "apply_successful",
+            "established_by": "apply",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "initialize",
+        "to_task": "plan",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "plan",
+        "to_task": "apply",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "apply",
+        "to_task": "verify",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:apply",
+      "task_id": "apply",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The 'apply' task is sequenced before verifying that the plan was successful.",
+      "suggested_fix": "Ensure that the 'apply' task is only attempted after the 'plan' task has successfully completed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:apply",
+      "task_id": "apply",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action for the 'apply' task lacks a robust verification step to ensure that the previous state is restored correctly.",
+      "suggested_fix": "Add a verification step after the rollback action to confirm that the previous state is valid.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:verify",
+      "task_id": "verify",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'verify' task depends on 'apply_successful', but this fact is not established explicitly in the 'apply' task.",
+      "suggested_fix": "Ensure the 'apply' task sets the 'apply_successful' flag upon completion.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:inf-02-terraform-migration:2:2",
+    "plan_id": "plan-inf-02-terraform-migration-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:apply",
+    "question": "Plan for goal 'inf-02-terraform-migration' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

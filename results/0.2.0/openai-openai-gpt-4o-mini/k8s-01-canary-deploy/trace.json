@@ -1,0 +1,286 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-01-canary-deploy",
+  "duration_seconds": 31.25,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-k8s-01-canary-deploy-r2",
+    "goal_id": "k8s-01-canary-deploy",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "k8s-01-canary-deploy-plan",
+    "created_at": "2026-08-23T06:54:24.572017Z",
+    "tasks": [
+      {
+        "id": "deploy_canary_5",
+        "description": "Deploy canary version with 5% traffic",
+        "action": "update_virtual_service",
+        "target": "istio_virtual_service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "application is up and running",
+            "fact": "app_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "5xx error rate and health checks",
+          "how": "Monitor logs and metrics",
+          "expected": "error rate < 1% and health check passes"
+        },
+        "rollback": {
+          "trigger": "failure in health check or 5xx error rate exceeds 1%",
+          "action": "revert to previous version",
+          "safety_guard": "ensure stable version is running"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_5",
+        "description": "Monitor traffic and error rates for canary at 5%",
+        "action": "monitor",
+        "target": "metrics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary version is deployed",
+            "fact": "canary_deployed_5",
+            "established_by": "deploy_canary_5",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "error rates",
+          "how": "check monitoring dashboard",
+          "expected": "error rate < 1%"
+        },
+        "rollback": {
+          "trigger": "5xx error rate exceeds threshold",
+          "action": "auto rollback to previous version",
+          "safety_guard": "trigger rollback only if metrics confirm failure"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_canary_50",
+        "description": "Deploy canary version with 50% traffic",
+        "action": "update_virtual_service",
+        "target": "istio_virtual_service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "5% traffic deployment is successful",
+            "fact": "traffic_5_successful",
+            "established_by": "monitor_5",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "5xx error rate and health checks",
+          "how": "Monitor logs and metrics",
+          "expected": "error rate < 1% and health check passes"
+        },
+        "rollback": {
+          "trigger": "failure in health check or 5xx error rate exceeds 1%",
+          "action": "revert to previous version",
+          "safety_guard": "ensure stable version is running"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_50",
+        "description": "Monitor traffic and error rates for canary at 50%",
+        "action": "monitor",
+        "target": "metrics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary version is deployed with 50% traffic",
+            "fact": "canary_deployed_50",
+            "established_by": "deploy_canary_50",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "error rates",
+          "how": "check monitoring dashboard",
+          "expected": "error rate < 1%"
+        },
+        "rollback": {
+          "trigger": "5xx error rate exceeds threshold",
+          "action": "auto rollback to previous version",
+          "safety_guard": "trigger rollback only if metrics confirm failure"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_canary_100",
+        "description": "Deploy canary version with 100% traffic",
+        "action": "update_virtual_service",
+        "target": "istio_virtual_service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "50% traffic deployment is successful",
+            "fact": "traffic_50_successful",
+            "established_by": "monitor_50",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "5xx error rate and health checks",
+          "how": "Monitor logs and metrics",
+          "expected": "error rate < 1% and health check passes"
+        },
+        "rollback": {
+          "trigger": "failure in health check or 5xx error rate exceeds 1%",
+          "action": "revert to previous version",
+          "safety_guard": "ensure stable version is running"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_100",
+        "description": "Monitor traffic and error rates for canary at 100%",
+        "action": "monitor",
+        "target": "metrics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary version is deployed with 100% traffic",
+            "fact": "canary_deployed_100",
+            "established_by": "deploy_canary_100",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "error rates",
+          "how": "check monitoring dashboard",
+          "expected": "error rate < 1%"
+        },
+        "rollback": {
+          "trigger": "5xx error rate exceeds threshold",
+          "action": "auto rollback to previous version",
+          "safety_guard": "trigger rollback only if metrics confirm failure"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_canary_5",
+        "to_task": "monitor_5",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_5",
+        "to_task": "deploy_canary_50",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_canary_50",
+        "to_task": "monitor_50",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_50",
+        "to_task": "deploy_canary_100",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_canary_100",
+        "to_task": "monitor_100",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:deploy_canary_100",
+      "task_id": "deploy_canary_100",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task deploy_canary_100 is ordered before its hard prerequisite monitor_50 has completed successfully.",
+      "suggested_fix": "Ensure that deploy_canary_100 is executed only after monitor_50 has successfully established traffic stability.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:deploy_canary_50",
+      "task_id": "deploy_canary_50",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task deploy_canary_50 depends on a verification fact 'traffic_5_successful' from monitor_5 which isn't confirmed as it is a soft dependency.",
+      "suggested_fix": "Establish a hard dependency or verification for traffic_5_successful prior to allowing deploy_canary_50 execution.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:deploy_canary_100",
+      "task_id": "deploy_canary_100",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback mechanism for deploy_canary_100 lacks verification for health checks prior to proceeding with the deployment.",
+      "suggested_fix": "Add additional checks or safety guards that ensure health checks are validated before deploying to 100% traffic.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-01-canary-deploy:2:2",
+    "plan_id": "plan-k8s-01-canary-deploy-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:deploy_canary_100",
+    "question": "Plan for goal 'k8s-01-canary-deploy' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

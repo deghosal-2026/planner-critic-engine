@@ -1,0 +1,231 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-01-ci-migration",
+  "duration_seconds": 7.97,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plat-01-ci-migration",
+    "goal_id": "plat-01-ci-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:50:06.903455Z",
+    "tasks": [
+      {
+        "id": "backup-repos",
+        "description": "Back up repository configurations",
+        "action": "backup",
+        "target": "repos",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "repositories are accessible",
+            "fact": "repos_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "convert-configs",
+        "description": "Convert .travis.yml files to GitHub Actions workflow files",
+        "action": "convert",
+        "target": "workflows",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "workflow files",
+          "how": "check for syntax errors",
+          "expected": "no syntax errors"
+        },
+        "rollback": {
+          "trigger": "conversion fails",
+          "action": "restore .travis.yml",
+          "safety_guard": "verify repo configuration integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "dry-run-tests",
+        "description": "Perform dry-run test runs for workflows",
+        "action": "test",
+        "target": "workflows",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "test results",
+          "how": "analyze test output",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "test fails",
+          "action": "disable workflows",
+          "safety_guard": "ensure no workflow is enabled"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "enable-actions",
+        "description": "Enable GitHub Actions workflows",
+        "action": "enable",
+        "target": "actions",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "actions status",
+          "how": "check GitHub Actions settings",
+          "expected": "GitHub Actions enabled"
+        },
+        "rollback": {
+          "trigger": "enablement fails",
+          "action": "disable actions",
+          "safety_guard": "restore previous actions state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "disable-travis",
+        "description": "Disable Travis CI integration",
+        "action": "disable",
+        "target": "travis",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Actions workflows are enabled",
+            "fact": "actions_enabled",
+            "established_by": "enable-actions",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "backup-repos",
+        "to_task": "convert-configs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "convert-configs",
+        "to_task": "dry-run-tests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dry-run-tests",
+        "to_task": "enable-actions",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "enable-actions",
+        "to_task": "disable-travis",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": [
+      {
+        "id": "batch-processing",
+        "kind": "fan_out",
+        "tasks": [
+          "backup-repos",
+          "convert-configs",
+          "dry-run-tests"
+        ],
+        "join": "quorum"
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:enable-actions",
+      "task_id": "enable-actions",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'enable-actions' is ordered before ensuring that 'dry-run-tests' complete successfully.",
+      "suggested_fix": "Reorder to ensure 'dry-run-tests' completes before 'enable-actions'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:dry-run-tests",
+      "task_id": "dry-run-tests",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'dry-run-tests' lacks a rollback plan for when tests fail, exposing the system to potential issues without a recovery option.",
+      "suggested_fix": "Implement a rollback strategy, such as reverting to a known-good state of the repository.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:disable-travis",
+      "task_id": "disable-travis",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'disable-travis' has a dependency on 'actions_enabled' which is not confirmed before execution, risking disabling Travis CI without valid confirmation.",
+      "suggested_fix": "Ensure 'actions_enabled' status is verified through the 'enable-actions' task prior to proceeding.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:feasibility:backup-repos",
+      "task_id": "backup-repos",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Task 'backup-repos' cannot be guaranteed to succeed as there are no clear measures to confirm that 'repos_accessible' is true.",
+      "suggested_fix": "Add verification steps to ensure repository accessibility before performing backups.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

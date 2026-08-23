@@ -1,0 +1,217 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mcc-02-multi-cloud-dr",
+  "duration_seconds": 29.32,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-mcc-02-multi-cloud-dr-r3",
+    "goal_id": "mcc-02-multi-cloud-dr",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-mcc-02-multi-cloud-dr-r2",
+    "created_at": "2026-08-23T06:45:41.662193Z",
+    "tasks": [
+      {
+        "id": "establish-replication",
+        "description": "Establish cross-cloud replication for database and object storage",
+        "action": "configure replication",
+        "target": "AWS to GCP/Azure",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replication status",
+          "how": "check logs",
+          "expected": "healthy replication"
+        },
+        "rollback": {
+          "trigger": "replication fails",
+          "action": "disable replication",
+          "safety_guard": "check data consistency"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-dns-failover",
+        "description": "Configure global DNS failover using Route 53",
+        "action": "setup routing",
+        "target": "Route 53",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Route 53 is operational",
+            "fact": "route53_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": {
+          "trigger": "DNS failover fails",
+          "action": "revert DNS settings",
+          "safety_guard": "verify traffic routing"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-dns-failover",
+        "description": "Verify the operational status of DNS failover",
+        "action": "check DNS failover",
+        "target": "Route 53",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "DNS failover status",
+          "how": "run DNS checks and verify record routing",
+          "expected": "failover operational and traffic routes correctly"
+        },
+        "rollback": null,
+        "risk_class": "low",
+        "blast_radius": "small"
+      },
+      {
+        "id": "dr-drill",
+        "description": "Run a DR failover drill",
+        "action": "failover to GCP",
+        "target": "active workload on GCP",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "system availability on GCP",
+          "how": "check service status",
+          "expected": "services running"
+        },
+        "rollback": {
+          "trigger": "drill fails",
+          "action": "fail back to AWS",
+          "safety_guard": "verify AWS workload integrity and confirm data availability"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "failback",
+        "description": "Execute failback to AWS after DR drill",
+        "action": "resync data and promote AWS",
+        "target": "AWS",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data consistency",
+          "how": "compare data checksum",
+          "expected": "identical data"
+        },
+        "rollback": {
+          "trigger": "failback issues",
+          "action": "promote GCP back",
+          "safety_guard": "validate data integrity before and after promotion"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "configure-dns-failover",
+        "to_task": "verify-dns-failover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-dns-failover",
+        "to_task": "dr-drill",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "establish-replication",
+        "to_task": "dr-drill",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dr-drill",
+        "to_task": "failback",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unverified_dependencies:verify-dns-failover",
+      "task_id": "verify-dns-failover",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "This task depends on the successful configuration of DNS failover, but it does not verify that the conditions for successful DNS routing (i.e., proper Route 53 operational status) are met beforehand.",
+      "suggested_fix": "Ensure preconditions verify the operational status of the DNS configuration before proceeding with this task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:dr-drill",
+      "task_id": "dr-drill",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The DR drill should not proceed until the DNS failover has been verified for proper operation.",
+      "suggested_fix": "Reorder tasks to ensure 'verify-dns-failover' is completed before 'dr-drill'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:weak_rollback:failback",
+      "task_id": "failback",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan lacks detailed steps to ensure data integrity on rollback. Validate and confirm data integrity before and after the promotion to avoid potential data loss.",
+      "suggested_fix": "Add specific steps to verify data integrity before promoting GCP back during rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mcc-02-multi-cloud-dr:3:3",
+    "plan_id": "plan-mcc-02-multi-cloud-dr-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unverified_dependencies:verify-dns-failover",
+    "question": "Plan for goal 'mcc-02-multi-cloud-dr' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

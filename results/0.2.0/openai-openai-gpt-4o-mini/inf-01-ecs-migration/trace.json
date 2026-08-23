@@ -1,0 +1,193 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-01-ecs-migration",
+  "duration_seconds": 21.01,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-inf-01-ecs-migration-r2",
+    "goal_id": "inf-01-ecs-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "inf-01-ecs-migration-plan",
+    "created_at": "2026-08-23T06:49:20.231304Z",
+    "tasks": [
+      {
+        "id": "backup-instances",
+        "description": "Back up the configuration of EC2 instances",
+        "action": "backup",
+        "target": "ec2-instances",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "backup status",
+          "how": "check backup logs",
+          "expected": "backup successful"
+        },
+        "rollback": {
+          "trigger": "backup fails",
+          "action": "stop migration and restore configurations",
+          "safety_guard": "check backup completeness"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "drain-traffic",
+        "description": "Drain traffic from EC2 instances",
+        "action": "drain",
+        "target": "ec2-instances",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Backup of instances is successful",
+            "fact": "backup_successful",
+            "established_by": "backup-instances",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic status",
+          "how": "monitor traffic flow",
+          "expected": "no active connections to EC2 instances"
+        },
+        "rollback": {
+          "trigger": "traffic drain fails",
+          "action": "restore traffic to instances",
+          "safety_guard": "check traffic metrics"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "migrate-to-ecs",
+        "description": "Migrate workloads from EC2 to ECS Fargate",
+        "action": "migrate",
+        "target": "ecs-fargate",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "workload functionality",
+          "how": "run application tests",
+          "expected": "all services operational on ECS"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "rollback to EC2 instances",
+          "safety_guard": "verify workload integrity by checking service responsiveness and availability"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover-traffic",
+        "description": "Cutover traffic to the new ECS services",
+        "action": "cutover",
+        "target": "ecs-fargate",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Migration to ECS is successful and verified",
+            "fact": "migration_successful",
+            "established_by": "migrate-to-ecs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service responsiveness",
+          "how": "check response times",
+          "expected": "response times within acceptable range"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "redirect traffic back to EC2",
+          "safety_guard": "monitor error rates"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "backup-instances",
+        "to_task": "drain-traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "drain-traffic",
+        "to_task": "migrate-to-ecs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate-to-ecs",
+        "to_task": "cutover-traffic",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:migrate-to-ecs",
+      "task_id": "migrate-to-ecs",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The migration to ECS task is executed before verifying the successful drain of traffic.",
+      "suggested_fix": "Ensure that 'drain-traffic' verification is passed before executing 'migrate-to-ecs'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:cutover-traffic",
+      "task_id": "cutover-traffic",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The cutover traffic task is executed before verifying the successful migration to ECS.",
+      "suggested_fix": "Ensure that 'migrate-to-ecs' verification is passed before executing 'cutover-traffic'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:inf-01-ecs-migration:2:2",
+    "plan_id": "plan-inf-01-ecs-migration-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:migrate-to-ecs",
+    "question": "Plan for goal 'inf-01-ecs-migration' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

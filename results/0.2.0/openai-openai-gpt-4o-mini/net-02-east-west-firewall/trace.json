@@ -1,0 +1,251 @@
+{
+  "dimension": "core-api",
+  "goal_id": "net-02-east-west-firewall",
+  "duration_seconds": 31.56,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-net-02-east-west-firewall-r3",
+    "goal_id": "net-02-east-west-firewall",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-net-02-east-west-firewall-r2",
+    "created_at": "2026-08-23T06:46:36.494786Z",
+    "tasks": [
+      {
+        "id": "baseline_traffic",
+        "description": "Baseline current traffic patterns across the cluster",
+        "action": "observe",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kubernetes cluster is operational",
+            "fact": "cluster_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic pattern report",
+          "how": "generate report using Prometheus",
+          "expected": "report aligns with expected service interactions"
+        },
+        "rollback": {
+          "trigger": "baseline fails",
+          "action": "revert to previous traffic analysis",
+          "safety_guard": "ensure previous analysis is valid"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "define_allow_list",
+        "description": "Define allow-list rules based on observed traffic",
+        "action": "create_rules",
+        "target": "Calico policies",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "allow-list rules",
+          "how": "review with service owners",
+          "expected": "rules cover all necessary service interactions"
+        },
+        "rollback": {
+          "trigger": "rules cause blockages",
+          "action": "restore previous rules",
+          "safety_guard": "cross-verify with service teams"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_audit_mode",
+        "description": "Deploy Calico policies in audit mode",
+        "action": "apply",
+        "target": "Calico",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Allow-list rules are defined",
+            "fact": "allow_list_defined",
+            "established_by": "define_allow_list",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment success",
+          "how": "check deployment logs",
+          "expected": "deployment completes without errors"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "revert to previous Calico policies",
+          "safety_guard": "ensure backup policies are intact"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_traffic",
+        "description": "Verify no legitimate traffic is blocked in audit mode",
+        "action": "check",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "traffic reports",
+          "how": "analyze using Prometheus and tcpdump",
+          "expected": "no legitimate service traffic is denied"
+        },
+        "rollback": {
+          "trigger": "critical traffic blocked",
+          "action": "disable audit rules",
+          "safety_guard": "monitor for alerts"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "switch_enforce_mode",
+        "description": "Switch Calico policies to enforce mode",
+        "action": "apply",
+        "target": "Calico",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Traffic verification is successful",
+            "fact": "traffic_verified",
+            "established_by": "verify_traffic",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "policy enforcement status",
+          "how": "run enforcement checks",
+          "expected": "policies are now in enforce mode without errors"
+        },
+        "rollback": {
+          "trigger": "enforcement causes failures",
+          "action": "revert to audit mode",
+          "safety_guard": "ensure backup policies are intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_denied_connections",
+        "description": "Monitor for denied connections after switching to enforce mode",
+        "action": "monitor",
+        "target": "traffic logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Policies are in enforce mode",
+            "fact": "enforce_mode_active",
+            "established_by": "switch_enforce_mode",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "baseline_traffic",
+        "to_task": "define_allow_list",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "define_allow_list",
+        "to_task": "deploy_audit_mode",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_audit_mode",
+        "to_task": "verify_traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_traffic",
+        "to_task": "switch_enforce_mode",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "switch_enforce_mode",
+        "to_task": "monitor_denied_connections",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:switch_enforce_mode",
+      "task_id": "switch_enforce_mode",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The 'switch_enforce_mode' task is executed before confirming with certainty that no critical traffic has been blocked, which is a hard prerequisite defined in the preceding task.",
+      "suggested_fix": "Ensure that traffic verification is completed satisfactorily before switching to enforce mode.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:monitor_denied_connections",
+      "task_id": "monitor_denied_connections",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'monitor_denied_connections' task depends on a fact that is not verified directly by its preceding task, 'switch_enforce_mode', making its execution potentially unsafe.",
+      "suggested_fix": "Add a verification step for monitoring impacts after switching to enforce mode.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:net-02-east-west-firewall:3:3",
+    "plan_id": "plan-net-02-east-west-firewall-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:switch_enforce_mode",
+    "question": "Plan for goal 'net-02-east-west-firewall' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

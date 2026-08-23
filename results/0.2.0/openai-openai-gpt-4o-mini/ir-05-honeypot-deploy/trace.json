@@ -1,0 +1,295 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-05-honeypot-deploy",
+  "duration_seconds": 9.19,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-ir-05",
+    "goal_id": "ir-05-honeypot-deploy",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:46:02.790660Z",
+    "tasks": [
+      {
+        "id": "prepare_tokens",
+        "description": "Prepare dummy tokens for deployment",
+        "action": "create",
+        "target": "tokens",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "deployment environment is ready",
+            "fact": "env_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_aws_key",
+        "description": "Deploy fake AWS access key in public repo",
+        "action": "deploy",
+        "target": "aws_key",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "aws_key deployed",
+          "how": "check public repo",
+          "expected": "aws_key present"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "remove aws key",
+          "safety_guard": "verify aws key absence"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_db_string",
+        "description": "Deploy fake database connection string in CI env var",
+        "action": "deploy",
+        "target": "db_string",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "db_string deployed",
+          "how": "check CI env vars",
+          "expected": "db_string present"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "remove db string",
+          "safety_guard": "verify db string absence"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_api_key",
+        "description": "Deploy fake API key in config file",
+        "action": "deploy",
+        "target": "api_key",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "api_key deployed",
+          "how": "check config file",
+          "expected": "api_key present"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "remove api key",
+          "safety_guard": "verify api key absence"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_alerts",
+        "description": "Configure alerting webhook to PagerDuty for all tokens",
+        "action": "configure",
+        "target": "alerts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "tokens are deployed",
+            "fact": "tokens_deployed",
+            "established_by": "deploy_aws_key",
+            "probe": null
+          },
+          {
+            "description": "tokens are deployed",
+            "fact": "tokens_deployed",
+            "established_by": "deploy_db_string",
+            "probe": null
+          },
+          {
+            "description": "tokens are deployed",
+            "fact": "tokens_deployed",
+            "established_by": "deploy_api_key",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "write_response_playbook",
+        "description": "Write a 3-step response playbook for token alerts",
+        "action": "create",
+        "target": "playbook",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "alerts are configured",
+            "fact": "alerts_configured",
+            "established_by": "configure_alerts",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "prepare_tokens",
+        "to_task": "deploy_aws_key",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "prepare_tokens",
+        "to_task": "deploy_db_string",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "prepare_tokens",
+        "to_task": "deploy_api_key",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_aws_key",
+        "to_task": "configure_alerts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_db_string",
+        "to_task": "configure_alerts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_api_key",
+        "to_task": "configure_alerts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_alerts",
+        "to_task": "write_response_playbook",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:prepare_tokens",
+      "task_id": "prepare_tokens",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The task 'prepare_tokens' does not define a clear method for preparing tokens to fulfill the deployment objective.",
+      "suggested_fix": "Define the specific method for creating or obtaining the dummy tokens needed for deployment.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:configure_alerts",
+      "task_id": "configure_alerts",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The configuration of alerts is dependent on the deployment of tokens, but the token deployments do not have a defined sequence leading to their verification.",
+      "suggested_fix": "Ensure that 'configure_alerts' is executed only after successful verification of all token deployments.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:write_response_playbook",
+      "task_id": "write_response_playbook",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'write_response_playbook' is dependent on 'alerts_configured', whose verification is not established for 'configure_alerts'.",
+      "suggested_fix": "Establish verification for the 'configure_alerts' task to ensure alerts are configured before proceeding to write the response playbook.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:deploy_aws_key",
+      "task_id": "deploy_aws_key",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider including a step that verifies the readiness of the public repository before deploying the AWS key.",
+      "suggested_fix": "Add a precondition to verify the public repository status.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:deploy_db_string",
+      "task_id": "deploy_db_string",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The deployment process could also mention specific checks for CI environment readiness.",
+      "suggested_fix": "Include a precondition to confirm the CI environment is prepared for the deployment of the database string.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:deploy_api_key",
+      "task_id": "deploy_api_key",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider including checks for the configuration file's accessibility before deploying the API key.",
+      "suggested_fix": "Add a precondition to ensure the config file is accessible before deployment.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

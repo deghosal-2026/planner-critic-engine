@@ -1,0 +1,254 @@
+{
+  "dimension": "core-api",
+  "goal_id": "data-06-cdc-rebuild",
+  "duration_seconds": 48.36,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 4,
+    "llm_calls": 4
+  },
+  "plan": {
+    "id": "plan-data-06-cdc-rebuild-r4",
+    "goal_id": "data-06-cdc-rebuild",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-data-06-cdc-rebuild-r3",
+    "created_at": "2026-08-23T06:40:25.268835Z",
+    "tasks": [
+      {
+        "id": "identify-lag",
+        "description": "Identify the cause of the replication lag",
+        "action": "analyze",
+        "target": "consumer",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "lag cause identified",
+          "how": "review logs",
+          "expected": "consumer outage confirmed"
+        },
+        "rollback": {
+          "trigger": "analysis fails",
+          "action": "revert to previous logs",
+          "safety_guard": "verify logs are intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "capture-wal-position",
+        "description": "Capture the current WAL position",
+        "action": "capture",
+        "target": "WAL",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "current WAL position",
+          "how": "query WAL status",
+          "expected": "position saved"
+        },
+        "rollback": {
+          "trigger": "capture fails",
+          "action": "restore from previous checkpoint",
+          "safety_guard": "check WAL integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-parity",
+        "description": "Verify data parity between source and target",
+        "action": "check",
+        "target": "parity",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data consistency",
+          "how": "compare datasets",
+          "expected": "datasets match"
+        },
+        "rollback": {
+          "trigger": "parity check fails",
+          "action": "restore latest known good state",
+          "safety_guard": "ensure no data loss"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-parity-confirmed",
+        "description": "Confirm that data parity has been verified",
+        "action": "confirm",
+        "target": "parity",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Verify parity check is established",
+            "fact": "parity_verified",
+            "established_by": "verify-parity",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "parity verification confirmed",
+          "how": "check verification records",
+          "expected": "parity_verified is true"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "replay-changes",
+        "description": "Replay missed changes from WAL archive",
+        "action": "replay",
+        "target": "target_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Verify data parity is completed",
+            "fact": "parity_verified",
+            "established_by": "verify-parity-confirmed",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data parity",
+          "how": "run data checks",
+          "expected": "data matches source"
+        },
+        "rollback": {
+          "trigger": "replay fails",
+          "action": "restore target_db from backup and previous WAL states",
+          "safety_guard": "verify backup integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover-consumers",
+        "description": "Cutover consumers back to real-time CDC stream",
+        "action": "cutover",
+        "target": "consumers",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Verify data parity before cutover",
+            "fact": "parity_verified",
+            "established_by": "verify-parity-confirmed",
+            "probe": null
+          },
+          {
+            "description": "Ensure replay changes are successful",
+            "fact": "changes_replayed",
+            "established_by": "replay-changes",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "consumer connectivity",
+          "how": "check consumer logs",
+          "expected": "consumers connected to real-time stream"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "switch back to WAL",
+          "safety_guard": "ensure all events are processed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "identify-lag",
+        "to_task": "capture-wal-position",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "capture-wal-position",
+        "to_task": "verify-parity",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-parity",
+        "to_task": "verify-parity-confirmed",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-parity-confirmed",
+        "to_task": "replay-changes",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "replay-changes",
+        "to_task": "cutover-consumers",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:cutover-consumers",
+      "task_id": "cutover-consumers",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'cutover-consumers' is ordered before 'replay-changes' is confirmed successful, which is a prerequisite for safe cutover.",
+      "suggested_fix": "Reorder tasks to ensure 'replay-changes' is completed and confirmed before 'cutover-consumers'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:cutover-consumers",
+      "task_id": "cutover-consumers",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'cutover-consumers' depends on 'changes_replayed' fact which is not established by an earlier task, making it concrete and potentially unsafe.",
+      "suggested_fix": "Ensure that 'replay-changes' sets a flag or establishes 'changes_replayed' before proceeding to 'cutover-consumers'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:data-06-cdc-rebuild:4:4",
+    "plan_id": "plan-data-06-cdc-rebuild-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:cutover-consumers",
+    "question": "Plan for goal 'data-06-cdc-rebuild' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

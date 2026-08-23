@@ -1,0 +1,283 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dbm-01-oracle-to-postgres",
+  "duration_seconds": 24.89,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-dbm-01-oracle-to-postgres-r2",
+    "goal_id": "dbm-01-oracle-to-postgres",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "dbm-01-oracle-to-postgres-plan",
+    "created_at": "2026-08-23T06:45:45.004903Z",
+    "tasks": [
+      {
+        "id": "schema_conversion",
+        "description": "Convert schema from Oracle data types to PostgreSQL types",
+        "action": "convert_schema",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "schema structure",
+          "how": "compare schemas",
+          "expected": "schemas are identical"
+        },
+        "rollback": {
+          "trigger": "schema conversion fails",
+          "action": "restore original schema",
+          "safety_guard": "ensure backup of original schema exists"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "type_mapping_validation",
+        "description": "Validate type mappings from Oracle to PostgreSQL",
+        "action": "validate_types",
+        "target": "type_mapping",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "type mapping correctness",
+          "how": "run tests on defined mappings",
+          "expected": "mappings are accurate"
+        },
+        "rollback": {
+          "trigger": "type mapping validation fails",
+          "action": "revert to original type mappings",
+          "safety_guard": "log all changes made"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "data_migration",
+        "description": "Migrate data from Oracle to PostgreSQL using AWS DMS or ora2pg",
+        "action": "migrate_data",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data consistency",
+          "how": "compare row counts and checksums",
+          "expected": "data matches Oracle"
+        },
+        "rollback": {
+          "trigger": "data migration fails",
+          "action": "fail back to Oracle",
+          "safety_guard": "ensure dual-write buffer is intact"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "dual_write_shadow",
+        "description": "Set up dual-write shadow period for application",
+        "action": "enable_dual_write",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application writes to both databases",
+          "how": "check logs",
+          "expected": "all writes recorded in both Oracle and PostgreSQL"
+        },
+        "rollback": {
+          "trigger": "dual-write causes issues",
+          "action": "disable dual-write",
+          "safety_guard": "verify application logs before rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "reconciliation_check",
+        "description": "Perform reconciliation checks on data between databases",
+        "action": "reconcile_data",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "row counts and checksums",
+          "how": "run comparison scripts",
+          "expected": "counts and checksums match"
+        },
+        "rollback": {
+          "trigger": "reconciliation fails",
+          "action": "revert application to read only from Oracle",
+          "safety_guard": "ensure application logs are preserved"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover",
+        "description": "Cutover to switch reads and writes to PostgreSQL",
+        "action": "cutover_databases",
+        "target": "databases",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application functionality",
+          "how": "run acceptance tests",
+          "expected": "application operates successfully on PostgreSQL"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "switch back to Oracle as the primary",
+          "safety_guard": "log all cutover actions"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify",
+        "description": "Verify the migration by testing application functionality",
+        "action": "verify_migration",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "complete application functionality",
+          "how": "run user acceptance tests",
+          "expected": "application behaves as intended"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "revert application to use Oracle",
+          "safety_guard": "check integrity of Postgres data"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "schema_conversion",
+        "to_task": "type_mapping_validation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "type_mapping_validation",
+        "to_task": "data_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "data_migration",
+        "to_task": "dual_write_shadow",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dual_write_shadow",
+        "to_task": "reconciliation_check",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "reconciliation_check",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover",
+        "to_task": "verify",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:type_mapping_validation",
+      "task_id": "type_mapping_validation",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Type mapping validation should occur after schema conversion is completed to ensure correct mappings.",
+      "suggested_fix": "Ensure that type_mapping_validation is executed only after the successful completion of schema_conversion.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:data_migration",
+      "task_id": "data_migration",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Data migration rollback plan lacks clear verification to ensure dual-write buffer integrity before failing back to Oracle.",
+      "suggested_fix": "Add specific checks to confirm dual-write buffer integrity prior to executing the rollback action.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:cutover",
+      "task_id": "cutover",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Cutover rollback plan lacks sound assurance for logging all cutover actions before switching back.",
+      "suggested_fix": "Implement stronger logging requirements for all actions taken during the cutover phase to verify integrity.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:data_migration",
+      "task_id": "data_migration",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Data migration task relies on previous tasks without verification that schema conversion and type mapping validation have succeeded.",
+      "suggested_fix": "Confirm success of schema_conversion and type_mapping_validation before proceeding to data_migration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:dbm-01-oracle-to-postgres:2:2",
+    "plan_id": "plan-dbm-01-oracle-to-postgres-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:type_mapping_validation",
+    "question": "Plan for goal 'dbm-01-oracle-to-postgres' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,249 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-02-streaming-replication",
+  "duration_seconds": 15.23,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "db-02-streaming-replication-plan",
+    "goal_id": "db-02-streaming-replication",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:41:13.294828Z",
+    "tasks": [
+      {
+        "id": "provision_primary",
+        "description": "Provision primary PostgreSQL instance",
+        "action": "provision",
+        "target": "primary_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cloud provider is accessible",
+            "fact": "cloud_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "primary instance status",
+          "how": "check instance health",
+          "expected": "running"
+        },
+        "rollback": {
+          "trigger": "provisioning fails",
+          "action": "delete primary instance",
+          "safety_guard": "check instance not in use"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "provision_standby",
+        "description": "Provision standby PostgreSQL instance",
+        "action": "provision",
+        "target": "standby_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "primary instance is running",
+            "fact": "primary_running",
+            "established_by": "provision_primary",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "standby instance status",
+          "how": "check instance health",
+          "expected": "running"
+        },
+        "rollback": {
+          "trigger": "provisioning fails",
+          "action": "delete standby instance",
+          "safety_guard": "check instance not in use"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_replication",
+        "description": "Configure streaming replication between primary and standby",
+        "action": "configure",
+        "target": "replication",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "both primary and standby are running",
+            "fact": "both_running",
+            "established_by": "provision_standby",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replication status",
+          "how": "run pg_stat_replication",
+          "expected": "no lag"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "reset replication settings",
+          "safety_guard": "ensure primary is still running"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_failover",
+        "description": "Configure Patroni or repmgr for automated failover",
+        "action": "configure",
+        "target": "failover",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "replication is configured",
+            "fact": "replication_configured",
+            "established_by": "configure_replication",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "failover functionality",
+          "how": "test simulated failover",
+          "expected": "standby becomes primary without data loss"
+        },
+        "rollback": {
+          "trigger": "failover setup fails",
+          "action": "reset failover configuration",
+          "safety_guard": "ensure replication is intact"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_replication_lag",
+        "description": "Verify replication lag under 100ms at P99",
+        "action": "monitor",
+        "target": "replication_lag",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "failover configuration is set up",
+            "fact": "failover_configured",
+            "established_by": "configure_failover",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "provision_primary",
+        "to_task": "provision_standby",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provision_standby",
+        "to_task": "configure_replication",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_replication",
+        "to_task": "configure_failover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_failover",
+        "to_task": "monitor_replication_lag",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:provision_standby",
+      "task_id": "provision_standby",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The standby instance provisioning task is dependent on the primary being running, but there is no verification step ensuring the primary is successfully provisioned before proceeding.",
+      "suggested_fix": "Add a verification step that ensures the primary instance is running after provisioning before starting the standby provisioning task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:configure_failover",
+      "task_id": "configure_failover",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The failover configuration task assumes that replication is configured without confirming its successful configuration through prior verification steps.",
+      "suggested_fix": "Add a prerequisite verification step to confirm that replication has been successfully configured before proceeding with failover configuration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:monitor_replication_lag",
+      "task_id": "monitor_replication_lag",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Monitoring replication lag should include a clear means or method of handling excessive lag cases, as specified in the plan objectives, to ensure operational integrity.",
+      "suggested_fix": "Document a response plan detailing steps to take if replication lag exceeds 100ms.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:risk:configure_replication",
+      "task_id": "configure_replication",
+      "version": 1,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "The replication configuration task carries a significant risk due to the complexities involved in ensuring data consistency during configuration.",
+      "suggested_fix": "Consider adding more detailed verification steps to ensure that data consistency is maintained throughout the configuration process.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

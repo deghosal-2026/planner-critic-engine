@@ -1,0 +1,273 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-01-multistage-pipeline",
+  "duration_seconds": 8.09,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "ci-01-multistage-pipeline",
+    "goal_id": "ci-01-multistage-pipeline",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:35:25.502402Z",
+    "tasks": [
+      {
+        "id": "lint",
+        "description": "Lint the codebase",
+        "action": "lint",
+        "target": "code",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "code is up to date",
+            "fact": "code_up_to_date",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "test",
+        "description": "Run unit tests",
+        "action": "test",
+        "target": "code",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "test results",
+          "how": "check test report",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "tests fail",
+          "action": "rollback changes",
+          "safety_guard": "verify previous test results"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "build",
+        "description": "Build the application",
+        "action": "build",
+        "target": "docker_image",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "image integrity",
+          "how": "run image checks",
+          "expected": "image valid"
+        },
+        "rollback": {
+          "trigger": "build fails",
+          "action": "clear cache and re-pull image",
+          "safety_guard": "confirm cache integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_staging",
+        "description": "Deploy to staging environment",
+        "action": "deploy",
+        "target": "staging",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "staging status",
+          "how": "check deployment health",
+          "expected": "staging healthy"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to previous stable version",
+          "safety_guard": "verify stable version exists"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "integration_tests",
+        "description": "Run integration tests",
+        "action": "test",
+        "target": "staging",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "integration test results",
+          "how": "analyze test report",
+          "expected": "all integration tests pass"
+        },
+        "rollback": {
+          "trigger": "integration tests fail",
+          "action": "rollback staging deployment",
+          "safety_guard": "confirm staging deployment state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "promote_prod",
+        "description": "Promote to production",
+        "action": "promote",
+        "target": "prod",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "production status",
+          "how": "monitor production health",
+          "expected": "production healthy and stable"
+        },
+        "rollback": {
+          "trigger": "promotion fails",
+          "action": "revert to last production version",
+          "safety_guard": "check active version"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "lint",
+        "to_task": "test",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test",
+        "to_task": "build",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "build",
+        "to_task": "deploy_staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_staging",
+        "to_task": "integration_tests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "integration_tests",
+        "to_task": "promote_prod",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:lint",
+      "task_id": "lint",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The task 'lint' is not achievable as the prerequisite 'code is up to date' is not ensured before execution.",
+      "suggested_fix": "Ensure that the code is updated before executing the lint task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:test",
+      "task_id": "test",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback mechanism for 'test' is not sound; rolling back changes does not guarantee previous test results can be restored safely.",
+      "suggested_fix": "Implement a more robust rollback strategy that also retains previous test results or prevents loss during rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:build",
+      "task_id": "build",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback mechanism for 'build' lacks sound verification steps to confirm cache integrity, which poses a risk if the rollback is triggered.",
+      "suggested_fix": "Add additional verification steps to confirm cache integrity before proceeding with rollback for the build task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:deploy_staging",
+      "task_id": "deploy_staging",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'deploy_staging' depends on successful completion of 'build', but its dependencies are not verified prior to execution.",
+      "suggested_fix": "Implement verification of the build task completion before executing deploy_staging.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:integration_tests",
+      "task_id": "integration_tests",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'integration_tests' is dependent on 'deploy_staging', but it does not verify the successful deployment before running integration tests.",
+      "suggested_fix": "Add a verification step to ensure 'deploy_staging' has successfully completed before executing integration_tests.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:promote_prod",
+      "task_id": "promote_prod",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'promote_prod' potentially risks a critical loss since it relies on checking active version without a solid mechanism to restore prior state.",
+      "suggested_fix": "Introduce a more reliable rollback strategy for 'promote_prod' that ensures a safe recovery to the last known good state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}
