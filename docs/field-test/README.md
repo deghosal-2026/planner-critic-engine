@@ -20,11 +20,11 @@ pip install -e .
 export OPENROUTER_API_KEY="sk-or-..."
 ```
 
-**Local provider (MLX):** no API key needed. Requires a local MLX server running:
+**Local provider (OMLX):** no API key needed (defaults to `omlx-test`). Requires an OMLX server running:
 
 ```bash
-# Start MLX server (separate terminal)
-mlx_lm.server --model mlx-community/Qwen3.5-14B --port 8080
+# Start OMLX server (separate terminal)
+omlx serve mlx-community/Qwen3-4B-Instruct-2507-4bit --port 8000
 ```
 
 ## Run Script
@@ -86,7 +86,7 @@ python3 docs/field-test/scripts/run.py --all --provider mlx
 | Provider | Flag | Model | Endpoint | Key needed | Cost |
 |----------|------|-------|----------|------------|------|
 | OpenRouter (cloud) | `--provider openai` | `gpt-4o-mini` | `api.openrouter.ai` | `OPENROUTER_API_KEY` | ~$0.35/sweep |
-| MLX (local) | `--provider mlx` | `Qwen3.5-14B` | `localhost:8080` | None | Free |
+| OMLX (local) | `--provider omlx` | `Qwen3-4B-Instruct-2507-4bit` | `127.0.0.1:8000` | None (defaults to `omlx-test`) | Free |
 
 **Cloud vs local notes:**
 - v0.1.0 field test proved local models (<14B) cannot produce structured JSON consistently
@@ -154,7 +154,7 @@ Results are stored in `results/<version>/<provider-model>/` by default:
 | Provider | Command | Output directory |
 |----------|---------|-----------------|
 | OpenRouter (cloud) | `run.py --all` | `results/0.2.0/openai-gpt-4o-mini/` |
-| MLX (local) | `run.py --all --provider mlx` | `results/0.2.0/mlx-Qwen3.5-14B/` |
+| OMLX (local) | `run.py --all --provider omlx` | `results/0.2.0/omlx-mlx-community-Qwen3-4B-Instruct-2507-4bit/` |
 | Custom | `run.py --all --output ./my-results` | `./my-results/` |
 
 Inside each output directory:
@@ -170,7 +170,7 @@ results/0.2.0/openai-gpt-4o-mini/
 └── ...
 ```
 
-Results are version-separated (`0.2.0`) and model-separated (`openai-gpt-4o-mini` vs `mlx-Qwen3.5-14B`), so you can compare cloud vs local results side by side.
+Results are version-separated (`0.2.0`) and model-separated (`openai-gpt-4o-mini` vs `omlx-mlx-community-Qwen3-4B-Instruct-2507-4bit`), so you can compare cloud vs local results side by side.
 
 ## Coverage
 
@@ -189,7 +189,7 @@ Results are version-separated (`0.2.0`) and model-separated (`openai-gpt-4o-mini
 | Problem | Cause | Fix |
 |---------|-------|-----|
 | `OPENROUTER_API_KEY not set` | Missing API key | `export OPENROUTER_API_KEY="sk-or-..."` |
-| `Connection refused` on MLX | MLX server not running | `mlx_lm.server --model Qwen3.5-14B --port 8080` |
+| `Connection refused` on OMLX | OMLX server not running | `omlx serve mlx-community/Qwen3-4B-Instruct-2507-4bit --port 8000` |
 | `0/0 results` | Assertion files malformed | Run P0 validation |
 | LLM produces garbled output | Local model too small | Use `--provider openai` (cloud) |
 | All strict goals escalate | Expected behavior | v0.1.0 proved strict+LLM critic = never approve |
