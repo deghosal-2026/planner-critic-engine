@@ -8,6 +8,8 @@ consumer of the bound contract.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 from pydantic import ValidationError
 
@@ -16,6 +18,8 @@ from planner_critic.escalation import EscalationManager
 from planner_critic.loop import LoopConfig, run_loop
 from planner_critic.schema.acceptance import (
     AcceptanceContract,
+    AcceptanceCriterion,
+    _content_hash,
     bind_acceptance,
     evaluate_contract,
     revise_contract,
@@ -39,6 +43,48 @@ class TestBindAndHash:
         a = bind_acceptance(goal, approving_authority="team-lead")
         b = bind_acceptance(goal, approving_authority="sre-oncall")
         assert a.content_hash != b.content_hash
+
+    def test_content_hash_is_order_independent(self) -> None:
+        """Identical criteria in different insertion order bind identically (#241).
+
+        The contract's identity must be a function of the rule *set*, not the
+        order it happened to be assembled in; genuinely different rule sets
+        still produce distinct hashes.
+        """
+        goal_id = "goal-order"
+        authority = "engine"
+        forward = (
+            AcceptanceCriterion(kind="policy_ref", value="p2"),
+            AcceptanceCriterion(kind="risk_tolerance", value="strict"),
+        )
+        reordered = (
+            AcceptanceCriterion(kind="risk_tolerance", value="strict"),
+            AcceptanceCriterion(kind="policy_ref", value="p2"),
+        )
+
+        def _bind(criteria: tuple[AcceptanceCriterion, ...]) -> AcceptanceContract:
+            """Build a v1 contract directly, hashing via the canonical path."""
+            return AcceptanceContract(
+                goal_id=goal_id,
+                criteria=criteria,
+                approving_authority=authority,
+                contract_version=1,
+                bound_at=datetime.now(UTC),
+                content_hash=_content_hash(goal_id, criteria, authority),
+            )
+
+        c_forward = _bind(forward)
+        c_reordered = _bind(reordered)
+        assert c_forward.content_hash == c_reordered.content_hash
+
+        # A genuinely different rule set must still diverge.
+        c_other = _bind(
+            (
+                AcceptanceCriterion(kind="risk_tolerance", value="balanced"),
+                AcceptanceCriterion(kind="policy_ref", value="p2"),
+            )
+        )
+        assert c_forward.content_hash != c_other.content_hash
 
     def test_revise_bumps_version_and_keeps_history(self) -> None:
         goal = make_goal(tolerance=RiskTolerance.BALANCED)
@@ -101,6 +147,22 @@ class TestLoopBinding:
         # findings); this asserts binding flows through without error and
         # approval is computed from the contract path.
         assert result.status == "approved"
+
+    def test_approved_plan_stamps_bound_contract_posture(self) -> None:
+        """#240: ApprovedPlan.risk_tolerance records the contract, not ambient goal."""
+        plans: list[Draft] = [make_plan(tasks=[make_task("t1")])]
+        result = run_loop(
+            make_goal(tolerance=RiskTolerance.BALANCED),
+            ScriptedPlanner(plans),
+            ScriptedCritic([[]]),
+            config=LoopConfig(),
+            acceptance=bind_acceptance(
+                make_goal(tolerance=RiskTolerance.STRICT), approving_authority="engine"
+            ),
+        )
+        assert result.status == "approved"
+        assert result.approved_plan is not None
+        assert result.approved_plan.risk_tolerance is RiskTolerance.STRICT
 
     def test_bound_strict_contract_escalates_warning_findings(self) -> None:
         """Balanced goal + strict-bound contract → warnings block approval."""

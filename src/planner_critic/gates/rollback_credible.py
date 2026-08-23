@@ -91,6 +91,7 @@ class Gate(BaseGate):
                         "re-stage the change behind an invertible action",
                     )
                 )
+            self_dep_n = 0
             for pre in producer.preconditions:
                 if pre.established_by == producer.id:
                     findings.append(
@@ -101,14 +102,33 @@ class Gate(BaseGate):
                             f"precondition fact {pre.fact!r} claims establishment "
                             f"by the task itself",
                             "Establish the fact from an earlier task or an env probe",
+                            index=self_dep_n,
                         )
                     )
+                    self_dep_n += 1
 
             if producer.rollback is None:
                 continue
 
-            for code, detail in _state_risks(plan, producer, by_id, id_to_index, consumers_of):
-                findings.append(self._finding(plan, detail, code, detail, ""))
+            for code, consumer_id in _state_risks(plan, producer, by_id, id_to_index, consumers_of):
+                if code == ROLLBACK_POST_CONSUMED:
+                    message = (
+                        f"task {consumer_id!r} hard-depends on this task with neither "
+                        f"verification nor rollback; if this task rolls back, state "
+                        f"{consumer_id!r} already consumed is erased with no re-sync"
+                    )
+                    fix = (
+                        f"add verification or a rollback to {consumer_id!r}, or move it "
+                        f"ahead of this task"
+                    )
+                else:  # ROLLBACK_INCONSISTENT_STATE
+                    message = (
+                        f"task {consumer_id!r} bases a precondition fact on this task yet "
+                        f"has neither verification nor rollback; restoring pre-write "
+                        f"state silently invalidates its basis"
+                    )
+                    fix = f"add verification or a rollback to {consumer_id!r}"
+                findings.append(self._finding(plan, consumer_id, code, message, fix))
         return findings
 
     def _finding(
@@ -118,10 +138,20 @@ class Gate(BaseGate):
         reason_code: str,
         message: str,
         suggested_fix: str,
+        *,
+        index: int = 0,
     ) -> Finding:
-        """Build one credibility blocker."""
+        """Build one credibility blocker.
+
+        ``index`` disambiguates findings that share a (task, reason_code) key
+        (#234) — e.g. two self-referential preconditions on one task — so
+        downstream ``{f.id: f}`` merges cannot collapse distinct defects. The
+        suffix is omitted for the first finding, keeping every existing
+        single-finding id string unchanged.
+        """
+        suffix = f":{index}" if index else ""
         return Finding(
-            id=f"rollback_credible:{plan.id}:{plan.version}:{task_id}:{reason_code}",
+            id=f"rollback_credible:{plan.id}:{plan.version}:{task_id}:{reason_code}{suffix}",
             task_id=task_id,
             version=plan.version,
             severity=Severity.BLOCKER,

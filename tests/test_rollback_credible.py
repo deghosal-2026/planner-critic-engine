@@ -77,6 +77,26 @@ class TestRollbackCredibleGate:
         assert len(findings) == 1
         assert findings[0].task_id == "t1"
 
+    def test_double_self_referential_preconditions_yield_distinct_ids(self) -> None:
+        """#234: two self-referential preconditions produce two distinguishable findings."""
+        task = make_task(
+            "t1",
+            risk_class="high",
+            blast_radius="high",
+            rollback=_RB,
+            preconditions=[
+                {"description": "fact one", "fact": "f1", "established_by": "t1"},
+                {"description": "fact two", "fact": "f2", "established_by": "t1"},
+            ],
+        )
+        plan = make_plan(tasks=[task])
+        findings = [
+            f for f in run_deterministic_gates(plan) if f.reason_code == ROLLBACK_SELF_DEPENDENT
+        ]
+        ids = [f.id for f in findings]
+        assert len(findings) == 2
+        assert len(set(ids)) == 2
+
     def test_inconsistent_state_consumer_flagged(self) -> None:
         """Later task's fact basis is this task, yet it cannot verify or undo."""
         consumer = make_task(
@@ -115,6 +135,36 @@ class TestRollbackCredibleGate:
         codes = {f.reason_code for f in run_deterministic_gates(plan)}
         assert ROLLBACK_POST_CONSUMED not in codes
         assert ROLLBACK_INCONSISTENT_STATE not in codes
+
+    def test_inconsistent_state_message_is_actionable(self) -> None:
+        """#233: state-risk blocker describes the defect, not a bare task id."""
+        consumer = make_task(
+            "t2",
+            preconditions=[
+                {"description": "schema migrated", "fact": "schema_v2", "established_by": "t1"}
+            ],
+        )
+        plan = make_plan(tasks=[_high("t1"), consumer])
+        finding = next(
+            f for f in run_deterministic_gates(plan) if f.reason_code == ROLLBACK_INCONSISTENT_STATE
+        )
+        message = finding.message or ""
+        task_id = finding.task_id or ""
+        assert task_id in message
+        assert message != task_id
+        assert finding.suggested_fix
+
+    def test_post_consumed_message_is_actionable(self) -> None:
+        """#233: post-consumed blocker names the consumer and a remediation."""
+        plan = make_plan(tasks=[_high("t1"), make_task("t2")], dependencies=[hard_dep("t1", "t2")])
+        finding = next(
+            f for f in run_deterministic_gates(plan) if f.reason_code == ROLLBACK_POST_CONSUMED
+        )
+        message = finding.message or ""
+        task_id = finding.task_id or ""
+        assert task_id in message
+        assert message != task_id
+        assert finding.suggested_fix
 
     def test_low_risk_producer_out_of_scope(self) -> None:
         """Only high-blast-radius producers are audited."""

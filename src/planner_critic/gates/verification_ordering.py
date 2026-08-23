@@ -151,10 +151,17 @@ class Gate(BaseGate):
         *,
         detail: str = "",
     ) -> Finding:
-        """Build one VERIFICATION_AFTER_CONSUMER blocker."""
+        """Build one VERIFICATION_AFTER_CONSUMER blocker.
+
+        The id carries the producer so two distinct producers offending against
+        the same consumer stay distinguishable downstream (#234) — escalation's
+        ``{f.id: f}`` merge would otherwise collapse one defect silently.
+        """
         where = f" ({detail})" if detail else ""
+        producer = next((t for t in plan.tasks if t.id == producer_id), None)
+        group = producer.parallel_group if producer is not None else None
         return Finding(
-            id=f"verification_ordering:{plan.id}:{plan.version}:{consumer_id}",
+            id=f"verification_ordering:{plan.id}:{plan.version}:{consumer_id}:{producer_id}",
             task_id=consumer_id,
             version=plan.version,
             severity=Severity.BLOCKER,
@@ -166,7 +173,7 @@ class Gate(BaseGate):
             ),
             suggested_fix=(
                 f"Order task {consumer_id!r} after {producer_id!r}'s verification "
-                f"(or move it out of parallel group {producer_id!r} shares)"
+                f"(or move it out of parallel group {group!r})"
             ),
         )
 

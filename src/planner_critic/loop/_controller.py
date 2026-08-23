@@ -366,7 +366,7 @@ def _run(
     # reads the frozen posture, never ambient goal/config state.
     contract = acceptance if acceptance is not None else bind_acceptance(goal)
 
-    approval: ApprovalGate = ApprovalGate(goal.risk_tolerance, goal.approval_ttl)
+    approval: ApprovalGate = ApprovalGate(contract.risk_tolerance(), goal.approval_ttl)
     prior_plan: PlanVersion | None = None
     prior_findings: list[Finding] = []
     sig_history: list[str] = []
@@ -533,10 +533,19 @@ def _run(
             return _escalate(goal, plan, findings, "plan_oscillation_detected", revision)
 
         hist_history.append(compute_family_histogram(findings))
-        # Cycling waits until structural oscillation's window has had its
-        # chance: when a trace exhibits BOTH patterns, #152's shape-based
-        # diagnosis (which tasks cycle) is the richer escalation and wins.
-        if len(hist_history) >= config.oscillation_window and detect_histogram_cycling(
+        # Cycling defers to structural oscillation (#152): when a trace
+        # exhibits BOTH patterns, shape-based diagnosis (which tasks cycle)
+        # is the richer escalation and wins. Deferral applies only while
+        # oscillation is actually reachable; under stock revision_cap=3 the
+        # oscillation window (4) can never fill (#232), so waiting on it
+        # leaves cycling dead too — there the earliest reachable revision is
+        # the detector's own minimum, histogram_lag + 1.
+        cycle_start = (
+            config.oscillation_window
+            if config.revision_cap >= config.oscillation_window
+            else config.histogram_lag + 1
+        )
+        if len(hist_history) >= cycle_start and detect_histogram_cycling(
             hist_history, config.histogram_lag
         ):
             logger.info("loop: family histogram cycling detected → escalate (reshuffling)")

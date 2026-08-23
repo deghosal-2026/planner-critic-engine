@@ -100,6 +100,25 @@ Scope note: `0.2.1-m11` was fast-forward-merged into `main` at `4029877` and CI-
 
 Rule carried from M11: benchmark/measurement steps may close on negative results if honestly documented; nothing else closes on partial evidence.
 
+### 5.2 Step-1 code-review findings — filed as [CodeReview] issues (#232–#241)
+
+The combined-diff code review (2026-08-23, multi-pass with runtime reproductions) produced ten validated findings, all triaged into this milestone. Fixes land with regression tests failing on pre-fix code (P1 rule applies). **All ten closed 2026-08-23** — nine fixed in-release with RED→GREEN regression tests; #238 documented as F-14 caveat deferred to v0.3.0. Verification gate at the fix tip: 1292 passed / 14 docker-gated skips, ruff + mypy strict clean (272 files), coverage **91.58%** (>91% floor; no regression vs M11's accepted 91.62%).
+
+| Issue | Finding | Disposition |
+|---|---|---|
+| ✅ [#232](https://github.com/deghosal-2026/planner-critic-engine/issues/232) | Histogram cycling detector unreachable under default `revision_cap=3` (< `oscillation_window` 4) | Fixed — gate now uses `histogram_lag + 1` when the oscillation window is unreachable; `test_default_config_reaches_cycling_detection` |
+| ✅ [#233](https://github.com/deghosal-2026/planner-critic-engine/issues/233) | `rollback_credible` state-risk blockers emit bare task id as message, empty suggested_fix | Fixed — descriptive messages + remediation per state-risk arm; `test_*_message_is_actionable` |
+| ✅ [#234](https://github.com/deghosal-2026/planner-critic-engine/issues/234) | `verification_ordering` finding ids omit producer_id → distinct defects collide/merge in escalation | Fixed — ids carry producer_id; rollback_credible self-dep adds `:n` suffix; `test_multi_producer_consumer_ids_are_distinct`, `test_double_self_referential_preconditions_yield_distinct_ids` |
+| ✅ [#235](https://github.com/deghosal-2026/planner-critic-engine/issues/235) | Live-critic runner loses entire run on mid-trial exception (no partial report) | Fixed — per-trial try/except, error recorded in-line, run continues; `test_transient_critic_error_does_not_discard_run` |
+| ✅ [#236](https://github.com/deghosal-2026/planner-critic-engine/issues/236) | `test_all_adapters_importable` gutted to `pass` — vacuous test | Fixed — restored with `importlib.import_module` over all six adapter modules |
+| ✅ [#237](https://github.com/deghosal-2026/planner-critic-engine/issues/237) | Suggested-fix prints producer id where parallel-group name belongs | Fixed — interpolates `producer.parallel_group`; `test_parallel_suggested_fix_names_the_group` |
+| ✅ [#238](https://github.com/deghosal-2026/planner-critic-engine/issues/238) | `approving_authority` never wired in CLI/HTTP/MCP entry points; `revise_contract` has zero production callers (#215 claim dormant on shipped surfaces) | Documented as **F-14** in `docs/reference/failure-modes.md`; wiring is a new API surface deferred to v0.3.0 (patch release keeps no-new-behavior discipline) |
+| ✅ [#239](https://github.com/deghosal-2026/planner-critic-engine/issues/239) | `evidence_drift_rate` pools explanations across trials → deterministic critics score 1.0 | Fixed — compares per-trial explanation-set signatures; `test_steady_two_finding_critic_has_zero_evidence_drift` |
+| ✅ [#240](https://github.com/deghosal-2026/planner-critic-engine/issues/240) | `ApprovalGate` reads ambient `goal.risk_tolerance`, not bound contract posture → `ApprovedPlan` stamps wrong regime | Fixed — `ApprovalGate` built from `contract.risk_tolerance()`; `test_approved_plan_stamps_bound_contract_posture` |
+| ✅ [#241](https://github.com/deghosal-2026/planner-critic-engine/issues/241) | Acceptance-contract content hash preserves criteria order (latent until multi-criterion contracts) | Fixed — `_content_hash` sorts `(kind, value)` pairs; `test_content_hash_is_order_independent` |
+
+Non-issue observations accepted as deviations (record for #225 release notes): the three release commits violate the Conventional Commits rule (history already pushed to `main` — not rewritten); 17 pre-existing src modules touched by the remediation pass lack module docstrings (pre-existing debt, not M11 additions — #222's docstring criterion scopes to M11-added modules only).
+
 ## 6. Version Bump Checklist (applied by [#226](https://github.com/deghosal-2026/planner-critic-engine/issues/226))
 
 | Location | Change |

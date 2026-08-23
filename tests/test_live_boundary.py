@@ -110,3 +110,71 @@ class TestRunLiveBoundaryCases:
             "trials_per_plan",
         ):
             assert key in report
+
+    def test_transient_critic_error_does_not_discard_run(self) -> None:
+        """#235: a mid-run critic exception yields a partial report, not total loss."""
+
+        class _FailingOnTrial3(_SteadyCritic):
+            def __init__(self) -> None:
+                self._n = 0
+
+            def audit(self, plan: PlanVersion, findings: list[Finding]) -> list[Finding]:
+                self._n += 1
+                if self._n == 3:
+                    raise RuntimeError("transient transport timeout")
+                return _SteadyCritic.audit(self, plan, findings)
+
+        report = run_live_boundary_cases(_FailingOnTrial3(), trials=5)
+        # The run completed despite the error: a report is returned and the
+        # failed trial is recorded rather than aborting everything.
+        assert cast("int", report["cases_evaluated"]) >= 1
+        # Every plan group has its full trial record set (errors recorded in-line).
+        for case_entry in cast("list[dict[str, object]]", report["cases"]):
+            plans_map = cast("dict[str, object]", case_entry["plans"])
+            for plan_rec in plans_map.values():
+                trials = cast("list[object]", cast("dict[str, object]", plan_rec)["trials"])
+                assert len(trials) == 5
+        # At least one trial carries an error marker somewhere in the report.
+        flat = json_dumps(report)
+        assert "error" in flat.lower() or "transient transport timeout" in flat.lower()
+
+    def test_steady_two_finding_critic_has_zero_evidence_drift(self) -> None:
+        """#239: a deterministic 2-finding critic must not score drift=1.0.
+
+        Explanations vary INTRA-trial (two findings) but are identical
+        ACROSS trials; drift measures cross-trial variation, so the rate
+        must be 0.0 for a stable critic.
+        """
+
+        class _SteadyTwoFindingCritic(CriticRole):
+            def audit(self, plan: PlanVersion, findings: list[Finding]) -> list[Finding]:
+                return [
+                    Finding(
+                        id=f"{plan.id}:b1",
+                        task_id=plan.tasks[0].id,
+                        version=plan.version,
+                        severity=Severity.BLOCKER,
+                        reason_code="llm_weak_rollback",
+                        message="rollback names recovery that does not exist",
+                        heuristic_family=HeuristicFamily.WEAK_ROLLBACK,
+                    ),
+                    Finding(
+                        id=f"{plan.id}:w1",
+                        task_id=plan.tasks[0].id,
+                        version=plan.version,
+                        severity=Severity.WARNING,
+                        reason_code="llm_risk",
+                        message="consider latency during cutover",
+                        heuristic_family=HeuristicFamily.RISK,
+                    ),
+                ]
+
+        report = run_live_boundary_cases(_SteadyTwoFindingCritic(), trials=3)
+        assert report["evidence_drift_rate"] == 0.0
+
+
+def json_dumps(obj: object) -> str:
+    """Render for substring assertions (import here to avoid top-level json dep)."""
+    import json
+
+    return json.dumps(obj, default=str)

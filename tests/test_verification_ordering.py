@@ -134,6 +134,36 @@ class TestVerificationOrderingGate:
             f.reason_code for f in run_deterministic_gates(plan)
         }
 
+    def test_multi_producer_consumer_ids_are_distinct(self) -> None:
+        """#234: two producers offending against one consumer yield two findings, distinct ids."""
+        plan = make_plan(
+            tasks=[make_task("u"), _high_mutate("t1"), _high_mutate("t2")],
+            dependencies=[hard_dep("t1", "u"), hard_dep("t2", "u")],
+        )
+        findings = [
+            f for f in run_deterministic_gates(plan) if f.reason_code == VERIFICATION_AFTER_CONSUMER
+        ]
+        ids = [f.id for f in findings]
+        assert len(findings) == 2
+        assert len(set(ids)) == 2
+
+    def test_parallel_suggested_fix_names_the_group(self) -> None:
+        """#237: parallel-race suggested fix names the parallel group, not the task id."""
+        plan = make_plan(
+            tasks=[
+                _high_mutate("deploy", parallel_group="g1"),
+                make_task("rotate", target="deploy", parallel_group="g1"),
+            ],
+        )
+        findings = [
+            f for f in run_deterministic_gates(plan) if f.reason_code == VERIFICATION_AFTER_CONSUMER
+        ]
+        assert len(findings) == 1
+        fix = findings[0].suggested_fix or ""
+        assert "'g1'" in fix
+        # The parallel-group slot names the group, not the producer task id.
+        assert "parallel group 'g1'" in fix
+
 
 class TestGateRegistration:
     def test_gate_registered_in_stable_order(self) -> None:

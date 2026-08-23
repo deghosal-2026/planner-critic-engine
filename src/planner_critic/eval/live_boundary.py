@@ -83,11 +83,19 @@ def run_live_boundary_cases(
         for role, plan in (("a", case.plan_a), ("b", case.plan_b)):
             trial_records = []
             signatures: set[frozenset[tuple[str, str]]] = set()
-            explanations: set[str] = set()
+            explanation_signatures: set[frozenset[str]] = set()
             for trial in range(trials):
-                found = critic.audit(plan, [])
+                try:
+                    found = critic.audit(plan, [])
+                except Exception as exc:
+                    trial_records.append({"trial": trial, "error": f"{type(exc).__name__}: {exc}"})
+                    continue
                 signatures.add(_verdict_signature(found))
-                explanations.update(f.message for f in found)
+                # Drift measures cross-trial variation of the explanation set:
+                # a deterministic multi-finding critic (intra-trial variety)
+                # must not be scored as drift (#239). Pool the per-trial message
+                # set as one signature and compare those signatures across trials.
+                explanation_signatures.add(frozenset(f.message or "" for f in found))
                 trial_records.append(
                     {
                         "trial": trial,
@@ -115,7 +123,7 @@ def run_live_boundary_cases(
             groups += 1
             if len(signatures) > 1:
                 label_flips += 1
-            if len(explanations) > 1:
+            if len(explanation_signatures) > 1:
                 drifts += 1
 
             plans_map[role] = {"trials": trial_records}

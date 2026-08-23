@@ -113,7 +113,19 @@ class TestM1Adapters:
     """M1-3: All adapters importable and functional."""
 
     def test_all_adapters_importable(self) -> None:
-        pass
+        """All adapter modules import cleanly (#236: restored from vacuous `pass`)."""
+        import importlib
+
+        adapter_modules = [
+            "planner_critic.adapters.python",
+            "planner_critic.adapters.crewai",
+            "planner_critic.adapters.langgraph",
+            "planner_critic.adapters.openai_agents",
+            "planner_critic.adapters.pydantic_ai",
+            "planner_critic.adapters.autogen",
+        ]
+        for module_name in adapter_modules:
+            importlib.import_module(module_name)
 
     def test_python_adapter_plan_method_exists(self) -> None:
         from planner_critic.adapters.python import PlannerCriticPlan

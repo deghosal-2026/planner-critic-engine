@@ -63,8 +63,15 @@ class AcceptanceContract(BaseModel):
 def _content_hash(
     goal_id: str, criteria: tuple[AcceptanceCriterion, ...], approving_authority: str
 ) -> str:
-    """Stable SHA-256 over the canonical serialized inputs."""
-    payload = repr(((goal_id, [(c.kind, c.value) for c in criteria]), approving_authority))
+    """Stable SHA-256 over the canonical serialized inputs.
+
+    Criteria enter the hash as an order-normalized ``(kind, value)`` sequence
+    (#241): the same rule set binds to one identity regardless of insertion
+    order, while genuinely different rule sets still diverge. Normalization
+    is a no-op for single-criterion contracts, preserving every hash already
+    bound by :func:`bind_acceptance`.
+    """
+    payload = repr(((goal_id, sorted((c.kind, c.value) for c in criteria)), approving_authority))
     return sha256(payload.encode("utf-8")).hexdigest()
 
 

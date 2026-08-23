@@ -211,3 +211,35 @@ class TestControllerIntegration:
             config=LoopConfig(revision_cap=10, oscillation_window=4),
         )
         assert result.reason_code == "plan_oscillation_detected"
+
+    def test_default_config_reaches_cycling_detection(self) -> None:
+        """#232: stock LoopConfig (revision_cap=3) must still reach the detector."""
+        from conftest import Draft, ScriptedCritic, ScriptedPlanner, make_goal, make_plan, make_task
+        from planner_critic.loop import LoopConfig, run_loop
+        from planner_critic.schema.goal import RiskTolerance
+
+        plans: list[Draft] = [
+            make_plan(
+                plan_id=f"plan-{i}",
+                tasks=[
+                    make_task(f"t{j}", verification={"what": "x", "how": "y", "expected": "z"})
+                    for j in range(1, i + 3)
+                ],
+            )
+            for i in range(3)
+        ]
+        critic = ScriptedCritic(
+            [
+                [_llm_blocker(HeuristicFamily.RISK)],
+                [_llm_blocker(HeuristicFamily.MISSING_STEPS)],
+                [_llm_blocker(HeuristicFamily.RISK)],
+            ]
+        )
+        result = run_loop(
+            make_goal(tolerance=RiskTolerance.STRICT),
+            ScriptedPlanner(plans),
+            critic,
+            config=LoopConfig(),
+        )
+        assert result.status == "escalated"
+        assert result.reason_code == FAMILY_HISTOGRAM_CYCLING
