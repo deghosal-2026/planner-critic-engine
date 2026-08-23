@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import time
 
-import pytest
-
 from planner_critic.run_budget import FailureClass, ReplanClassifier, RunBudget
 from planner_critic.types import ExecutionTrace
 

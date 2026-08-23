@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import time
 
-import pytest
-
+from conftest import EmptyCritic, ScriptedPlanner, make_goal, make_plan, make_task
 from planner_critic.ledger import PreconditionLedger
-from planner_critic.loop import LoopConfig, LoopResult, run_loop
+from planner_critic.loop import LoopConfig, run_loop
 from planner_critic.run_budget import RunBudget
 from planner_critic.schema.goal import RiskTolerance
 from planner_critic.schema.plan import PlanVersion
-from conftest import EmptyCritic, ScriptedPlanner, make_goal, make_plan, make_task
 
 
 def _safe_plan() -> PlanVersion:

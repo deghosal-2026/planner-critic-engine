@@ -3,14 +3,11 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from ..corpus import load_all_instances, load_corpus_manifest
-from ..eval.injection_harness import injection_summary, run_injection_harness
-from ..eval.oracle import OracleEvalHarness, save_report
 from ..eval.regression import generate_artifact
 from ..gates import run_deterministic_gates
-from ..roles import CriticRole, PlannerRole
 from ..types import Severity
 
 

@@ -18,10 +18,9 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import json
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
@@ -344,8 +343,8 @@ class Notifier:
 
 __all__ = [
     "EscalationEvent",
-    "Notifier",
     "NotificationResult",
+    "Notifier",
     "SlackFormatter",
     "TeamsFormatter",
     "WebhookFormatter",

@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from planner_critic.eval.label_migration import (
-    BoundaryCase,
     IrreversibleInvariantGate,
     LabelMigrationRecord,
     build_confusion_matrix,

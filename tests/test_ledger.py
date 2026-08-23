@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import pytest
-
 from planner_critic.ledger import PreconditionLedger
-from planner_critic.schema.plan import PlanVersion, RiskClass, Task, Precondition
+from planner_critic.schema.plan import PlanVersion, Precondition, RiskClass, Task
 
 
 def _make_precondition(fact: str) -> Precondition:

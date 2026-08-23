@@ -3,10 +3,10 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
-from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, Pattern
+from re import Pattern
+from typing import Any
 
 from planner_critic.reason_codes import SECRET_REDACTED
 

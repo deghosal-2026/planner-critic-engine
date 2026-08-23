@@ -136,7 +136,7 @@ def _match_broad_target(target: str, broad: str) -> bool:
     if broad == "everything":
         return target == "everything"
     if broad == "arn:aws:iam::*":
-        return target == "arn:aws:iam::*" or target.startswith("arn:aws:iam::") and target.endswith(":root")
+        return target == "arn:aws:iam::*" or (target.startswith("arn:aws:iam::") and target.endswith(":root"))
     return False
 
 

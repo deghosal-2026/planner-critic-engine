@@ -3,13 +3,14 @@ from __future__ import annotations
 import functools
 import inspect
 import logging
-from typing import Any, Callable, TypeVar, cast
+from collections.abc import Callable
+from typing import Any, TypeVar, cast
 
 from .engine import Engine
 from .loop import LoopConfig
 from .roles import CriticRole, PlannerRole
 from .schema.goal import Goal, RiskTolerance
-from .types import Finding, PlanningError, Severity
+from .types import Finding
 
 logger = logging.getLogger(__name__)
 
@@ -176,7 +177,8 @@ def _make_goal(
     risk_tolerance: str,
     constraints: dict[str, Any] | None,
 ) -> Goal:
-    from .schema.goal import Budget, Constraints as GoalConstraints
+    from .schema.goal import Budget
+    from .schema.goal import Constraints as GoalConstraints
     rt = RiskTolerance(risk_tolerance)
     c = GoalConstraints()
     if constraints:
@@ -195,9 +197,7 @@ def _make_engine(
     critic: CriticRole | None,
     config: LoopConfig | None,
 ) -> Engine:
-    from .critique.critic import LLMCritic
-    from .llm.base import LLMProvider, Message
-    from .llm.registry import ProviderRegistry
+    from .llm.base import Message
     from .llm.structured import StructuredEnforcer
     from .schema.plan import PlanVersion
 
@@ -247,7 +247,7 @@ def _get_default_provider() -> Any:
             return provider
     except Exception:
         pass
-    from .llm.base import Completion, LLMProvider, Message
+    from .llm.base import Completion, Message
     class _FakeProvider:
         name = "fake"
         base_url = ""

@@ -8,11 +8,11 @@ irreversible steps.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from ..gates.base import BaseGate
 from ..reason_codes import IRREVERSIBLE_INVARIANT_BLOCKED
-from ..schema.plan import Dependency, DependencyKind, PlanVersion, Task
+from ..schema.plan import PlanVersion, Task
 from ..types import Finding, Severity
 
 

@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-import pytest
-
-from planner_critic.cli.diagnose import _diagnose_trace, DIAGNOSTIC_RULES
+from planner_critic.cli.diagnose import DIAGNOSTIC_RULES, _diagnose_trace
 from planner_critic.types import ExecutionTrace
 
 

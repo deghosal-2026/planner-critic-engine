@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from planner_critic.quota import BlastRadiusQuotaConfig, BlastRadiusQuotaGate
 from planner_critic.schema.goal import RiskTolerance
 from planner_critic.schema.plan import PlanVersion, RiskClass, Task

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Batch 13: 2 scenarios — runs each goal individually via run_core_api."""
-import json, time
+import json
+import time
 from pathlib import Path
 
 GOALS_ROOT = Path("docs/field-test/goals")
@@ -28,6 +29,7 @@ def load_results():
 
 def main():
     import yaml
+
     from planner_critic.field_test_harness import run_core_api
     from planner_critic.llm.registry import ProviderRegistry
     from planner_critic.loop import LoopConfig

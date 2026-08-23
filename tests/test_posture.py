@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from planner_critic.posture import PostureResolver, ResolvedPosture, PostureRule
+from planner_critic.posture import PostureResolver, PostureRule, ResolvedPosture
 from planner_critic.schema.goal import RiskTolerance
 
 

@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import json
 import tempfile
 from pathlib import Path
-
-import pytest
 
 from planner_critic.schema.plan import PlanVersion, RiskClass, Task
 
@@ -15,7 +12,7 @@ def _plan() -> PlanVersion:
 
 
 def test_cli_imports() -> None:
-    from planner_critic._cli import _SUBCOMMANDS, main
+    from planner_critic._cli import _SUBCOMMANDS
     assert "check" in _SUBCOMMANDS
     assert "domains" in _SUBCOMMANDS
     assert "policy" in _SUBCOMMANDS
@@ -133,7 +130,11 @@ def test_policy_test_nonexistent() -> None:
 
 
 def test_guardrail_module_imports() -> None:
-    from planner_critic.guardrail import guardrail, re_gate, escalate, EscalationRequired, PreconditionDrift
+    from planner_critic.guardrail import (
+        escalate,
+        guardrail,
+        re_gate,
+    )
     assert callable(guardrail)
     assert callable(re_gate)
     assert callable(escalate)
