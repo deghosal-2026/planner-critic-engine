@@ -1,0 +1,246 @@
+{
+  "dimension": "core-api",
+  "goal_id": "pay-02-checkout-integration",
+  "duration_seconds": 9.49,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "pay-02-checkout-integration-plan",
+    "goal_id": "pay-02-checkout-integration",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:49:40.853275Z",
+    "tasks": [
+      {
+        "id": "sdk_swap",
+        "description": "Replace Stripe Elements with Adyen Web Drop-in component",
+        "action": "replace",
+        "target": "payment component",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "current payment component is Stripe Elements",
+            "fact": "stripe_elements_active",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "tokenization_migration",
+        "description": "Migrate from Stripe token to Adyen token format",
+        "action": "migrate",
+        "target": "backend token handling",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "backend token acceptance",
+          "how": "test API with Adyen token",
+          "expected": "success response for Adyen token"
+        },
+        "rollback": {
+          "trigger": "tokenization fails",
+          "action": "revert backend to Stripe token handling",
+          "safety_guard": "verify backend integrity after rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_sca",
+        "description": "Configure Strong Customer Authentication flow with Adyen",
+        "action": "configure",
+        "target": "3DS2 implementation",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "SCA configuration",
+          "how": "run tests against the SCA flow",
+          "expected": "successful 3DS2 authentication"
+        },
+        "rollback": {
+          "trigger": "configuration issue",
+          "action": "revert to previous SCA settings",
+          "safety_guard": "verify configuration fallback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "sandbox_testing",
+        "description": "Conduct testing in Adyen sandbox with various card networks",
+        "action": "test",
+        "target": "Adyen sandbox",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "SCA is configured",
+            "fact": "sca_configured",
+            "established_by": "configure_sca",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "canary_release",
+        "description": "Deploy to 5% of users via feature flag",
+        "action": "deploy",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "user feedback and error rates",
+          "how": "monitor logs and collect feedback",
+          "expected": "error rates remain low"
+        },
+        "rollback": {
+          "trigger": "excessive errors",
+          "action": "revert feature flag to Stripe Elements",
+          "safety_guard": "monitor error rates after rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "full_rollout",
+        "description": "Roll out to 100% of users",
+        "action": "release",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "overall system stability",
+          "how": "review performance and error metrics",
+          "expected": "system maintains performance under load"
+        },
+        "rollback": {
+          "trigger": "critical issues",
+          "action": "revert feature flag to Stripe Elements",
+          "safety_guard": "confirm rollback does not introduce new issues"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "sdk_swap",
+        "to_task": "tokenization_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "tokenization_migration",
+        "to_task": "configure_sca",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_sca",
+        "to_task": "sandbox_testing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "sandbox_testing",
+        "to_task": "canary_release",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "canary_release",
+        "to_task": "full_rollout",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:tokenization_migration",
+      "task_id": "tokenization_migration",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'tokenization_migration' is ordered before the prerequisite task 'sdk_swap' is completed.",
+      "suggested_fix": "Reorder tasks to ensure 'sdk_swap' completes before 'tokenization_migration'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:sandbox_testing",
+      "task_id": "sandbox_testing",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'sandbox_testing' depends on 'configure_sca', which has no verified output confirming implementation success.",
+      "suggested_fix": "Implement verification for 'configure_sca' to confirm successful SCA configuration before allowing 'sandbox_testing' to execute.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:full_rollout",
+      "task_id": "full_rollout",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'full_rollout' lacks a detailed rollback plan that ensures no new issues occur if rolled back.",
+      "suggested_fix": "Define a rollback plan for 'full_rollout' that includes testing for new issues on rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:risk:full_rollout",
+      "task_id": "full_rollout",
+      "version": 1,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Task 'full_rollout' has high-risk factors associated with releasing to 100% of users without validated stability from previous tasks.",
+      "suggested_fix": null,
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

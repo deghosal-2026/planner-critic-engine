@@ -1,0 +1,241 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-02-loki-stack",
+  "duration_seconds": 10.0,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "obs-02-loki-stack",
+    "goal_id": "obs-02-loki-stack",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:47:02.187068Z",
+    "tasks": [
+      {
+        "id": "deploy_promtail",
+        "description": "Deploy Promtail to gather logs from pods",
+        "action": "helm install",
+        "target": "promtail",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kubernetes cluster is accessible",
+            "fact": "k8s_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Promtail pods status",
+          "how": "check kubectl get pods",
+          "expected": "all Promtail pods should be running"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "uninstall promtail",
+          "safety_guard": "verify that all resources are cleaned up"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_loki",
+        "description": "Configure Loki for log storage and indexing",
+        "action": "helm install",
+        "target": "loki",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Promtail is deployed",
+            "fact": "promtail_deployed",
+            "established_by": "deploy_promtail",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Loki deployment status",
+          "how": "check kubectl get pods",
+          "expected": "all Loki pods should be running"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "uninstall loki",
+          "safety_guard": "verify that Loki is in a stable state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_grafana",
+        "description": "Deploy Grafana for log visualization",
+        "action": "helm install",
+        "target": "grafana",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Loki is configured",
+            "fact": "loki_configured",
+            "established_by": "configure_loki",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_dashboard",
+        "description": "Create Grafana dashboard for logs",
+        "action": "create_dashboard",
+        "target": "grafana",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Grafana is deployed",
+            "fact": "grafana_deployed",
+            "established_by": "setup_grafana",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "set_retention_policy",
+        "description": "Configure 7-day log retention with S3 backend",
+        "action": "configure_retention",
+        "target": "loki",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Loki is configured",
+            "fact": "loki_configured",
+            "established_by": "configure_loki",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Retention policy setting",
+          "how": "check Loki config",
+          "expected": "logs should have a retention period of 7 days"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "revert retention settings",
+          "safety_guard": "verify retention settings are reverted"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_promtail",
+        "to_task": "configure_loki",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_loki",
+        "to_task": "setup_grafana",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_grafana",
+        "to_task": "configure_dashboard",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_loki",
+        "to_task": "set_retention_policy",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unverified_dependencies:setup_grafana",
+      "task_id": "setup_grafana",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task setup_grafana depends on the hard prerequisite 'loki_configured', but it lacks a verification step to confirm that Loki is indeed configured before proceeding.",
+      "suggested_fix": "Add a verification step to ensure that Loki is configured before deploying Grafana.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:setup_grafana",
+      "task_id": "setup_grafana",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The setup_grafana task does not include rollback procedures which increases the risk if deployment fails.",
+      "suggested_fix": "Implement a rollback procedure for the setup_grafana task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:configure_dashboard",
+      "task_id": "configure_dashboard",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The configure_dashboard task lacks verification and rollback procedures, increasing the blast radius in case of issues.",
+      "suggested_fix": "Add verification and rollback steps for the configure_dashboard task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:set_retention_policy",
+      "task_id": "set_retention_policy",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for set_retention_policy is vulnerable since it aims to revert settings without validating their previous state.",
+      "suggested_fix": "Enhance the rollback procedure to ensure it verifies the state before attempting to revert retention settings.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,243 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-06-cross-region-replication",
+  "duration_seconds": 25.59,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-db-06-cross-region-replication-r2",
+    "goal_id": "db-06-cross-region-replication",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "db-06-cross-region-replication-plan",
+    "created_at": "2026-08-23T06:42:25.491097Z",
+    "tasks": [
+      {
+        "id": "set-up-replication",
+        "description": "Set up logical replication from us-east-1 to eu-west-1",
+        "action": "configure",
+        "target": "pglogical",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replication status",
+          "how": "check replication slots",
+          "expected": "replication slot active and healthy"
+        },
+        "rollback": {
+          "trigger": "replication setup fails",
+          "action": "remove replication configuration",
+          "safety_guard": "verify no residual configuration remains"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "filter-databases",
+        "description": "Filter to subset of critical databases for replication",
+        "action": "configure",
+        "target": "pglogical",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "replication configuration established",
+            "fact": "replication_ready",
+            "established_by": "set-up-replication",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor-replication-lag",
+        "description": "Implement monitoring for replication lag",
+        "action": "set up",
+        "target": "CloudWatch",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "lag metrics",
+          "how": "check CloudWatch dashboards",
+          "expected": "lag under 5 seconds during normal, under 30 seconds during peak"
+        },
+        "rollback": {
+          "trigger": "monitoring setup fails",
+          "action": "disable monitoring",
+          "safety_guard": "verify metrics are not sent"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "automated-failback",
+        "description": "Implement automated failback procedure when primary recovers",
+        "action": "configure",
+        "target": "Route53",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "DNS configuration",
+          "how": "check DNS records",
+          "expected": "DNS points back to primary region"
+        },
+        "rollback": {
+          "trigger": "failback setup fails",
+          "action": "revert DNS settings",
+          "safety_guard": "ensure no residual DNS records"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "test-dr-drill",
+        "description": "Automate and verify full DR drill quarterly",
+        "action": "execute",
+        "target": "Chaos Mesh",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "DR drill outcomes",
+          "how": "document results",
+          "expected": "DR drill completed with no issues"
+        },
+        "rollback": {
+          "trigger": "dr drill fails",
+          "action": "restore previous state",
+          "safety_guard": "verify system stability post-drill"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "set-up-replication",
+        "to_task": "filter-databases",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set-up-replication",
+        "to_task": "monitor-replication-lag",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor-replication-lag",
+        "to_task": "automated-failback",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "automated-failback",
+        "to_task": "test-dr-drill",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:filter-databases",
+      "task_id": "filter-databases",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'filter-databases' is scheduled before its hard prerequisite 'set-up-replication' is completed.",
+      "suggested_fix": "Ensure 'filter-databases' is executed after 'set-up-replication'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:automated-failback",
+      "task_id": "automated-failback",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'automated-failback' lacks a reliable rollback strategy in case of failure, which can lead to unresolved states.",
+      "suggested_fix": "Implement a rollback procedure that ensures safe reversion of DNS settings and confirms no stale records exist if the automated failback fails.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:plan",
+      "task_id": null,
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider including a step to validate the replication slot retention to prevent WAL bloat on primary.",
+      "suggested_fix": "Add a monitoring step that periodically checks the status of the replication slots.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:risk:plan",
+      "task_id": null,
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "There is a risk of logical replication breaking due to schema changes on the primary, which is not directly addressed in the tasks.",
+      "suggested_fix": "Add a strategy or task to monitor schema changes and ensure that they do not conflict with replication.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:monitor-replication-lag",
+      "task_id": "monitor-replication-lag",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'monitor-replication-lag' does not verify that 'set-up-replication' completed successfully before execution.",
+      "suggested_fix": "Include a precondition on 'monitor-replication-lag' to verify 'set-up-replication' has successfully established replication.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-06-cross-region-replication:2:2",
+    "plan_id": "plan-db-06-cross-region-replication-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:filter-databases",
+    "question": "Plan for goal 'db-06-cross-region-replication' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

@@ -1,0 +1,285 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-08-repo-permission-model",
+  "duration_seconds": 9.72,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-plat-08-repo-permission-model",
+    "goal_id": "plat-08-repo-permission-model",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:52:22.250784Z",
+    "tasks": [
+      {
+        "id": "inventory_permissions",
+        "description": "Inventory current per-repo permissions",
+        "action": "inventory",
+        "target": "repo_permissions",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "permissions list",
+          "how": "compare against expected",
+          "expected": "full inventory"
+        },
+        "rollback": {
+          "trigger": "inventory fails",
+          "action": "restore previous state",
+          "safety_guard": "verify inventory snapshot"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "define_team_structure",
+        "description": "Define team structure and roles",
+        "action": "define",
+        "target": "team_structure",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "inventory is complete",
+            "fact": "permissions_inventory_complete",
+            "established_by": "inventory_permissions",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create_teams",
+        "description": "Create teams and assign members",
+        "action": "create",
+        "target": "teams",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "team membership",
+          "how": "list teams with members",
+          "expected": "expected teams and roles"
+        },
+        "rollback": {
+          "trigger": "team creation fails",
+          "action": "remove incomplete teams",
+          "safety_guard": "verify team existence"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "apply_team_permissions",
+        "description": "Apply team-based permissions to repos",
+        "action": "apply",
+        "target": "repo_permissions",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "current permissions",
+          "how": "run audits",
+          "expected": "permissions should match team-based model"
+        },
+        "rollback": {
+          "trigger": "permissions application fails",
+          "action": "revert permissions to legacy",
+          "safety_guard": "check current permissions state"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "enable_branch_protection",
+        "description": "Enable branch protection rules",
+        "action": "enable",
+        "target": "branch_protection",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "branch protection status",
+          "how": "check protection rules",
+          "expected": "protection rules applied"
+        },
+        "rollback": {
+          "trigger": "branch protection fails",
+          "action": "disable branch protection",
+          "safety_guard": "verify branch protection status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_access",
+        "description": "Verify access is correct per team",
+        "action": "verify",
+        "target": "access",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "access levels",
+          "how": "conduct access tests",
+          "expected": "expected access per team"
+        },
+        "rollback": {
+          "trigger": "access verification fails",
+          "action": "reassign permissions",
+          "safety_guard": "confirm previous access states"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "remove_legacy_permissions",
+        "description": "Remove legacy per-repo permissions",
+        "action": "remove",
+        "target": "legacy_permissions",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "verification complete",
+            "fact": "access_verified",
+            "established_by": "verify_access",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "inventory_permissions",
+        "to_task": "define_team_structure",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "define_team_structure",
+        "to_task": "create_teams",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_teams",
+        "to_task": "apply_team_permissions",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "apply_team_permissions",
+        "to_task": "enable_branch_protection",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "enable_branch_protection",
+        "to_task": "verify_access",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_access",
+        "to_task": "remove_legacy_permissions",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unverified_dependencies:define_team_structure",
+      "task_id": "define_team_structure",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task depends on completion of 'inventory_permissions' but does not verify that 'permissions_inventory_complete' is established.",
+      "suggested_fix": "Add verification step to ensure 'permissions_inventory_complete' is established after 'inventory_permissions'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:feasibility:apply_team_permissions",
+      "task_id": "apply_team_permissions",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Applying team permissions is not feasible without defined team structure and roles.",
+      "suggested_fix": "Ensure 'define_team_structure' is completed and verified before proceeding with 'apply_team_permissions'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:feasibility:enable_branch_protection",
+      "task_id": "enable_branch_protection",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Enabling branch protection cannot be executed until 'apply_team_permissions' is completed.",
+      "suggested_fix": "Alter task dependencies to ensure 'apply_team_permissions' is completed prior to 'enable_branch_protection'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:feasibility:verify_access",
+      "task_id": "verify_access",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Verifying access levels cannot be executed until 'enable_branch_protection' has been completed.",
+      "suggested_fix": "Correct task sequencing to ensure 'enable_branch_protection' is finished before 'verify_access'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:feasibility:remove_legacy_permissions",
+      "task_id": "remove_legacy_permissions",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Removal of legacy permissions is not feasible until access verification is complete.",
+      "suggested_fix": "Ensure 'verify_access' has been completed and verified before 'remove_legacy_permissions' is attempted.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

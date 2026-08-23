@@ -1,0 +1,258 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-09-oncall-escalation",
+  "duration_seconds": 17.24,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "obs-09-oncall-escalation",
+    "goal_id": "obs-09-oncall-escalation",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:48:54.623711Z",
+    "tasks": [
+      {
+        "id": "define_rotation",
+        "description": "Define on-call rotation for SRE team",
+        "action": "configure",
+        "target": "on-call rotation",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "team members available",
+            "fact": "team_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_escalation_rules",
+        "description": "Configure escalation rules in PagerDuty",
+        "action": "configure",
+        "target": "escalation rules",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "on-call rotation defined",
+            "fact": "rotation_defined",
+            "established_by": "define_rotation",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "escalation flow correctness",
+          "how": "run test pages",
+          "expected": "primary paged, secondary paged after timeout"
+        },
+        "rollback": {
+          "trigger": "escalation rules misconfigured",
+          "action": "restore previous escalation settings",
+          "safety_guard": "verify previous settings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_routing_rules",
+        "description": "Set up service-to-team routing rules",
+        "action": "configure",
+        "target": "routing rules",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "escalation rules configured",
+            "fact": "escalation_rules_configured",
+            "established_by": "configure_escalation_rules",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_policies",
+        "description": "Configure business-hours vs after-hours policies",
+        "action": "configure",
+        "target": "policies",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "routing rules set up",
+            "fact": "routing_rules_setup",
+            "established_by": "setup_routing_rules",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run_drill",
+        "description": "Run a drill to verify paging works",
+        "action": "execute",
+        "target": "drill",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "policies configured",
+            "fact": "policies_configured",
+            "established_by": "configure_policies",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "response time to pages",
+          "how": "measure response times during the drill",
+          "expected": "responses within SLA"
+        },
+        "rollback": {
+          "trigger": "drill fails",
+          "action": "notify team and review drill",
+          "safety_guard": "identify real incident metrics"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "document_runbook",
+        "description": "Document the runbook for on-call procedures",
+        "action": "write",
+        "target": "runbook",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "drill completed successfully",
+            "fact": "drill_success",
+            "established_by": "run_drill",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define_rotation",
+        "to_task": "configure_escalation_rules",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_escalation_rules",
+        "to_task": "setup_routing_rules",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_routing_rules",
+        "to_task": "configure_policies",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_policies",
+        "to_task": "run_drill",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_drill",
+        "to_task": "document_runbook",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:setup_routing_rules",
+      "task_id": "setup_routing_rules",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'setup_routing_rules' is ordered before the prerequisite 'escalation_rules_configured' established by 'configure_escalation_rules'.",
+      "suggested_fix": "Reorder 'setup_routing_rules' to follow 'configure_escalation_rules' in the plan.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:run_drill",
+      "task_id": "run_drill",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The 'run_drill' task lacks a solid rollback plan for the failure of the drill execution.",
+      "suggested_fix": "Develop a more comprehensive rollback strategy to address drill failure, including notifying affected team members and reverting to previous escalation policies.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:configure_policies",
+      "task_id": "configure_policies",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'configure_policies' task depends on 'routing_rules_setup', but there is no verification in place to confirm this dependency.",
+      "suggested_fix": "Add a verification step after 'setup_routing_rules' to confirm 'routing_rules_setup' before proceeding to 'configure_policies'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:document_runbook",
+      "task_id": "document_runbook",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The plan does not include steps for reviewing or approving the runbook after documentation.",
+      "suggested_fix": "Include a task for runbook review and approval after documentation is completed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

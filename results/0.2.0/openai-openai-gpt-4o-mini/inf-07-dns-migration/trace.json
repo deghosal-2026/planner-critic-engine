@@ -1,0 +1,191 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-07-dns-migration",
+  "duration_seconds": 23.17,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-inf-07-dns-migration-r2",
+    "goal_id": "inf-07-dns-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "inf-07-dns-migration-v1",
+    "created_at": "2026-08-23T06:51:08.497046Z",
+    "tasks": [
+      {
+        "id": "lower_ttl",
+        "description": "Lower TTL for DNS records",
+        "action": "update_ttl",
+        "target": "dns_records",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "TTL value",
+          "how": "query DNS",
+          "expected": "lower than previous value"
+        },
+        "rollback": {
+          "trigger": "TTL update fails",
+          "action": "restore previous TTL",
+          "safety_guard": "verify previous TTL"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update_records",
+        "description": "Update DNS records to new server",
+        "action": "update_records",
+        "target": "dns",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "DNS records updated",
+          "how": "query DNS",
+          "expected": "records point to eu-west-1"
+        },
+        "rollback": {
+          "trigger": "record update fails",
+          "action": "restore previous records",
+          "safety_guard": "verify previous records"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_traffic",
+        "description": "Monitor traffic shift to new DNS records",
+        "action": "monitor_traffic",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DNS records have been updated",
+            "fact": "records_updated",
+            "established_by": "update_records",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_failover",
+        "description": "Verify failover functionality",
+        "action": "test_failover",
+        "target": "failover",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "failover response",
+          "how": "simulate failure",
+          "expected": "failover to eu-west-1 is successful"
+        },
+        "rollback": {
+          "trigger": "failover verification fails",
+          "action": "switch back to primary DNS and verify",
+          "safety_guard": "ensure primary DNS is operational"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "lower_ttl",
+        "to_task": "update_records",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_records",
+        "to_task": "monitor_traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_traffic",
+        "to_task": "verify_failover",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:update_records",
+      "task_id": "update_records",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The 'update_records' task is not sequenced correctly after 'lower_ttl' as it has no established precondition.",
+      "suggested_fix": "Ensure that 'update_records' has a precondition verifying that TTL has been lowered before execution.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:monitor_traffic",
+      "task_id": "monitor_traffic",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'monitor_traffic' task depends on 'update_records' but lacks a proper verification step to ensure records are actually updated.",
+      "suggested_fix": "Add a verification step to 'update_records' to confirm DNS records are updated before proceeding to 'monitor_traffic'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:verify_failover",
+      "task_id": "verify_failover",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'verify_failover' task has no preconditions confirming that the previous tasks were completed successfully.",
+      "suggested_fix": "Add preconditions for 'verify_failover' to ensure that traffic monitoring is confirmed before executing this task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:inf-07-dns-migration:2:2",
+    "plan_id": "plan-inf-07-dns-migration-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:update_records",
+    "question": "Plan for goal 'inf-07-dns-migration' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

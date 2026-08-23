@@ -1,0 +1,248 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dr-01-failover-drill",
+  "duration_seconds": 52.43,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-dr-01-failover-drill-r4",
+    "goal_id": "dr-01-failover-drill",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-dr-01-failover-drill-r3",
+    "created_at": "2026-08-23T06:48:32.423455Z",
+    "tasks": [
+      {
+        "id": "lower-dns-ttl",
+        "description": "Lower DNS TTL to 60 seconds",
+        "action": "update_dns_ttl",
+        "target": "Route53",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Route53 is accessible",
+            "fact": "dns_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update-connection-strings",
+        "description": "Update application connection strings to point to the new primary",
+        "action": "update_connections",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "New primary is accessible",
+            "fact": "new_primary_accessible",
+            "established_by": "promote-replica",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application functionality",
+          "how": "run application tests",
+          "expected": "application functions without errors"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "promote-replica",
+        "description": "Promote the us-west-2 read replica to primary",
+        "action": "promote",
+        "target": "us-west-2-db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "No active writes on us-east-1",
+            "fact": "us-east-1-idle",
+            "established_by": "lower-dns-ttl",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data consistency",
+          "how": "run checksum comparisons",
+          "expected": "no discrepancies"
+        },
+        "rollback": {
+          "trigger": "promotion fails or data loss detected",
+          "action": "restore from us-east-1 primary",
+          "safety_guard": "verify data consistency"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-data-consistency",
+        "description": "Verify data consistency in the new primary",
+        "action": "verify_data",
+        "target": "us-west-2-db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Primary promotion completed successfully",
+            "fact": "promotion_successful",
+            "established_by": "promote-replica",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data integrity",
+          "how": "run integrity checks on data",
+          "expected": "all checks pass"
+        },
+        "rollback": {
+          "trigger": "data inconsistency found",
+          "action": "restore previous state",
+          "safety_guard": "record all data changes"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor-write-conflicts",
+        "description": "Monitor for write conflicts during the failover",
+        "action": "monitor_conflicts",
+        "target": "us-west-2-db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Application is connected to new primary",
+            "fact": "app_connected_to_primary",
+            "established_by": "update-connection-strings",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "write conflict logs",
+          "how": "check logs for anomalies",
+          "expected": "no conflicts found"
+        },
+        "rollback": {
+          "trigger": "write conflict detected",
+          "action": "pause writes and alert team",
+          "safety_guard": "send alert to operations team"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "failback",
+        "description": "Failback to us-east-1 primary and re-establish replication",
+        "action": "failback",
+        "target": "us-east-1-db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Write conflicts resolved",
+            "fact": "conflicts_resolved",
+            "established_by": "monitor-write-conflicts",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replication status",
+          "how": "check replication health",
+          "expected": "replication re-established"
+        },
+        "rollback": {
+          "trigger": "failback fails",
+          "action": "revert to us-west-2 primary",
+          "safety_guard": "ensure data integrity before reverting"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "lower-dns-ttl",
+        "to_task": "update-connection-strings",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-connection-strings",
+        "to_task": "promote-replica",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote-replica",
+        "to_task": "verify-data-consistency",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-connection-strings",
+        "to_task": "monitor-write-conflicts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor-write-conflicts",
+        "to_task": "failback",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "preconditions_referenced:plan-dr-01-failover-drill-r4:4:update-connection-strings:new_primary_accessible",
+      "task_id": "update-connection-strings",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "blocker",
+      "reason_code": "unverified_precondition",
+      "message": "precondition 'new_primary_accessible' on task 'update-connection-strings' references no established fact from an earlier task",
+      "suggested_fix": "Point the precondition at an earlier task that establishes 'new_primary_accessible'",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:dr-01-failover-drill:4:4",
+    "plan_id": "plan-dr-01-failover-drill-r4",
+    "version": 4,
+    "blocker_finding_id": "preconditions_referenced:plan-dr-01-failover-drill-r4:4:update-connection-strings:new_primary_accessible",
+    "question": "Plan for goal 'dr-01-failover-drill' cannot be approved: blockers remain (unverified_precondition). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

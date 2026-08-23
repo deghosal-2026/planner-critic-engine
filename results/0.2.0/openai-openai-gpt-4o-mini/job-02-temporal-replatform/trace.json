@@ -1,0 +1,256 @@
+{
+  "dimension": "core-api",
+  "goal_id": "job-02-temporal-replatform",
+  "duration_seconds": 25.33,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-job-02-temporal-replatform-r2",
+    "goal_id": "job-02-temporal-replatform",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "job-02-temporal-replatform-plan",
+    "created_at": "2026-08-23T06:53:53.025543Z",
+    "tasks": [
+      {
+        "id": "rewrite_dags",
+        "description": "Rewrite Airflow DAGs as Temporal Workflows and Activities",
+        "action": "rewrite",
+        "target": "DAGs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "DAG functionality",
+          "how": "run tests",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "rewrite fails",
+          "action": "restore original DAGs",
+          "safety_guard": "validate backup of original DAGs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "scale_workers",
+        "description": "Scale Temporal worker pools and configure concurrency",
+        "action": "scale",
+        "target": "workers",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "worker performance metrics",
+          "how": "check logs and metrics",
+          "expected": "workers operating within expected thresholds"
+        },
+        "rollback": {
+          "trigger": "scaling issues",
+          "action": "revert worker configuration",
+          "safety_guard": "monitor worker performance"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "replay_check",
+        "description": "Run a replay/visibility check in Temporal",
+        "action": "run",
+        "target": "replay",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "workflow correctness",
+          "how": "compare outputs with historical events",
+          "expected": "outputs match historical events"
+        },
+        "rollback": {
+          "trigger": "replay fails",
+          "action": "restore previous state",
+          "safety_guard": "ensure replay logs intact"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "dual_run",
+        "description": "Run a dual-run period with both Airflow and Temporal",
+        "action": "execute",
+        "target": "duel",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "compare outputs",
+          "how": "run comparative analysis",
+          "expected": "outputs from both systems are consistent"
+        },
+        "rollback": {
+          "trigger": "output discrepancies",
+          "action": "disable Temporal workflows",
+          "safety_guard": "validate Airflow outputs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover",
+        "description": "Cut over to Temporal as primary orchestrator",
+        "action": "cutover",
+        "target": "orchestration",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "DAG execution",
+          "how": "monitor task completion",
+          "expected": "all Temporal workflows complete successfully"
+        },
+        "rollback": {
+          "trigger": "cutover issues",
+          "action": "re-enable Airflow",
+          "safety_guard": "check Airflow health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "decommission_airflow",
+        "description": "Decommission Airflow after successful cutover",
+        "action": "decommission",
+        "target": "Airflow",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cutover successful",
+            "fact": "cutover_success",
+            "established_by": "cutover",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "rewrite_dags",
+        "to_task": "scale_workers",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "scale_workers",
+        "to_task": "replay_check",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "replay_check",
+        "to_task": "dual_run",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dual_run",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover",
+        "to_task": "decommission_airflow",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:scale_workers",
+      "task_id": "scale_workers",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'scale_workers' is ordered before 'rewrite_dags', which is a prerequisite for scaling the worker pools.",
+      "suggested_fix": "Reorder the tasks to ensure 'rewrite_dags' comes before 'scale_workers'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:cutover",
+      "task_id": "cutover",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The cutover task should include verification steps to ensure that all workflows in Temporal are functioning correctly before proceeding with the cutover.",
+      "suggested_fix": "Add verification steps to ensure all Temporal workflows execute as expected post-cutover.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:cutover",
+      "task_id": "cutover",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for the cutover task only mentions re-enabling Airflow but does not detail steps to ensure the system is stable after rollback.",
+      "suggested_fix": "Include detailed rollback steps to validate Airflow's functionality after reverting.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:decommission_airflow",
+      "task_id": "decommission_airflow",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'decommission_airflow' relies on 'cutover_success' but there is no prior verification to ensure cutover was indeed successful.",
+      "suggested_fix": "Implement a verification step in the cutover task to formally establish the success of the cutover before proceeding to decommission Airflow.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:job-02-temporal-replatform:2:2",
+    "plan_id": "plan-job-02-temporal-replatform-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:scale_workers",
+    "question": "Plan for goal 'job-02-temporal-replatform' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

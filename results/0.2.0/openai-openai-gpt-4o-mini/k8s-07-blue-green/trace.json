@@ -1,0 +1,298 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-07-blue-green",
+  "duration_seconds": 46.65,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-k8s-07-blue-green-r3",
+    "goal_id": "k8s-07-blue-green",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-k8s-07-blue-green-r2",
+    "created_at": "2026-08-23T06:58:20.842432Z",
+    "tasks": [
+      {
+        "id": "deploy_green",
+        "description": "Deploy the green version of the application",
+        "action": "deploy",
+        "target": "green_stack",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "kubectl is configured for production",
+            "fact": "kubectl_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "check green deployment status",
+          "how": "kubectl get deployments",
+          "expected": "green deployment is available"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "roll back to blue stack",
+          "safety_guard": "verify blue stack operational"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_services",
+        "description": "Deploy services for the green stack",
+        "action": "deploy",
+        "target": "green_services",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "green stack is deployed",
+            "fact": "green_deployed",
+            "established_by": "deploy_green",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "check services health",
+          "how": "kubectl get services",
+          "expected": "green services are running"
+        },
+        "rollback": {
+          "trigger": "service deployment fails",
+          "action": "revert service configuration to blue",
+          "safety_guard": "verify blue services running"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_ingress",
+        "description": "Deploy ingress for the green stack",
+        "action": "deploy",
+        "target": "green_ingress",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "green services are deployed and healthy",
+            "fact": "green_services_healthy",
+            "established_by": "deploy_services",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "check ingress status",
+          "how": "kubectl get ingress",
+          "expected": "green ingress is available"
+        },
+        "rollback": {
+          "trigger": "ingress deployment fails",
+          "action": "revert ingress to blue",
+          "safety_guard": "verify blue ingress operational"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run_smoke_tests",
+        "description": "Run smoke tests against the green service",
+        "action": "test",
+        "target": "green_service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "green ingress is deployed",
+            "fact": "green_ingress_deployed",
+            "established_by": "deploy_ingress",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "smoke test results",
+          "how": "run test suite",
+          "expected": "all smoke tests pass"
+        },
+        "rollback": {
+          "trigger": "smoke tests fail",
+          "action": "revert to old traffic routing",
+          "safety_guard": "ensure blue service is operational"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_green",
+        "description": "Monitor the green deployment for 30 minutes",
+        "action": "monitor",
+        "target": "green_service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "smoke tests pass",
+            "fact": "smoke_tests_passed",
+            "established_by": "run_smoke_tests",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "switch_traffic",
+        "description": "Switch traffic to the green service",
+        "action": "update",
+        "target": "ingress",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "green service is monitored for 30 minutes",
+            "fact": "green_monitored",
+            "established_by": "monitor_green",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "check traffic routing",
+          "how": "kubectl get ingress",
+          "expected": "traffic routed to green"
+        },
+        "rollback": {
+          "trigger": "traffic switch issues",
+          "action": "revert ingress to point to blue",
+          "safety_guard": "ensure blue ingress is functional"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "decommission_blue",
+        "description": "Decommission the blue stack after successful traffic switch",
+        "action": "decommission",
+        "target": "blue_stack",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "traffic is successfully routed to green",
+            "fact": "traffic_switched_to_green",
+            "established_by": "switch_traffic",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "check traffic routing to green",
+          "how": "kubectl get ingress",
+          "expected": "traffic successfully routed to green"
+        },
+        "rollback": {
+          "trigger": "post-decommission issues",
+          "action": "restore blue stack to operational state",
+          "safety_guard": "verify blue stack functionality"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_green",
+        "to_task": "deploy_services",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_services",
+        "to_task": "deploy_ingress",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_ingress",
+        "to_task": "run_smoke_tests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_smoke_tests",
+        "to_task": "monitor_green",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_green",
+        "to_task": "switch_traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "switch_traffic",
+        "to_task": "decommission_blue",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:decommission_blue",
+      "task_id": "decommission_blue",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The decommission_blue task is ordered after the switch_traffic task, but it does not verify if the blue stack is operational before executing, violating rollback safety.",
+      "suggested_fix": "Add a verification step to ensure that the blue stack is operational before allowing decommission_blue to proceed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:weak_rollback:decommission_blue",
+      "task_id": "decommission_blue",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback mechanism for decommissioning the blue stack lacks sufficient safety guards to ensure a reliable restoration process.",
+      "suggested_fix": "Implement additional checks to verify complete functionality of the blue stack before allowing its decommissioning.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-07-blue-green:3:3",
+    "plan_id": "plan-k8s-07-blue-green-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:decommission_blue",
+    "question": "Plan for goal 'k8s-07-blue-green' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

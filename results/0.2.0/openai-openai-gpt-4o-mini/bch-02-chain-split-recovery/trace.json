@@ -1,0 +1,253 @@
+{
+  "dimension": "core-api",
+  "goal_id": "bch-02-chain-split-recovery",
+  "duration_seconds": 23.03,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-bch-02-chain-split-recovery-r2",
+    "goal_id": "bch-02-chain-split-recovery",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "bch-02-chain-split-recovery-plan",
+    "created_at": "2026-08-23T06:35:17.651118Z",
+    "tasks": [
+      {
+        "id": "detect_split",
+        "description": "Detect the chain split by monitoring finality gaps and comparing chain heads across nodes",
+        "action": "monitor",
+        "target": "finality",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "nodes are reachable",
+            "fact": "nodes_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "finality status",
+          "how": "check logs",
+          "expected": "finality gaps identified"
+        },
+        "rollback": {
+          "trigger": "initial assessment fails",
+          "action": "reassess chain states",
+          "safety_guard": "validate detection logic"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "prevent_slashing",
+        "description": "Prevent slashing by pausing the validator client to stop attesting immediately",
+        "action": "pause",
+        "target": "validator client",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "detect_split task completed",
+            "fact": "split_detected",
+            "established_by": "detect_split",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "validator client status",
+          "how": "check client logs",
+          "expected": "client is paused"
+        },
+        "rollback": {
+          "trigger": "client remains operational",
+          "action": "resume validation under safe conditions",
+          "safety_guard": "confirm correct chain state"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "identify_canonical_chain",
+        "description": "Identify the canonical chain using block explorers and community consensus",
+        "action": "consult",
+        "target": "canonical_chain",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "prevent_slashing task completed",
+            "fact": "slashing_prevented",
+            "established_by": "prevent_slashing",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "canonical chain identified",
+          "how": "validate with explorers",
+          "expected": "consistent chain selected"
+        },
+        "rollback": {
+          "trigger": "canonical chain unclear",
+          "action": "re-evaluate sources",
+          "safety_guard": "cross-confirm with multiple explorations"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "resync_beacon_node",
+        "description": "Resync the beacon node to align with the identified canonical chain",
+        "action": "resync",
+        "target": "beacon_node",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "identify_canonical_chain task completed",
+            "fact": "canonical_chain_identified",
+            "established_by": "identify_canonical_chain",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "beacon node state",
+          "how": "check synchronization status",
+          "expected": "node resynced successfully to canonical chain"
+        },
+        "rollback": {
+          "trigger": "resync takes too long",
+          "action": "perform a diagnostic check",
+          "safety_guard": "ensure data consistency"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_attestation_behavior",
+        "description": "Verify attestation behavior resumes correctly and check for slashing events",
+        "action": "verify",
+        "target": "attestation",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "resync_beacon_node task completed",
+            "fact": "beacon_node_resynced",
+            "established_by": "resync_beacon_node",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "attestation status and incidents",
+          "how": "analyze records",
+          "expected": "no slashing events recorded"
+        },
+        "rollback": {
+          "trigger": "failed verification",
+          "action": "conduct forensic analysis",
+          "safety_guard": "document and verify slashing protection checks"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "detect_split",
+        "to_task": "prevent_slashing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "prevent_slashing",
+        "to_task": "identify_canonical_chain",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "identify_canonical_chain",
+        "to_task": "resync_beacon_node",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "resync_beacon_node",
+        "to_task": "verify_attestation_behavior",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:prevent_slashing",
+      "task_id": "prevent_slashing",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task to prevent slashing is sequenced before confirming that the split is detected, which may lead to actions taken on the wrong fork.",
+      "suggested_fix": "Ensure the detect_split task confirms the split before executing the prevent_slashing task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:resync_beacon_node",
+      "task_id": "resync_beacon_node",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The resync step lacks a comprehensive rollback plan to handle complete failure scenarios during synchronization.",
+      "suggested_fix": "Include a more robust rollback plan outlining specific steps to recover from a failed resync.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:identify_canonical_chain",
+      "task_id": "identify_canonical_chain",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The identification of the canonical chain depends on the successful completion of the prevent_slashing task, but there's no verification if it was successful before proceeding.",
+      "suggested_fix": "Add explicit verification to ensure prevent_slashing was successful before proceeding with identify_canonical_chain.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:bch-02-chain-split-recovery:2:2",
+    "plan_id": "plan-bch-02-chain-split-recovery-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:prevent_slashing",
+    "question": "Plan for goal 'bch-02-chain-split-recovery' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

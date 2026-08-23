@@ -1,0 +1,218 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-10-trunk-based-promo",
+  "duration_seconds": 21.32,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-ci-10-trunk-based-promo-r3",
+    "goal_id": "ci-10-trunk-based-promo",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-ci-10-trunk-based-promo-r2",
+    "created_at": "2026-08-23T06:37:13.298473Z",
+    "tasks": [
+      {
+        "id": "configure_branch_protection",
+        "description": "Configure branch protection rules on main",
+        "action": "configure",
+        "target": "GitHub",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "branch protection compliance",
+          "how": "check settings in GitHub",
+          "expected": "PRs require CI and review"
+        },
+        "rollback": {
+          "trigger": "branch protection misconfigured",
+          "action": "revert branch protection settings",
+          "safety_guard": "verify branch protection settings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_auto_deploy",
+        "description": "Set up auto-deployment to staging on merge to main",
+        "action": "setup",
+        "target": "ArgoCD",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "auto-deploy functionality",
+          "how": "perform test merge",
+          "expected": "staging environment updated"
+        },
+        "rollback": {
+          "trigger": "auto-deploy fails",
+          "action": "disable auto-deploy",
+          "safety_guard": "ensure no pending deployments"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run_integration_tests",
+        "description": "Run integration tests on staging",
+        "action": "run",
+        "target": "tests",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "test results",
+          "how": "check test reports",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "tests fail",
+          "action": "revert changes in staging",
+          "safety_guard": "verify last working state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_promotion_gate",
+        "description": "Configure promotion gate for production deployment",
+        "action": "configure",
+        "target": "deployment pipeline",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "promotion gate criteria",
+          "how": "review deployment pipeline",
+          "expected": "pass all tests + manual approval"
+        },
+        "rollback": {
+          "trigger": "promote to prod with failing tests",
+          "action": "block production deployment",
+          "safety_guard": "manual rollback process in place"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_rollback_path",
+        "description": "Verify rollback path for prod deployment failure",
+        "action": "verify",
+        "target": "rollback process",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "rollback process effectiveness",
+          "how": "simulate prod failure",
+          "expected": "rollback completes successfully"
+        },
+        "rollback": {
+          "trigger": "prod deployment fails",
+          "action": "revert to last stable state",
+          "safety_guard": "check system integrity before rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "configure_branch_protection",
+        "to_task": "setup_auto_deploy",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_auto_deploy",
+        "to_task": "run_integration_tests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_integration_tests",
+        "to_task": "configure_promotion_gate",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_promotion_gate",
+        "to_task": "verify_rollback_path",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:setup_auto_deploy",
+      "task_id": "setup_auto_deploy",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'setup_auto_deploy' is ordered before the prerequisite task 'configure_branch_protection'.",
+      "suggested_fix": "Reorder the tasks to ensure 'configure_branch_protection' is completed before 'setup_auto_deploy'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:weak_rollback:configure_promotion_gate",
+      "task_id": "configure_promotion_gate",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'configure_promotion_gate' allows promotion to prod with failing tests, which could cause bad code to reach production.",
+      "suggested_fix": "Implement a stronger rollback action to ensure no production deployment occurs unless all tests pass.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:verify_rollback_path",
+      "task_id": "verify_rollback_path",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'verify_rollback_path' depends on the successful completion of 'configure_promotion_gate', which is not verified as 'promote to prod with failing tests' could be executed.",
+      "suggested_fix": "Ensure that 'configure_promotion_gate' correctly verifies that all tests must pass before proceeding.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ci-10-trunk-based-promo:3:3",
+    "plan_id": "plan-ci-10-trunk-based-promo-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:setup_auto_deploy",
+    "question": "Plan for goal 'ci-10-trunk-based-promo' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

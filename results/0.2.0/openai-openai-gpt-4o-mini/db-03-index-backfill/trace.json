@@ -1,0 +1,133 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-03-index-backfill",
+  "duration_seconds": 11.62,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-db-03-index-backfill-r2",
+    "goal_id": "db-03-index-backfill",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "db-03-index-backfill-plan",
+    "created_at": "2026-08-23T06:41:26.801167Z",
+    "tasks": [
+      {
+        "id": "check_db_health",
+        "description": "Check database health",
+        "action": "check",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "db is reachable",
+            "fact": "db_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create_concurrent_index",
+        "description": "Create index concurrently on orders table",
+        "action": "create_index",
+        "target": "orders(customer_id, created_at)",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "database health is verified",
+            "fact": "db_health_verified",
+            "established_by": "check_db_health",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "index existence",
+          "how": "query pg_stat_user_indexes",
+          "expected": "index exists"
+        },
+        "rollback": {
+          "trigger": "index creation fails",
+          "action": "DROP INDEX CONCURRENTLY orders_customer_id_created_at_index",
+          "safety_guard": "verify index does not exist"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_db_health",
+        "to_task": "create_concurrent_index",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:weak_rollback:create_concurrent_index",
+      "task_id": "create_concurrent_index",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for DROP INDEX CONCURRENTLY lacks a clear safety guard against concurrent index presence verification.",
+      "suggested_fix": "Ensure the rollback only executes if the index indeed does not exist, or implement a more thorough verification step before rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:create_concurrent_index",
+      "task_id": "create_concurrent_index",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task depends on db_health_verified which is not explicitly established in the plan, making it unsafe.",
+      "suggested_fix": "Ensure 'db_health_verified' is established as a fact before executing 'create_concurrent_index'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-03-index-backfill:2:2",
+    "plan_id": "plan-db-03-index-backfill-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:weak_rollback:create_concurrent_index",
+    "question": "Plan for goal 'db-03-index-backfill' cannot be approved: blockers remain (llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=2"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

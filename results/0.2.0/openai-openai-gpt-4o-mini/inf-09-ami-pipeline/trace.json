@@ -1,0 +1,274 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-09-ami-pipeline",
+  "duration_seconds": 11.85,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "inf-09-ami-pipeline",
+    "goal_id": "inf-09-ami-pipeline",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:52:23.164427Z",
+    "tasks": [
+      {
+        "id": "build_ami",
+        "description": "Build the base AMI from Amazon Linux 2",
+        "action": "build",
+        "target": "AMI",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "AMI ID",
+          "how": "describe images",
+          "expected": "new AMI ID exists"
+        },
+        "rollback": {
+          "trigger": "AMI build fails",
+          "action": "delete incomplete AMI",
+          "safety_guard": "check AMI existence before deletion"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "bake_dependencies",
+        "description": "Bake application dependencies into the AMI",
+        "action": "bake",
+        "target": "AMI",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "installed packages",
+          "how": "check package list",
+          "expected": "packages are present"
+        },
+        "rollback": {
+          "trigger": "baking fails",
+          "action": "rebuild AMI without dependencies",
+          "safety_guard": "confirm rollback compatibility"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "apply_hardening",
+        "description": "Apply CIS hardening baseline to the AMI",
+        "action": "apply_hardening",
+        "target": "AMI",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "hardening compliance",
+          "how": "run compliance checks",
+          "expected": "no critical issues found"
+        },
+        "rollback": {
+          "trigger": "hardening fails",
+          "action": "restore previous AMI",
+          "safety_guard": "validate AMI integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run_security_scans",
+        "description": "Run security scans (Trivy, CIS-CAT) on the AMI",
+        "action": "scan",
+        "target": "AMI",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "scan results",
+          "how": "check scan report",
+          "expected": "no high vulnerabilities reported"
+        },
+        "rollback": {
+          "trigger": "scans fail",
+          "action": "revert to last known good AMI",
+          "safety_guard": "ensure last AMI is secure"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "promote_ami",
+        "description": "Promote AMI through environments (dev \u2192 staging \u2192 prod)",
+        "action": "promote",
+        "target": "AMI",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "environment readiness",
+          "how": "check deployment status",
+          "expected": "all environments running latest AMI"
+        },
+        "rollback": {
+          "trigger": "promotion fails",
+          "action": "rollback to previous version in staging",
+          "safety_guard": "audit promotion logs"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update_autoscaling_groups",
+        "description": "Update auto-scaling groups to use the new AMI",
+        "action": "update",
+        "target": "ASG",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "ASG configuration",
+          "how": "describe auto-scaling groups",
+          "expected": "ASGs are using new AMI"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "revert ASGs to previous AMI",
+          "safety_guard": "confirm ASGs status post-rollback"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "build_ami",
+        "to_task": "bake_dependencies",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "bake_dependencies",
+        "to_task": "apply_hardening",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "apply_hardening",
+        "to_task": "run_security_scans",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_security_scans",
+        "to_task": "promote_ami",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote_ami",
+        "to_task": "update_autoscaling_groups",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:build_ami",
+      "task_id": "build_ami",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Building the base AMI may fail due to potential issues with environment configuration or resource availability.",
+      "suggested_fix": "Ensure that the required AWS resources and permissions are in place before executing the task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:promote_ami",
+      "task_id": "promote_ami",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback strategy for promoting the AMI fails to ensure a secure state for the previous version being rolled back.",
+      "suggested_fix": "Include a verification step to ensure that the AMI being rolled back is free of vulnerabilities.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:update_autoscaling_groups",
+      "task_id": "update_autoscaling_groups",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Updating auto-scaling groups depends on the successful promotion of the AMI, which may not be guaranteed.",
+      "suggested_fix": "Add a verification step to check if the AMI promotion was successful before executing this task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:apply_hardening",
+      "task_id": "apply_hardening",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider including a step to handle edge cases where hardening might affect application functionality.",
+      "suggested_fix": "Test application functionality after applying hardening before proceeding to security scans.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:run_security_scans",
+      "task_id": "run_security_scans",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Include a step for reporting or addressing vulnerabilities found during the scans.",
+      "suggested_fix": "Implement a procedure to classify, report, and remediate vulnerabilities found in the scan results.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:risk:bake_dependencies",
+      "task_id": "bake_dependencies",
+      "version": 1,
+      "heuristic_family": "risk",
+      "severity": "info",
+      "reason_code": "llm_risk",
+      "message": "Baking application dependencies into the AMI has a high risk of introducing breaking changes.",
+      "suggested_fix": "Consider thorough testing of each dependency version compatibility before baking.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

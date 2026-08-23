@@ -1,0 +1,270 @@
+{
+  "dimension": "core-api",
+  "goal_id": "int-01-key-extraction",
+  "duration_seconds": 21.16,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-int-01-key-extraction-r2",
+    "goal_id": "int-01-key-extraction",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "int-01-key-extraction-plan",
+    "created_at": "2026-08-23T06:40:35.045665Z",
+    "tasks": [
+      {
+        "id": "scan_strings",
+        "description": "Automated scan for hardcoded strings",
+        "action": "scan",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "list of hardcoded strings",
+          "how": "compare output to expected results",
+          "expected": "all hardcoded strings identified"
+        },
+        "rollback": {
+          "trigger": "scan fails",
+          "action": "notify team",
+          "safety_guard": "check scanning tool logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "manual_review",
+        "description": "Manual review of identified hardcoded strings",
+        "action": "review",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "manual review completion",
+          "how": "team sign-off",
+          "expected": "review completed and documented"
+        },
+        "rollback": {
+          "trigger": "review fails",
+          "action": "revert to automated scan results",
+          "safety_guard": "document findings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "extract_keys",
+        "description": "Extract identified strings to key files",
+        "action": "extract",
+        "target": "messages.en.json",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "key file content",
+          "how": "check key file against extracted strings",
+          "expected": "keys properly extracted and namespaced"
+        },
+        "rollback": {
+          "trigger": "extraction fails",
+          "action": "restore previous key file",
+          "safety_guard": "verify previous key file integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update_application_code",
+        "description": "Update application code to use i18n keys",
+        "action": "update",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application functionality",
+          "how": "run test suite",
+          "expected": "no failing tests related to i18n keys"
+        },
+        "rollback": {
+          "trigger": "code update fails",
+          "action": "restore previous code state",
+          "safety_guard": "verify code repo integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_rendering",
+        "description": "Verify that each component renders correctly with extracted keys",
+        "action": "verify",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "UI rendering",
+          "how": "conduct manual visual checks and automated rendering tests",
+          "expected": "all components render without missing keys or layout issues"
+        },
+        "rollback": {
+          "trigger": "rendering fails",
+          "action": "revert components to hardcoded strings",
+          "safety_guard": "ensure toggle is available to switch states"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "ship",
+        "description": "Deploy the application with i18n key changes",
+        "action": "deploy",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "deployment status",
+          "how": "monitor logs and post-deployment tests",
+          "expected": "deployment successful without major issues"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to previous version",
+          "safety_guard": "retain backup of previous production state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "scan_strings",
+        "to_task": "manual_review",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "manual_review",
+        "to_task": "extract_keys",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "extract_keys",
+        "to_task": "update_application_code",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_application_code",
+        "to_task": "verify_rendering",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_rendering",
+        "to_task": "ship",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:manual_review",
+      "task_id": "manual_review",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Manual review should follow automated scan completion, ensure that no overlapping tasks start prematurely before review completion.",
+      "suggested_fix": "Add a hard dependency from 'manual_review' to 'scan_strings'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:extract_keys",
+      "task_id": "extract_keys",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Extract keys task cannot start until manual review is complete. Ensure correct sequencing to avoid errors in string extraction.",
+      "suggested_fix": "Add a hard dependency from 'extract_keys' to 'manual_review'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:update_application_code",
+      "task_id": "update_application_code",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Application code update must occur only after key extraction is finalized, verify task sequencing to maintain integrity.",
+      "suggested_fix": "Add a hard dependency from 'update_application_code' to 'extract_keys'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:verify_rendering",
+      "task_id": "verify_rendering",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Rendering verification must occur after application code has been updated, ensure it is properly sequenced to avoid testing on outdated code.",
+      "suggested_fix": "Add a hard dependency from 'verify_rendering' to 'update_application_code'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:ship",
+      "task_id": "ship",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Shipping deployment should only happen after confirming all render tests are passing, recheck task order to prevent premature shipping.",
+      "suggested_fix": "Add a hard dependency from 'ship' to 'verify_rendering'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:int-01-key-extraction:2:2",
+    "plan_id": "plan-int-01-key-extraction-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:manual_review",
+    "question": "Plan for goal 'int-01-key-extraction' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

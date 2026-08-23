@@ -1,0 +1,225 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-02-hotfix-rollback",
+  "duration_seconds": 18.19,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-ci-02-hotfix-rollback-r2",
+    "goal_id": "ci-02-hotfix-rollback",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "ci-02-hotfix-rollback",
+    "created_at": "2026-08-23T06:35:44.887592Z",
+    "tasks": [
+      {
+        "id": "revert_commit",
+        "description": "Revert the offending commit",
+        "action": "git revert",
+        "target": "repository",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "commit status",
+          "how": "check git log",
+          "expected": "previous commit present"
+        },
+        "rollback": {
+          "trigger": "revert fails",
+          "action": "manual intervention required",
+          "safety_guard": "notify on slack"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "build_image",
+        "description": "Build the Docker image",
+        "action": "docker build",
+        "target": "image",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Revert commit successful",
+            "fact": "revert_commit_successful",
+            "established_by": "revert_commit",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "image tag",
+          "how": "check docker images",
+          "expected": "latest build tag present"
+        },
+        "rollback": {
+          "trigger": "build fails",
+          "action": "trigger previous build",
+          "safety_guard": "build history check"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy",
+        "description": "Deploy the Docker image",
+        "action": "kubectl apply",
+        "target": "deployment",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Build image successful",
+            "fact": "build_image_successful",
+            "established_by": "build_image",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment status",
+          "how": "check kubectl get pods",
+          "expected": "all pods running"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "kubectl rollback",
+          "safety_guard": "verify previous successful deployment"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "notify_approval",
+        "description": "Notify for manual approval",
+        "action": "send notification",
+        "target": "slack",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Deployment completed",
+            "fact": "deploy_completed",
+            "established_by": "deploy",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_dependents",
+        "description": "Verify downstream dependents",
+        "action": "run health checks",
+        "target": "services",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Approval notified",
+            "fact": "approval_notified",
+            "established_by": "notify_approval",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service health",
+          "how": "check health endpoints",
+          "expected": "all services healthy"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "revert deployment",
+          "safety_guard": "recheck service status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "revert_commit",
+        "to_task": "build_image",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "build_image",
+        "to_task": "deploy",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy",
+        "to_task": "notify_approval",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "notify_approval",
+        "to_task": "verify_dependents",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:deploy",
+      "task_id": "deploy",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The 'deploy' task is sequenced before the manual approval task 'notify_approval'.",
+      "suggested_fix": "Reorder the tasks so that 'notify_approval' is completed before 'deploy'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:verify_dependents",
+      "task_id": "verify_dependents",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'verify_dependents' has a dependency on 'notify_approval' but the result of 'notify_approval' is not verified before this step.",
+      "suggested_fix": "Verify that the manual approval has been received before proceeding to 'verify_dependents'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ci-02-hotfix-rollback:2:2",
+    "plan_id": "plan-ci-02-hotfix-rollback-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:deploy",
+    "question": "Plan for goal 'ci-02-hotfix-rollback' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

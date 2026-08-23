@@ -1,0 +1,272 @@
+{
+  "dimension": "core-api",
+  "goal_id": "gf-03-landing-zone",
+  "duration_seconds": 40.7,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-gf-03-landing-zone-r3",
+    "goal_id": "gf-03-landing-zone",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-gf-03-landing-zone-r2",
+    "created_at": "2026-08-23T06:40:15.184013Z",
+    "tasks": [
+      {
+        "id": "check_account_limits",
+        "description": "Check AWS account limits for organization accounts.",
+        "action": "check",
+        "target": "AWS Organizations limits",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "account limits status",
+          "how": "evaluate limits",
+          "expected": "limits are sufficient"
+        },
+        "rollback": {
+          "trigger": "account limits check fails",
+          "action": "notify admin",
+          "safety_guard": "ensure admin is aware of limits"
+        },
+        "risk_class": "high",
+        "blast_radius": "low"
+      },
+      {
+        "id": "create_orgs",
+        "description": "Create AWS Organizations with 3 accounts: audit, shared-services, prod.",
+        "action": "create",
+        "target": "AWS Organizations",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AWS organization limits verified",
+            "fact": "limits_verified",
+            "established_by": "check_account_limits",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "account presence",
+          "how": "list accounts",
+          "expected": "audit, shared-services, prod"
+        },
+        "rollback": {
+          "trigger": "account creation fails",
+          "action": "delete created accounts",
+          "safety_guard": "verify no resources exist in accounts"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_sso",
+        "description": "Set up AWS SSO with MFA enforcement.",
+        "action": "configure",
+        "target": "AWS SSO",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "SSO status",
+          "how": "check SSO settings",
+          "expected": "MFA enforced"
+        },
+        "rollback": {
+          "trigger": "SSO configuration fails",
+          "action": "reset SSO settings",
+          "safety_guard": "verify admin access after reset"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "apply_guardrails",
+        "description": "Apply guardrails (SCP policies) to prevent public S3 buckets, restrict regions, enforce encryption.",
+        "action": "apply",
+        "target": "guardrails",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "SSO configuration verified and enforced MFA",
+            "fact": "sso_verified",
+            "established_by": "configure_sso",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "SCP policies",
+          "how": "list SCPs",
+          "expected": "no public S3, restricted regions, enforced encryption"
+        },
+        "rollback": {
+          "trigger": "guardrail application fails",
+          "action": "remove guardrails",
+          "safety_guard": "verify no policies remain"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_network",
+        "description": "Configure network segmentation with VPCs per account and Transit Gateway.",
+        "action": "configure",
+        "target": "network",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Guardrails applied",
+            "fact": "guardrails_applied",
+            "established_by": "apply_guardrails",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "network setup",
+          "how": "check VPC and TG settings",
+          "expected": "correct VPCs and TG configurations"
+        },
+        "rollback": {
+          "trigger": "network configuration fails",
+          "action": "remove Transit Gateway and VPCs",
+          "safety_guard": "verify no routing exists"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_guardrails",
+        "description": "Verify that guardrails are enforced and functioning as intended.",
+        "action": "verify",
+        "target": "guardrails enforcement",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Network configuration verified",
+            "fact": "network_config_verified",
+            "established_by": "configure_network",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "guardrail enforcement status",
+          "how": "audit logs",
+          "expected": "guardrails enforced successfully"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "reapply guardrails",
+          "safety_guard": "verify enforcement status before reapplying"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_account_limits",
+        "to_task": "create_orgs",
+        "kind": "hard",
+        "reason": "ensure account creation limit compliance"
+      },
+      {
+        "from_task": "create_orgs",
+        "to_task": "configure_sso",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_sso",
+        "to_task": "apply_guardrails",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "apply_guardrails",
+        "to_task": "configure_network",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_network",
+        "to_task": "verify_guardrails",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:apply_guardrails",
+      "task_id": "apply_guardrails",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'apply_guardrails' depends on 'configure_sso' which must be completed successfully before guardrails can be applied.",
+      "suggested_fix": "Ensure that 'configure_sso' is completed and verified before executing 'apply_guardrails'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:configure_network",
+      "task_id": "configure_network",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'configure_network' depends on 'apply_guardrails' which must be completed successfully before configuring network settings.",
+      "suggested_fix": "Ensure that 'apply_guardrails' is completed and verified before executing 'configure_network'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:verify_guardrails",
+      "task_id": "verify_guardrails",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'verify_guardrails' depends on 'configure_network' which must be completed successfully before verification can occur.",
+      "suggested_fix": "Ensure that 'configure_network' is completed and verified before executing 'verify_guardrails'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:gf-03-landing-zone:3:3",
+    "plan_id": "plan-gf-03-landing-zone-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:apply_guardrails",
+    "question": "Plan for goal 'gf-03-landing-zone' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}
