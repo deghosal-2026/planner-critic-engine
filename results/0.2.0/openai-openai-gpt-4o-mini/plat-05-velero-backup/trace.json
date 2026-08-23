@@ -1,0 +1,386 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-05-velero-backup",
+  "duration_seconds": 50.48,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 4
+  },
+  "plan": {
+    "id": "plan-plat-05-velero-backup-r4",
+    "goal_id": "plat-05-velero-backup",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-plat-05-velero-backup-r3",
+    "created_at": "2026-08-23T06:51:37.419262Z",
+    "tasks": [
+      {
+        "id": "install_velero",
+        "description": "Install Velero with AWS S3 plugin",
+        "action": "install",
+        "target": "velero",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kubernetes cluster is accessible",
+            "fact": "k8s_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Velero installation status",
+          "how": "check helm release",
+          "expected": "velero deployed successfully"
+        },
+        "rollback": {
+          "trigger": "installation fails",
+          "action": "remove velero",
+          "safety_guard": "check helm release status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_backup",
+        "description": "Configure daily backup schedules with 30-day retention policy",
+        "action": "configure",
+        "target": "backup_schedule",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Velero is installed successfully",
+            "fact": "velero_installed",
+            "established_by": "install_velero",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Backup schedule configuration",
+          "how": "check backup schedule settings",
+          "expected": "backup schedule set correctly"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "revert backup settings",
+          "safety_guard": "check previous schedule state"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_backup_schedule",
+        "description": "Verify the configured backup schedule against expected settings",
+        "action": "verify",
+        "target": "backup_schedule",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Backup schedule is configured",
+            "fact": "backup_schedule_configured",
+            "established_by": "configure_backup",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Backup schedule settings",
+          "how": "compare with expected configuration",
+          "expected": "backup schedule matches expected settings"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "execute_backup",
+        "description": "Execute a manual backup",
+        "action": "execute",
+        "target": "manual_backup",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Backup schedule is configured",
+            "fact": "backup_schedule_configured",
+            "established_by": "configure_backup",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Backup execution status",
+          "how": "check backup logs",
+          "expected": "backup executed successfully"
+        },
+        "rollback": {
+          "trigger": "backup execution fails",
+          "action": "notify failure and retry",
+          "safety_guard": "log backup execution attempts"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "handle_partial_backup",
+        "description": "Handle cases where only part of the backup succeeds",
+        "action": "handle",
+        "target": "manual_backup",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Backup execution is in progress",
+            "fact": "backup_in_progress",
+            "established_by": "execute_backup",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Backup execution result",
+          "how": "check overall backup status",
+          "expected": "determine if partial success occurred"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "perform_restore",
+        "description": "Perform full restore to a validation namespace",
+        "action": "restore",
+        "target": "validation_namespace",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Manual backup executed successfully",
+            "fact": "manual_backup_executed",
+            "established_by": "execute_backup",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "restored application functionality",
+          "how": "run functional tests",
+          "expected": "application behaves as expected"
+        },
+        "rollback": {
+          "trigger": "restore fails",
+          "action": "revert to previous state",
+          "safety_guard": "check original namespace status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_functionality",
+        "description": "Verify application functionality post-restore",
+        "action": "verify",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Restore performed successfully",
+            "fact": "restore_successful",
+            "established_by": "perform_restore",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Tests run for application functionality",
+          "how": "list of functional tests executed",
+          "expected": "application functions correctly as per specifications"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "validate_alerts",
+        "description": "Validate automated alerts on backup failures",
+        "action": "validate",
+        "target": "alerts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Backup schedule is configured",
+            "fact": "backup_schedule_configured",
+            "established_by": "configure_backup",
+            "probe": null
+          },
+          {
+            "description": "At least one backup has been executed",
+            "fact": "backup_executed",
+            "established_by": "execute_backup",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Automated alerts status",
+          "how": "check alerting system logs",
+          "expected": "alerts functioning as intended"
+        },
+        "rollback": null,
+        "risk_class": "low",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "install_velero",
+        "to_task": "configure_backup",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_backup",
+        "to_task": "verify_backup_schedule",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_backup",
+        "to_task": "execute_backup",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "execute_backup",
+        "to_task": "handle_partial_backup",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "execute_backup",
+        "to_task": "perform_restore",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "perform_restore",
+        "to_task": "verify_functionality",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_backup",
+        "to_task": "validate_alerts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "execute_backup",
+        "to_task": "verify_backup_schedule",
+        "kind": "soft",
+        "reason": ""
+      },
+      {
+        "from_task": "execute_backup",
+        "to_task": "handle_partial_backup",
+        "kind": "soft",
+        "reason": ""
+      },
+      {
+        "from_task": "execute_backup",
+        "to_task": "validate_alerts",
+        "kind": "soft",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:configure_backup",
+      "task_id": "configure_backup",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'configure_backup' is sequenced before verifying that Velero is installed, violating the prerequisite dependency.",
+      "suggested_fix": "Ensure 'configure_backup' is executed only after 'install_velero' is successfully completed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:execute_backup",
+      "task_id": "execute_backup",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'execute_backup' depends on 'backup_schedule_configured' which is established by 'configure_backup', but this dependency is not verified before executing.",
+      "suggested_fix": "Add verification of 'backup_schedule_configured' either in preconditions of 'execute_backup' or ensure its status is checked prior to execution.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:weak_rollback:perform_restore",
+      "task_id": "perform_restore",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for task 'perform_restore' could result in loss of data if a failure occurs.",
+      "suggested_fix": "Implement a more robust rollback mechanism to ensure no data is lost upon restore failure.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:missing_steps:perform_restore",
+      "task_id": "perform_restore",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider addressing edge cases where restoring data may not fully restore application state or related infrastructure.",
+      "suggested_fix": "Include explicit steps to handle these edge cases in the restoration process.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:risk:verify_functionality",
+      "task_id": "verify_functionality",
+      "version": 4,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Verifying functionality post-restore does not account for the possibility of incomplete restoration affecting application performance.",
+      "suggested_fix": "Add a detailed assessment plan post-restore to ensure all application features are fully functional.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:plat-05-velero-backup:4:4",
+    "plan_id": "plan-plat-05-velero-backup-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:configure_backup",
+    "question": "Plan for goal 'plat-05-velero-backup' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

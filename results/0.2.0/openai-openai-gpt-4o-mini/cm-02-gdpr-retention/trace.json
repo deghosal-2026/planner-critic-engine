@@ -1,0 +1,143 @@
+{
+  "dimension": "core-api",
+  "goal_id": "cm-02-gdpr-retention",
+  "duration_seconds": 5.35,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "cm-02-gdpr-retention-plan",
+    "goal_id": "cm-02-gdpr-retention",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:38:09.978232Z",
+    "tasks": [
+      {
+        "id": "classify_data",
+        "description": "Classify data types by retention period",
+        "action": "classify",
+        "target": "user_data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "data sources are accessible",
+            "fact": "data_sources_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "build_postgres_pipeline",
+        "description": "Build deletion pipeline for PostgreSQL",
+        "action": "build_pipeline",
+        "target": "postgresql",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "deletion logs",
+          "how": "check against retention policy",
+          "expected": "logs must show no deletions outside policy"
+        },
+        "rollback": {
+          "trigger": "pipeline fails",
+          "action": "revert to previous state",
+          "safety_guard": "ensure data integrity before revert"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "classify_data",
+        "to_task": "build_postgres_pipeline",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unverified_dependencies:build_postgres_pipeline",
+      "task_id": "build_postgres_pipeline",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The build_postgres_pipeline task relies on the classify_data task which has not been verified to successfully classify the data types, risking pipeline build based on incorrect classifications.",
+      "suggested_fix": "Ensure classify_data produces verified output before proceeding to build_postgres_pipeline.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:build_postgres_pipeline",
+      "task_id": "build_postgres_pipeline",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for the build_postgres_pipeline task lacks a comprehensive safety plan, which could lead to incomplete data restoration after a failure.",
+      "suggested_fix": "Enhance the rollback strategy to include detailed steps for safely recovering data and ensuring full integrity.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:classify_data",
+      "task_id": "classify_data",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "info",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding steps to explicitly handle unclassified data or edge cases that may arise during classification.",
+      "suggested_fix": null,
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:build_postgres_pipeline",
+      "task_id": "build_postgres_pipeline",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "info",
+      "reason_code": "llm_missing_steps",
+      "message": "It may be beneficial to include validation steps post-deletion pipeline construction to verify it functions as intended.",
+      "suggested_fix": null,
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=2"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

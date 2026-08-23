@@ -1,0 +1,304 @@
+{
+  "dimension": "core-api",
+  "goal_id": "id-01-idp-migration",
+  "duration_seconds": 32.21,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-id-01-idp-migration-r2",
+    "goal_id": "id-01-idp-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "id-01-idp-migration-plan",
+    "created_at": "2026-08-23T06:41:19.331944Z",
+    "tasks": [
+      {
+        "id": "configure-okta",
+        "description": "Configure Okta as new IdP with SAML 2.0 + OIDC",
+        "action": "configure",
+        "target": "Okta",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Okta account is accessible",
+            "fact": "okta_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Okta SAML configuration",
+          "how": "run validation scripts",
+          "expected": "no errors in configuration"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "restore previous IdP configuration",
+          "safety_guard": "verify previous configuration integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup-mfa",
+        "description": "Set up MFA enforcement (TOTP + push)",
+        "action": "setup",
+        "target": "MFA",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Configuration of Okta is completed",
+            "fact": "okta_configured",
+            "established_by": "configure-okta",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "MFA functionality",
+          "how": "conduct user testing",
+          "expected": "users can log in with MFA"
+        },
+        "rollback": {
+          "trigger": "MFA setup fails",
+          "action": "disable MFA",
+          "safety_guard": "ensure all users can authenticate without MFA"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "migrate-apps",
+        "description": "Migrate all applications from SAML to Okta (update SP entity IDs, ACS URLs)",
+        "action": "migrate",
+        "target": "apps",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "MFA setup is complete",
+            "fact": "mfa_setup_completed",
+            "established_by": "setup-mfa",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application authentication",
+          "how": "run integration tests",
+          "expected": "all apps authenticate successfully against Okta"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore SAML configuration for apps",
+          "safety_guard": "test application availability"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "test-sessions",
+        "description": "Test session compatibility (existing sessions must not be force-logged-out)",
+        "action": "test",
+        "target": "sessions",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Application migration is completed",
+            "fact": "apps_migrated",
+            "established_by": "migrate-apps",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "active user sessions",
+          "how": "check session lengths",
+          "expected": "no sessions are invalidated during migration"
+        },
+        "rollback": {
+          "trigger": "session invalidation occurs",
+          "action": "revert to legacy session handling",
+          "safety_guard": "ensure user sessions remain active"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover-dns",
+        "description": "Cutover DNS for the IdP endpoint",
+        "action": "cutover",
+        "target": "DNS",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Session testing is completed successfully",
+            "fact": "session_testing_completed",
+            "established_by": "test-sessions",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-authentication",
+        "description": "Verify all apps authenticate against Okta",
+        "action": "verify",
+        "target": "authentication",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DNS cutover is completed",
+            "fact": "dns_cutover_completed",
+            "established_by": "cutover-dns",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "authentication flow",
+          "how": "perform user sign-in tests",
+          "expected": "all applications authenticate correctly"
+        },
+        "rollback": {
+          "trigger": "authentication fails",
+          "action": "revert DNS cutover",
+          "safety_guard": "ensure users can authenticate through legacy IdP"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "configure-okta",
+        "to_task": "setup-mfa",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup-mfa",
+        "to_task": "migrate-apps",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate-apps",
+        "to_task": "test-sessions",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test-sessions",
+        "to_task": "cutover-dns",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover-dns",
+        "to_task": "verify-authentication",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:cutover-dns",
+      "task_id": "cutover-dns",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Cutover DNS cannot proceed without verification and rollback steps, making it unsafe to execute.",
+      "suggested_fix": "Include a verification step to ensure the DNS cutover is successful, along with a rollback plan to revert changes if authentication fails.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:cutover-dns",
+      "task_id": "cutover-dns",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Cutover DNS lacks a rollback plan, exposing users to downtime during the cutover process.",
+      "suggested_fix": "Implement a rollback strategy that allows reversion to the previous DNS configuration if issues arise post-cutover.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:cutover-dns",
+      "task_id": "cutover-dns",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Cutover DNS depends on session testing, but no verification is provided for the success of session testing, leading to potential issues during cutover.",
+      "suggested_fix": "Establish a verification mechanism for session testing that confirms readiness for the DNS cutover.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:risk:plan",
+      "task_id": null,
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "The plan could benefit from more rigorous testing and validation before each cutover step to mitigate risks associated with user authentication failures.",
+      "suggested_fix": null,
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:plan",
+      "task_id": null,
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider including a step for notifying users about the migration and potential authentication changes to ease transition.",
+      "suggested_fix": "Add a task for user communication regarding the IdP changes during the migration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:id-01-idp-migration:2:2",
+    "plan_id": "plan-id-01-idp-migration-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:feasibility:cutover-dns",
+    "question": "Plan for goal 'id-01-idp-migration' cannot be approved: blockers remain (llm_feasibility; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

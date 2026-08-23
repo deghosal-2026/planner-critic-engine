@@ -1,0 +1,210 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-07-api-sunset",
+  "duration_seconds": 22.67,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-ci-07-api-sunset-r2",
+    "goal_id": "ci-07-api-sunset",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "ci-07-api-sunset-plan",
+    "created_at": "2026-08-23T06:36:32.803618Z",
+    "tasks": [
+      {
+        "id": "deprecate-api-v1",
+        "description": "Deprecate API v1 with Sunset header",
+        "action": "update",
+        "target": "api-v1",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "API response header",
+          "how": "check headers with curl",
+          "expected": "Sunset"
+        },
+        "rollback": {
+          "trigger": "deprecation fails",
+          "action": "restore API v1 without Sunset header",
+          "safety_guard": "verify API v1 functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "notify-consumers",
+        "description": "Notify known consumers about deprecation",
+        "action": "send_notification",
+        "target": "slack",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "deprecation completed",
+            "fact": "api_v1_deprecated",
+            "established_by": "deprecate-api-v1",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "redirect-to-v2",
+        "description": "Redirect traffic from API v1 to API v2",
+        "action": "update",
+        "target": "api-v1",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "traffic redirection",
+          "how": "monitor logs for v2 hits",
+          "expected": "v2 receives traffic"
+        },
+        "rollback": {
+          "trigger": "redirection fails",
+          "action": "restore original routing",
+          "safety_guard": "verify routing to API v1"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor-orphaned-calls",
+        "description": "Monitor for orphaned calls to API v1",
+        "action": "set_monitoring",
+        "target": "datadog",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "redirection in place",
+            "fact": "traffic_redirected",
+            "established_by": "redirect-to-v2",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "remove-api-v1-code",
+        "description": "Remove API v1 code after monitoring",
+        "action": "delete_code",
+        "target": "repository",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "no orphaned calls detected",
+            "fact": "orphaned_calls_clean",
+            "established_by": "monitor-orphaned-calls",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "repository state",
+          "how": "check out historical commit",
+          "expected": "v1 code is removed"
+        },
+        "rollback": {
+          "trigger": "removal fails",
+          "action": "restore previous API v1 code",
+          "safety_guard": "verify code integrity before deletion"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deprecate-api-v1",
+        "to_task": "notify-consumers",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "notify-consumers",
+        "to_task": "redirect-to-v2",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "redirect-to-v2",
+        "to_task": "monitor-orphaned-calls",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor-orphaned-calls",
+        "to_task": "remove-api-v1-code",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:remove-api-v1-code",
+      "task_id": "remove-api-v1-code",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task to remove API v1 code is dependent on the verification of orphaned calls, but there is no confirmation step that verifies orphaned calls were monitored correctly before proceeding to removal.",
+      "suggested_fix": "Add a verification step to ensure orphaned calls are confirmed clean before executing the removal.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:remove-api-v1-code",
+      "task_id": "remove-api-v1-code",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for removing API v1 code lacks a specific method for verifying the integrity of code after restoration, which poses a risk of restoring faulty code.",
+      "suggested_fix": "Enhance the rollback procedure to include a verification step to confirm the integrity of the restored code.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ci-07-api-sunset:2:2",
+    "plan_id": "plan-ci-07-api-sunset-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unverified_dependencies:remove-api-v1-code",
+    "question": "Plan for goal 'ci-07-api-sunset' cannot be approved: blockers remain (llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

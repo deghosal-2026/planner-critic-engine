@@ -1,0 +1,143 @@
+{
+  "dimension": "core-api",
+  "goal_id": "scp-03-canary-internal-dep",
+  "duration_seconds": 5.17,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "scp-03-canary-internal-dep",
+    "goal_id": "scp-03-canary-internal-dep",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:53:29.931457Z",
+    "tasks": [
+      {
+        "id": "deploy-canary",
+        "description": "Deploy the patched core library to the canary group of microservices",
+        "action": "deploy",
+        "target": "core-library",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service responsiveness",
+          "how": "monitor logs and metrics",
+          "expected": "no errors in logs"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "revert canary services",
+          "safety_guard": "verify service health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-canary",
+        "description": "Verify the canary deployment of the core library",
+        "action": "verify",
+        "target": "canary-services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service performance",
+          "how": "check metrics against baseline",
+          "expected": "performance within acceptable range"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "rollback canary deployment",
+          "safety_guard": "restore previous library version"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy-remaining",
+        "description": "Deploy the patched core library to the remaining microservices",
+        "action": "deploy",
+        "target": "core-library",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary deployment is verified",
+            "fact": "canary_verified",
+            "established_by": "verify-canary",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy-canary",
+        "to_task": "verify-canary",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-canary",
+        "to_task": "deploy-remaining",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:deploy-remaining",
+      "task_id": "deploy-remaining",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The 'deploy-remaining' task is ordered before the prerequisite 'verify-canary' task is completed.",
+      "suggested_fix": "Ensure 'deploy-remaining' is executed only after 'verify-canary' confirms successful canary deployment.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:deploy-remaining",
+      "task_id": "deploy-remaining",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The 'deploy-remaining' task lacks a defined rollback procedure, which is critical in case of failure.",
+      "suggested_fix": "Define a rollback action for 'deploy-remaining' to revert the deployment if issues are encountered.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

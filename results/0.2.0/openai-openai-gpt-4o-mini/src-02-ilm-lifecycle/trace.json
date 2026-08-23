@@ -1,0 +1,267 @@
+{
+  "dimension": "core-api",
+  "goal_id": "src-02-ilm-lifecycle",
+  "duration_seconds": 12.66,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "src-02-ilm-lifecycle-plan",
+    "goal_id": "src-02-ilm-lifecycle",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:54:58.077252Z",
+    "tasks": [
+      {
+        "id": "define-ilm-policy",
+        "description": "Define the ILM policy for index management",
+        "action": "define",
+        "target": "ILM policy",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Cluster is operational",
+            "fact": "cluster_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-node-attributes",
+        "description": "Configure node attribute-based tier allocation",
+        "action": "configure",
+        "target": "node attributes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ILM policy is defined",
+            "fact": "ilm_policy_defined",
+            "established_by": "define-ilm-policy",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup-index-rollover",
+        "description": "Set up index rollover for managed indices",
+        "action": "setup",
+        "target": "index rollover",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Node attributes are configured",
+            "fact": "node_attributes_configured",
+            "established_by": "configure-node-attributes",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "index rollover settings",
+          "how": "run checks on indices",
+          "expected": "max_size 50GB or max_age 1d"
+        },
+        "rollback": {
+          "trigger": "rollover fails",
+          "action": "revert to previous index settings",
+          "safety_guard": "verify rollback integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "repoint-aliases",
+        "description": "Re-point aliases to the new managed indices",
+        "action": "repoint",
+        "target": "index aliases",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Index rollover is set up",
+            "fact": "index_rollover_setup",
+            "established_by": "setup-index-rollover",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "alias configuration",
+          "how": "check aliases with API",
+          "expected": "aliases point to new managed indices"
+        },
+        "rollback": {
+          "trigger": "alias repointing fails",
+          "action": "restore previous aliases",
+          "safety_guard": "verify alias integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-ilm-policy",
+        "description": "Verify the ILM policy is active using ILM Explain API",
+        "action": "verify",
+        "target": "ILM policy",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Aliases are repointed",
+            "fact": "aliases_repointed",
+            "established_by": "repoint-aliases",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "policy state",
+          "how": "use ILM Explain API",
+          "expected": "policy is active on indices"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "detach policy and revert to manual management",
+          "safety_guard": "ensure policy detachment is confirmed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define-ilm-policy",
+        "to_task": "configure-node-attributes",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-node-attributes",
+        "to_task": "setup-index-rollover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup-index-rollover",
+        "to_task": "repoint-aliases",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "repoint-aliases",
+        "to_task": "verify-ilm-policy",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:configure-node-attributes",
+      "task_id": "configure-node-attributes",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'configure-node-attributes' is ordered before 'define-ilm-policy' is fully established, making it unsafe to execute.",
+      "suggested_fix": "Ensure 'define-ilm-policy' is complete before starting 'configure-node-attributes'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:setup-index-rollover",
+      "task_id": "setup-index-rollover",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'setup-index-rollover' lacks a verified integrity check after reverting.",
+      "suggested_fix": "Add a verification step after rollback to ensure integrity of index settings.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:repoint-aliases",
+      "task_id": "repoint-aliases",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'repoint-aliases' does not verify the integrity of the restored aliases.",
+      "suggested_fix": "Include a verification step to confirm that the restored aliases are correctly pointing to the expected indices.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:verify-ilm-policy",
+      "task_id": "verify-ilm-policy",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'verify-ilm-policy' lacks a confirmation step to ensure the policy detachment was successful.",
+      "suggested_fix": "Add a validation step after rollback to confirm that the policy has been detached correctly.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:setup-index-rollover",
+      "task_id": "setup-index-rollover",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The success of 'setup-index-rollover' relies on 'node_attributes_configured', which is not verified by a prior task.",
+      "suggested_fix": "Ensure that the task confirming that node attributes are configured is reliably verified before proceeding to index rollover.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:repoint-aliases",
+      "task_id": "repoint-aliases",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'repoint-aliases' depends on 'index_rollover_setup', which is not verified, creating a potential risk.",
+      "suggested_fix": "Implement a verification step to confirm that index rollover is successfully set up before repointing the aliases.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

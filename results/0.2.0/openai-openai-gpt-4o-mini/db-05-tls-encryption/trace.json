@@ -1,0 +1,199 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-05-tls-encryption",
+  "duration_seconds": 29.97,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-db-05-tls-encryption-r3",
+    "goal_id": "db-05-tls-encryption",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-db-05-tls-encryption-r2",
+    "created_at": "2026-08-23T06:42:00.706147Z",
+    "tasks": [
+      {
+        "id": "update_service_1",
+        "description": "Update Service 1 with CA certificate, client cert, and client key",
+        "action": "update",
+        "target": "service_1",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "connection encryption",
+          "how": "check pg_stat_ssl",
+          "expected": "TLS 1.3"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "restore previous configuration",
+          "safety_guard": "verify service is running with previous settings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_service_1",
+        "description": "Monitor connections for Service 1 after update",
+        "action": "monitor",
+        "target": "service_1",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Service 1 update completed successfully",
+            "fact": "service_1_updated",
+            "established_by": "update_service_1",
+            "probe": null
+          },
+          {
+            "description": "Service 1 is reachable",
+            "fact": "service_1_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "monitor for authentication or connection errors",
+          "how": "check logs and connection metrics",
+          "expected": "no errors"
+        },
+        "rollback": {
+          "trigger": "monitoring fails",
+          "action": "alert team",
+          "safety_guard": "check last successful connections"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update_service_2",
+        "description": "Update Service 2 with CA certificate, client cert, and client key",
+        "action": "update",
+        "target": "service_2",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "connection encryption",
+          "how": "check pg_stat_ssl",
+          "expected": "TLS 1.3"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "restore previous configuration",
+          "safety_guard": "verify service is running with previous settings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_service_2",
+        "description": "Monitor connections for Service 2 after update",
+        "action": "monitor",
+        "target": "service_2",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Service 2 update completed successfully",
+            "fact": "service_2_updated",
+            "established_by": "update_service_2",
+            "probe": null
+          },
+          {
+            "description": "Service 2 is reachable",
+            "fact": "service_2_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "monitor for authentication or connection errors",
+          "how": "check logs and connection metrics",
+          "expected": "no errors"
+        },
+        "rollback": {
+          "trigger": "monitoring fails",
+          "action": "alert team",
+          "safety_guard": "check last successful connections"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "update_service_1",
+        "to_task": "monitor_service_1",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_service_2",
+        "to_task": "monitor_service_2",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:monitor_service_1",
+      "task_id": "monitor_service_1",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The monitoring of Service 1 is scheduled before the completion of the update and validation of encryption settings.",
+      "suggested_fix": "Ensure that monitor_service_1 follows update_service_1 with a concrete dependency linking them.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:monitor_service_2",
+      "task_id": "monitor_service_2",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The monitoring of Service 2 is scheduled before the completion of the update and validation of encryption settings.",
+      "suggested_fix": "Ensure that monitor_service_2 follows update_service_2 with a concrete dependency linking them.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-05-tls-encryption:3:3",
+    "plan_id": "plan-db-05-tls-encryption-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:monitor_service_1",
+    "question": "Plan for goal 'db-05-tls-encryption' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

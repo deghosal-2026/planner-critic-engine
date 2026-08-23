@@ -1,0 +1,226 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-05-ci-runner-scaling",
+  "duration_seconds": 6.15,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "ci-05-ci-runner-scaling-plan",
+    "goal_id": "ci-05-ci-runner-scaling",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:36:03.160010Z",
+    "tasks": [
+      {
+        "id": "create_asg",
+        "description": "Create an Auto Scaling Group (ASG) for GitHub Actions runners",
+        "action": "create",
+        "target": "asg",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "ASG exists",
+          "how": "describe asg command",
+          "expected": "ASG details"
+        },
+        "rollback": {
+          "trigger": "ASG creation fails",
+          "action": "delete ASG",
+          "safety_guard": "verify ASG does not exist"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_runners",
+        "description": "Configure self-hosted runners registration with GitHub",
+        "action": "configure",
+        "target": "runners",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "runner registration status",
+          "how": "check GitHub settings",
+          "expected": "runner is active"
+        },
+        "rollback": {
+          "trigger": "runner configuration fails",
+          "action": "remove runner registration",
+          "safety_guard": "verify no runners registered"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "scale_up",
+        "description": "Handle scale-up on demand by adjusting ASG settings",
+        "action": "scale",
+        "target": "asg",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ASG is created",
+            "fact": "asg_created",
+            "established_by": "create_asg",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "scale_down",
+        "description": "Handle scale-down on idle by adjusting ASG settings",
+        "action": "scale",
+        "target": "asg",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ASG is created",
+            "fact": "asg_created",
+            "established_by": "create_asg",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_jobs",
+        "description": "Ensure zero job queue backlog during peak usage",
+        "action": "monitor",
+        "target": "job_queue",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "job queue status",
+          "how": "check job queue metrics",
+          "expected": "zero backlog"
+        },
+        "rollback": {
+          "trigger": "job queue backlog created",
+          "action": "alert team and initiate scale-up",
+          "safety_guard": "verify backlog exists"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "create_asg",
+        "to_task": "configure_runners",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_runners",
+        "to_task": "scale_up",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_runners",
+        "to_task": "scale_down",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "scale_up",
+        "to_task": "monitor_jobs",
+        "kind": "soft",
+        "reason": ""
+      },
+      {
+        "from_task": "scale_down",
+        "to_task": "monitor_jobs",
+        "kind": "soft",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:scale_up",
+      "task_id": "scale_up",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Scale-up task cannot be executed without a valid Auto Scaling Group (ASG) in place.",
+      "suggested_fix": "Ensure the 'create_asg' task is completed successfully before proceeding with the 'scale_up' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:feasibility:scale_down",
+      "task_id": "scale_down",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Scale-down task cannot be executed without a valid Auto Scaling Group (ASG) in place.",
+      "suggested_fix": "Ensure the 'create_asg' task is completed successfully before proceeding with the 'scale_down' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:scale_up",
+      "task_id": "scale_up",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The scale_up task depends on ASG creation verification that is not explicitly established in the task's preconditions.",
+      "suggested_fix": "Add a verification step to confirm the existence and proper configuration of the ASG before executing the 'scale_up' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:scale_down",
+      "task_id": "scale_down",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The scale_down task depends on ASG creation verification that is not explicitly established in the task's preconditions.",
+      "suggested_fix": "Add a verification step to confirm the existence and proper configuration of the ASG before executing the 'scale_down' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

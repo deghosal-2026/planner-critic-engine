@@ -1,0 +1,305 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-05-registry-migration",
+  "duration_seconds": 44.37,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-k8s-05-registry-migration-r3",
+    "goal_id": "k8s-05-registry-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-k8s-05-registry-migration-r2",
+    "created_at": "2026-08-23T06:56:49.031767Z",
+    "tasks": [
+      {
+        "id": "pull-images",
+        "description": "Pull current images from Docker Hub",
+        "action": "pull",
+        "target": "Docker Hub",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "image existence",
+          "how": "list images",
+          "expected": "images are present"
+        },
+        "rollback": {
+          "trigger": "pull fails",
+          "action": "retry pulling images",
+          "safety_guard": "check image availability"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "retag-images",
+        "description": "Retag images with ECR repository URI",
+        "action": "retag",
+        "target": "ECR",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "pull-images is completed and verifies image existence",
+            "fact": "pull_images_verified",
+            "established_by": "pull-images",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "image tags",
+          "how": "describe images",
+          "expected": "tags match ECR URI"
+        },
+        "rollback": {
+          "trigger": "retagging fails",
+          "action": "revert to original tags",
+          "safety_guard": "verify original tags"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "push-images",
+        "description": "Push retagged images to Amazon ECR",
+        "action": "push",
+        "target": "ECR",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "retag-images is completed and verifies tags",
+            "fact": "retag_images_verified",
+            "established_by": "retag-images",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "image status in ECR",
+          "how": "list images",
+          "expected": "images are successfully pushed"
+        },
+        "rollback": {
+          "trigger": "push fails",
+          "action": "remove partially pushed images",
+          "safety_guard": "ensure no corrupt images in ECR"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update-manifests",
+        "description": "Update Deployment and StatefulSet manifests to reference ECR images",
+        "action": "update",
+        "target": "kubernetes manifests",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "push-images is completed and verifies pushed images",
+            "fact": "push_images_verified",
+            "established_by": "push-images",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment state",
+          "how": "get deployments",
+          "expected": "deployments reference new images"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "revert to old manifests",
+          "safety_guard": "verify manifest integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "trigger-rolling-restart",
+        "description": "Trigger a rolling restart of services",
+        "action": "restart",
+        "target": "kubernetes deployments",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "update-manifests is completed and verifies manifests",
+            "fact": "manifests_verified",
+            "established_by": "update-manifests",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "pod status",
+          "how": "check pod readiness",
+          "expected": "all pods are ready"
+        },
+        "rollback": {
+          "trigger": "restart fails",
+          "action": "rollback deployments",
+          "safety_guard": "verify service health"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-traffic",
+        "description": "Verify that every service pod pulls successfully from ECR and serves traffic normally",
+        "action": "check",
+        "target": "service traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "trigger-rolling-restart is completed and verifies restart",
+            "fact": "rolling_restart_verified",
+            "established_by": "trigger-rolling-restart",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service traffic",
+          "how": "monitor requests",
+          "expected": "services are serving traffic normally"
+        },
+        "rollback": {
+          "trigger": "traffic issues detected",
+          "action": "switch back to old images",
+          "safety_guard": "monitor traffic metrics"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "pull-images",
+        "to_task": "retag-images",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "retag-images",
+        "to_task": "push-images",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "push-images",
+        "to_task": "update-manifests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-manifests",
+        "to_task": "trigger-rolling-restart",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "trigger-rolling-restart",
+        "to_task": "verify-traffic",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unverified_dependencies:retag-images",
+      "task_id": "retag-images",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task depends on 'pull-images' verifying image existence, which is not confirmed due to the lack of established verification in prior tasks.",
+      "suggested_fix": "Ensure that 'pull-images' verification is properly established before proceeding to 'retag-images'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:push-images",
+      "task_id": "push-images",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task depends on 'retag-images' verifying tags, which is not confirmed due to the lack of established verification in prior tasks.",
+      "suggested_fix": "Ensure that 'retag-images' verification is properly established before proceeding to 'push-images'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:update-manifests",
+      "task_id": "update-manifests",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task depends on 'push-images' verifying pushed images, which is not confirmed due to the lack of established verification in prior tasks.",
+      "suggested_fix": "Ensure that 'push-images' verification is properly established before proceeding to 'update-manifests'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:trigger-rolling-restart",
+      "task_id": "trigger-rolling-restart",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task depends on 'update-manifests' verifying manifests, which is not confirmed due to the lack of established verification in prior tasks.",
+      "suggested_fix": "Ensure that 'update-manifests' verification is properly established before proceeding to 'trigger-rolling-restart'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:verify-traffic",
+      "task_id": "verify-traffic",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task depends on 'trigger-rolling-restart' verifying the restart, which is not confirmed due to the lack of established verification in prior tasks.",
+      "suggested_fix": "Ensure that 'trigger-rolling-restart' verification is properly established before proceeding to 'verify-traffic'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-05-registry-migration:3:3",
+    "plan_id": "plan-k8s-05-registry-migration-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unverified_dependencies:retag-images",
+    "question": "Plan for goal 'k8s-05-registry-migration' cannot be approved: blockers remain (llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

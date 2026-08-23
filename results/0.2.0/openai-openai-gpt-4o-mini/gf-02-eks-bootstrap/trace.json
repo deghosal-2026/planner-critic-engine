@@ -1,0 +1,274 @@
+{
+  "dimension": "core-api",
+  "goal_id": "gf-02-eks-bootstrap",
+  "duration_seconds": 60.23,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-gf-02-eks-bootstrap-r4",
+    "goal_id": "gf-02-eks-bootstrap",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-gf-02-eks-bootstrap-r3",
+    "created_at": "2026-08-23T06:39:36.808551Z",
+    "tasks": [
+      {
+        "id": "install_cert_manager",
+        "description": "Install cert-manager",
+        "action": "install",
+        "target": "cert-manager",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EKS cluster is provisioned",
+            "fact": "eks_cluster_active",
+            "established_by": "create_eks_cluster",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "cert-manager installation",
+          "how": "check cert-manager status via kubectl",
+          "expected": "cert-manager deployed successfully"
+        },
+        "rollback": {
+          "trigger": "cert-manager installation fails",
+          "action": "remove cert-manager",
+          "safety_guard": "ensure no residual cert-manager resources"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "install_cluster_autoscaler",
+        "description": "Install cluster-autoscaler",
+        "action": "install",
+        "target": "cluster-autoscaler",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EKS cluster is provisioned",
+            "fact": "eks_cluster_active",
+            "established_by": "create_eks_cluster",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "cluster-autoscaler installation",
+          "how": "check cluster-autoscaler status via kubectl",
+          "expected": "cluster-autoscaler deployed successfully"
+        },
+        "rollback": {
+          "trigger": "cluster-autoscaler installation fails",
+          "action": "remove cluster-autoscaler",
+          "safety_guard": "ensure no leftover cluster-autoscaler configurations"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_monitoring_stack",
+        "description": "Deploy Prometheus + Grafana",
+        "action": "deploy",
+        "target": "monitoring stack",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EKS cluster is provisioned",
+            "fact": "eks_cluster_active",
+            "established_by": "create_eks_cluster",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "monitoring stack deployment",
+          "how": "check Prometheus and Grafana status via kubectl",
+          "expected": "Prometheus and Grafana deployed successfully"
+        },
+        "rollback": {
+          "trigger": "monitoring stack deployment fails",
+          "action": "remove Prometheus and Grafana",
+          "safety_guard": "ensure no resources are left behind"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create_eks_cluster",
+        "description": "Provision EKS cluster via Terraform",
+        "action": "provision",
+        "target": "EKS",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AWS credentials are configured",
+            "fact": "aws_credentials_set",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "EKS cluster health",
+          "how": "check EKS status via AWS CLI",
+          "expected": "cluster active"
+        },
+        "rollback": {
+          "trigger": "EKS provision fails",
+          "action": "destroy EKS cluster",
+          "safety_guard": "ensure no resources left behind"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "apply_security_baseline",
+        "description": "Apply Pod Security Standards (restricted baseline)",
+        "action": "apply",
+        "target": "PodSecurityPolicy",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Pod Security Policy enforcement",
+          "how": "check policies applied via kubectl",
+          "expected": "restricted policies active"
+        },
+        "rollback": {
+          "trigger": "security baseline application fails",
+          "action": "remove Pod Security Policy",
+          "safety_guard": "verify no active policies"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "enable_velero_backup",
+        "description": "Enable Velero backup with schedule",
+        "action": "enable",
+        "target": "Velero",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "backup schedule",
+          "how": "list Velero backup schedules",
+          "expected": "scheduled backups exist"
+        },
+        "rollback": {
+          "trigger": "Velero backup fails",
+          "action": "remove Velero",
+          "safety_guard": "ensure no backup jobs remain"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_network_policies",
+        "description": "Configure network policies (default deny + allow-list)",
+        "action": "configure",
+        "target": "network policies",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "network policy effectiveness",
+          "how": "test pod access via kubectl",
+          "expected": "only allowed pods accessible"
+        },
+        "rollback": {
+          "trigger": "network policy configuration fails",
+          "action": "remove network policies",
+          "safety_guard": "verify all pods are accessible"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_all_components",
+        "description": "Verify all components are healthy",
+        "action": "verify",
+        "target": "all components",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "component health status",
+          "how": "check health endpoints of all components",
+          "expected": "all healthy status"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "roll back to initial state",
+          "safety_guard": "ensure no components are broken"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "install_cert_manager",
+        "to_task": "create_eks_cluster",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "install_cluster_autoscaler",
+        "to_task": "create_eks_cluster",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_monitoring_stack",
+        "to_task": "create_eks_cluster",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "preconditions_referenced:plan-gf-02-eks-bootstrap-r4:4:install_cert_manager:eks_cluster_active",
+      "task_id": "install_cert_manager",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "blocker",
+      "reason_code": "unverified_precondition",
+      "message": "precondition 'eks_cluster_active' on task 'install_cert_manager' references no established fact from an earlier task",
+      "suggested_fix": "Point the precondition at an earlier task that establishes 'eks_cluster_active'",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:gf-02-eks-bootstrap:4:4",
+    "plan_id": "plan-gf-02-eks-bootstrap-r4",
+    "version": 4,
+    "blocker_finding_id": "preconditions_referenced:plan-gf-02-eks-bootstrap-r4:4:install_cert_manager:eks_cluster_active",
+    "question": "Plan for goal 'gf-02-eks-bootstrap' cannot be approved: blockers remain (unverified_precondition). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

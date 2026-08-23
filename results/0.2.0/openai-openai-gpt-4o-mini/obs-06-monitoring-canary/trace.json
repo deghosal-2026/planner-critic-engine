@@ -1,0 +1,206 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-06-monitoring-canary",
+  "duration_seconds": 9.97,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "obs-06-monitoring-canary-plan",
+    "goal_id": "obs-06-monitoring-canary",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:48:16.287069Z",
+    "tasks": [
+      {
+        "id": "deploy_check_pod",
+        "description": "Deploy a synthetic check pod for health checks",
+        "action": "kubectl apply -f check_pod.yaml",
+        "target": "k8s_cluster",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "k8s cluster is reachable",
+            "fact": "k8s_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_prometheus",
+        "description": "Expose canary metrics to Prometheus",
+        "action": "kubectl apply -f prometheus_config.yaml",
+        "target": "k8s_cluster",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Prometheus is running",
+            "fact": "prometheus_running",
+            "established_by": "deploy_check_pod",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create_grafana_dashboard",
+        "description": "Create a Grafana dashboard for canary health",
+        "action": "grafana-cli dashboards import dashboard.json",
+        "target": "grafana_instance",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Grafana is running",
+            "fact": "grafana_running",
+            "established_by": "configure_prometheus",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_alert",
+        "description": "Configure alert for canary health metrics",
+        "action": "kubectl apply -f alert.yaml",
+        "target": "k8s_cluster",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "alert rule status",
+          "how": "check alert list",
+          "expected": "alert rule created successfully"
+        },
+        "rollback": {
+          "trigger": "alert configuration fails",
+          "action": "remove alert configuration",
+          "safety_guard": "validate removal of alert rules"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_check_pod",
+        "to_task": "configure_prometheus",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_prometheus",
+        "to_task": "create_grafana_dashboard",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_grafana_dashboard",
+        "to_task": "configure_alert",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:configure_prometheus",
+      "task_id": "configure_prometheus",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'configure_prometheus' is ordered before its prerequisite 'deploy_check_pod' has successfully finished deploying the check pod.",
+      "suggested_fix": "Ensure 'deploy_check_pod' task completes successfully before starting the 'configure_prometheus' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:configure_alert",
+      "task_id": "configure_alert",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'configure_alert' lacks a robust rollback mechanism, with high blast radius due to alert configuration failure.",
+      "suggested_fix": "Implement a more comprehensive rollback procedure for 'configure_alert' to restore to previous state gracefully.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:configure_alert",
+      "task_id": "configure_alert",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'configure_alert' depends on the creation of alerts which is not verified before execution.",
+      "suggested_fix": "Add a verification step to ensure that the alert rules are created successfully before 'configure_alert' runs.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:deploy_check_pod",
+      "task_id": "deploy_check_pod",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Task 'deploy_check_pod' could also cover edge cases such as failure in applying the check pod configuration or network issues.",
+      "suggested_fix": "Include checks for successful application and connectivity errors in 'deploy_check_pod'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:configure_prometheus",
+      "task_id": "configure_prometheus",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Task 'configure_prometheus' could include verification of metrics exposure to ensure they are ready before configuring the dashboard.",
+      "suggested_fix": "Add a post-deployment verification step that checks if canary metrics are correctly exposed to Prometheus.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

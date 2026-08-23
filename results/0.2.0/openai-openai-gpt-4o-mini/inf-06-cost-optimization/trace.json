@@ -1,0 +1,169 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-06-cost-optimization",
+  "duration_seconds": 7.17,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "inf-06-cost-optimization-plan",
+    "goal_id": "inf-06-cost-optimization",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:50:52.476356Z",
+    "tasks": [
+      {
+        "id": "identify_resources",
+        "description": "Identify idle and oversized resources",
+        "action": "identify",
+        "target": "resources",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AWS CLI is configured",
+            "fact": "aws_cli_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "resize_resources",
+        "description": "Resize or terminate identified resources",
+        "action": "resize/terminate",
+        "target": "resources",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "resource health status",
+          "how": "check metrics",
+          "expected": "stable state"
+        },
+        "rollback": {
+          "trigger": "resource failure",
+          "action": "restore previous configuration",
+          "safety_guard": "verify resource health before changes"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_impact",
+        "description": "Verify no impact after resizing or terminating resources",
+        "action": "verify",
+        "target": "services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service uptime and performance",
+          "how": "monitor logs and metrics",
+          "expected": "no issues"
+        },
+        "rollback": {
+          "trigger": "impact detected",
+          "action": "revert changes",
+          "safety_guard": "ensure rollback checks pass"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "identify_resources",
+        "to_task": "resize_resources",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "resize_resources",
+        "to_task": "verify_impact",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:resize_resources",
+      "task_id": "resize_resources",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'resize_resources' is ordered before verifying the identification of resources by 'identify_resources'.",
+      "suggested_fix": "Ensure 'identify_resources' is completed successfully before proceeding to 'resize_resources'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:resize_resources",
+      "task_id": "resize_resources",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No preconditions are listed for 'resize_resources', which could result in attempting a resize without a successful resource identification.",
+      "suggested_fix": "Add a precondition to ensure that 'identify_resources' has been completed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:resize_resources",
+      "task_id": "resize_resources",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for 'resize_resources' does not account for the potential failure of the initial identification process if it was not verified beforehand.",
+      "suggested_fix": "Enhance the rollback plan to include checks that ensure resources were correctly identified before resizing.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:verify_impact",
+      "task_id": "verify_impact",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The task 'verify_impact' does not include preconditions, risking execution when prior checks may not have been fulfilled.",
+      "suggested_fix": "Add preconditions to ensure that 'resize_resources' has been verified before executing 'verify_impact'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

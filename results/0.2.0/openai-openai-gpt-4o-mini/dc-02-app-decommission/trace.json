@@ -1,0 +1,278 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dc-02-app-decommission",
+  "duration_seconds": 11.22,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "dc-02-app-decommission-plan",
+    "goal_id": "dc-02-app-decommission",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:47:35.482555Z",
+    "tasks": [
+      {
+        "id": "identify-dependencies",
+        "description": "Identify all dependencies (upstream callers, downstream APIs, databases)",
+        "action": "scan",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "dependencies list",
+          "how": "cross-reference with service registry",
+          "expected": "complete list of dependencies"
+        },
+        "rollback": {
+          "trigger": "failed to identify dependencies",
+          "action": "revert to previous system map",
+          "safety_guard": "verify previous mapping accuracy"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "notify-teams",
+        "description": "Notify all teams depending on the application",
+        "action": "notify",
+        "target": "teams",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dependencies identified",
+            "fact": "dependencies_list_complete",
+            "established_by": "identify-dependencies",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup-traffic-redirect",
+        "description": "Set up traffic redirect to replacement service",
+        "action": "configure",
+        "target": "nginx",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "traffic redirection",
+          "how": "monitor traffic flow",
+          "expected": "100% success rate on redirection"
+        },
+        "rollback": {
+          "trigger": "redirect fails",
+          "action": "revert nginx configuration",
+          "safety_guard": "check for error states in logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "handle-in-flight-transactions",
+        "description": "Handle in-flight transactions and billing reconciliation",
+        "action": "reconcile",
+        "target": "transactions",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "billing state accuracy",
+          "how": "compare against transaction logs",
+          "expected": "100% accurate billing"
+        },
+        "rollback": {
+          "trigger": "reconciliation fails",
+          "action": "restore previous billing state",
+          "safety_guard": "verify transaction integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "export-archive-data",
+        "description": "Export and archive historical data",
+        "action": "archive",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "archived data completeness",
+          "how": "check file sizes",
+          "expected": "all historical data archived"
+        },
+        "rollback": {
+          "trigger": "archiving fails",
+          "action": "restore data from last backup",
+          "safety_guard": "verify backup integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "revoke-access-credentials",
+        "description": "Revoke access credentials",
+        "action": "revoke",
+        "target": "credentials",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "shutdown-infrastructure",
+        "description": "Shut down infrastructure",
+        "action": "shutdown",
+        "target": "resources",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "resource state",
+          "how": "check resource status",
+          "expected": "all resources safely shut down"
+        },
+        "rollback": {
+          "trigger": "shutdown fails",
+          "action": "restart infrastructure",
+          "safety_guard": "verify resource health post-restart"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "identify-dependencies",
+        "to_task": "notify-teams",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "identify-dependencies",
+        "to_task": "setup-traffic-redirect",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "identify-dependencies",
+        "to_task": "handle-in-flight-transactions",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "identify-dependencies",
+        "to_task": "export-archive-data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "handle-in-flight-transactions",
+        "to_task": "shutdown-infrastructure",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "export-archive-data",
+        "to_task": "shutdown-infrastructure",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:notify-teams",
+      "task_id": "notify-teams",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Notify teams task is sequenced before identifying dependencies, which is a hard prerequisite.",
+      "suggested_fix": "Reorder tasks to ensure 'identify-dependencies' is completed before 'notify-teams'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:setup-traffic-redirect",
+      "task_id": "setup-traffic-redirect",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Setup traffic redirect task is sequenced before identifying dependencies, which is a hard prerequisite.",
+      "suggested_fix": "Reorder tasks to ensure 'identify-dependencies' is completed before 'setup-traffic-redirect'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:handle-in-flight-transactions",
+      "task_id": "handle-in-flight-transactions",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Handle in-flight transactions task is sequenced before identifying dependencies, which is a hard prerequisite.",
+      "suggested_fix": "Reorder tasks to ensure 'identify-dependencies' is completed before 'handle-in-flight-transactions'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:export-archive-data",
+      "task_id": "export-archive-data",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Export and archive data task is sequenced before identifying dependencies, which is a hard prerequisite.",
+      "suggested_fix": "Reorder tasks to ensure 'identify-dependencies' is completed before 'export-archive-data'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:shutdown-infrastructure",
+      "task_id": "shutdown-infrastructure",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Shutdown infrastructure task requires completion of 'handle-in-flight-transactions' and 'export-archive-data', both of which have unsafe sequencing.",
+      "suggested_fix": "Reorder tasks to ensure dependencies are resolved before 'shutdown-infrastructure'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

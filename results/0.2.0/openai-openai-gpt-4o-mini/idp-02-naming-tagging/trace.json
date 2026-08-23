@@ -1,0 +1,140 @@
+{
+  "dimension": "core-api",
+  "goal_id": "idp-02-naming-tagging",
+  "duration_seconds": 10.19,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-idp-02-naming-tagging-r2",
+    "goal_id": "idp-02-naming-tagging",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "idp-02-naming-tagging-plan",
+    "created_at": "2026-08-23T06:43:16.480208Z",
+    "tasks": [
+      {
+        "id": "set_tags",
+        "description": "Set cost-center, team-ownership, and environment label tags",
+        "action": "tag_resources",
+        "target": "rds_instance",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "tags on RDS instance",
+          "how": "describe tags",
+          "expected": "cost-center, team-ownership, environment"
+        },
+        "rollback": {
+          "trigger": "tagging fails",
+          "action": "remove tags and reapply necessary tags",
+          "safety_guard": "ensure no unauthorized tags are present"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "provision_rds",
+        "description": "Provision RDS PostgreSQL instance",
+        "action": "create",
+        "target": "rds_instance",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "RDS instance status",
+          "how": "describe rds",
+          "expected": "available"
+        },
+        "rollback": {
+          "trigger": "provisioning fails",
+          "action": "delete rds_instance",
+          "safety_guard": "check for dependent resources"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "set_tags",
+        "to_task": "provision_rds",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:provision_rds",
+      "task_id": "provision_rds",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'provision_rds' is sequenced before the prerequisite task 'set_tags' completes.",
+      "suggested_fix": "Reorder the tasks to ensure 'set_tags' runs before 'provision_rds'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:set_tags",
+      "task_id": "set_tags",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'set_tags' involves removing tags but doesn't specify a check to ensure required tags remain after removal.",
+      "suggested_fix": "Enhance the rollback strategy to confirm necessary tags are reapplied after removal.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:provision_rds",
+      "task_id": "provision_rds",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'provision_rds' task relies on the completion of 'set_tags' without verification that tags are correctly applied.",
+      "suggested_fix": "Add verification to ensure the tags are correctly set before proceeding with RDS provisioning.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:idp-02-naming-tagging:2:2",
+    "plan_id": "plan-idp-02-naming-tagging-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:provision_rds",
+    "question": "Plan for goal 'idp-02-naming-tagging' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=2"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

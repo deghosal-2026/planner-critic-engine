@@ -1,0 +1,242 @@
+{
+  "dimension": "core-api",
+  "goal_id": "cm-01-pci-scope-reduction",
+  "duration_seconds": 19.88,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-cm-01-pci-scope-reduction-r2",
+    "goal_id": "cm-01-pci-scope-reduction",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "cm-01-pci-scope-reduction-plan",
+    "created_at": "2026-08-23T06:37:48.695190Z",
+    "tasks": [
+      {
+        "id": "tokenization",
+        "description": "Implement tokenization for credit card data",
+        "action": "replace",
+        "target": "PANs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "payment processing success",
+          "how": "run transaction test",
+          "expected": "transactions complete with tokens"
+        },
+        "rollback": {
+          "trigger": "tokenization fails",
+          "action": "revert to original PANs and notify stakeholders",
+          "safety_guard": "ensure payment processing is active"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "segment-network",
+        "description": "Segment the cardholder data environment from the rest of the network",
+        "action": "modify",
+        "target": "network",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "tokenization is complete and verified",
+            "fact": "tokenization_verified",
+            "established_by": "tokenization",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "access to CDE",
+          "how": "perform connectivity tests",
+          "expected": "CDE is isolated, essential flows are functional"
+        },
+        "rollback": {
+          "trigger": "segmentation causes downtime",
+          "action": "restore previous network configuration",
+          "safety_guard": "backup current network state"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-firewall",
+        "description": "Configure firewall rules to isolate CDE",
+        "action": "apply",
+        "target": "firewall",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "firewall configuration",
+          "how": "review firewall logs",
+          "expected": "rules are effective for CDE isolation"
+        },
+        "rollback": {
+          "trigger": "firewall misconfiguration",
+          "action": "restore previous firewall rules",
+          "safety_guard": "verify access controls"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "collect-evidence",
+        "description": "Collect compliance evidence such as network diagrams and config logs",
+        "action": "gather",
+        "target": "compliance evidence",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "network diagrams are updated",
+            "fact": "diagrams_updated",
+            "established_by": "segment-network",
+            "probe": null
+          },
+          {
+            "description": "firewall configurations are applied",
+            "fact": "firewall_configured",
+            "established_by": "configure-firewall",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-scope-reduction",
+        "description": "Verify scope reduction via ASV scan",
+        "action": "scan",
+        "target": "ASV",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "ASV scan results",
+          "how": "review scan report",
+          "expected": "no critical findings"
+        },
+        "rollback": {
+          "trigger": "scan fails",
+          "action": "review and adjust configurations and conduct a targeted remediation plan",
+          "safety_guard": "consult PCI guidelines"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "document-scope",
+        "description": "Document the new scope boundary",
+        "action": "document",
+        "target": "scope",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "scope reduction verified",
+            "fact": "scope_verified",
+            "established_by": "verify-scope-reduction",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "tokenization",
+        "to_task": "segment-network",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "segment-network",
+        "to_task": "configure-firewall",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-firewall",
+        "to_task": "collect-evidence",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "collect-evidence",
+        "to_task": "verify-scope-reduction",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-scope-reduction",
+        "to_task": "document-scope",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:segment-network",
+      "task_id": "segment-network",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'segment-network' depends on the fact 'tokenization_verified', which is not verified by the task 'tokenization'.",
+      "suggested_fix": "Ensure that 'tokenization_verified' is established as a fact in the task 'tokenization' before executing 'segment-network'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:collect-evidence",
+      "task_id": "collect-evidence",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'collect-evidence' has unverified dependencies on 'diagrams_updated' and 'firewall_configured', established by tasks that are not verified yet.",
+      "suggested_fix": "Add verification steps in 'segment-network' and 'configure-firewall' to confirm these facts before executing 'collect-evidence'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:cm-01-pci-scope-reduction:2:2",
+    "plan_id": "plan-cm-01-pci-scope-reduction-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unverified_dependencies:segment-network",
+    "question": "Plan for goal 'cm-01-pci-scope-reduction' cannot be approved: blockers remain (llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

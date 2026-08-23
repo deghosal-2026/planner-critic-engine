@@ -1,0 +1,231 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ai-02-embedding-index-migration",
+  "duration_seconds": 32.98,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-ai-02-embedding-index-migration-r3",
+    "goal_id": "ai-02-embedding-index-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-ai-02-embedding-index-migration-r2",
+    "created_at": "2026-08-23T06:34:28.990011Z",
+    "tasks": [
+      {
+        "id": "provision-qdrant",
+        "description": "Provision Qdrant cluster with 3 nodes",
+        "action": "provision",
+        "target": "qdrant-cluster",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "cluster operational status",
+          "how": "run health checks",
+          "expected": "all nodes healthy"
+        },
+        "rollback": {
+          "trigger": "provisioning fails",
+          "action": "destroy qdrant resources",
+          "safety_guard": "verify no active nodes"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rebuild-index",
+        "description": "Rebuild index from source data using OpenAI embeddings",
+        "action": "rebuild",
+        "target": "embedding-index",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "index completeness",
+          "how": "run consistency checks",
+          "expected": "500M vectors in index"
+        },
+        "rollback": {
+          "trigger": "index rebuild fails",
+          "action": "restore previous index version",
+          "safety_guard": "verify index integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup-dual-query",
+        "description": "Set up dual-query for Pinecone and Qdrant",
+        "action": "setup",
+        "target": "dual-query-system",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "query response consistency",
+          "how": "compare responses from both systems",
+          "expected": "results match within 0.01 metric"
+        },
+        "rollback": {
+          "trigger": "query setup fails",
+          "action": "remove dual-query setup",
+          "safety_guard": "verify queries still work on Pinecone"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "backfill-vectors",
+        "description": "Backfill any new vectors added during migration",
+        "action": "backfill",
+        "target": "embedding-index",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "new vector availability",
+          "how": "query index for new vectors",
+          "expected": "all new vectors present"
+        },
+        "rollback": {
+          "trigger": "backfill fails",
+          "action": "remove new vectors",
+          "safety_guard": "verify pre-backfill index state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-search-quality",
+        "description": "Verify search quality with recall metrics",
+        "action": "verify",
+        "target": "search-results",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "recall@k metric level",
+          "how": "run performance tests",
+          "expected": "recall@k \u2265 0.98"
+        },
+        "rollback": {
+          "trigger": "search quality below threshold",
+          "action": "return to previous state",
+          "safety_guard": "verify no data loss"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover-queries",
+        "description": "Cutover application queries from Pinecone to Qdrant",
+        "action": "cutover",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application query performance",
+          "how": "monitor application logs",
+          "expected": "no errors reported"
+        },
+        "rollback": {
+          "trigger": "cutover creates issues",
+          "action": "revert back to Pinecone and restore application data",
+          "safety_guard": "verify application stability and data integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "provision-qdrant",
+        "to_task": "rebuild-index",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rebuild-index",
+        "to_task": "setup-dual-query",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup-dual-query",
+        "to_task": "backfill-vectors",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "backfill-vectors",
+        "to_task": "verify-search-quality",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-search-quality",
+        "to_task": "cutover-queries",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unverified_dependencies:cutover-queries",
+      "task_id": "cutover-queries",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Cutover from Pinecone to Qdrant lacks verification of vector presence in Qdrant before execution.",
+      "suggested_fix": "Add a precondition to verify presence of all vectors in Qdrant before the cutover.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:weak_rollback:cutover-queries",
+      "task_id": "cutover-queries",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for cutover to Pinecone may not ensure complete data integrity as it does not verify the state of application data beforehand.",
+      "suggested_fix": "Enhance rollback to perform data validation and ensure application maintains consistent state post-rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ai-02-embedding-index-migration:3:3",
+    "plan_id": "plan-ai-02-embedding-index-migration-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unverified_dependencies:cutover-queries",
+    "question": "Plan for goal 'ai-02-embedding-index-migration' cannot be approved: blockers remain (llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

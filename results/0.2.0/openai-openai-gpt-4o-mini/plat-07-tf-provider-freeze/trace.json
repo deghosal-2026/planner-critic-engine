@@ -1,0 +1,253 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-07-tf-provider-freeze",
+  "duration_seconds": 27.13,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-plat-07-tf-provider-freeze-r2",
+    "goal_id": "plat-07-tf-provider-freeze",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plat-07-tf-provider-freeze",
+    "created_at": "2026-08-23T06:52:14.837696Z",
+    "tasks": [
+      {
+        "id": "inventory",
+        "description": "Inventory all provider versions in use",
+        "action": "list",
+        "target": "provider_versions",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Terraform environment is accessible",
+            "fact": "terraform_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "list of provider versions",
+          "how": "compare with previous records",
+          "expected": "no discrepancies"
+        },
+        "rollback": {
+          "trigger": "inventory fails",
+          "action": "restore previous inventory",
+          "safety_guard": "verify previous inventory integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "pin_versions",
+        "description": "Pin provider versions in lock files",
+        "action": "pin",
+        "target": "lock_files",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Provider versions are inventoried",
+            "fact": "inventory_complete",
+            "established_by": "inventory",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "lock file content",
+          "how": "diff against previous version",
+          "expected": "correct pinned versions"
+        },
+        "rollback": {
+          "trigger": "pinning fails",
+          "action": "revert lock files to previous state",
+          "safety_guard": "verify previous state integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "validate_plans",
+        "description": "Validate that pinned versions produce identical plans",
+        "action": "plan",
+        "target": "terraform",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Versions are pinned in lock files",
+            "fact": "lock_files_pinned",
+            "established_by": "pin_versions",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "plan output",
+          "how": "compare outputs of previous runs",
+          "expected": "identical outputs"
+        },
+        "rollback": {
+          "trigger": "plan validation fails",
+          "action": "revert to previous configuration",
+          "safety_guard": "ensure current state is not modified"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "test_apply",
+        "description": "Test apply in staging",
+        "action": "apply",
+        "target": "staging_environment",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Plans validated successfully",
+            "fact": "plans_validated",
+            "established_by": "validate_plans",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "staging state",
+          "how": "check state consistency",
+          "expected": "no errors in staging"
+        },
+        "rollback": {
+          "trigger": "staging apply fails",
+          "action": "rollback staging environment",
+          "safety_guard": "ensure testing environment stability"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rollout_production",
+        "description": "Roll out version-pinned providers to production",
+        "action": "apply",
+        "target": "production_environment",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Staging apply completed without issues",
+            "fact": "staging_successful",
+            "established_by": "test_apply",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "production state",
+          "how": "monitor logs for errors",
+          "expected": "successful apply without issues"
+        },
+        "rollback": {
+          "trigger": "production apply fails",
+          "action": "rollback production environment",
+          "safety_guard": "ensure production stability"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "inventory",
+        "to_task": "pin_versions",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "pin_versions",
+        "to_task": "validate_plans",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "validate_plans",
+        "to_task": "test_apply",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test_apply",
+        "to_task": "rollout_production",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:pin_versions",
+      "task_id": "pin_versions",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'pin_versions' is sequenced before successful completion of its hard prerequisite 'inventory'.",
+      "suggested_fix": "Ensure 'inventory' is marked complete before proceeding to 'pin_versions'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:validate_plans",
+      "task_id": "validate_plans",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'validate_plans' lacks a robust rollback plan if validation fails. Current rollback will modify the state rather than revert to a safe previous state.",
+      "suggested_fix": "Implement a rollback that restores the environment to the state before pinning versions.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:test_apply",
+      "task_id": "test_apply",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'test_apply' is dependent on 'plans_validated' which is not verified before testing. If validation fails, this step will proceed unsafely.",
+      "suggested_fix": "Add verification to ensure 'plans_validated' is established prior to executing 'test_apply'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:plat-07-tf-provider-freeze:2:2",
+    "plan_id": "plan-plat-07-tf-provider-freeze-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:pin_versions",
+    "question": "Plan for goal 'plat-07-tf-provider-freeze' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

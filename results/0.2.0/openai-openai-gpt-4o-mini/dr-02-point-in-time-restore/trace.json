@@ -1,0 +1,233 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dr-02-point-in-time-restore",
+  "duration_seconds": 9.84,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "dr-02-point-in-time-restore",
+    "goal_id": "dr-02-point-in-time-restore",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:48:39.201266Z",
+    "tasks": [
+      {
+        "id": "identify_restore_point",
+        "description": "Identify the restore point based on timestamp T-2 hours",
+        "action": "locate",
+        "target": "restore timestamp",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "current timestamp is accessible",
+            "fact": "current_timestamp_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "pitr_restore",
+        "description": "Run PITR restore to isolated environment",
+        "action": "restore",
+        "target": "isolated_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "restore point is identified",
+            "fact": "restore_point_identified",
+            "established_by": "identify_restore_point",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data integrity at restore point",
+          "how": "run row count comparisons",
+          "expected": "row counts match expected values"
+        },
+        "rollback": {
+          "trigger": "restore fails",
+          "action": "retry restore process",
+          "safety_guard": "check archive availability"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_data",
+        "description": "Verify row counts and critical records",
+        "action": "validate",
+        "target": "restored_data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PITR restore completed successfully",
+            "fact": "restoration_successful",
+            "established_by": "pitr_restore",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "critical records verification",
+          "how": "compare with source data",
+          "expected": "no discrepancies found"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "restore from backup",
+          "safety_guard": "verify backup integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "test_application",
+        "description": "Run application tests against the restored DB",
+        "action": "test",
+        "target": "isolated_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "data verification completed",
+            "fact": "data_verified",
+            "established_by": "verify_data",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cleanup",
+        "description": "Securely delete the restored data and clean up the environment",
+        "action": "cleanup",
+        "target": "isolated_environment",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "application tests completed",
+            "fact": "tests_completed",
+            "established_by": "test_application",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "identify_restore_point",
+        "to_task": "pitr_restore",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "pitr_restore",
+        "to_task": "verify_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_data",
+        "to_task": "test_application",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test_application",
+        "to_task": "cleanup",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unverified_dependencies:test_application",
+      "task_id": "test_application",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'test_application' has unverified dependency on 'data_verified' which may lead to running tests on unverified data.",
+      "suggested_fix": "Ensure that 'data_verified' is validated before executing 'test_application'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:identify_restore_point",
+      "task_id": "identify_restore_point",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Task 'identify_restore_point' lacks details on what will happen if the restore point cannot be identified.",
+      "suggested_fix": "Add a contingency plan for identifying a restore point failure.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:pitr_restore",
+      "task_id": "pitr_restore",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for 'pitr_restore' involves a retry, but does not address multiple consecutive failures.",
+      "suggested_fix": "Consider adding a fallback mechanism or alternative actions if multiple retries fail.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:cleanup",
+      "task_id": "cleanup",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Task 'cleanup' does not specify how to securely delete data, which is crucial for data integrity.",
+      "suggested_fix": "Include a clear method for securely deleting the restored data.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

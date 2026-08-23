@@ -1,0 +1,247 @@
+{
+  "dimension": "core-api",
+  "goal_id": "erp-02-workflow-platform",
+  "duration_seconds": 10.53,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "erp-02-workflow-platform-plan",
+    "goal_id": "erp-02-workflow-platform",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:49:21.256771Z",
+    "tasks": [
+      {
+        "id": "process_remap",
+        "description": "Map ServiceNow workflows to the custom platform's workflow engine.",
+        "action": "remap",
+        "target": "workflows",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "workflow mappings",
+          "how": "compare mapped vs original",
+          "expected": "1:1 mapping for all workflows"
+        },
+        "rollback": {
+          "trigger": "mapping errors",
+          "action": "revert to original workflows",
+          "safety_guard": "verify original alignment"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "data_import",
+        "description": "Export ServiceNow records and import to the custom platform.",
+        "action": "import_data",
+        "target": "database",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "record counts and mappings",
+          "how": "check counts and field matches",
+          "expected": "match on all fields and counts"
+        },
+        "rollback": {
+          "trigger": "import failures",
+          "action": "restore from original records",
+          "safety_guard": "verify record integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "test_parallel",
+        "description": "Run both platforms in parallel for critical workflows.",
+        "action": "test",
+        "target": "workflows",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "SLA timers, assignments, notifications",
+          "how": "monitor outputs",
+          "expected": "no discrepancies between platforms"
+        },
+        "rollback": {
+          "trigger": "testing issues",
+          "action": "revert to ServiceNow",
+          "safety_guard": "verify workflow status unaffected"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "canary_migration",
+        "description": "Migrate a single department's workflows to the custom platform and monitor for a week.",
+        "action": "migrate_canary",
+        "target": "department_workflows",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "department workflow functionality",
+          "how": "monitor key performance indicators",
+          "expected": "no issues reported from users"
+        },
+        "rollback": {
+          "trigger": "canary failure",
+          "action": "revert department to ServiceNow",
+          "safety_guard": "verify canary rollback success"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover",
+        "description": "Switch all departments to the custom platform.",
+        "action": "cutover",
+        "target": "all_workflows",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "workflow functionality",
+          "how": "user reports and monitoring",
+          "expected": "all workflows operational"
+        },
+        "rollback": {
+          "trigger": "cutover issues",
+          "action": "revert all departments to ServiceNow",
+          "safety_guard": "verify no workflows lost"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "decommission",
+        "description": "Export final data from ServiceNow and cancel the license.",
+        "action": "decommission_service_now",
+        "target": "service_now",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "all data migrated",
+            "fact": "data_import_completed",
+            "established_by": "data_import",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "process_remap",
+        "to_task": "data_import",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "data_import",
+        "to_task": "test_parallel",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test_parallel",
+        "to_task": "canary_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "canary_migration",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover",
+        "to_task": "decommission",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:data_import",
+      "task_id": "data_import",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'data_import' is sequenced before its prerequisite 'process_remap'.",
+      "suggested_fix": "Ensure 'process_remap' is completed before starting 'data_import'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:test_parallel",
+      "task_id": "test_parallel",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'test_parallel' depends on 'data_import', which has not been completed yet.",
+      "suggested_fix": "Reorder tasks to ensure 'data_import' is completed prior to 'test_parallel'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:canary_migration",
+      "task_id": "canary_migration",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'canary_migration' is sequenced before its prerequisite 'test_parallel'.",
+      "suggested_fix": "Reorder tasks to ensure 'test_parallel' is successfully completed before 'canary_migration'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:cutover",
+      "task_id": "cutover",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'cutover' is sequenced before its prerequisite 'canary_migration'.",
+      "suggested_fix": "Reorder tasks to ensure 'canary_migration' is completed prior to 'cutover'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

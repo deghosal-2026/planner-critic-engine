@@ -1,0 +1,193 @@
+{
+  "dimension": "core-api",
+  "goal_id": "sre-02-telemetry-precondition",
+  "duration_seconds": 13.39,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-sre-02-telemetry-precondition-r2",
+    "goal_id": "sre-02-telemetry-precondition",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plan-sre-02-telemetry-precondition",
+    "created_at": "2026-08-23T06:56:21.715942Z",
+    "tasks": [
+      {
+        "id": "drain-batch-1",
+        "description": "Drain the first batch of pods",
+        "action": "drain",
+        "target": "pods",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "pod status",
+          "how": "query pod state",
+          "expected": "drained"
+        },
+        "rollback": {
+          "trigger": "drain fails",
+          "action": "restart pods",
+          "safety_guard": "check pod health status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "health-check-1",
+        "description": "Perform health check after draining first batch",
+        "action": "check",
+        "target": "pods",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "pod health",
+          "how": "query health probe",
+          "expected": "healthy"
+        },
+        "rollback": {
+          "trigger": "health check fails",
+          "action": "revert drain",
+          "safety_guard": "ensure previous batch is intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "drain-batch-2",
+        "description": "Drain the second batch of pods",
+        "action": "drain",
+        "target": "pods",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "health-check-1 completed and healthy",
+            "fact": "health_check_1_healthy",
+            "established_by": "health-check-1",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "pod status",
+          "how": "query pod state",
+          "expected": "drained"
+        },
+        "rollback": {
+          "trigger": "drain fails",
+          "action": "restart pods",
+          "safety_guard": "check pod health status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "health-check-2",
+        "description": "Perform health check after draining second batch",
+        "action": "check",
+        "target": "pods",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "drain-batch-2 completed and pods are drained",
+            "fact": "drain_batch_2_drained",
+            "established_by": "drain-batch-2",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "pod health",
+          "how": "query health probe",
+          "expected": "healthy"
+        },
+        "rollback": {
+          "trigger": "health check fails",
+          "action": "revert drain",
+          "safety_guard": "ensure previous batch is intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "drain-batch-1",
+        "to_task": "health-check-1",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "health-check-1",
+        "to_task": "drain-batch-2",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "drain-batch-2",
+        "to_task": "health-check-2",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:health-check-2",
+      "task_id": "health-check-2",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Health check for the second batch is sequenced incorrectly as it does not ensure the integrity of the previous batch before execution.",
+      "suggested_fix": "Ensure health-check-2 is executed only after confirming the successful health of the first batch and that the second batch is completely drained.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:drain-batch-2",
+      "task_id": "drain-batch-2",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "drain-batch-2 depends on an unverified condition concerning the health of the previous batch. This creates a risk of proceeding with draining if the previous batch is not healthy.",
+      "suggested_fix": "Add a verification step to ensure that the first batch is healthy before allowing the second batch drain to proceed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:sre-02-telemetry-precondition:2:2",
+    "plan_id": "plan-sre-02-telemetry-precondition-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:health-check-2",
+    "question": "Plan for goal 'sre-02-telemetry-precondition' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

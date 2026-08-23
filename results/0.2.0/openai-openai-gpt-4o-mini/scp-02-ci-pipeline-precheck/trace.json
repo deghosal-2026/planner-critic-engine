@@ -1,0 +1,180 @@
+{
+  "dimension": "core-api",
+  "goal_id": "scp-02-ci-pipeline-precheck",
+  "duration_seconds": 30.35,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-scp-02-ci-pipeline-precheck-r4",
+    "goal_id": "scp-02-ci-pipeline-precheck",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-scp-02-ci-pipeline-precheck-r3",
+    "created_at": "2026-08-23T06:53:22.481779Z",
+    "tasks": [
+      {
+        "id": "ci-check",
+        "description": "Run CI pipeline checks for each microservice",
+        "action": "execute",
+        "target": "ci/cd",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "CI check results",
+          "how": "review logs",
+          "expected": "all tests passed"
+        },
+        "rollback": {
+          "trigger": "CI pipeline fails",
+          "action": "revert to previous state",
+          "safety_guard": "ensure no changes are deployed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "ci-check-verification",
+        "description": "Verify CI check results before signing artifacts",
+        "action": "verify",
+        "target": "ci/cd",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CI checks completed successfully",
+            "fact": "ci_check_results_verified",
+            "established_by": "ci-check",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "CI check successful",
+          "how": "check log accuracy",
+          "expected": "CI check results verified"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "invalidate CI check results",
+          "safety_guard": "ensure artifacts are not signed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "sign-artifacts",
+        "description": "Sign artifacts after successful CI checks",
+        "action": "sign",
+        "target": "artifact-registry",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CI checks are verified",
+            "fact": "ci_check_results_verified",
+            "established_by": "ci-check-verification",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "artifact signatures",
+          "how": "validate signatures",
+          "expected": "all artifacts signed correctly"
+        },
+        "rollback": {
+          "trigger": "signing fails",
+          "action": "remove unsigned artifacts from registry",
+          "safety_guard": "check signature validity of existing artifacts"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "ci-check",
+        "to_task": "ci-check-verification",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "ci-check-verification",
+        "to_task": "sign-artifacts",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:sign-artifacts",
+      "task_id": "sign-artifacts",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'sign-artifacts' has a hard dependency on 'ci-check-verification' which must be completed before signing can occur. However, if 'ci-check' fails, 'ci-check-verification' won't execute and the plan can lead to signing artifacts without verified CI results.",
+      "suggested_fix": "Reorder the tasks to ensure 'sign-artifacts' cannot run unless both 'ci-check' and 'ci-check-verification' have succeeded.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:sign-artifacts",
+      "task_id": "sign-artifacts",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'sign-artifacts' relies on 'ci-check-verification' having successfully verified results, but there are no checks to ensure this dependency is validated before execution, which can result in signing artifacts without verified CI results.",
+      "suggested_fix": "Add an explicit check to affirm that 'ci-check-verification' has indeed passed before allowing 'sign-artifacts' to execute.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:weak_rollback:sign-artifacts",
+      "task_id": "sign-artifacts",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback mechanism for 'sign-artifacts' only checks the validity of existing signatures, but does not guarantee that all unsigned artifacts are removed in a fail case, which could leave unverified artifacts in the registry.",
+      "suggested_fix": "Implement a rollback that fully reverts unverified artifacts and checks the integrity of the entire registry state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:scp-02-ci-pipeline-precheck:4:4",
+    "plan_id": "plan-scp-02-ci-pipeline-precheck-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:sign-artifacts",
+    "question": "Plan for goal 'scp-02-ci-pipeline-precheck' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,276 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-04-workload-identity",
+  "duration_seconds": 48.07,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 4,
+    "llm_calls": 4
+  },
+  "plan": {
+    "id": "plan-inf-04-workload-identity-r4",
+    "goal_id": "inf-04-workload-identity",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-inf-04-workload-identity-r3",
+    "created_at": "2026-08-23T06:50:40.613936Z",
+    "tasks": [
+      {
+        "id": "create_service_account",
+        "description": "Create a new service account for workload identity",
+        "action": "create",
+        "target": "service_account",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service account existence",
+          "how": "check service accounts list",
+          "expected": "new service account listed"
+        },
+        "rollback": {
+          "trigger": "service account creation fails",
+          "action": "delete service account",
+          "safety_guard": "verify service account does not exist"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_service_account",
+        "description": "Verify that the service account was created successfully",
+        "action": "verify",
+        "target": "service_account",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "service account is created",
+            "fact": "new_service_account_exists",
+            "established_by": "create_service_account",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service account validity",
+          "how": "check service accounts list",
+          "expected": "service account created"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "alert user",
+          "safety_guard": "check service account creation logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "migrate_pods",
+        "description": "Migrate existing pods to use the new service account",
+        "action": "migrate",
+        "target": "pods",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "pod service account",
+          "how": "describe pods",
+          "expected": "pods using new service account"
+        },
+        "rollback": {
+          "trigger": "pod migration fails",
+          "action": "revert pod configurations",
+          "safety_guard": "ensure old service account is still available"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_migration",
+        "description": "Verify that pods are functioning correctly with the new service account",
+        "action": "verify",
+        "target": "pods",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "pod health",
+          "how": "run health checks",
+          "expected": "all pods healthy"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "revert to previous configuration",
+          "safety_guard": "check pod health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "check_old_credentials_usage",
+        "description": "Check that old credentials are not in use by any pods",
+        "action": "verify",
+        "target": "old_credentials",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "old credentials usage",
+          "how": "analyze pod configurations",
+          "expected": "no active pods using old credentials"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_absence_old_credentials",
+        "description": "Verify that no active pods are using old credentials",
+        "action": "verify",
+        "target": "old_credentials",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "absence of active pods using old credentials",
+          "how": "check pod configurations",
+          "expected": "no active pods using old credentials"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "alert user",
+          "safety_guard": "check pod configurations logs"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "remove_old_credentials",
+        "description": "Remove old service account credentials",
+        "action": "remove",
+        "target": "old_credentials",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "old credentials are not in use by any pods",
+            "fact": "no_active_pods_using_old_credentials",
+            "established_by": "verify_absence_old_credentials",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": {
+          "trigger": "removal fails",
+          "action": "restore old credentials",
+          "safety_guard": "confirm restoration"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "create_service_account",
+        "to_task": "verify_service_account",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_service_account",
+        "to_task": "migrate_pods",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate_pods",
+        "to_task": "verify_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_migration",
+        "to_task": "check_old_credentials_usage",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check_old_credentials_usage",
+        "to_task": "verify_absence_old_credentials",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_absence_old_credentials",
+        "to_task": "remove_old_credentials",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:migrate_pods",
+      "task_id": "migrate_pods",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'migrate_pods' is executed before 'verify_service_account', which is a hard prerequisite.",
+      "suggested_fix": "Reorder tasks to ensure 'verify_service_account' is completed before 'migrate_pods'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:remove_old_credentials",
+      "task_id": "remove_old_credentials",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'remove_old_credentials' depends on 'verify_absence_old_credentials', but does not establish a fact that confirms it is safe to proceed without using a hard dependency.",
+      "suggested_fix": "Implement a verification step before 'remove_old_credentials' to ensure old credentials are confirmed as unused.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:weak_rollback:migrate_pods",
+      "task_id": "migrate_pods",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'migrate_pods' does not ensure proper restoration of the previous configurations if the migration fails, potentially causing inconsistency.",
+      "suggested_fix": "Enhance the rollback process to include validation that configurations revert successfully.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:inf-04-workload-identity:4:4",
+    "plan_id": "plan-inf-04-workload-identity-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:migrate_pods",
+    "question": "Plan for goal 'inf-04-workload-identity' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

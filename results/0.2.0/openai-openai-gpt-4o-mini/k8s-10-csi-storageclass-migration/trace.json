@@ -1,0 +1,308 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-10-csi-storageclass-migration",
+  "duration_seconds": 59.82,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 4
+  },
+  "plan": {
+    "id": "plan-k8s-10-csi-storageclass-migration-r4",
+    "goal_id": "k8s-10-csi-storageclass-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-k8s-10-csi-storageclass-migration-r3",
+    "created_at": "2026-08-23T07:00:20.785001Z",
+    "tasks": [
+      {
+        "id": "install-driver",
+        "description": "Install the EBS CSI driver via Helm",
+        "action": "helm install",
+        "target": "ebs-csi-driver",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Helm is configured and can access the cluster",
+            "fact": "helm_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "driver installation status",
+          "how": "check Helm release status",
+          "expected": "release is active and running"
+        },
+        "rollback": {
+          "trigger": "installation fails",
+          "action": "rollback to previous driver version",
+          "safety_guard": "verify previous driver functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create-storageclass",
+        "description": "Create new StorageClass pointing to the EBS CSI driver",
+        "action": "kubectl create",
+        "target": "storageclass",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EBS CSI driver is installed",
+            "fact": "ebs_driver_installed",
+            "established_by": "install-driver",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "StorageClass creation status",
+          "how": "describe storageclass",
+          "expected": "StorageClass exists and is configured correctly"
+        },
+        "rollback": {
+          "trigger": "creation fails",
+          "action": "delete created StorageClass",
+          "safety_guard": "ensure no PVCs are using it"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-storageclass",
+        "description": "Verify successful creation of StorageClass",
+        "action": "kubectl get",
+        "target": "storageclass",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "StorageClass creation task has been executed",
+            "fact": "storageclass_created",
+            "established_by": "create-storageclass",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "StorageClass existence",
+          "how": "check for StorageClass in resources",
+          "expected": "StorageClass is successfully created"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "notify error",
+          "safety_guard": "check installation logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "migrate-pvs",
+        "description": "Migrate existing PersistentVolumes by creating new volumes from snapshots",
+        "action": "velero restore",
+        "target": "pvs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "StorageClass is verified as created",
+            "fact": "storageclass_verified",
+            "established_by": "verify-storageclass",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data integrity of migrated volumes",
+          "how": "compare checksum of old and new volumes",
+          "expected": "checksums match"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore from old PVs",
+          "safety_guard": "verify integrity of old PVs"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update-pvcs",
+        "description": "Update PVCs to reference new StorageClass",
+        "action": "kubectl patch",
+        "target": "pvcs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PVs are successfully migrated",
+            "fact": "pvs_verified",
+            "established_by": "migrate-pvs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "PVC reference",
+          "how": "check PVC specs",
+          "expected": "PVCs reference new StorageClass"
+        },
+        "rollback": {
+          "trigger": "PVC update fails",
+          "action": "revert PVC to old StorageClass",
+          "safety_guard": "verify application continuity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-pvcs",
+        "description": "Verify that all PVCs reference the new StorageClass",
+        "action": "kubectl get",
+        "target": "pvcs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PVCs update task has been executed",
+            "fact": "pvcs_updated",
+            "established_by": "update-pvcs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "PVC references",
+          "how": "describe PVCs",
+          "expected": "All PVCs reference the updated StorageClass"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "notify error",
+          "safety_guard": "check logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "decommission-old-driver",
+        "description": "Decommission the old in-tree EBS driver",
+        "action": "kubectl delete",
+        "target": "old-driver",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "All PVCs are verified to reference new StorageClass",
+            "fact": "pvcs_verified",
+            "established_by": "verify-pvcs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "old driver decommission status",
+          "how": "check driver status",
+          "expected": "old driver is not active"
+        },
+        "rollback": {
+          "trigger": "decommission fails",
+          "action": "reinstall old driver",
+          "safety_guard": "verify application functionality"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:migrate-pvs",
+      "task_id": "migrate-pvs",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Migration of PersistentVolumes should not occur before successful verification of StorageClass creation.",
+      "suggested_fix": "Reorder tasks to ensure 'verify-storageclass' is completed before 'migrate-pvs'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:weak_rollback:migrate-pvs",
+      "task_id": "migrate-pvs",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback action for 'migrate-pvs' does not guarantee restoration of data integrity if migration fails.",
+      "suggested_fix": "Add a safety guard that verifies the integrity of both old and new volumes before rolling back.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:update-pvcs",
+      "task_id": "update-pvcs",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'update-pvcs' depends on 'migrate-pvs' and presumes success without explicitly verifying migration before executing.",
+      "suggested_fix": "Add a verification step to confirm successful migration of PVs before proceeding to update PVCs.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:weak_rollback:update-pvcs",
+      "task_id": "update-pvcs",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for 'update-pvcs' does not ensure the application continuity adequately if the PVC update fails.",
+      "suggested_fix": "Modify the rollback to include checks that validated restore to the previous state does not disrupt application functionality.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:decommission-old-driver",
+      "task_id": "decommission-old-driver",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "'decommission-old-driver' assumes that all PVCs have been successfully updated without verifying prior to proceeding with decommissioning.",
+      "suggested_fix": "Include a verification step to ensure that all PVCs are confirmed to reference the new StorageClass before decommissioning the old driver.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-10-csi-storageclass-migration:4:4",
+    "plan_id": "plan-k8s-10-csi-storageclass-migration-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:migrate-pvs",
+    "question": "Plan for goal 'k8s-10-csi-storageclass-migration' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

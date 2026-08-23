@@ -1,0 +1,257 @@
+{
+  "dimension": "core-api",
+  "goal_id": "sf-02-cdn-origin-migration",
+  "duration_seconds": 18.83,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "sf-02-cdn-origin-migration-plan",
+    "goal_id": "sf-02-cdn-origin-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:55:30.069897Z",
+    "tasks": [
+      {
+        "id": "configure-origin",
+        "description": "Configure Nginx as a new origin behind CDN",
+        "action": "configure",
+        "target": "Nginx",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Nginx is installed",
+            "fact": "nginx_installed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Nginx configuration correctness",
+          "how": "test endpoint responses",
+          "expected": "valid responses and 200 status"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "revert to previous configuration",
+          "safety_guard": "validate old configuration functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-cdn",
+        "description": "Set up CDN with new origin configuration",
+        "action": "configure",
+        "target": "CloudFront",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "CDN distribution settings",
+          "how": "run CDN diagnostics",
+          "expected": "distribution correctly points to the new origin"
+        },
+        "rollback": {
+          "trigger": "CDN misconfigured",
+          "action": "restore previous CDN settings",
+          "safety_guard": "review previous configuration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "set-up-dual-origin",
+        "description": "Configure dual-origin setup with weighted routing",
+        "action": "configure",
+        "target": "CloudFront",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "weighted routing correctness",
+          "how": "verify routing percentages",
+          "expected": "requests routed correctly to origins"
+        },
+        "rollback": {
+          "trigger": "routing issue detected",
+          "action": "switch back to single origin routing",
+          "safety_guard": "monitor traffic patterns"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "stagger-traffic-cut",
+        "description": "Stagger traffic cut from old origin to new origins",
+        "action": "stagger",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dual-origin configuration is active",
+            "fact": "dual_origin_active",
+            "established_by": "set-up-dual-origin",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic distribution status",
+          "how": "monitor traffic logs",
+          "expected": "traffic gradually increases to 100% on new origin"
+        },
+        "rollback": {
+          "trigger": "critical errors detected",
+          "action": "restore full traffic to old origin",
+          "safety_guard": "ensure fallback mechanism is functional"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-cache-hit",
+        "description": "Verify cache hit rates at each stage of traffic cut",
+        "action": "verify",
+        "target": "cache",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "cache hit rate",
+          "how": "analyze cache hit logs",
+          "expected": "acceptable cache hit rate above threshold"
+        },
+        "rollback": {
+          "trigger": "cache miss detected",
+          "action": "adjust cache settings",
+          "safety_guard": "ensure cache monitoring tools are enabled"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "warm-caches",
+        "description": "Warm caches before full cutover",
+        "action": "warm",
+        "target": "cache",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "final-cutover",
+        "description": "Complete the cutover to the new origin",
+        "action": "cutover",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Caches warmed",
+            "fact": "caches_warmed",
+            "established_by": "warm-caches",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "final traffic distribution",
+          "how": "monitor traffic patterns",
+          "expected": "100% traffic to new origin"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "revert traffic back to old origin",
+          "safety_guard": "confirm old origin is functional"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-content",
+        "description": "Verify edge locations serve correct content",
+        "action": "verify",
+        "target": "content",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "content validation",
+          "how": "test endpoints for content correctness",
+          "expected": "all endpoints return new content"
+        },
+        "rollback": {
+          "trigger": "stale content detected",
+          "action": "clear cache and revert",
+          "safety_guard": "check content version"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:stagger-traffic-cut",
+      "task_id": "stagger-traffic-cut",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'stagger-traffic-cut' is ordered before verifying that all caches have been warmed, which is a prerequisite for this step.",
+      "suggested_fix": "Ensure 'warm-caches' is completed and verified before executing 'stagger-traffic-cut'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:warm-caches",
+      "task_id": "warm-caches",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'warm-caches' lacks a defined rollback action, making it risky if the task fails.",
+      "suggested_fix": "Add a rollback process for 'warm-caches' to handle cache warming failures.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:final-cutover",
+      "task_id": "final-cutover",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'final-cutover' depends on successful cache warming but this dependency is not explicitly verified by preceding tasks.",
+      "suggested_fix": "Include verification of cache warming completion before proceeding to 'final-cutover'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

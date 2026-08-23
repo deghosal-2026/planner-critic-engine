@@ -1,0 +1,144 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-04-connection-pooling",
+  "duration_seconds": 4.57,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "db-04-connection-pooling-plan",
+    "goal_id": "db-04-connection-pooling",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:41:31.884124Z",
+    "tasks": [
+      {
+        "id": "setup_pgbouncer",
+        "description": "Set up PgBouncer in transaction-pooling mode",
+        "action": "deploy",
+        "target": "PgBouncer HA",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "PgBouncer status",
+          "how": "check PgBouncer logs",
+          "expected": "running in transaction-pooling mode"
+        },
+        "rollback": {
+          "trigger": "PgBouncer setup fails",
+          "action": "tear down PgBouncer",
+          "safety_guard": "ensure primary DB is intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_apps",
+        "description": "Update application configurations to point to PgBouncer",
+        "action": "update",
+        "target": "app_configs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application connection string",
+          "how": "review application settings",
+          "expected": "pointing to PgBouncer"
+        },
+        "rollback": {
+          "trigger": "config update fails",
+          "action": "restore previous app configurations",
+          "safety_guard": "verify app functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "dns_cutover",
+        "description": "Perform DNS cutover from app servers to PgBouncer",
+        "action": "cutover",
+        "target": "DNS",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "DNS resolution for app servers",
+          "how": "query DNS records",
+          "expected": "resolved to PgBouncer IPs"
+        },
+        "rollback": {
+          "trigger": "DNS cutover fails",
+          "action": "revert DNS to direct connection",
+          "safety_guard": "check app connectivity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup_pgbouncer",
+        "to_task": "configure_apps",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_apps",
+        "to_task": "dns_cutover",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:configure_apps",
+      "task_id": "configure_apps",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Configuration of applications should only occur after PgBouncer has been successfully set up.",
+      "suggested_fix": "Reorder tasks to ensure 'setup_pgbouncer' is completed before 'configure_apps'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:dns_cutover",
+      "task_id": "dns_cutover",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "DNS cutover has high blast radius with no adequate rollback to restore previous DNS state reliably if issues arise.",
+      "suggested_fix": "Implement a more detailed rollback plan to ensure DNS can be reverted quickly and efficiently.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

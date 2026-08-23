@@ -1,0 +1,233 @@
+{
+  "dimension": "core-api",
+  "goal_id": "data-05-warehouse-model",
+  "duration_seconds": 23.01,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-data-05-warehouse-model-r3",
+    "goal_id": "data-05-warehouse-model",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-data-05-warehouse-model-r2",
+    "created_at": "2026-08-23T06:39:36.057268Z",
+    "tasks": [
+      {
+        "id": "backup",
+        "description": "Back up the existing star schema data",
+        "action": "backup",
+        "target": "star_schema_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "star schema database is reachable",
+            "fact": "star_schema_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "backup integrity",
+          "how": "run integrity checks",
+          "expected": "backup is complete and valid"
+        },
+        "rollback": {
+          "trigger": "backup fails",
+          "action": "alert and halt operation",
+          "safety_guard": "check backup service status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "migrate",
+        "description": "Apply new dimensional model migration",
+        "action": "migrate",
+        "target": "star_schema",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "backup is successful",
+            "fact": "backup_success",
+            "established_by": "backup",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "new schema version",
+          "how": "run migration version checks",
+          "expected": "new schema version is applied successfully"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore from backup",
+          "safety_guard": "verify backup integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "backfill",
+        "description": "Backfill historical data into new star schema",
+        "action": "backfill",
+        "target": "historical_data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "migration was successful",
+            "fact": "migration_success",
+            "established_by": "migrate",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "backfill completeness",
+          "how": "run backfill checks",
+          "expected": "backfill is complete"
+        },
+        "rollback": {
+          "trigger": "backfill fails",
+          "action": "alert and halt operation",
+          "safety_guard": "check backfill service status"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify",
+        "description": "Verify the completeness of the migration and backfill",
+        "action": "verify",
+        "target": "data_quality",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "historical data is backfilled",
+            "fact": "backfill_complete",
+            "established_by": "backfill",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data quality metrics",
+          "how": "run data quality checks",
+          "expected": "data quality metrics meet standards"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "revert to last known good state",
+          "safety_guard": "confirm last good state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "backup",
+        "to_task": "migrate",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate",
+        "to_task": "backfill",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "backfill",
+        "to_task": "verify",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:migrate",
+      "task_id": "migrate",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Migration task is ordered before confirming backup success.",
+      "suggested_fix": "Ensure the migration task occurs only after backup success is verified.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:weak_rollback:migrate",
+      "task_id": "migrate",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Migration lacks a robust rollback plan for a high-blast-radius action.",
+      "suggested_fix": "Modify the rollback to include verification of the backup integrity before restoring.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:backfill",
+      "task_id": "backfill",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Backfill task relies on a verification of migration success that is not established before it executes.",
+      "suggested_fix": "Ensure migration success is validated before allowing backfill to begin.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:weak_rollback:verify",
+      "task_id": "verify",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Verification task has a rollback that may not ensure a complete revert to a functional state.",
+      "suggested_fix": "Enhance rollback procedures to guarantee a complete revert to a last known good state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:data-05-warehouse-model:3:3",
+    "plan_id": "plan-data-05-warehouse-model-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:migrate",
+    "question": "Plan for goal 'data-05-warehouse-model' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

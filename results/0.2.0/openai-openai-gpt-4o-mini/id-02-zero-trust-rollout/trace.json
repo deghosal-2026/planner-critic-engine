@@ -1,0 +1,266 @@
+{
+  "dimension": "core-api",
+  "goal_id": "id-02-zero-trust-rollout",
+  "duration_seconds": 51.83,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-id-02-zero-trust-rollout-r4",
+    "goal_id": "id-02-zero-trust-rollout",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-id-02-zero-trust-rollout-r3",
+    "created_at": "2026-08-23T06:42:14.309240Z",
+    "tasks": [
+      {
+        "id": "deploy-ca",
+        "description": "Deploy internal CA using cert-manager",
+        "action": "deploy",
+        "target": "cert-manager",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "kubectl is configured",
+            "fact": "kubectl_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "CA is deployed",
+          "how": "check cert-manager status",
+          "expected": "cert-manager running"
+        },
+        "rollback": {
+          "trigger": "CA deployment fails",
+          "action": "roll back to previous CA configuration",
+          "safety_guard": "verify deployment logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "issue-mtls-certs",
+        "description": "Issue mTLS certificates to all services",
+        "action": "issue",
+        "target": "mTLS certs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CA is successfully deployed",
+            "fact": "ca_deployed",
+            "established_by": "deploy-ca",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "certs are issued",
+          "how": "check cert validity",
+          "expected": "all services have valid mTLS certs"
+        },
+        "rollback": {
+          "trigger": "cert issuance fails",
+          "action": "restore previous certs",
+          "safety_guard": "verify previous cert integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-istio",
+        "description": "Configure Istio with STRICT mTLS",
+        "action": "configure",
+        "target": "Istio",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "mTLS certs are issued",
+            "fact": "mtls_certs_issued",
+            "established_by": "issue-mtls-certs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Istio is configured correctly",
+          "how": "test service communication",
+          "expected": "all services communicate over mTLS"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "revert Istio configuration",
+          "safety_guard": "verify Istio status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-egress",
+        "description": "Configure egress firewall rules (default deny + allowlist)",
+        "action": "configure",
+        "target": "egress firewall",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Proxy is deployed and functional",
+            "fact": "proxy_deployed",
+            "established_by": "deploy-iap",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Egress rules are in place",
+          "how": "test service communication to outside",
+          "expected": "only allowlisted services can communicate"
+        },
+        "rollback": {
+          "trigger": "egress configuration fails",
+          "action": "revert egress rules to default",
+          "safety_guard": "check for allowed traffic"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy-iap",
+        "description": "Deploy identity-aware proxy (IAP or AWS ALB with OIDC)",
+        "action": "deploy",
+        "target": "IAP",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Istio is configured with strict mTLS",
+            "fact": "istio_configured",
+            "established_by": "configure-istio",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "IAP is deployed and functional",
+          "how": "check proxy access logs",
+          "expected": "all access routed through IAP"
+        },
+        "rollback": {
+          "trigger": "proxy deployment fails",
+          "action": "remove proxy and revert settings",
+          "safety_guard": "verify traffic routes correctly without proxy"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-mtls",
+        "description": "Verify all service-to-service traffic uses mTLS",
+        "action": "verify",
+        "target": "service traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Egress rules are configured",
+            "fact": "egress_configured",
+            "established_by": "configure-egress",
+            "probe": null
+          },
+          {
+            "description": "Istio is configured with strict mTLS",
+            "fact": "istio_configured",
+            "established_by": "configure-istio",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Verify mTLS is enforced",
+          "how": "check service logs for mTLS connections",
+          "expected": "all service traffic uses mTLS"
+        },
+        "rollback": {
+          "trigger": "mTLS verification fails",
+          "action": "analyze traffic logs and revert to non-mTLS configuration",
+          "safety_guard": "ensure traffic is logged"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy-ca",
+        "to_task": "issue-mtls-certs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "issue-mtls-certs",
+        "to_task": "configure-istio",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-istio",
+        "to_task": "configure-egress",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-egress",
+        "to_task": "deploy-iap",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-iap",
+        "to_task": "verify-mtls",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "preconditions_referenced:plan-id-02-zero-trust-rollout-r4:4:configure-egress:proxy_deployed",
+      "task_id": "configure-egress",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "blocker",
+      "reason_code": "unverified_precondition",
+      "message": "precondition 'proxy_deployed' on task 'configure-egress' references no established fact from an earlier task",
+      "suggested_fix": "Point the precondition at an earlier task that establishes 'proxy_deployed'",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:id-02-zero-trust-rollout:4:4",
+    "plan_id": "plan-id-02-zero-trust-rollout-r4",
+    "version": 4,
+    "blocker_finding_id": "preconditions_referenced:plan-id-02-zero-trust-rollout-r4:4:configure-egress:proxy_deployed",
+    "question": "Plan for goal 'id-02-zero-trust-rollout' cannot be approved: blockers remain (unverified_precondition). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}
