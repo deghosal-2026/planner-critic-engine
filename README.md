@@ -75,6 +75,12 @@ The plan is a persisted, versioned artifact — you can diff revisions, see whic
 | **Probe system** | Health probes for pre-execution precondition validation (DB, deploy, env, HTTP) | v0.2.0 |
 | **Drift observability** | Finding-drift detection — track how findings change across revisions (#181) | v0.2.0 |
 | **pytest plugin** | `pytest-planner-critic` — use gate assertions in your test suite (#156) | v0.2.0 |
+| **Frozen acceptance contract** | Bound pre-run; post-bind mutation creates new version + audit trail (#215) | v0.2.1 |
+| **Rollback credibility gate** | Detects unreachable / self-dependent / inconsistent-state / post-consumed rollbacks (#216) | v0.2.1 |
+| **Verification ordering gate** | Catches vacuous verifications — consumer runs before verified mutation (#219) | v0.2.1 |
+| **Histogram cycling detection** | Period-2 reshuffling stall signal — A→B→A→B pattern detection (#217) | v0.2.1 |
+| **Live-critic boundary evaluator** | Repeated-trial label-flip, evidence-drift, family-migration, underclaim metrics (#218) | v0.2.1 |
+| **Failure-mode register** | Intentional vs. needs-evidence assumptions register (14 rows) (#220) | v0.2.1 |
 
 ### What It Is Not
 
@@ -158,18 +164,20 @@ See [API Reference](docs/reference/api.md) for full CLI docs, HTTP endpoints, an
 
 170 goals across 40 domains, all run against a real LLM (gpt-4o-mini via OpenRouter):
 
-| Metric | Result |
-|--------|--------|
-| Balanced goals approved | **73/73 (100%)** |
-| Strict goals escalated | **97/97 (100%)** |
-| Adversarial goals escalated | **8/8 (100%)** |
-| True failures | **0** |
-| Deterministic gate passes | **170/170 (100%)** |
-| Security oracle (SWE-bench) | **7/7 correct, 35/35 flawed blocked, 21 traps** |
-| **Scorecard A (pre-amended)** | **PASS** |
-| **Scorecard B (pass\* semantics)** | **100%** |
+| Metric | v0.2.1 Result | v0.2.0 Result |
+|--------|---------------|---------------|
+| Balanced goals approved | **73/73 (100%)** | **73/73 (100%)** |
+| Strict goals escalated | **96/97 (99%)** ⚠ 1 transient error | **97/97 (100%)** |
+| Adversarial goals escalated | **8/8 (100%)** | **8/8 (100%)** |
+| True failures | **0** | **0** |
+| Deterministic gate passes | **170/170 (100%)** | **170/170 (100%)** |
+| Verdict deltas vs prior | 30 — all attributable | — |
+| Deterministic tests | **1295 pass** | **90 pass** |
+| Benchmarks | **3/3** | **3/3** |
+| **Scorecard A** | **PASS** | **PASS** |
+| **Scorecard B (pass\*)** | **100%** | **100%** |
 
-Full results: [field-test-results-0.2.0.md](docs/field-test/v0.2.0/field-test-results-0.2.0.md)
+Full results: [field-test-results-0.2.1.md](docs/field-test/v0.2.1/field-test-results-0.2.1.md) | [v0.2.0 results](docs/field-test/v0.2.0/field-test-results-0.2.0.md)
 
 ---
 
@@ -177,10 +185,12 @@ Full results: [field-test-results-0.2.0.md](docs/field-test/v0.2.0/field-test-re
 
 | Doc | Path | Contents |
 |-----|------|----------|
-| **Field Test Results v0.2.0** | [results](docs/field-test/v0.2.0/field-test-results-0.2.0.md) | BLUF, conclusions, per-goal data, scorecards, blocker analysis |
+| **Field Test Results v0.2.1** | [results](docs/field-test/v0.2.1/field-test-results-0.2.1.md) | BLUF, regression diff, per-goal data, scorecards, blocker analysis |
+| **Field Test Results v0.2.0** | [results](docs/field-test/v0.2.0/field-test-results-0.2.0.md) | v0.2.0 results for reference |
 | **Field Test Results v0.1.0** | [results](docs/field-test/v0.1.0/field-test-results-0.1.0.md) | v0.1.0 results for reference |
 | **Field Test Plan** | [plan](docs/field-test/README.md) | Corpus, invariant assertions, execution guide |
-| **Release Notes v0.2.0** | [release-notes](docs/reference/release-notes-v0.2.0.md) | What's new, breaking changes, upgrade path |
+| **Release Notes v0.2.1** | [release-notes](docs/reference/release-notes-v0.2.1.md) | What's new, hardening, field test results |
+| **Release Notes v0.2.0** | [release-notes](docs/reference/release-notes-v0.2.0.md) | v0.2.0 release notes for reference |
 | **Release Notes v0.1.0** | [release-notes](docs/reference/release-notes-v0.1.0.md) | v0.1.0 release notes for reference |
 | **Architecture** | [architecture](docs/architecture/architecture-v0.1.0.md) | Component diagram, module map, data flow |
 | **API Reference** | [api](docs/reference/api.md) | CLI cheat-sheet, HTTP endpoints, MCP tools |
@@ -191,7 +201,8 @@ Full results: [field-test-results-0.2.0.md](docs/field-test/v0.2.0/field-test-re
 | **Developer Surfaces Design** | [developer-surfaces](docs/design/developer-surfaces-design.md) | CLI commands, decorator, seed Rego |
 | **Integration Surfaces Design** | [integration](docs/design/integration-surfaces-design.md) | CI runners, AutoGen, notifier |
 | **Security** | [security](SECURITY.md) | Security policy, OWASP, OpenSSF |
-| **WBS Index (v0.2.0)** | [wbs](docs/wbs/v0.2.0/wbs-v0.2.0-index.md) | Milestone overview, dependency graph |
+| **WBS Index (v0.2.1)** | [wbs](docs/wbs/v0.2.1/wbs-v0.2.1-index.md) | Milestone overview, dependency graph |
+| **WBS Index (v0.2.0)** | [wbs](docs/wbs/v0.2.0/wbs-v0.2.0-index.md) | v0.2.0 WBS for reference |
 
 ---
 
