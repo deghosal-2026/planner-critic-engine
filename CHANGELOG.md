@@ -1,6 +1,29 @@
 # Changelog
 
-## v0.2.0 (2026-08-23)
+## v0.2.1 (2026-08-23)
+
+### Hardening
+- **Frozen acceptance-criteria contract (#215)** — `AcceptanceContract` bound pre-run; post-bind mutation creates new version + audit trail; wrong-principal rejection
+- **Rollback credibility gate (#216)** — unreachable / self-dependent / inconsistent-state / post-consumed rollback detection
+- **Verification-before-mutate ordering gate (#219)** — vacuous-verification-window detection; data-subject contract (pre-state vs output)
+- **Family-histogram cycling detection (#217)** — period-2 A→B→A→B reshuffling stall signal; progress guard suppresses declining-mass alternation
+- **Live-critic boundary-case runner (#218)** — repeated-trial label-flip, family-migration, evidence-drift, underclaim-approval measurement
+- **Failure-mode register (#220)** — `docs/reference/failure-modes.md` (14 rows)
+- **Drift-metric blind-spot contract (#231)** — `critical_underclaims` interpretation key; two measurement classes
+
+### Bug Fixes
+- **10 bugs fixed** by code review (#232–#241): histogram cycling detector (#232), rollback-credible message quality (#233), gate finding-id collisions (#234), live-boundary fault isolation (#235), vacuous adapter test (#236), suggested-fix group name (#237), evidence-drift pooling (#239), contract posture stamping (#240), content-hash ordering (#241)
+- **1 documented caveat** — F-14: `approving_authority` wiring deferred to v0.3.0 (#238)
+
+### Field Test Results
+- **170 goals across 40 domains** — 73 balanced approved (100%), 96 strict escalated (99%), 8 adversarial (100%)
+- **30 verdict deltas vs v0.2.0** — all attributable; zero unexplained
+- **1295 deterministic subsystem tests pass**
+- **3 benchmarks** — cycling, operational, live-critic boundary (#218)
+- **Live-critic boundary:** label_flip=1.0, evidence_drift=1.0, family_migration=0.0, underclaim_approvals=0
+- **Operational benchmark:** latency p50=13.86s/27.82s, median revisions=1.0
+- **Release gate: PASS**
+- Coverage 91.58% (>91% floor), lint clean (ruff + mypy strict, 274 files)
 
 ### Features
 - **Deterministic loop efficiency** — topological auto-repair (#130), deterministic precondition closer (#131), oscillation detection + auto-converge (#152)

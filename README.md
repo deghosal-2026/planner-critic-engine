@@ -4,20 +4,20 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
-[![PyPI](https://img.shields.io/badge/pypi-v0.2.0-blue)](https://pypi.org/project/planner-critic/)
+[![PyPI](https://img.shields.io/badge/pypi-v0.2.1-blue)](https://pypi.org/project/planner-critic/)
 [![Ruff](https://img.shields.io/badge/code%20style-ruff-000000)](https://github.com/astral-sh/ruff)
 [![Type checked](https://img.shields.io/badge/mypy-strict-blue)](https://github.com/python/mypy)
-[![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen)](https://github.com/deghosal-2026/planner-critic-engine/actions)
+[![Coverage](https://img.shields.io/badge/coverage-91%25-brightgreen)](https://github.com/deghosal-2026/planner-critic-engine/actions)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14184/badge)](https://www.bestpractices.dev/projects/14184)
-[![Field Test](https://img.shields.io/badge/field%20test-170%20goals%2C%200%20failures-brightgreen)](docs/field-test/v0.2.0/field-test-results-0.2.0.md)
+[![Field Test](https://img.shields.io/badge/field%20test-170%20goals%2C%200%20failures-brightgreen)](docs/field-test/v0.2.1/field-test-results-0.2.1.md)
 
 **Hierarchical task planning with an independent LLM critic. A planner decomposes a goal into a structured plan; a critic audits every subtask; the plan is revised until approval — or escalated to a human.**
 
 </div>
 
 > [!NOTE]
-> **Status:** v0.2.0 released · [PyPI](https://pypi.org/project/planner-critic/) · `pip install planner-critic`
+> **Status:** v0.2.1 released · [PyPI](https://pypi.org/project/planner-critic/) · `pip install planner-critic`
 > **License:** MIT
 
 ---

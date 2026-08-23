@@ -37,6 +37,7 @@ from typing import Any
 
 from planner_critic.eval.label_migration import generate_boundary_cases
 from planner_critic.eval.live_boundary import run_live_boundary_cases
+from planner_critic.redaction import SecretsRedactor
 from planner_critic.schema.goal import Goal, RiskTolerance
 
 API_KEY = os.environ.get("OPENROUTER_API_KEY")
@@ -221,10 +222,14 @@ def run_boundary(critic: Any, *, trials: int = 5, model: str = "stub") -> dict:
     elapsed = time.time() - start
     report["model"] = model  # type: ignore[assignment]
 
+    redactor = SecretsRedactor()
+    redacted_json = redactor.redact(json.dumps(report, indent=2, default=str))
+    redacted_md = redactor.redact(_markdown_summary(report, model, trials, elapsed))
+
     json_path = RESULTS_DIR / "live-boundary-report.json"
     md_path = RESULTS_DIR / "live-boundary-report.md"
-    json_path.write_text(json.dumps(report, indent=2, default=str))
-    md_path.write_text(_markdown_summary(report, model, trials, elapsed))
+    json_path.write_text(redacted_json)
+    md_path.write_text(redacted_md)
 
     print(f"\nReport written to:\n  {json_path}\n  {md_path}")
     print(
