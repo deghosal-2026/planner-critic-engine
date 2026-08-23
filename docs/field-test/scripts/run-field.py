@@ -157,10 +157,40 @@ def run_goals_sweep(args) -> None:
     print(f"\n[goals-sweep] Done: {len(results)} results ({passed} passed)")
 
 
+# ── Skip-existing helpers ───────────────────────────────────────────────────
+
+
+def _has_results(path: Path) -> bool:
+    """Check if output already exists for skip-existing logic."""
+    if path.is_file():
+        return path.exists() and path.stat().st_size > 0
+    if path.is_dir():
+        return any(path.rglob("trace.json")) or (path / "results.json").exists()
+    return False
+
+
+def _should_skip(args, marker: str) -> bool:
+    """Check if a phase should be skipped (--skip-existing)."""
+    if not args.skip_existing:
+        return False
+    marker_path = RESULTS_ROOT / f".{marker}_done"
+    return marker_path.exists()
+
+
+def _mark_done(marker: str) -> None:
+    """Mark a phase as done (for --skip-existing)."""
+    marker_path = RESULTS_ROOT / f".{marker}_done"
+    marker_path.parent.mkdir(parents=True, exist_ok=True)
+    marker_path.write_text("done")
+
+
 # ── P0: Validation ─────────────────────────────────────────────────────────
 
 
 def run_validate(args) -> None:
+    if _should_skip(args, "validate"):
+        print("[validate] ✅ SKIP (already done)")
+        return
     print("[validate] Checking all 170 assertion YAMLs...")
     result = subprocess.run(
         [sys.executable, str(SCRIPTS_DIR / "pre_run_validation.py")],
@@ -170,12 +200,17 @@ def run_validate(args) -> None:
         print("[validate] ❌ FAILED")
     else:
         print("[validate] ✅ PASSED")
+        _mark_done("validate")
 
 
 # ── P2/P3: Subsystem tests ──────────────────────────────────────────────────
 
 
 def run_subsystem(args) -> None:
+    marker = "subsystem_llm" if args.run_llm else "subsystem"
+    if _should_skip(args, marker):
+        print(f"[subsystem] ✅ SKIP (already done, {marker})")
+        return
     cmd = [sys.executable, "-m", "pytest", str(TESTS_DIR), "-v", "--no-cov"]
     if args.run_llm:
         print("[subsystem] Running with --run-llm (requires live LLM)")
@@ -186,12 +221,16 @@ def run_subsystem(args) -> None:
         print("[subsystem] ❌ FAILED")
     else:
         print("[subsystem] ✅ PASSED")
+        _mark_done(marker)
 
 
 # ── Security oracle ─────────────────────────────────────────────────────────
 
 
 def run_security(args) -> None:
+    if _should_skip(args, "security"):
+        print("[security] ✅ SKIP (already done)")
+        return
     print("[security] Running SWE-bench security oracle evaluation...")
     if args.adversarial:
         print("[security] Running injection harness (adversarial)...")
@@ -212,30 +251,42 @@ def run_security(args) -> None:
         print("[security] Proposing standing rules...")
         subprocess.run([sys.executable, "-m", "planner_critic.cli.lessons", "propose"])
         print("[security] ✅ ALL DONE")
+        _mark_done("security")
 
 
 # ── Benchmarks ───────────────────────────────────────────────────────────────
 
 
 def run_benchmarks(args) -> None:
+    if _should_skip(args, "benchmarks"):
+        print("[benchmarks] ✅ SKIP (already done)")
+        return
     benchmarks = [
         ("auto-repair", SCRIPTS_DIR / "bench_auto_repair.py"),
         ("rollback", SCRIPTS_DIR / "bench_rollback.py"),
         ("stasis", SCRIPTS_DIR / "bench_stasis.py"),
     ]
+    all_ok = True
     for name, script in benchmarks:
         if not script.exists():
             print(f"[benchmarks] ❌ {name}: script not found ({script})")
+            all_ok = False
+            continue
+        out_file = RESULTS_ROOT / f"bench_{name}.json"
+        if args.skip_existing and out_file.exists() and out_file.stat().st_size > 0:
+            print(f"[benchmarks] ✅ {name}: SKIP (results exist)")
             continue
         print(f"[benchmarks] Running {name}...")
-        out_file = RESULTS_ROOT / f"bench_{name}.json"
         out_file.parent.mkdir(parents=True, exist_ok=True)
         with open(out_file, "w") as f:
             result = subprocess.run([sys.executable, str(script)], stdout=f, stderr=subprocess.PIPE)
         if result.returncode != 0:
             print(f"[benchmarks] ❌ {name}: {result.stderr.decode()[:200]}")
+            all_ok = False
         else:
             print(f"[benchmarks] ✅ {name}: results → {out_file}")
+    if all_ok:
+        _mark_done("benchmarks")
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
