@@ -1,0 +1,205 @@
+{
+  "dimension": "core-api",
+  "goal_id": "arch-01-microservice-extract",
+  "duration_seconds": 18.98,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-arch-01-microservice-extract-r2",
+    "goal_id": "arch-01-microservice-extract",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plan-arch-01",
+    "created_at": "2026-08-23T21:54:12.074941Z",
+    "tasks": [
+      {
+        "id": "identify_boundary",
+        "description": "Identify the bounded context boundary for payments microservice",
+        "action": "analyze",
+        "target": "monolith",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "existing payments logic in monolith is understood",
+            "fact": "payments_logic_documented",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "implement_dual_write",
+        "description": "Implement dual-write pattern for payments",
+        "action": "develop",
+        "target": "payments_service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "payments logic is documented",
+            "fact": "payments_logic_documented",
+            "established_by": "identify_boundary",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data consistency between systems",
+          "how": "run integration tests",
+          "expected": "no data discrepancies"
+        },
+        "rollback": {
+          "trigger": "implementation fails",
+          "action": "revert code changes",
+          "safety_guard": "ensure legacy code remains intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover_traffic",
+        "description": "Cut over traffic to the new payments service",
+        "action": "redirect",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "implement_dual_write has been successfully executed",
+            "fact": "dual_write_successful",
+            "established_by": "implement_dual_write",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service availability",
+          "how": "check health endpoints",
+          "expected": "new service responds with 200 OK"
+        },
+        "rollback": {
+          "trigger": "traffic cutover fails",
+          "action": "redirect traffic back to legacy service",
+          "safety_guard": "monitor response times"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "decommission_legacy",
+        "description": "Decommission legacy payments code",
+        "action": "remove",
+        "target": "legacy_service",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "legacy code is removed",
+          "how": "codebase audit",
+          "expected": "legacy payments code no longer present"
+        },
+        "rollback": {
+          "trigger": "decommission fails",
+          "action": "restore legacy payments code",
+          "safety_guard": "backup existing code"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "identify_boundary",
+        "to_task": "implement_dual_write",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "implement_dual_write",
+        "to_task": "cutover_traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover_traffic",
+        "to_task": "decommission_legacy",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:implement_dual_write",
+      "task_id": "implement_dual_write",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The implementation of dual-write relies on an unverified fact (payments_logic_documented).",
+      "suggested_fix": "Ensure that payments logic is documented before proceeding with the dual-write implementation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:decommission_legacy",
+      "task_id": "decommission_legacy",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Decommissioning legacy payments code is sequenced before verifying traffic cutover success.",
+      "suggested_fix": "Restructure the plan to ensure decommissioning occurs only after a successful cutover.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:cutover_traffic",
+      "task_id": "cutover_traffic",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback plan for traffic cutover does not specify mechanisms for monitoring or reverting traffic in case of failures.",
+      "suggested_fix": "Enhance the rollback plan by including automated monitoring tools to detect failure and initiate redirection back to the legacy service.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:arch-01-microservice-extract:2:2",
+    "plan_id": "plan-arch-01-microservice-extract-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unverified_dependencies:implement_dual_write",
+    "question": "Plan for goal 'arch-01-microservice-extract' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

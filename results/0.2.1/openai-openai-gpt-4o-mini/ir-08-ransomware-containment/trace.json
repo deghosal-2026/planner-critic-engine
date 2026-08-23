@@ -1,0 +1,244 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-08-ransomware-containment",
+  "duration_seconds": 22.73,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-ir-08-ransomware-containment-r2",
+    "goal_id": "ir-08-ransomware-containment",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "ir-08-ransomware-containment-plan",
+    "created_at": "2026-08-23T22:07:26.907539Z",
+    "tasks": [
+      {
+        "id": "isolate_server",
+        "description": "Isolate the affected server from the network",
+        "action": "disconnect",
+        "target": "production_server",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "network status",
+          "how": "run connectivity tests",
+          "expected": "server isolated"
+        },
+        "rollback": {
+          "trigger": "isolation fails",
+          "action": "reconnect to network",
+          "safety_guard": "ensure no active connections exist"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "snapshot_disk",
+        "description": "Create a forensic snapshot of the server's disk",
+        "action": "snapshot",
+        "target": "disk",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "snapshot integrity",
+          "how": "compare hash values",
+          "expected": "hash matches original data"
+        },
+        "rollback": {
+          "trigger": "snapshot fails",
+          "action": "destroy partial snapshot",
+          "safety_guard": "verify integrity of existing data"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "halt_propagation",
+        "description": "Identify and halt lateral propagation paths",
+        "action": "scan",
+        "target": "network",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "propagation paths",
+          "how": "run analysis tools",
+          "expected": "no threats detected"
+        },
+        "rollback": {
+          "trigger": "halt fails",
+          "action": "restore previous network settings",
+          "safety_guard": "verify no new connections established"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_systems",
+        "description": "Verify that no other systems are affected",
+        "action": "scan",
+        "target": "network",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "affected systems",
+          "how": "cross-check with logs",
+          "expected": "all systems clean"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "enable security protocols",
+          "safety_guard": "monitor for re-infection"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "restore_services",
+        "description": "Restore affected services from clean backups",
+        "action": "restore",
+        "target": "services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service functionality",
+          "how": "run service health checks",
+          "expected": "services operational"
+        },
+        "rollback": {
+          "trigger": "restore fails",
+          "action": "revert to previous service state",
+          "safety_guard": "ensure service restart integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_data_integrity",
+        "description": "Verify data integrity post-restore",
+        "action": "check",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data integrity",
+          "how": "run checksum comparisons",
+          "expected": "data integrity confirmed"
+        },
+        "rollback": {
+          "trigger": "data integrity fails",
+          "action": "revert to backup",
+          "safety_guard": "ensure no corruption"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "isolate_server",
+        "to_task": "snapshot_disk",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "isolate_server",
+        "to_task": "halt_propagation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "isolate_server",
+        "to_task": "restore_services",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "halt_propagation",
+        "to_task": "verify_systems",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "restore_services",
+        "to_task": "verify_data_integrity",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:snapshot_disk",
+      "task_id": "snapshot_disk",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'snapshot_disk' is sequenced before its hard prerequisite 'isolate_server' is completed, which can lead to contamination of forensic evidence.",
+      "suggested_fix": "Reorder the tasks to ensure 'isolate_server' is fully executed before proceeding to 'snapshot_disk'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:restore_services",
+      "task_id": "restore_services",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'restore_services' depends on the completion of 'isolate_server', but this dependency has not been verified to ensure that the server is truly isolated before restoring.",
+      "suggested_fix": "Add a verification step to ensure that 'isolate_server' has successfully isolated the server before 'restore_services' can proceed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:restore_services",
+      "task_id": "restore_services",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'restore_services' does not ensure integrity during the revert to the previous state, which risks downtime or failure to restore operational capacity.",
+      "suggested_fix": "Enhance the rollback mechanism for 'restore_services' to include detailed verification of service integrity after the rollback action.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-08-ransomware-containment:2:2",
+    "plan_id": "plan-ir-08-ransomware-containment-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:snapshot_disk",
+    "question": "Plan for goal 'ir-08-ransomware-containment' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

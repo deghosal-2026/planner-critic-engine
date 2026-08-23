@@ -1,0 +1,215 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-01-prometheus-stack",
+  "duration_seconds": 19.91,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-obs-01-prometheus-stack-r2",
+    "goal_id": "obs-01-prometheus-stack",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "obs-01-prometheus-stack",
+    "created_at": "2026-08-23T22:19:15.584809Z",
+    "tasks": [
+      {
+        "id": "setup_prometheus",
+        "description": "Set up Prometheus server",
+        "action": "deploy",
+        "target": "prometheus",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Prometheus service availability",
+          "how": "check service endpoint",
+          "expected": "service is up and reachable"
+        },
+        "rollback": {
+          "trigger": "Prometheus setup fails",
+          "action": "remove Prometheus deployment",
+          "safety_guard": "ensure no residual states"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_scrape_targets",
+        "description": "Configure scrape targets for services",
+        "action": "configure",
+        "target": "prometheus_scrape",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "scrape targets",
+          "how": "view Prometheus configuration",
+          "expected": "all services are listed in scrape targets"
+        },
+        "rollback": {
+          "trigger": "scrape target configuration fails",
+          "action": "revert to previous config",
+          "safety_guard": "validate previous configuration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_grafana",
+        "description": "Set up Grafana for visualization",
+        "action": "deploy",
+        "target": "grafana",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Prometheus is running",
+            "fact": "prometheus_up",
+            "established_by": "setup_prometheus",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Grafana service availability",
+          "how": "check Grafana endpoint",
+          "expected": "Grafana is up and reachable"
+        },
+        "rollback": {
+          "trigger": "Grafana setup fails",
+          "action": "remove Grafana deployment",
+          "safety_guard": "ensure no residual states"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "build_grafana_dashboards",
+        "description": "Create Grafana dashboards for CPU, memory, request rate, error rate, and latency",
+        "action": "create",
+        "target": "grafana_dashboards",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Grafana is set up",
+            "fact": "grafana_up",
+            "established_by": "setup_grafana",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "define_alerting_rules",
+        "description": "Define alerting rules for high CPU and error rates",
+        "action": "define",
+        "target": "alerting_rules",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "alerting rules",
+          "how": "check alerting configuration",
+          "expected": "rules for high CPU and error rates exist"
+        },
+        "rollback": {
+          "trigger": "alerting rules configuration fails",
+          "action": "remove alerting rules",
+          "safety_guard": "ensure previous rules are intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup_prometheus",
+        "to_task": "configure_scrape_targets",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_grafana",
+        "to_task": "build_grafana_dashboards",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_scrape_targets",
+        "to_task": "define_alerting_rules",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "build_grafana_dashboards",
+        "to_task": "define_alerting_rules",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:setup_grafana",
+      "task_id": "setup_grafana",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "setup_grafana is ordered before its hard prerequisite setup_prometheus is verified as running.",
+      "suggested_fix": "Ensure setup_grafana tasks wait until setup_prometheus is successfully verified.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:build_grafana_dashboards",
+      "task_id": "build_grafana_dashboards",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The task lacks verification and rollback steps, making it difficult to confirm success or revert changes.",
+      "suggested_fix": "Add a verification step to check if dashboards were created successfully and a rollback step to revert changes if needed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:define_alerting_rules",
+      "task_id": "define_alerting_rules",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding verification for the successful definition of alerting rules.",
+      "suggested_fix": "Add a verification step to ensure alerting rules are defined as expected.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

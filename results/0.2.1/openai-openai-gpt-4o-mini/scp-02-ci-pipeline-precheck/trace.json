@@ -1,0 +1,179 @@
+{
+  "dimension": "core-api",
+  "goal_id": "scp-02-ci-pipeline-precheck",
+  "duration_seconds": 17.9,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-scp-02-ci-pipeline-precheck-r2",
+    "goal_id": "scp-02-ci-pipeline-precheck",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "scp-02-ci-pipeline-precheck",
+    "created_at": "2026-08-23T22:04:14.116160Z",
+    "tasks": [
+      {
+        "id": "check_services",
+        "description": "Check the status of all microservices",
+        "action": "check_status",
+        "target": "microservices",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "production environment is stable",
+            "fact": "env_stable",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run_tests",
+        "description": "Run test suite for all microservices",
+        "action": "run_suite",
+        "target": "test_suites",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "production environment is stable",
+            "fact": "env_stable",
+            "established_by": "check_services",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "test results summary",
+          "how": "analyze test output",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "tests fail",
+          "action": "notify dev teams and revert any changes made during testing",
+          "safety_guard": "verify notification delivery and check system stability"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "sign_artifacts",
+        "description": "Sign artifacts for all microservices",
+        "action": "sign",
+        "target": "artifacts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "all tests have passed",
+            "fact": "tests_passed",
+            "established_by": "run_tests",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "artifact signatures",
+          "how": "check signature validity",
+          "expected": "valid signatures"
+        },
+        "rollback": {
+          "trigger": "signing fails",
+          "action": "rollback signed artifacts",
+          "safety_guard": "validate rollback integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_services",
+        "to_task": "run_tests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_tests",
+        "to_task": "sign_artifacts",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:sign_artifacts",
+      "task_id": "sign_artifacts",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'sign_artifacts' is scheduled before verifying if all tests have passed, which is a hard prerequisite.",
+      "suggested_fix": "Reorder the task 'sign_artifacts' to occur after 'run_tests' has successfully verified that all tests have passed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:run_tests",
+      "task_id": "run_tests",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback strategy for 'run_tests' lacks specific actions for re-stabilizing the environment after test failures, which could leave the system in an unstable state.",
+      "suggested_fix": "Add a clear action plan to restore the environment to a stable state if test failures occur.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:sign_artifacts",
+      "task_id": "sign_artifacts",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for 'sign_artifacts' does not specify what happens if the rollback integrity validation fails, which could create inconsistencies.",
+      "suggested_fix": "Define specific actions to be taken in case the rollback integrity validation fails, ensuring all scenarios are accounted for.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:scp-02-ci-pipeline-precheck:2:2",
+    "plan_id": "plan-scp-02-ci-pipeline-precheck-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:sign_artifacts",
+    "question": "Plan for goal 'scp-02-ci-pipeline-precheck' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

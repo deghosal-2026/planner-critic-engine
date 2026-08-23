@@ -1,0 +1,297 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-07-blue-green",
+  "duration_seconds": 55.91,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-k8s-07-blue-green-r4",
+    "goal_id": "k8s-07-blue-green",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-k8s-07-blue-green-r3",
+    "created_at": "2026-08-23T22:06:01.891285Z",
+    "tasks": [
+      {
+        "id": "spin_up_green",
+        "description": "Spin up the green stack including Deployments, Services, and Ingress resources",
+        "action": "deploy",
+        "target": "green_stack",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "green stack operational status",
+          "how": "check health endpoints",
+          "expected": "green stack is ready"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "restore blue stack",
+          "safety_guard": "verify blue stack operational"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run_smoke_tests",
+        "description": "Run smoke tests against the green service endpoint",
+        "action": "test",
+        "target": "green_service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "green stack is operational",
+            "fact": "green_stack_ready",
+            "established_by": "spin_up_green",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "smoke test results",
+          "how": "execute test suite",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "smoke tests fail",
+          "action": "switch back to blue service",
+          "safety_guard": "verify blue service operational"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run_health_checks",
+        "description": "Run comprehensive health checks against the green service",
+        "action": "check",
+        "target": "green_service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "green stack is operational",
+            "fact": "green_stack_ready",
+            "established_by": "spin_up_green",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "health check results",
+          "how": "perform health check queries",
+          "expected": "all checks succeed"
+        },
+        "rollback": {
+          "trigger": "health checks fail",
+          "action": "restore blue stack",
+          "safety_guard": "verify blue stack operational"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "switch_to_green",
+        "description": "Switch the production Ingress or DNS record to point to the green service",
+        "action": "update",
+        "target": "dns_record",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "run_smoke_tests completed successfully",
+            "fact": "smoke_tests_passed",
+            "established_by": "run_smoke_tests",
+            "probe": null
+          },
+          {
+            "description": "run_health_checks completed successfully",
+            "fact": "health_checks_passed",
+            "established_by": "run_health_checks",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "DNS record status",
+          "how": "query DNS",
+          "expected": "points to green service"
+        },
+        "rollback": {
+          "trigger": "degradation detected",
+          "action": "revert DNS to blue",
+          "safety_guard": "check blue service health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_green",
+        "description": "Monitor the green service for 30 minutes",
+        "action": "monitor",
+        "target": "green_service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "switch_to_green executed successfully",
+            "fact": "switch_to_green_successful",
+            "established_by": "switch_to_green",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "monitoring results",
+          "how": "collect logs and metrics",
+          "expected": "no critical issues detected"
+        },
+        "rollback": {
+          "trigger": "monitoring fails",
+          "action": "take corrective measures",
+          "safety_guard": "verify service stability"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "decommission_blue",
+        "description": "Drain and decommission the blue stack after a successful monitoring period",
+        "action": "decommission",
+        "target": "blue_stack",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "no issues with green service",
+            "fact": "green_service_stable",
+            "established_by": "monitor_green",
+            "probe": null
+          },
+          {
+            "description": "check stability and performance of green service",
+            "fact": "green_service_stable_performance",
+            "established_by": "monitor_green",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "decommission status",
+          "how": "check blue stack operational status",
+          "expected": "blue stack is decommissioned safely"
+        },
+        "rollback": {
+          "trigger": "decommission fails",
+          "action": "restore blue stack",
+          "safety_guard": "verify blue stack operational"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "spin_up_green",
+        "to_task": "run_smoke_tests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "spin_up_green",
+        "to_task": "run_health_checks",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_smoke_tests",
+        "to_task": "switch_to_green",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_health_checks",
+        "to_task": "switch_to_green",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "switch_to_green",
+        "to_task": "monitor_green",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_green",
+        "to_task": "decommission_blue",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unverified_dependencies:switch_to_green",
+      "task_id": "switch_to_green",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'switch_to_green' depends on the results of 'run_smoke_tests' and 'run_health_checks', but these tasks do not validate the overall stability of the green service before the switch.",
+      "suggested_fix": "Add a final stability check before switching the DNS or Ingress record to the green service.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:weak_rollback:switch_to_green",
+      "task_id": "switch_to_green",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action for 'switch_to_green' lacks a clear rollback process for service degradation beyond the health check verification.",
+      "suggested_fix": "Enhance the rollback to include a comprehensive evaluation of the green service's performance before reverting to blue.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:decommission_blue",
+      "task_id": "decommission_blue",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'decommission_blue' relies on the fact 'green_service_stable_performance', which is not established by any prior tasks nor verified explicitly.",
+      "suggested_fix": "Ensure that 'green_service_stable_performance' is explicitly verified or derived from earlier tasks before proceeding to decommission the blue stack.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-07-blue-green:4:4",
+    "plan_id": "plan-k8s-07-blue-green-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unverified_dependencies:switch_to_green",
+    "question": "Plan for goal 'k8s-07-blue-green' cannot be approved: blockers remain (llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,165 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-01-ecs-migration",
+  "duration_seconds": 11.46,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-inf-01-ecs-migration-r2",
+    "goal_id": "inf-01-ecs-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "inf-01-ecs-migration-plan",
+    "created_at": "2026-08-23T22:08:45.716215Z",
+    "tasks": [
+      {
+        "id": "backup-instances",
+        "description": "Back up EC2 instances",
+        "action": "backup",
+        "target": "ec2-instances",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EC2 instances are reachable",
+            "fact": "ec2_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "drain-traffic",
+        "description": "Drain traffic from EC2 instances",
+        "action": "drain",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "traffic status",
+          "how": "check load balancer metrics",
+          "expected": "no traffic to EC2 instances"
+        },
+        "rollback": {
+          "trigger": "traffic drain fails",
+          "action": "restore traffic to instances",
+          "safety_guard": "verify traffic restoration through load balancer metrics"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "migrate-to-ecs",
+        "description": "Migrate EC2 workloads to ECS Fargate",
+        "action": "migrate",
+        "target": "ecs-fargate",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "workload status",
+          "how": "check ECS task health",
+          "expected": "all tasks running"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "revert to EC2 instances",
+          "safety_guard": "verify instance functionality through health checks"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "backup-instances",
+        "to_task": "drain-traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "drain-traffic",
+        "to_task": "migrate-to-ecs",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:migrate-to-ecs",
+      "task_id": "migrate-to-ecs",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'migrate-to-ecs' is sequenced before addressing its prerequisites of draining traffic.",
+      "suggested_fix": "Ensure that 'drain-traffic' task completes successfully before 'migrate-to-ecs' starts.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:migrate-to-ecs",
+      "task_id": "migrate-to-ecs",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'migrate-to-ecs' does not verify that the instance functionality is completely restored.",
+      "suggested_fix": "Add a further verification step for ensuring the EC2 instances are fully operational after rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:drain-traffic",
+      "task_id": "drain-traffic",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'drain-traffic' does not have established prerequisites indicating it is safe to execute.",
+      "suggested_fix": "Include checks to verify that the EC2 instances are healthy and appropriately configured before draining traffic.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:inf-01-ecs-migration:2:2",
+    "plan_id": "plan-inf-01-ecs-migration-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:migrate-to-ecs",
+    "question": "Plan for goal 'inf-01-ecs-migration' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

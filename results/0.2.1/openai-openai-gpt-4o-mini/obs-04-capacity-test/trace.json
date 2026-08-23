@@ -1,0 +1,279 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-04-capacity-test",
+  "duration_seconds": 22.54,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-obs-04-capacity-test-r2",
+    "goal_id": "obs-04-capacity-test",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "obs-04-capacity-test-plan",
+    "created_at": "2026-08-23T21:56:49.649770Z",
+    "tasks": [
+      {
+        "id": "define_slo",
+        "description": "Define SLO targets for the checkout service",
+        "action": "define",
+        "target": "SLOs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "checkout service is deployed",
+            "fact": "checkout_service_deployed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run_load_test",
+        "description": "Run k6 ramp-up test from 10 to 500 RPS over 10 min",
+        "action": "run_test",
+        "target": "k6",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "k6 is installed and configured",
+            "fact": "k6_ready",
+            "established_by": "define_slo",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "SLO metrics collected",
+          "how": "check Prometheus metrics",
+          "expected": "p99 latency <500ms and error rate <0.1%"
+        },
+        "rollback": {
+          "trigger": "test execution fails",
+          "action": "abort test and revert changes",
+          "safety_guard": "ensure no lingering load on service"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "collect_metrics",
+        "description": "Collect Prometheus metrics after the load test",
+        "action": "collect",
+        "target": "Prometheus",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "load test has been executed",
+            "fact": "load_test_completed",
+            "established_by": "run_load_test",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "metrics collected",
+          "how": "validate Prometheus output",
+          "expected": "metrics available"
+        },
+        "rollback": {
+          "trigger": "metrics collection fails",
+          "action": "re-attempt metrics collection",
+          "safety_guard": "ensure no impact on service"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "analyze_bottlenecks",
+        "description": "Analyze metrics to identify bottlenecks",
+        "action": "analyze",
+        "target": "metrics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Prometheus metrics have been collected",
+            "fact": "metrics_collected",
+            "established_by": "collect_metrics",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "right_size_hpa",
+        "description": "Right-size HPA limits based on analysis",
+        "action": "update",
+        "target": "HPA",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "bottlenecks have been identified",
+            "fact": "bottlenecks_analyzed",
+            "established_by": "analyze_bottlenecks",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "ret_test",
+        "description": "Re-test to confirm SLOs hold at target load",
+        "action": "run_test",
+        "target": "k6",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "HPA limits have been updated",
+            "fact": "hpa_limits_updated",
+            "established_by": "right_size_hpa",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "SLO metrics confirmed",
+          "how": "check Prometheus metrics",
+          "expected": "p99 latency <500ms and error rate <0.1%"
+        },
+        "rollback": {
+          "trigger": "re-test fails",
+          "action": "reset HPA limits",
+          "safety_guard": "monitor service stability"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define_slo",
+        "to_task": "run_load_test",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_load_test",
+        "to_task": "collect_metrics",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "collect_metrics",
+        "to_task": "analyze_bottlenecks",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "analyze_bottlenecks",
+        "to_task": "right_size_hpa",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "right_size_hpa",
+        "to_task": "ret_test",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:define_slo",
+      "task_id": "define_slo",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The task 'define_slo' depends on the checkout service being deployed, but there is no verification step to ensure it is deployed before this task executes.",
+      "suggested_fix": "Add a verification step to confirm the checkout service is deployed before executing the 'define_slo' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:run_load_test",
+      "task_id": "run_load_test",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'run_load_test' is dependent on the completion of 'define_slo', but the precondition check does not verify that SLOs have been properly defined before running the load test.",
+      "suggested_fix": "Ensure that the verification of SLO definitions is completed successfully before executing the 'run_load_test' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:collect_metrics",
+      "task_id": "collect_metrics",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Lack of a check to ensure that the load test was successful before collecting metrics might lead to collecting metrics from unsuccessful tests.",
+      "suggested_fix": "Add a precondition to confirm the successful execution of the load test before proceeding to 'collect_metrics'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:analyze_bottlenecks",
+      "task_id": "analyze_bottlenecks",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "It would be beneficial to ensure that the analysis of bottlenecks is verified before executing the next step regarding the right-sizing of HPA limits.",
+      "suggested_fix": "Add a verification step for the completion of bottleneck analysis before moving to 'right_size_hpa'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:ret_test",
+      "task_id": "ret_test",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The precondition 'hpa_limits_updated' relies on the completion of the 'right_size_hpa' task, but there is no verification to confirm that HPA limits are indeed updated before re-testing.",
+      "suggested_fix": "Incorporate a verification step to affirm that HPA limits have been correctly updated before executing the 'ret_test' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

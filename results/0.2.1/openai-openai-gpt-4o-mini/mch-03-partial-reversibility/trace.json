@@ -1,0 +1,183 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mch-03-partial-reversibility",
+  "duration_seconds": 35.1,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-mch-03-partial-reversibility-r3",
+    "goal_id": "mch-03-partial-reversibility",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-mch-03-partial-reversibility-r2",
+    "created_at": "2026-08-23T22:12:28.035445Z",
+    "tasks": [
+      {
+        "id": "schema_migration",
+        "description": "Apply schema migration to add column",
+        "action": "migrate",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Database is reachable",
+            "fact": "db_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "schema version and presence of new column",
+          "how": "run SQL checks",
+          "expected": "column exists"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "DROP COLUMN",
+          "safety_guard": "verify schema integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "schema_migration_verification",
+        "description": "Verify schema migration success",
+        "action": "verify",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Schema migration has been applied",
+            "fact": "schema_migration",
+            "established_by": "schema_migration",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "schema migration success status",
+          "how": "run checks",
+          "expected": "successful migration confirmed"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "data_backfill",
+        "description": "Backfill data for new column",
+        "action": "update",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Schema migration verification has completed successfully",
+            "fact": "schema_migration_successful",
+            "established_by": "schema_migration_verification",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data integrity and completeness",
+          "how": "run data validation checks",
+          "expected": "all rows updated correctly"
+        },
+        "rollback": {
+          "trigger": "backfill fails or column is repurposed",
+          "action": "revert to prior data state and clear changes",
+          "safety_guard": "ensure no mid-way state is present and verify data integrity after rollback"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "schema_migration",
+        "to_task": "schema_migration_verification",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "schema_migration_verification",
+        "to_task": "data_backfill",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:feasibility:data_backfill",
+      "task_id": "data_backfill",
+      "version": 3,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Data backfill is irreversible if the column is repurposed mid-migration which contradicts rollback expectations.",
+      "suggested_fix": "Ensure a mechanism to securely handle scenarios where the column is repurposed before backfill completes.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:weak_rollback:data_backfill",
+      "task_id": "data_backfill",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback action lacks a safe mechanism to revert irreversible data changes if repurposing occurs.",
+      "suggested_fix": "Implement stronger rollback procedures that cover scenarios where data integrity must be preserved after rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:data_backfill",
+      "task_id": "data_backfill",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Data backfill depends on successful schema migration verification which is labeled as incomplete if initial migration fails.",
+      "suggested_fix": "Ensure that task dependencies clearly define successful outcomes before allowing subsequent steps.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mch-03-partial-reversibility:3:3",
+    "plan_id": "plan-mch-03-partial-reversibility-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:feasibility:data_backfill",
+    "question": "Plan for goal 'mch-03-partial-reversibility' cannot be approved: blockers remain (llm_feasibility; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

@@ -220,23 +220,21 @@ def run_boundary_live(args) -> None:
     """P3 #218: live-critic boundary-case run via bench_live_boundary.py.
 
     Writes JSON + markdown to results/0.2.1/. Spend ≤ $1 (mini-class model,
-    ~60 audits). The bench script resolves the provider from plancritic.toml
-    or LLM_* env vars.
+    ~60 audits). Provider is overridden to match the --provider flag so the
+    boundary run uses the same model as the goals sweep.
     """
     script = BENCH_DIR_V021 / "bench_live_boundary.py"
     if not script.exists():
         print(f"[boundary] missing {script}")
         return
     trials = str(args.boundary_trials)
-    cmd = [sys.executable, str(script), "--trials", trials]
-    print(f"[boundary] live-critic run (#218): {' '.join(cmd)}")
+    spec = PROVIDERS[args.provider]
+    cmd = [sys.executable, str(script), "--trials", trials, "--model-label", spec.model, "--provider", args.provider]
+    print(f"[boundary] live-critic run (#218) via {spec.model}: {' '.join(cmd)}")
     if args.dry_run:
         print(" ".join(cmd))
         return
-    env = os.environ.copy()
-    if args.provider == "openai" and API_KEY:
-        env.setdefault("OPENROUTER_API_KEY", API_KEY)
-    result = subprocess.run(cmd, cwd=REPO_ROOT, env=env)
+    result = subprocess.run(cmd, cwd=REPO_ROOT)
     if result.returncode != 0:
         print("[boundary] FAILED or incomplete")
     else:

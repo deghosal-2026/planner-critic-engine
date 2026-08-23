@@ -1,0 +1,241 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dr-02-point-in-time-restore",
+  "duration_seconds": 16.82,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-dr-02-point-in-time-restore-r2",
+    "goal_id": "dr-02-point-in-time-restore",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "dr-02-point-in-time-restore",
+    "created_at": "2026-08-23T21:51:53.743314Z",
+    "tasks": [
+      {
+        "id": "identify_restore_point",
+        "description": "Identify the restore point timestamp (T-2 hours)",
+        "action": "identify",
+        "target": "timestamp",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Current time is recorded",
+            "fact": "current_time_recorded",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "pitr_restore",
+        "description": "Perform point-in-time restore to isolated environment",
+        "action": "restore",
+        "target": "isolated_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Restore point is identified",
+            "fact": "restore_point_identified",
+            "established_by": "identify_restore_point",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "restore completion",
+          "how": "check restore logs",
+          "expected": "restore completed without errors"
+        },
+        "rollback": {
+          "trigger": "restore fails",
+          "action": "restore from latest backup",
+          "safety_guard": "verify backup integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_data",
+        "description": "Verify row counts and critical records in restored DB",
+        "action": "verify",
+        "target": "restored_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PITR process completed",
+            "fact": "restore_completed",
+            "established_by": "pitr_restore",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "row counts and critical records",
+          "how": "query and compare",
+          "expected": "match expected values"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "check raw data",
+          "safety_guard": "cross-verify with original DB"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run_application_tests",
+        "description": "Run application tests against the restored DB",
+        "action": "test",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data verification is successful",
+            "fact": "data_verified",
+            "established_by": "verify_data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application test results",
+          "how": "review test outcomes",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "tests fail",
+          "action": "restore previous application state",
+          "safety_guard": "ensure application consistency"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cleanup_environment",
+        "description": "Securely delete the restored data from the isolated environment",
+        "action": "cleanup",
+        "target": "isolated_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Application tests completed successfully",
+            "fact": "tests_completed",
+            "established_by": "run_application_tests",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "identify_restore_point",
+        "to_task": "pitr_restore",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "pitr_restore",
+        "to_task": "verify_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_data",
+        "to_task": "run_application_tests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_application_tests",
+        "to_task": "cleanup_environment",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:pitr_restore",
+      "task_id": "pitr_restore",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "PITR restoration depends on identifying the restore point, which is not verified by an earlier task.",
+      "suggested_fix": "Ensure that the restore point is validated before the PITR task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:verify_data",
+      "task_id": "verify_data",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Verification of data depends on successful completion of the PITR, which is not verified prior to this task.",
+      "suggested_fix": "Ensure that data verification is contingent upon successful completion of PITR restoration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:run_application_tests",
+      "task_id": "run_application_tests",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Application testing depends on successful data verification, which requires a verified condition that has not been established.",
+      "suggested_fix": "Establish verification of data before running application tests.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:cleanup_environment",
+      "task_id": "cleanup_environment",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Cleanup of the environment depends on successful completion of application tests, but there is no preceding verification for this dependency.",
+      "suggested_fix": "Ensure that post-application test verifications are established before cleanup.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

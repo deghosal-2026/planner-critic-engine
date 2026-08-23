@@ -1,0 +1,286 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dc-01-eks-retirement",
+  "duration_seconds": 52.35,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 0
+  },
+  "plan": {
+    "id": "plan-dc-01-eks-retirement-r4",
+    "goal_id": "dc-01-eks-retirement",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-dc-01-eks-retirement-r3",
+    "created_at": "2026-08-23T22:07:44.726969Z",
+    "tasks": [
+      {
+        "id": "drain-workloads",
+        "description": "Drain all workloads from the EKS cluster",
+        "action": "drain",
+        "target": "eks-cluster",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "workload status",
+          "how": "kubectl get pods --all-namespaces",
+          "expected": "no running workloads"
+        },
+        "rollback": {
+          "trigger": "drain fails",
+          "action": "restore workloads",
+          "safety_guard": "verify all workloads are running"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-workloads",
+        "description": "Verify no critical workloads remain",
+        "action": "check",
+        "target": "eks-cluster",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "workloads have been drained",
+            "fact": "drain-complete",
+            "established_by": "drain-workloads",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "critical workloads",
+          "how": "kubectl get pods --field-selector=status.phase!=Succeeded",
+          "expected": "all pods removed or in Succeeded state"
+        },
+        "rollback": {
+          "trigger": "critical workloads found",
+          "action": "abort retirement process",
+          "safety_guard": "restore pod configurations"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "export-data-configs",
+        "description": "Export any needed data and configurations",
+        "action": "export",
+        "target": "configs-data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "critical workloads verification completed",
+            "fact": "no-critical-workloads",
+            "established_by": "verify-workloads",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "exported data and configurations",
+          "how": "check export logs",
+          "expected": "all necessary data and configurations exported"
+        },
+        "rollback": {
+          "trigger": "export fails",
+          "action": "restore previous configurations",
+          "safety_guard": "verify configurations integrity"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "terraform-destroy",
+        "description": "Destroy the EKS cluster infrastructure with Terraform",
+        "action": "destroy",
+        "target": "eks-infrastructure",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "data and configurations exported",
+            "fact": "export-complete",
+            "established_by": "export-data-configs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "infrastructure state",
+          "how": "terraform plan",
+          "expected": "no resources remaining"
+        },
+        "rollback": {
+          "trigger": "terraform destroy fails",
+          "action": "restore infrastructure from snapshot",
+          "safety_guard": "verify snapshot integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "purge-secrets",
+        "description": "Purge secrets from Vault",
+        "action": "purge",
+        "target": "Vault",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EKS infrastructure destroyed",
+            "fact": "eks-destroyed",
+            "established_by": "terraform-destroy",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "secrets status",
+          "how": "Vault audit logs",
+          "expected": "no secrets remaining related to EKS"
+        },
+        "rollback": {
+          "trigger": "purge fails",
+          "action": "restore secrets",
+          "safety_guard": "verify secrets integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cleanup-iam",
+        "description": "Clean up cross-account IAM roles and peering connections",
+        "action": "cleanup",
+        "target": "IAM",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "secrets purged from Vault",
+            "fact": "secrets-purged",
+            "established_by": "purge-secrets",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "IAM roles status",
+          "how": "check IAM logs",
+          "expected": "all cross-account roles cleaned up"
+        },
+        "rollback": {
+          "trigger": "cleanup fails",
+          "action": "restore IAM roles",
+          "safety_guard": "verify IAM roles integrity"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-dns",
+        "description": "Verify DNS records are removed",
+        "action": "check",
+        "target": "DNS",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "IAM roles cleaned up",
+            "fact": "iam-cleaned",
+            "established_by": "cleanup-iam",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "DNS records status",
+          "how": "check DNS records",
+          "expected": "no DNS records related to EKS"
+        },
+        "rollback": {
+          "trigger": "DNS verification fails",
+          "action": "restore DNS records",
+          "safety_guard": "verify DNS record integrity"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "drain-workloads",
+        "to_task": "verify-workloads",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-workloads",
+        "to_task": "export-data-configs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "export-data-configs",
+        "to_task": "terraform-destroy",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "terraform-destroy",
+        "to_task": "purge-secrets",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "purge-secrets",
+        "to_task": "cleanup-iam",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cleanup-iam",
+        "to_task": "verify-dns",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plan-dc-01-eks-retirement-r4:4:terraform-destroy:rollback_unreachable",
+      "task_id": "terraform-destroy",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "blocker",
+      "reason_code": "rollback_unreachable",
+      "message": "action 'destroy' has no automated inverse; the named rollback cannot execute",
+      "suggested_fix": "Replace the rollback with a snapshot-restore step or re-stage the change behind an invertible action",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:dc-01-eks-retirement:4:4",
+    "plan_id": "plan-dc-01-eks-retirement-r4",
+    "version": 4,
+    "blocker_finding_id": "rollback_credible:plan-dc-01-eks-retirement-r4:4:terraform-destroy:rollback_unreachable",
+    "question": "Plan for goal 'dc-01-eks-retirement' cannot be approved: blockers remain (rollback_unreachable). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

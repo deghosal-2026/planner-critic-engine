@@ -1,0 +1,164 @@
+{
+  "dimension": "core-api",
+  "goal_id": "net-03-tls-termination-move",
+  "duration_seconds": 11.89,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-net-03-tls-termination-move-r2",
+    "goal_id": "net-03-tls-termination-move",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "net-03-tls-termination-move-plan",
+    "created_at": "2026-08-23T22:18:56.529703Z",
+    "tasks": [
+      {
+        "id": "deploy-nginx",
+        "description": "Deploy Nginx with TLS configured using cert-manager",
+        "action": "deploy",
+        "target": "nginx",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Nginx is running with valid TLS config",
+          "how": "curl -v https://nginx-url",
+          "expected": "TLS handshake succeeds and certificate chain is valid"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "remove nginx deployment",
+          "safety_guard": "ensure previous deployment is intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-dual-termination",
+        "description": "Configure dual termination on ALB and Nginx",
+        "action": "configure",
+        "target": "dual-termination",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Traffic is properly routed through both ALB and Nginx",
+          "how": "check access logs",
+          "expected": "logs show traffic to both ALB and Nginx"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "revert dual termination settings",
+          "safety_guard": "ensure ALB continues to serve traffic"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover-traffic",
+        "description": "Cutover traffic from ALB termination to Nginx termination",
+        "action": "cutover",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "TLS handshakes complete successfully with Nginx",
+          "how": "openssl s_client -connect nginx-url:443",
+          "expected": "successful connection without errors"
+        },
+        "rollback": {
+          "trigger": "cutover results in errors",
+          "action": "revert traffic back to ALB",
+          "safety_guard": "monitor traffic for errors"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update-alb",
+        "description": "Update ALB to TCP passthrough mode",
+        "action": "update",
+        "target": "ALB",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Cutover traffic is successful",
+            "fact": "traffic_cutover_success",
+            "established_by": "cutover-traffic",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "ALB is updated to TCP passthrough mode",
+          "how": "check ALB settings",
+          "expected": "ALB is in TCP passthrough mode"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "revert ALB to previous configuration",
+          "safety_guard": "ensure ALB continues to serve traffic"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy-nginx",
+        "to_task": "configure-dual-termination",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-dual-termination",
+        "to_task": "cutover-traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover-traffic",
+        "to_task": "update-alb",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:update-alb",
+      "task_id": "update-alb",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'update-alb' is ordered before confirming successful cutover traffic.",
+      "suggested_fix": "Ensure 'update-alb' is executed only after verifying a successful cutover from ALB to Nginx.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

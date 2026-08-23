@@ -1,0 +1,472 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-02-cluster-upgrade",
+  "duration_seconds": 87.87,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-k8s-02-cluster-upgrade-r4",
+    "goal_id": "k8s-02-cluster-upgrade",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-k8s-02-cluster-upgrade-r3",
+    "created_at": "2026-08-23T22:02:29.248842Z",
+    "tasks": [
+      {
+        "id": "backup-etcd",
+        "description": "Take a full etcd snapshot backup",
+        "action": "snapshot",
+        "target": "etcd",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "etcd is reachable",
+            "fact": "etcd_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "backup integrity",
+          "how": "compare snapshot hash",
+          "expected": "hash matches previous snapshot"
+        },
+        "rollback": {
+          "trigger": "backup fails",
+          "action": "retry backup",
+          "safety_guard": "use previous successful snapshot"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cordon-drain-node1",
+        "description": "Cordon and drain worker node 1",
+        "action": "cordon_and_drain",
+        "target": "node1",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "node1 is in Ready state",
+            "fact": "node1_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "node1 cordon and drain status",
+          "how": "check node conditions",
+          "expected": "node1 cordoned and drained"
+        },
+        "rollback": {
+          "trigger": "drain fails",
+          "action": "uncordon node1",
+          "safety_guard": "wait for workloads to stabilize"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "upgrade-control-plane",
+        "description": "Upgrade control plane components via kubeadm",
+        "action": "upgrade",
+        "target": "control_plane",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "backup has been completed successfully",
+            "fact": "backup_successful",
+            "established_by": "backup-etcd",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "control plane health",
+          "how": "check components status",
+          "expected": "all components running"
+        },
+        "rollback": {
+          "trigger": "upgrade fails",
+          "action": "revert to previous version",
+          "safety_guard": "verify previous version is functional"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-control-plane-upgraded",
+        "description": "Verify control plane upgrade was successful",
+        "action": "check_status",
+        "target": "control_plane",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "control plane has been upgraded",
+            "fact": "control_plane_upgraded",
+            "established_by": "upgrade-control-plane",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "upgrade status",
+          "how": "check upgrade completion",
+          "expected": "control plane is upgraded"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-node1-ready",
+        "description": "Verify node1 is in Ready state",
+        "action": "check_status",
+        "target": "node1",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "node1 is operational",
+            "fact": "node1_operational",
+            "established_by": "cordon-drain-node1",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "node1 status",
+          "how": "check node condition",
+          "expected": "node1 reports Ready"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "upgrade-node1",
+        "description": "Upgrade kubelet and kube-proxy on node1",
+        "action": "upgrade",
+        "target": "node1",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "control plane upgraded successfully",
+            "fact": "control_plane_upgraded",
+            "established_by": "verify-control-plane-upgraded",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "node1 status",
+          "how": "check node condition",
+          "expected": "node1 reports Ready"
+        },
+        "rollback": {
+          "trigger": "upgrade fails",
+          "action": "restart kubelet with previous version",
+          "safety_guard": "ensure kube-proxy is functional"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-workload-node1",
+        "description": "Verify workloads on node1 remain healthy",
+        "action": "check_health",
+        "target": "node1",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "node1 is in Ready state after upgrade",
+            "fact": "node1_ready_after_upgrade",
+            "established_by": "upgrade-node1",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "workload status on node1",
+          "how": "check workload conditions",
+          "expected": "all workloads healthy"
+        },
+        "rollback": {
+          "trigger": "verify fails",
+          "action": "restart workloads",
+          "safety_guard": "ensure data persistency"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cordon-drain-node2",
+        "description": "Cordon and drain worker node 2",
+        "action": "cordon_and_drain",
+        "target": "node2",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "node2 is in Ready state",
+            "fact": "node2_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "node2 cordon and drain status",
+          "how": "check node conditions",
+          "expected": "node2 cordoned and drained"
+        },
+        "rollback": {
+          "trigger": "drain fails",
+          "action": "uncordon node2",
+          "safety_guard": "wait for workloads to stabilize"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-node2-ready",
+        "description": "Verify node2 is in Ready state",
+        "action": "check_status",
+        "target": "node2",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "node2 is operational",
+            "fact": "node2_operational",
+            "established_by": "cordon-drain-node2",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "node2 status",
+          "how": "check node condition",
+          "expected": "node2 reports Ready"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "upgrade-node2",
+        "description": "Upgrade kubelet and kube-proxy on node2",
+        "action": "upgrade",
+        "target": "node2",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "control plane upgraded successfully",
+            "fact": "control_plane_upgraded",
+            "established_by": "verify-control-plane-upgraded",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "node2 status",
+          "how": "check node condition",
+          "expected": "node2 reports Ready"
+        },
+        "rollback": {
+          "trigger": "upgrade fails",
+          "action": "restart kubelet with previous version",
+          "safety_guard": "ensure kube-proxy is functional"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-workload-node2",
+        "description": "Verify workloads on node2 remain healthy",
+        "action": "check_health",
+        "target": "node2",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "node2 is in Ready state after upgrade",
+            "fact": "node2_ready_after_upgrade",
+            "established_by": "upgrade-node2",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "workload status on node2",
+          "how": "check workload conditions",
+          "expected": "all workloads healthy"
+        },
+        "rollback": {
+          "trigger": "verify fails",
+          "action": "restart workloads",
+          "safety_guard": "ensure data persistency"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-addons",
+        "description": "Verify core add-ons function correctly",
+        "action": "check_health",
+        "target": "addons",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "both nodes report Ready",
+            "fact": "nodes_ready",
+            "established_by": "verify-workload-node1",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "add-ons operational status",
+          "how": "check add-ons health",
+          "expected": "all add-ons functioning"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "restart add-ons",
+          "safety_guard": "ensure configuration backup"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "backup-etcd",
+        "to_task": "cordon-drain-node1",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cordon-drain-node1",
+        "to_task": "upgrade-control-plane",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "upgrade-control-plane",
+        "to_task": "verify-control-plane-upgraded",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-control-plane-upgraded",
+        "to_task": "verify-node1-ready",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-node1-ready",
+        "to_task": "upgrade-node1",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "upgrade-node1",
+        "to_task": "verify-workload-node1",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-workload-node1",
+        "to_task": "cordon-drain-node2",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cordon-drain-node2",
+        "to_task": "verify-node2-ready",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-node2-ready",
+        "to_task": "upgrade-node2",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "upgrade-node2",
+        "to_task": "verify-workload-node2",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-workload-node2",
+        "to_task": "verify-addons",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "auto_repair:plan-k8s-02-cluster-upgrade-r4:4:ordering",
+      "task_id": null,
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "info",
+      "reason_code": "auto_repaired_ordering",
+      "message": "auto-repaired task ordering to satisfy hard-dependency precedences",
+      "suggested_fix": null,
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "auto_repair:plan-k8s-02-cluster-upgrade-r4:4:ordering",
+      "task_id": null,
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "info",
+      "reason_code": "auto_repaired_ordering",
+      "message": "auto-repaired task ordering to satisfy hard-dependency precedences",
+      "suggested_fix": null,
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:verify-addons",
+      "task_id": "verify-addons",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'verify-addons' depends on both nodes being ready, but no verification step ensures that the health of the add-ons is checked after the workload verifications are completed for both nodes.",
+      "suggested_fix": "Add a task to verify that both nodes' workloads are healthy before proceeding to verify add-ons.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-02-cluster-upgrade:4:4",
+    "plan_id": "plan-k8s-02-cluster-upgrade-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unverified_dependencies:verify-addons",
+    "question": "Plan for goal 'k8s-02-cluster-upgrade' cannot be approved: blockers remain (llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=12"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

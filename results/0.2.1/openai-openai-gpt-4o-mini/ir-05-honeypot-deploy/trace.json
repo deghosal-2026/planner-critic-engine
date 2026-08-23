@@ -1,0 +1,216 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-05-honeypot-deploy",
+  "duration_seconds": 19.09,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-ir-05-honeypot-deploy-r2",
+    "goal_id": "ir-05-honeypot-deploy",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "ir-05-honeypot-deploy",
+    "created_at": "2026-08-23T22:05:54.037977Z",
+    "tasks": [
+      {
+        "id": "create_repo_token",
+        "description": "Deploy a fake AWS access key in a public repo",
+        "action": "deploy",
+        "target": "repo",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AWS credentials are available",
+            "fact": "aws_credentials_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create_ci_token",
+        "description": "Deploy a fake database connection string in a CI environment variable",
+        "action": "deploy",
+        "target": "ci_env",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CI environment is accessible",
+            "fact": "ci_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create_api_token",
+        "description": "Deploy a fake API key in a config file",
+        "action": "deploy",
+        "target": "config_file",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Config file is writable",
+            "fact": "config_file_writable",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_alerts",
+        "description": "Configure each token with an alerting webhook to PagerDuty",
+        "action": "configure",
+        "target": "webhook",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Webhook endpoint is valid",
+            "fact": "webhook_valid",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "webhook configuration status",
+          "how": "send test alerts",
+          "expected": "alerts received in PagerDuty"
+        },
+        "rollback": {
+          "trigger": "alert configuration fails",
+          "action": "remove webhook configurations",
+          "safety_guard": "check the status of webhooks"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "write_playbook",
+        "description": "Write a 3-step response playbook for token alerts",
+        "action": "document",
+        "target": "playbook",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Token alerting is configured",
+            "fact": "token_alerts_configured",
+            "established_by": "configure_alerts",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "playbook completion status",
+          "how": "review document",
+          "expected": "playbook is complete and accurate"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "create_repo_token",
+        "to_task": "configure_alerts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_ci_token",
+        "to_task": "configure_alerts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_api_token",
+        "to_task": "configure_alerts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_alerts",
+        "to_task": "write_playbook",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:configure_alerts",
+      "task_id": "configure_alerts",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'configure_alerts' depends on the prerequisite 'token_alerts_configured' which is never established before this task.",
+      "suggested_fix": "Ensure that 'token_alerts_configured' is established by a task that runs before 'configure_alerts'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:configure_alerts",
+      "task_id": "configure_alerts",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for 'configure_alerts' lacks a reliable method to verify if webhooks were successfully removed, posing a risk of incomplete rollback.",
+      "suggested_fix": "Add a verification step to confirm that webhook configurations have been removed successfully during the rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:write_playbook",
+      "task_id": "write_playbook",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider including a validation step in the playbook to ensure the effectiveness of the response steps.",
+      "suggested_fix": "Add a step in the playbook to evaluate the response actions taken during token alerts.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

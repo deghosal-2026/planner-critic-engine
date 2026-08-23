@@ -1,0 +1,293 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dr-03-both-sides-failover",
+  "duration_seconds": 17.83,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-dr-03-both-sides-failover-r2",
+    "goal_id": "dr-03-both-sides-failover",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "dr-03-both-sides-failover-plan",
+    "created_at": "2026-08-23T21:52:10.516685Z",
+    "tasks": [
+      {
+        "id": "failover-dns",
+        "description": "Failover DNS from primary to secondary region",
+        "action": "failover",
+        "target": "Route53",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "DNS resolution",
+          "how": "query DNS records",
+          "expected": "pointing to secondary region"
+        },
+        "rollback": {
+          "trigger": "DNS failover fails",
+          "action": "switch back to primary DNS",
+          "safety_guard": "verify primary DNS is healthy"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "scale-up-secondary",
+        "description": "Scale up the application in the secondary region",
+        "action": "scale",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application health",
+          "how": "check health endpoints",
+          "expected": "healthy in secondary region"
+        },
+        "rollback": {
+          "trigger": "scaling fails",
+          "action": "scale down secondary application",
+          "safety_guard": "check secondary app health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "scale-down-primary",
+        "description": "Scale down the application in the primary region",
+        "action": "scale",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "secondary application is healthy",
+            "fact": "app_healthy_secondary",
+            "established_by": "scale-up-secondary",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "primary application health",
+          "how": "check health endpoints",
+          "expected": "healthy in primary region"
+        },
+        "rollback": {
+          "trigger": "scaling down fails",
+          "action": "scale up primary application",
+          "safety_guard": "check primary app health"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-dns-independent",
+        "description": "Verify DNS independently",
+        "action": "verify",
+        "target": "Route53",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "DNS records",
+          "how": "check consistency of DNS records",
+          "expected": "consistent across multiple queries"
+        },
+        "rollback": {
+          "trigger": "DNS verification fails",
+          "action": "recheck DNS records",
+          "safety_guard": "ensure DNS is still resolving to secondary"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-app-independent",
+        "description": "Verify application independently",
+        "action": "verify",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data consistency",
+          "how": "run consistency checks",
+          "expected": "data matches expected state"
+        },
+        "rollback": {
+          "trigger": "application verification fails",
+          "action": "trigger health checks again",
+          "safety_guard": "ensure app has not scaled down"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutback-traffic",
+        "description": "Cutback traffic to primary",
+        "action": "cutback",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "traffic distribution",
+          "how": "review traffic routing",
+          "expected": "limited traffic to primary without issues"
+        },
+        "rollback": {
+          "trigger": "traffic cutback fails",
+          "action": "restore full traffic to primary",
+          "safety_guard": "check primary health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "failover-dns",
+        "to_task": "scale-up-secondary",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "scale-up-secondary",
+        "to_task": "scale-down-primary",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "scale-up-secondary",
+        "to_task": "verify-app-independent",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "failover-dns",
+        "to_task": "verify-dns-independent",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "scale-down-primary",
+        "to_task": "cutback-traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-app-independent",
+        "to_task": "cutback-traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-dns-independent",
+        "to_task": "cutback-traffic",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:scale-down-primary",
+      "task_id": "scale-down-primary",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The scaling down of the primary application happens before the verification of the secondary side, which is required for ensuring the secondary is healthy before cutting back traffic.",
+      "suggested_fix": "Reorder the tasks to ensure that verification of the secondary application is completed before scaling down the primary.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:cutback-traffic",
+      "task_id": "cutback-traffic",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Cutback traffic depends on both app and DNS verification which have not been established as prerequisites before this step.",
+      "suggested_fix": "Add prerequisites to the cutback-traffic task to ensure app and DNS verifications are completed successfully.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:cutback-traffic",
+      "task_id": "cutback-traffic",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Cutback traffic step lacks a sound rollback mechanism to address potential issues if traffic cutback fails.",
+      "suggested_fix": "Implement a rollback step that ensures the system can revert to a safe state in case traffic cutback fails.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:cutback-traffic",
+      "task_id": "cutback-traffic",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The plan neglects to ensure that proper checks are in place to confirm the complete health of the secondary system before cutting back traffic.",
+      "suggested_fix": "Incorporate additional verification steps that confirm both sides are fully operational before cutting back.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:risk:failover-dns",
+      "task_id": "failover-dns",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Failover DNS and application scaling are not synchronized, which poses a risk of inconsistency during the failover process.",
+      "suggested_fix": "Consider implementing a synchronization mechanism or wait for confirmation that DNS has failed over before proceeding with application scaling.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:risk:scale-up-secondary",
+      "task_id": "scale-up-secondary",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Potential delay or issues in scaling up the secondary region may affect the overall timeline of the failover operation.",
+      "suggested_fix": "Introduce monitoring or timeout mechanisms to ensure the scaling action completes in a timely manner.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

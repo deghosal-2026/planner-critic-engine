@@ -1,0 +1,222 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dbm-02-mysql-to-postgres",
+  "duration_seconds": 10.27,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "dbm-02-mysql-to-postgres-plan",
+    "goal_id": "dbm-02-mysql-to-postgres",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T22:06:13.109539Z",
+    "tasks": [
+      {
+        "id": "setup_replication_bridge",
+        "description": "Set up a replication bridge from MySQL to PostgreSQL",
+        "action": "setup_replication",
+        "target": "replication_bridge",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replication status",
+          "how": "check replication logs",
+          "expected": "active"
+        },
+        "rollback": {
+          "trigger": "replication setup fails",
+          "action": "reset configuration",
+          "safety_guard": "ensure MySQL is still operational"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "schema_diff_conversion",
+        "description": "Perform schema diff and conversion from MySQL to PostgreSQL",
+        "action": "migrate_schema",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "schema compatibility",
+          "how": "compare schema definitions",
+          "expected": "schemas are equivalent"
+        },
+        "rollback": {
+          "trigger": "schema migration fails",
+          "action": "revert schema changes",
+          "safety_guard": "double-check original schema"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run_dual_write_period",
+        "description": "Run a dual-write period to ensure both databases receive writes",
+        "action": "enable_dual_write",
+        "target": "applications",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application write logs",
+          "how": "analyze logs for discrepancies",
+          "expected": "writes are successful to both dbs"
+        },
+        "rollback": {
+          "trigger": "issues detected during dual write",
+          "action": "disable dual write",
+          "safety_guard": "monitor application logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run_reconciliation",
+        "description": "Run reconciliation to ensure data integrity between databases",
+        "action": "reconcile_data",
+        "target": "databases",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data counts and checksums",
+          "how": "compute counts and checksums",
+          "expected": "counts and checksums match"
+        },
+        "rollback": {
+          "trigger": "reconciliation fails",
+          "action": "restore previous data state",
+          "safety_guard": "verify data integrity beforehand"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover",
+        "description": "Execute cutover to the new PostgreSQL database",
+        "action": "perform_cutover",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application stability and data integrity",
+          "how": "monitor application performance and logs",
+          "expected": "system is stable and data is consistent"
+        },
+        "rollback": {
+          "trigger": "cutover results in critical failure",
+          "action": "fail back to MySQL",
+          "safety_guard": "log all PostgreSQL writes"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup_replication_bridge",
+        "to_task": "schema_diff_conversion",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "schema_diff_conversion",
+        "to_task": "run_dual_write_period",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_dual_write_period",
+        "to_task": "run_reconciliation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_reconciliation",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:schema_diff_conversion",
+      "task_id": "schema_diff_conversion",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Schema conversion must not occur before replication bridge setup is complete.",
+      "suggested_fix": "Reorder tasks to ensure 'setup_replication_bridge' is completed before 'schema_diff_conversion'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:run_dual_write_period",
+      "task_id": "run_dual_write_period",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Dual-write period must not start before schema conversion is completed.",
+      "suggested_fix": "Reorder tasks to ensure 'schema_diff_conversion' is completed before 'run_dual_write_period'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:run_reconciliation",
+      "task_id": "run_reconciliation",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Reconciliation must not occur before dual-write has been executed.",
+      "suggested_fix": "Reorder tasks to ensure 'run_dual_write_period' is completed before 'run_reconciliation'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:cutover",
+      "task_id": "cutover",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Cutover cannot be executed before reconciliation is completed.",
+      "suggested_fix": "Reorder tasks to ensure 'run_reconciliation' is completed before 'cutover'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

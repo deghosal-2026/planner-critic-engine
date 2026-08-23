@@ -1,0 +1,183 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-05-ci-runner-scaling",
+  "duration_seconds": 6.8,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "ci-05-ci-runner-scaling-plan",
+    "goal_id": "ci-05-ci-runner-scaling",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T21:50:02.399404Z",
+    "tasks": [
+      {
+        "id": "setup_ec2",
+        "description": "Set up auto-scaling group on EC2",
+        "action": "create",
+        "target": "auto-scaling group",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "auto-scaling group status",
+          "how": "check EC2 console",
+          "expected": "active"
+        },
+        "rollback": {
+          "trigger": "setup fails",
+          "action": "delete auto-scaling group",
+          "safety_guard": "ensure no jobs are running"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_runner",
+        "description": "Configure GitHub Actions self-hosted runner registration",
+        "action": "configure",
+        "target": "runner",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "runner registration status",
+          "how": "check GitHub Actions settings",
+          "expected": "runner online"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "remove runner",
+          "safety_guard": "verify no ongoing jobs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "scale_on_demand",
+        "description": "Implement scale-up on demand logic",
+        "action": "implement",
+        "target": "scaling policy",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "scaling policy effectiveness",
+          "how": "simulate load tests",
+          "expected": "scales up to minimum 2 runners"
+        },
+        "rollback": {
+          "trigger": "scale-up logic fails",
+          "action": "revert scaling policy",
+          "safety_guard": "verify policy integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "scale_down_idle",
+        "description": "Implement scale-down on idle logic",
+        "action": "implement",
+        "target": "scaling policy",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "scaling policy effectiveness",
+          "how": "monitor idle state",
+          "expected": "scales down to minimum 1 runner"
+        },
+        "rollback": {
+          "trigger": "scale-down logic fails",
+          "action": "revert scaling policy",
+          "safety_guard": "verify policy integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup_ec2",
+        "to_task": "configure_runner",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_runner",
+        "to_task": "scale_on_demand",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_runner",
+        "to_task": "scale_down_idle",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:configure_runner",
+      "task_id": "configure_runner",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task is ordered before its hard prerequisite (setup_ec2) is completed.",
+      "suggested_fix": "Reorder tasks to ensure 'setup_ec2' is completed before 'configure_runner'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:scale_on_demand",
+      "task_id": "scale_on_demand",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task depends on a fact (runner registration status) that is never established by an earlier task.",
+      "suggested_fix": "Add verification of runner registration status before executing 'scale_on_demand'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:scale_down_idle",
+      "task_id": "scale_down_idle",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task depends on a fact (runner registration status) that is never established by an earlier task.",
+      "suggested_fix": "Add verification of runner registration status before executing 'scale_down_idle'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

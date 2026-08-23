@@ -1,0 +1,322 @@
+{
+  "dimension": "core-api",
+  "goal_id": "data-04-streaming-pipeline",
+  "duration_seconds": 57.31,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-data-04-streaming-pipeline-r4",
+    "goal_id": "data-04-streaming-pipeline",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-data-04-streaming-pipeline-r3",
+    "created_at": "2026-08-23T21:55:23.682187Z",
+    "tasks": [
+      {
+        "id": "deploy_kafka",
+        "description": "Deploy Kafka cluster",
+        "action": "deploy",
+        "target": "kafka",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Sufficient resources available",
+            "fact": "resources_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Kafka cluster status",
+          "how": "check health endpoint",
+          "expected": "running"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "destroy kafka cluster",
+          "safety_guard": "verify kafka cluster health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_kafka_operational",
+        "description": "Verify Kafka Cluster operational status",
+        "action": "verify",
+        "target": "kafka",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kafka cluster is deployed",
+            "fact": "kafka_deployed",
+            "established_by": "deploy_kafka",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Kafka operational status",
+          "how": "check Kafka health endpoint",
+          "expected": "operational"
+        },
+        "rollback": null,
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_flink",
+        "description": "Deploy Flink application",
+        "action": "deploy",
+        "target": "flink",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kafka cluster is operational",
+            "fact": "kafka_running",
+            "established_by": "verify_kafka_operational",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Flink application status",
+          "how": "check metrics endpoint",
+          "expected": "running"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "terminate flink application",
+          "safety_guard": "verify flink application health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "connect_flink_to_kafka",
+        "description": "Connect Flink to Kafka source",
+        "action": "connect",
+        "target": "flink_kafka_source",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Flink application is deployed",
+            "fact": "flink_deployed",
+            "established_by": "deploy_flink",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Connection status",
+          "how": "check connection metrics",
+          "expected": "connected"
+        },
+        "rollback": {
+          "trigger": "connection fails",
+          "action": "re-establish connection",
+          "safety_guard": "verify connection status"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_flink_connected_kafka",
+        "description": "Verify Flink connection to Kafka source",
+        "action": "verify",
+        "target": "flink_kafka_connection",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Flink application is connected to Kafka",
+            "fact": "flink_connected_kafka",
+            "established_by": "connect_flink_to_kafka",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Flink connection status to Kafka",
+          "how": "check Flink connection metrics",
+          "expected": "connected"
+        },
+        "rollback": {
+          "trigger": "connection verification fails",
+          "action": "reconnect Flink to Kafka",
+          "safety_guard": "verify Flink connection"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "stream_to_s3",
+        "description": "Stream data from Flink to S3",
+        "action": "stream",
+        "target": "s3",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Flink is connected to Kafka",
+            "fact": "flink_connected_kafka",
+            "established_by": "verify_flink_connected_kafka",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Streaming status",
+          "how": "check S3 metrics",
+          "expected": "data streaming"
+        },
+        "rollback": {
+          "trigger": "streaming fails",
+          "action": "stop streaming process",
+          "safety_guard": "verify stop of streaming"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_throughput",
+        "description": "Verify throughput of streaming pipeline",
+        "action": "verify",
+        "target": "throughput",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data is flowing to S3",
+            "fact": "data_streaming",
+            "established_by": "stream_to_s3",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "streaming throughput",
+          "how": "check Prometheus metrics",
+          "expected": "above threshold"
+        },
+        "rollback": {
+          "trigger": "throughput below threshold",
+          "action": "increase resources",
+          "safety_guard": "monitor throughput metrics"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_checkpointing",
+        "description": "Verify checkpointing in Flink",
+        "action": "verify",
+        "target": "checkpointing",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Flink is streaming to S3",
+            "fact": "flink_streaming_to_s3",
+            "established_by": "stream_to_s3",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "checkpoint status",
+          "how": "check checkpoint metrics",
+          "expected": "successful checkpoints"
+        },
+        "rollback": {
+          "trigger": "checkpointing fails",
+          "action": "restore last known good state",
+          "safety_guard": "verify successful state restoration"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_kafka",
+        "to_task": "verify_kafka_operational",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_kafka_operational",
+        "to_task": "deploy_flink",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_flink",
+        "to_task": "connect_flink_to_kafka",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "connect_flink_to_kafka",
+        "to_task": "verify_flink_connected_kafka",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_flink_connected_kafka",
+        "to_task": "stream_to_s3",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "stream_to_s3",
+        "to_task": "verify_throughput",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_throughput",
+        "to_task": "verify_checkpointing",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_present:plan-data-04-streaming-pipeline-r4:4:verify_kafka_operational",
+      "task_id": "verify_kafka_operational",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "blocker",
+      "reason_code": "missing_rollback",
+      "message": "high-risk task 'verify_kafka_operational' has no rollback step",
+      "suggested_fix": "Add a RollbackStep to task 'verify_kafka_operational'",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:data-04-streaming-pipeline:4:4",
+    "plan_id": "plan-data-04-streaming-pipeline-r4",
+    "version": 4,
+    "blocker_finding_id": "rollback_present:plan-data-04-streaming-pipeline-r4:4:verify_kafka_operational",
+    "question": "Plan for goal 'data-04-streaming-pipeline' cannot be approved: blockers remain (missing_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

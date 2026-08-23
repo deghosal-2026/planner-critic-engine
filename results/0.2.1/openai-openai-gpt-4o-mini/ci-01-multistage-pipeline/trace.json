@@ -1,0 +1,291 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-01-multistage-pipeline",
+  "duration_seconds": 18.09,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-ci-01-multistage-pipeline-r2",
+    "goal_id": "ci-01-multistage-pipeline",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "ci-01-multistage-pipeline-plan",
+    "created_at": "2026-08-23T21:59:16.698638Z",
+    "tasks": [
+      {
+        "id": "lint",
+        "description": "Run lint checks on the code",
+        "action": "lint",
+        "target": "codebase",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "codebase is available",
+            "fact": "codebase_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "test",
+        "description": "Run unit tests",
+        "action": "test",
+        "target": "codebase",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "lint checks pass",
+            "fact": "lint_passed",
+            "established_by": "lint",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "test coverage report",
+          "how": "generate coverage report",
+          "expected": "coverage >= 80%"
+        },
+        "rollback": {
+          "trigger": "test fails",
+          "action": "revert code changes",
+          "safety_guard": "ensure previous tests pass"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "build",
+        "description": "Build the application Docker image",
+        "action": "build",
+        "target": "docker_image",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "unit tests pass",
+            "fact": "unit_tests_passed",
+            "established_by": "test",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Docker image build status",
+          "how": "check build logs",
+          "expected": "build successful"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "staging",
+        "description": "Deploy the application to the staging environment",
+        "action": "deploy",
+        "target": "staging_environment",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Docker image is built",
+            "fact": "docker_image_built",
+            "established_by": "build",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "staging environment health",
+          "how": "ping health endpoints",
+          "expected": "status 200"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback staging",
+          "safety_guard": "monitor for service disruption"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "integration",
+        "description": "Run integration tests in staging",
+        "action": "integration_test",
+        "target": "staging_environment",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "staging deployment is successful",
+            "fact": "staging_deployed",
+            "established_by": "staging",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "integration test results",
+          "how": "evaluate logs and success state",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "integration tests fail",
+          "action": "revert staging environment",
+          "safety_guard": "check for data integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "prod_promote",
+        "description": "Promote application to production",
+        "action": "promote",
+        "target": "production_environment",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "integration tests pass",
+            "fact": "integration_tests_passed",
+            "established_by": "integration",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "production deployment health",
+          "how": "monitor service metrics",
+          "expected": "no errors in logs"
+        },
+        "rollback": {
+          "trigger": "promotion fails",
+          "action": "rollback production deployment",
+          "safety_guard": "verify production health checks"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "lint",
+        "to_task": "test",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test",
+        "to_task": "build",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "build",
+        "to_task": "staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "staging",
+        "to_task": "integration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "integration",
+        "to_task": "prod_promote",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:weak_rollback:build",
+      "task_id": "build",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The build task lacks a rollback mechanism, which may hinder recovery in case of build failure.",
+      "suggested_fix": "Implement a rollback procedure to revert changes if the Docker image build fails.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:staging",
+      "task_id": "staging",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback mechanism for the staging deployment does not ensure service continuity or data integrity in case of failure.",
+      "suggested_fix": "Reassess the safety guard for the rollback to ensure sufficient monitoring and data safety during the rollback process.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:prod_promote",
+      "task_id": "prod_promote",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action in production promotion relies on health checks that may not cover all failure scenarios.",
+      "suggested_fix": "Consider adding additional precautions or rollback checks during the production deployment rollback process.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:risk:integration",
+      "task_id": "integration",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Integration tests are critical but may not fully cover all potential edge cases in staging.",
+      "suggested_fix": "Expand integration tests to include edge cases and more comprehensive coverage.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:risk:prod_promote",
+      "task_id": "prod_promote",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Production deployment carries high risk; consider pre-deployment strategies to mitigate potential issues.",
+      "suggested_fix": "Implement a canary deployment strategy or monitoring tools to catch issues early during production deployment.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

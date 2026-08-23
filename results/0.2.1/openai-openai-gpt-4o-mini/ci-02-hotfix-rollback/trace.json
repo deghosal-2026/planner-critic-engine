@@ -1,0 +1,291 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-02-hotfix-rollback",
+  "duration_seconds": 38.72,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-ci-02-hotfix-rollback-r4",
+    "goal_id": "ci-02-hotfix-rollback",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-ci-02-hotfix-rollback-r3",
+    "created_at": "2026-08-23T21:59:54.553408Z",
+    "tasks": [
+      {
+        "id": "revert_commit",
+        "description": "Revert the offending commit in the Git repository",
+        "action": "git revert origin/main",
+        "target": "repository",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "commit status",
+          "how": "check git log",
+          "expected": "offending commit reverted"
+        },
+        "rollback": {
+          "trigger": "revert fails",
+          "action": "restore original commit",
+          "safety_guard": "verify commit integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "build_image",
+        "description": "Rebuild the Docker image after reverting",
+        "action": "docker build",
+        "target": "image",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "image status",
+          "how": "check image digest",
+          "expected": "new image built"
+        },
+        "rollback": {
+          "trigger": "build fails",
+          "action": "use last stable image",
+          "safety_guard": "verify image integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_image",
+        "description": "Deploy the new Docker image to production",
+        "action": "kubectl apply",
+        "target": "deployment",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "deployment status",
+          "how": "check Kubernetes status",
+          "expected": "deployment successful"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to previous deployment",
+          "safety_guard": "verify deployment status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_deployment",
+        "description": "Verify successful deployment",
+        "action": "check deployment status",
+        "target": "deployment",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "deployment successful",
+            "fact": "deployment_successful",
+            "established_by": "deploy_image",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment status",
+          "how": "check deployment logs",
+          "expected": "deployment successful"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "rollback deployment",
+          "safety_guard": "verify rollback status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_downstream",
+        "description": "Verify downstream services are operational after redeployment",
+        "action": "check status",
+        "target": "downstream",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "deployment verified successful",
+            "fact": "deployment_successful",
+            "established_by": "verify_deployment",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service status",
+          "how": "ping downstream services",
+          "expected": "all services operational"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "rollback deployment",
+          "safety_guard": "verify rollback status"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "notify_team",
+        "description": "Notify the team via Slack about the changes",
+        "action": "send message",
+        "target": "slack",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "image built successfully",
+            "fact": "image_build_successful",
+            "established_by": "build_image",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "notification status",
+          "how": "check Slack channel",
+          "expected": "notification sent successfully"
+        },
+        "rollback": {
+          "trigger": "notification fails",
+          "action": "send notification again",
+          "safety_guard": "verify notification sent"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "revert_commit",
+        "to_task": "build_image",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "build_image",
+        "to_task": "deploy_image",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_image",
+        "to_task": "verify_deployment",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_deployment",
+        "to_task": "verify_downstream",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_downstream",
+        "to_task": "notify_team",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unverified_dependencies:build_image",
+      "task_id": "build_image",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'build_image' depends on the successful execution of 'revert_commit', but the success is not verified before this step starts.",
+      "suggested_fix": "Ensure 'build_image' has a precondition verifying that 'revert_commit' was successful.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:deploy_image",
+      "task_id": "deploy_image",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'deploy_image' depends on the successful execution of 'build_image', but the success is not verified before this step starts.",
+      "suggested_fix": "Ensure 'deploy_image' has a precondition verifying that 'build_image' was successful.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:verify_deployment",
+      "task_id": "verify_deployment",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'verify_deployment' depends on the successful execution of 'deploy_image', but the success is not verified before this step starts.",
+      "suggested_fix": "Ensure 'verify_deployment' has a precondition verifying that 'deploy_image' was successful.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:verify_downstream",
+      "task_id": "verify_downstream",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'verify_downstream' depends on the successful execution of 'verify_deployment', but the success is not verified before this step starts.",
+      "suggested_fix": "Ensure 'verify_downstream' has a precondition verifying that 'verify_deployment' was successful.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:notify_team",
+      "task_id": "notify_team",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'notify_team' depends on the successful execution of 'verify_downstream', but the success is not verified before this step starts.",
+      "suggested_fix": "Ensure 'notify_team' has a precondition verifying that 'verify_downstream' was successful.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ci-02-hotfix-rollback:4:4",
+    "plan_id": "plan-ci-02-hotfix-rollback-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unverified_dependencies:build_image",
+    "question": "Plan for goal 'ci-02-hotfix-rollback' cannot be approved: blockers remain (llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,201 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-02-streaming-replication",
+  "duration_seconds": 8.46,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "db-02-streaming-replication-plan",
+    "goal_id": "db-02-streaming-replication",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T21:58:07.338922Z",
+    "tasks": [
+      {
+        "id": "provision_primary",
+        "description": "Provision primary PostgreSQL instance",
+        "action": "create",
+        "target": "primary_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "availability zone is ready",
+            "fact": "az_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "provision_standby",
+        "description": "Provision standby PostgreSQL instance",
+        "action": "create",
+        "target": "standby_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "availability zone is ready",
+            "fact": "az_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_replication_slots",
+        "description": "Configure WAL replication slots",
+        "action": "configure",
+        "target": "primary_db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "WAL accumulation status",
+          "how": "check pg_stat_replication",
+          "expected": "no WAL accumulation"
+        },
+        "rollback": {
+          "trigger": "failure in slot configuration",
+          "action": "remove replication slots",
+          "safety_guard": "ensure no WAL accumulation"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "set_up_patroni",
+        "description": "Set up Patroni for automated failover",
+        "action": "configure",
+        "target": "primary_db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Patroni health",
+          "how": "run Patroni checks",
+          "expected": "Patroni in healthy state"
+        },
+        "rollback": {
+          "trigger": "failover misconfiguration",
+          "action": "reset Patroni settings",
+          "safety_guard": "validate Patroni health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_replication_lag",
+        "description": "Monitor replication lag",
+        "action": "check",
+        "target": "pg_stat_replication",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replication lag",
+          "how": "check lag metrics",
+          "expected": "lag under 100ms at P99"
+        },
+        "rollback": {
+          "trigger": "lag exceeds threshold",
+          "action": "alert and investigate",
+          "safety_guard": "regular monitoring"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "provision_primary",
+        "to_task": "configure_replication_slots",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provision_standby",
+        "to_task": "set_up_patroni",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_replication_slots",
+        "to_task": "monitor_replication_lag",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:configure_replication_slots",
+      "task_id": "configure_replication_slots",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'configure_replication_slots' is ordered before the completion of 'provision_primary', which is a hard prerequisite.",
+      "suggested_fix": "Reorder the tasks to ensure 'provision_primary' is completed before 'configure_replication_slots'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:set_up_patroni",
+      "task_id": "set_up_patroni",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'set_up_patroni' is ordered before the completion of 'provision_standby', which is a hard prerequisite.",
+      "suggested_fix": "Reorder the tasks to ensure 'provision_standby' is completed before 'set_up_patroni'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:monitor_replication_lag",
+      "task_id": "monitor_replication_lag",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'monitor_replication_lag' is ordered before the completion of 'configure_replication_slots', which is a hard prerequisite.",
+      "suggested_fix": "Reorder the tasks to ensure 'configure_replication_slots' is completed before 'monitor_replication_lag'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

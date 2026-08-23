@@ -1,0 +1,248 @@
+{
+  "dimension": "core-api",
+  "goal_id": "bch-01-validator-setup",
+  "duration_seconds": 33.35,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-bch-01-validator-setup-r4",
+    "goal_id": "bch-01-validator-setup",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-bch-01-validator-setup-r3",
+    "created_at": "2026-08-23T21:58:22.591977Z",
+    "tasks": [
+      {
+        "id": "key_custody",
+        "description": "Generate validator signing keys using EIP-2333 and store in a hardware security module.",
+        "action": "generate",
+        "target": "validator_keys",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "validator key generation",
+          "how": "check key creation logs",
+          "expected": "keys successfully created in HSM"
+        },
+        "rollback": {
+          "trigger": "key generation fails",
+          "action": "discard generated keys",
+          "safety_guard": "ensure no keys are written to disk"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_signing_client",
+        "description": "Configure the signing client (Prysm/Lighthouse/TEKU beacon node + validator client).",
+        "action": "configure",
+        "target": "signing_client",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Key custody task completed successfully",
+            "fact": "key_custody_success",
+            "established_by": "key_custody",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "signing client configuration",
+          "how": "check configuration logs",
+          "expected": "signing client configured successfully"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "reset client configuration",
+          "safety_guard": "document existing configuration"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "register_validator",
+        "description": "Submit the deposit transaction of 32 ETH to the deposit contract via the validator deposit CLI.",
+        "action": "register",
+        "target": "validator",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "validator registration",
+          "how": "check deposit status on beacon chain",
+          "expected": "validator registered successfully"
+        },
+        "rollback": {
+          "trigger": "registration fails",
+          "action": "delay registration attempt",
+          "safety_guard": "verify deposit amount in queue"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_monitoring",
+        "description": "Set up monitoring for alerting on missed attestations, low balance, slashing warnings.",
+        "action": "setup",
+        "target": "monitoring",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Configure signing client task completed successfully",
+            "fact": "signing_client_configured",
+            "established_by": "configure_signing_client",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "monitoring setup",
+          "how": "check monitoring status",
+          "expected": "monitoring configured successfully"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "simulate_alert_conditions",
+        "description": "Simulate missed attestations and low balance conditions to validate the monitoring setup.",
+        "action": "simulate",
+        "target": "monitoring",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Monitoring setup task completed successfully",
+            "fact": "monitoring_configured",
+            "established_by": "setup_monitoring",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "alert functionality validation",
+          "how": "check alert notifications",
+          "expected": "alerts triggered correctly for simulated conditions"
+        },
+        "rollback": {
+          "trigger": "alert simulation fails",
+          "action": "re-check monitoring configuration",
+          "safety_guard": "document findings"
+        },
+        "risk_class": "medium",
+        "blast_radius": "low"
+      },
+      {
+        "id": "exit_plan",
+        "description": "Establish an exit/stop plan for the validator node.",
+        "action": "plan",
+        "target": "exit_strategy",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "exit strategy validation",
+          "how": "review exit conditions",
+          "expected": "exit plan meets requirements"
+        },
+        "rollback": {
+          "trigger": "exit plan fails",
+          "action": "reassess exit strategy",
+          "safety_guard": "document the existing plan"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "key_custody",
+        "to_task": "configure_signing_client",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_signing_client",
+        "to_task": "register_validator",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_signing_client",
+        "to_task": "setup_monitoring",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "register_validator",
+        "to_task": "exit_plan",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_monitoring",
+        "to_task": "simulate_alert_conditions",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unverified_dependencies:simulate_alert_conditions",
+      "task_id": "simulate_alert_conditions",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'simulate_alert_conditions' depends on 'monitoring_configured', but there is no verification step to confirm that the monitoring setup completed successfully prior to this task.",
+      "suggested_fix": "Add a verification step in 'setup_monitoring' to establish the 'monitoring_configured' fact.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:simulate_alert_conditions",
+      "task_id": "simulate_alert_conditions",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'simulate_alert_conditions' is sequenced before it has an established prerequisite of successful monitoring setup which could lead to incorrect assumptions about the monitoring functionality.",
+      "suggested_fix": "Reorder the tasks to ensure 'setup_monitoring' is completed and verified before 'simulate_alert_conditions'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:bch-01-validator-setup:4:4",
+    "plan_id": "plan-bch-01-validator-setup-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unverified_dependencies:simulate_alert_conditions",
+    "question": "Plan for goal 'bch-01-validator-setup' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,207 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-03-canary-launchdarkly",
+  "duration_seconds": 8.04,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "ci-03-canary-launchdarkly",
+    "goal_id": "ci-03-canary-launchdarkly",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T21:49:44.836741Z",
+    "tasks": [
+      {
+        "id": "enable_flag",
+        "description": "Enable feature flag at 5% for beta users",
+        "action": "enable_flag",
+        "target": "launchdarkly",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "LaunchDarkly service is available",
+            "fact": "ld_service_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_metrics",
+        "description": "Monitor metrics for errors and performance",
+        "action": "monitor",
+        "target": "datadog",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Feature flag is enabled",
+            "fact": "flag_enabled",
+            "established_by": "enable_flag",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "ramp_to_25",
+        "description": "Ramp feature flag to 25%",
+        "action": "ramp",
+        "target": "launchdarkly",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "current user percentage",
+          "how": "check LaunchDarkly dashboard",
+          "expected": "25% enabled"
+        },
+        "rollback": {
+          "trigger": "ramp fails or error spike detected",
+          "action": "disable feature flag",
+          "safety_guard": "verify no ongoing transactions"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "ramp_to_50",
+        "description": "Ramp feature flag to 50%",
+        "action": "ramp",
+        "target": "launchdarkly",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "current user percentage",
+          "how": "check LaunchDarkly dashboard",
+          "expected": "50% enabled"
+        },
+        "rollback": {
+          "trigger": "ramp fails or error spike detected",
+          "action": "disable feature flag",
+          "safety_guard": "verify no ongoing transactions"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "ramp_to_100",
+        "description": "Ramp feature flag to 100%",
+        "action": "ramp",
+        "target": "launchdarkly",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "current user percentage",
+          "how": "check LaunchDarkly dashboard",
+          "expected": "100% enabled"
+        },
+        "rollback": {
+          "trigger": "ramp fails or error spike detected",
+          "action": "disable feature flag",
+          "safety_guard": "verify no ongoing transactions"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "enable_flag",
+        "to_task": "monitor_metrics",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_metrics",
+        "to_task": "ramp_to_25",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "ramp_to_25",
+        "to_task": "ramp_to_50",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "ramp_to_50",
+        "to_task": "ramp_to_100",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:weak_rollback:ramp_to_25",
+      "task_id": "ramp_to_25",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action for ramping to 25% involves disabling the feature flag but lacks a proper contingency plan if verification fails or ongoing transactions exist.",
+      "suggested_fix": "Implement a more comprehensive rollback strategy that includes checks for ongoing transactions before disabling the feature flag.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:ramp_to_50",
+      "task_id": "ramp_to_50",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action for ramping to 50% involves disabling the feature flag but lacks a proper contingency plan if verification fails or ongoing transactions exist.",
+      "suggested_fix": "Implement a more comprehensive rollback strategy that includes checks for ongoing transactions before disabling the feature flag.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:ramp_to_100",
+      "task_id": "ramp_to_100",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action for ramping to 100% involves disabling the feature flag but lacks a proper contingency plan if verification fails or ongoing transactions exist.",
+      "suggested_fix": "Implement a more comprehensive rollback strategy that includes checks for ongoing transactions before disabling the feature flag.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

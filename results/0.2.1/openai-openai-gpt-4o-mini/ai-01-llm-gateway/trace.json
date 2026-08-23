@@ -1,0 +1,249 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ai-01-llm-gateway",
+  "duration_seconds": 22.22,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-ai-01-llm-gateway-r2",
+    "goal_id": "ai-01-llm-gateway",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "ai-01-llm-gateway-plan",
+    "created_at": "2026-08-23T21:51:58.360542Z",
+    "tasks": [
+      {
+        "id": "deploy_gateway",
+        "description": "Deploy LiteLLM gateway with API key management",
+        "action": "deploy",
+        "target": "gateway",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "gateway status",
+          "how": "check health endpoint",
+          "expected": "status 200"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to previous version",
+          "safety_guard": "verify backup system availability"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_rate_limiting",
+        "description": "Configure rate limiting per consumer to 100 requests per minute",
+        "action": "configure",
+        "target": "rate_limiting",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "rate limit rules",
+          "how": "test API with burst requests",
+          "expected": "limits enforced"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "revert to default settings",
+          "safety_guard": "monitor incoming traffic"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "set_canary_routing",
+        "description": "Set up canary routing for A/B testing (90% to GPT-4o-mini, 10% to Claude)",
+        "action": "set",
+        "target": "routing",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "gateway is deployed",
+            "fact": "gateway_deployed",
+            "established_by": "deploy_gateway",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "canary routing configuration",
+          "how": "check routing distribution",
+          "expected": "90% to GPT-4o-mini, 10% to Claude"
+        },
+        "rollback": {
+          "trigger": "canary routing setup fails",
+          "action": "reset routing to previous configuration",
+          "safety_guard": "monitor traffic distribution"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_model_routing_rules",
+        "description": "Configure model routing rules to select the cheapest model that meets quality bar",
+        "action": "configure",
+        "target": "model_routing",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "model selection accuracy",
+          "how": "run quality checks",
+          "expected": "appropriate model selected"
+        },
+        "rollback": {
+          "trigger": "wrong model selected",
+          "action": "revert to previous routing rules",
+          "safety_guard": "verify model performance"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_monitoring",
+        "description": "Deploy monitoring for token usage, latency, and error rate",
+        "action": "deploy",
+        "target": "monitoring",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "gateway is deployed",
+            "fact": "gateway_deployed",
+            "established_by": "deploy_gateway",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "monitoring functionality",
+          "how": "check monitoring dashboard",
+          "expected": "metrics reported"
+        },
+        "rollback": {
+          "trigger": "monitoring deployment fails",
+          "action": "remove monitoring components",
+          "safety_guard": "check system performance"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_failover",
+        "description": "Verify failover to backup provider is functional",
+        "action": "verify",
+        "target": "failover_system",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "failover functionality",
+          "how": "trigger failover and test",
+          "expected": "backup provider serves traffic"
+        },
+        "rollback": {
+          "trigger": "failover verification fails",
+          "action": "disable failover mechanism",
+          "safety_guard": "confirm primary provider operability"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_gateway",
+        "to_task": "configure_rate_limiting",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_gateway",
+        "to_task": "set_canary_routing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_gateway",
+        "to_task": "configure_model_routing_rules",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_gateway",
+        "to_task": "deploy_monitoring",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_model_routing_rules",
+        "to_task": "verify_failover",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:configure_model_routing_rules",
+      "task_id": "configure_model_routing_rules",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Model routing rules configuration must wait for the gateway to be deployed.",
+      "suggested_fix": "Reorder tasks to ensure 'configure_model_routing_rules' follows 'deploy_gateway'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:verify_failover",
+      "task_id": "verify_failover",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Failover verification depends on model routing rules which are not yet verified.",
+      "suggested_fix": "Ensure 'verify_failover' can only start after 'configure_model_routing_rules' is verified.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:deploy_monitoring",
+      "task_id": "deploy_monitoring",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback action for deploying monitoring lacks a clear safety guard mechanism.",
+      "suggested_fix": "Implement a safety check that confirms monitoring is no longer adversely affecting system performance.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

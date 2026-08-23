@@ -1,0 +1,224 @@
+{
+  "dimension": "core-api",
+  "goal_id": "flc-02-config-drift-remediation",
+  "duration_seconds": 20.45,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-flc-02-config-drift-remediation-r2",
+    "goal_id": "flc-02-config-drift-remediation",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "flc-02-config-drift-remediation-v1",
+    "created_at": "2026-08-23T21:57:06.865037Z",
+    "tasks": [
+      {
+        "id": "detect_drift",
+        "description": "Detect configuration drift across hosts",
+        "action": "run Puppet in noop mode or Ansible check mode",
+        "target": "8000 Linux hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "production environment is ready for checks",
+            "fact": "prod_env_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "drift detection report",
+          "how": "check host statuses",
+          "expected": "80% of hosts reported with drift"
+        },
+        "rollback": {
+          "trigger": "failed drift detection",
+          "action": "revert to last known good state",
+          "safety_guard": "confirm previous state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "classify_drift",
+        "description": "Classify types of drift detected",
+        "action": "categorize drift",
+        "target": "drifted hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "drift detection completed successfully",
+            "fact": "drift_detected",
+            "established_by": "detect_drift",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "drift classification summary",
+          "how": "review classification categories",
+          "expected": "all types of drift classified correctly"
+        },
+        "rollback": {
+          "trigger": "classification errors",
+          "action": "reset classification",
+          "safety_guard": "ensure classification integrity"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "auto_remediate",
+        "description": "Auto-remediate drifted hosts in staged batches",
+        "action": "apply correct configurations",
+        "target": "staged batches of hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "drift classified successfully",
+            "fact": "drift_classified",
+            "established_by": "classify_drift",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service status and configuration",
+          "how": "monitor services for any failures",
+          "expected": "all services running without issues"
+        },
+        "rollback": {
+          "trigger": "remediation causes service failure",
+          "action": "revert changes on affected hosts",
+          "safety_guard": "verify service health"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "generate_drift_report",
+        "description": "Generate a comprehensive drift report",
+        "action": "compile inventory and summary",
+        "target": "drift report",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "auto-remediation completed",
+            "fact": "auto_remediate_done",
+            "established_by": "auto_remediate",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "drift report completeness",
+          "how": "review report contents",
+          "expected": "report includes all drifted hosts and classifications"
+        },
+        "rollback": {
+          "trigger": "report generation fails",
+          "action": "recompile previous report",
+          "safety_guard": "verify previous report integrity"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "detect_drift",
+        "to_task": "classify_drift",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "classify_drift",
+        "to_task": "auto_remediate",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "auto_remediate",
+        "to_task": "generate_drift_report",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:detect_drift",
+      "task_id": "detect_drift",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The action to detect drift may not work effectively in all environments, particularly at scale with 8000 hosts relying on Puppet's noop mode, potentially leading to undetected drift.",
+      "suggested_fix": "Consider validating the drift detection process in a smaller environment before full-scale execution.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:auto_remediate",
+      "task_id": "auto_remediate",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The task does not define what should happen when intentional drift is detected; this could lead to incorrect remediation actions.",
+      "suggested_fix": "Include a step to verify that the detected drift is not an intentional configuration before proceeding with remediation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:auto_remediate",
+      "task_id": "auto_remediate",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for reverting changes on affected hosts lacks clarity on how to confirm the previous state before performing the rollback.",
+      "suggested_fix": "Ensure that the rollback plan includes more detailed procedures for validating which previous state to revert to.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:generate_drift_report",
+      "task_id": "generate_drift_report",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The completion of this task depends on the successful execution of the auto_remediate task, but no verification process is specified for ensuring that the remediation was indeed successful before generating the report.",
+      "suggested_fix": "Add a verification step to confirm that auto-remediation did not introduce any new issues before generating the report.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

@@ -1,0 +1,231 @@
+{
+  "dimension": "core-api",
+  "goal_id": "sre-02-telemetry-precondition",
+  "duration_seconds": 37.2,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-sre-02-telemetry-precondition-r3",
+    "goal_id": "sre-02-telemetry-precondition",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-sre-02-telemetry-precondition-r2",
+    "created_at": "2026-08-23T22:07:12.231258Z",
+    "tasks": [
+      {
+        "id": "check_health",
+        "description": "Perform health check on the pods",
+        "action": "check",
+        "target": "pod",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "pod health status",
+          "how": "query health endpoint",
+          "expected": "healthy"
+        },
+        "rollback": {
+          "trigger": "health check fails",
+          "action": "alert incident response",
+          "safety_guard": "log health check results"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "drain_batch_1",
+        "description": "Drain first batch of pods",
+        "action": "drain",
+        "target": "pod_batch_1",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "batch 1 pod status",
+          "how": "check pod readiness",
+          "expected": "not running"
+        },
+        "rollback": {
+          "trigger": "failed to drain batch 1",
+          "action": "restore pods to previous state",
+          "safety_guard": "monitor pod recovery"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "post_drain_1_health_check",
+        "description": "Health check after draining first batch",
+        "action": "check",
+        "target": "pod",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "pod health status after drain 1",
+          "how": "query health endpoint",
+          "expected": "healthy"
+        },
+        "rollback": {
+          "trigger": "health check fails",
+          "action": "alert incident response",
+          "safety_guard": "log health check results"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "drain_batch_2",
+        "description": "Drain second batch of pods",
+        "action": "drain",
+        "target": "pod_batch_2",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "batch 2 pod status",
+          "how": "check pod readiness",
+          "expected": "not running"
+        },
+        "rollback": {
+          "trigger": "failed to drain batch 2",
+          "action": "restore pods to previous state",
+          "safety_guard": "monitor pod recovery"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "post_drain_2_health_check",
+        "description": "Health check after draining second batch",
+        "action": "check",
+        "target": "pod",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "pod health status after drain 2",
+          "how": "query health endpoint",
+          "expected": "healthy"
+        },
+        "rollback": {
+          "trigger": "health check fails",
+          "action": "alert incident response",
+          "safety_guard": "log health check results"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "final_health_check",
+        "description": "Final health check after draining all batches",
+        "action": "check",
+        "target": "pod",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "final pod health status",
+          "how": "query health endpoint",
+          "expected": "healthy"
+        },
+        "rollback": {
+          "trigger": "health check fails",
+          "action": "alert incident response",
+          "safety_guard": "log health check results"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_health",
+        "to_task": "drain_batch_1",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "drain_batch_1",
+        "to_task": "post_drain_1_health_check",
+        "kind": "hard",
+        "reason": "Requires confirmation of successful draining of batch 1"
+      },
+      {
+        "from_task": "post_drain_1_health_check",
+        "to_task": "drain_batch_2",
+        "kind": "hard",
+        "reason": "Requires confirmation of successful health check after batch 1"
+      },
+      {
+        "from_task": "drain_batch_2",
+        "to_task": "post_drain_2_health_check",
+        "kind": "hard",
+        "reason": "Requires confirmation of successful draining of batch 2"
+      },
+      {
+        "from_task": "post_drain_2_health_check",
+        "to_task": "final_health_check",
+        "kind": "hard",
+        "reason": "Requires confirmation of successful health check after batch 2"
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:drain_batch_1",
+      "task_id": "drain_batch_1",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'drain_batch_1' is sequenced before verifying the health of the pods with 'check_health'.",
+      "suggested_fix": "Ensure 'check_health' is executed before 'drain_batch_1'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:drain_batch_2",
+      "task_id": "drain_batch_2",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'drain_batch_2' depends on the health status verification from 'post_drain_1_health_check', which was not confirmed as a prerequisite.",
+      "suggested_fix": "Add a dependency to ensure 'post_drain_1_health_check' is completed successfully before proceeding to 'drain_batch_2'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:sre-02-telemetry-precondition:3:3",
+    "plan_id": "plan-sre-02-telemetry-precondition-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:drain_batch_1",
+    "question": "Plan for goal 'sre-02-telemetry-precondition' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

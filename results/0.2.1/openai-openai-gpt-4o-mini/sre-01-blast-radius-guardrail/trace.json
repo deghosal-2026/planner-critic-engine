@@ -1,0 +1,192 @@
+{
+  "dimension": "core-api",
+  "goal_id": "sre-01-blast-radius-guardrail",
+  "duration_seconds": 17.61,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-sre-01-blast-radius-guardrail-r2",
+    "goal_id": "sre-01-blast-radius-guardrail",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "sre-01-blast-radius-guardrail",
+    "created_at": "2026-08-23T22:06:35.733384Z",
+    "tasks": [
+      {
+        "id": "check_health",
+        "description": "Check the health of the API pods",
+        "action": "check",
+        "target": "api_pods",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "pods are deployed",
+            "fact": "pods_deployed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "drain_pods",
+        "description": "Drain a portion of the API pods (max 25%)",
+        "action": "drain",
+        "target": "api_pods",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "pod health checks passed",
+            "fact": "health_checks_passed",
+            "established_by": "check_health",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "drained pod status",
+          "how": "get pod statuses",
+          "expected": "drained"
+        },
+        "rollback": {
+          "trigger": "drain fails or errors exceed threshold",
+          "action": "restart drained pods",
+          "safety_guard": "confirm pod statuses"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "check_drained",
+        "description": "Check the status of drained pods and health of remaining pods",
+        "action": "check",
+        "target": "api_pods",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "API error rates",
+          "how": "query prometheus metrics",
+          "expected": "error rate < threshold"
+        },
+        "rollback": {
+          "trigger": "high error rates detected after draining",
+          "action": "restart previous batch of pods",
+          "safety_guard": "monitor api health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "repeat_drain",
+        "description": "Repeat pod draining in batches until all pods are drained",
+        "action": "loop",
+        "target": "api_pods",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "previous drain confirmed successful",
+            "fact": "previous_drain_successful",
+            "established_by": "check_drained",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "all pods safely drained",
+          "how": "check all pod statuses",
+          "expected": "all drained"
+        },
+        "rollback": {
+          "trigger": "final drain fails",
+          "action": "restore all pods to previous state",
+          "safety_guard": "monitor overall system health and validate stability"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_health",
+        "to_task": "drain_pods",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "drain_pods",
+        "to_task": "check_drained",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check_drained",
+        "to_task": "repeat_drain",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:repeat_drain",
+      "task_id": "repeat_drain",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'repeat_drain' has a hard dependency on 'check_drained' which verifies the health post-drain, yet it could inadvertently proceed without the confirmation of prior drainer success.",
+      "suggested_fix": "Reorder the plan to ensure 'repeat_drain' strictly follows 'check_drained' after a successful health verification.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:repeat_drain",
+      "task_id": "repeat_drain",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action for 'repeat_drain' is to restore all pods without confirming if the previous state is watertight, risking system stability if not managed carefully.",
+      "suggested_fix": "Implement a detailed verification step before executing the rollback to ensure all previous conditions for stability are met.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:sre-01-blast-radius-guardrail:2:2",
+    "plan_id": "plan-sre-01-blast-radius-guardrail-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:repeat_drain",
+    "question": "Plan for goal 'sre-01-blast-radius-guardrail' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

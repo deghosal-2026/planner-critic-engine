@@ -1,0 +1,387 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dr-01-failover-drill",
+  "duration_seconds": 69.71,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-dr-01-failover-drill-r4",
+    "goal_id": "dr-01-failover-drill",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-dr-01-failover-drill-r3",
+    "created_at": "2026-08-23T21:51:35.445342Z",
+    "tasks": [
+      {
+        "id": "lower_dns_ttl",
+        "description": "Lower DNS TTL to 60 seconds",
+        "action": "update",
+        "target": "Route53",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Route53 is accessible",
+            "fact": "dns_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "DNS TTL status",
+          "how": "check TTL value",
+          "expected": "TTL is 60 seconds"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "check_no_writes",
+        "description": "Check for ongoing writes to us-west-2",
+        "action": "check",
+        "target": "RDS",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "us-west-2 is accessible",
+            "fact": "us_west_2_accessible",
+            "established_by": "lower_dns_ttl",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "write status",
+          "how": "check write logs",
+          "expected": "no ongoing writes"
+        },
+        "rollback": {
+          "trigger": "check fails",
+          "action": "retry check for writes",
+          "safety_guard": "ensure consistent status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "promote_replica",
+        "description": "Promote the us-west-2 read replica to primary",
+        "action": "promote",
+        "target": "RDS",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Check for writes is completed",
+            "fact": "no_active_writes_us_west_2",
+            "established_by": "check_no_writes",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "primary status",
+          "how": "check replication status",
+          "expected": "us-west-2 is the primary"
+        },
+        "rollback": {
+          "trigger": "promotion fails",
+          "action": "revert to original primary",
+          "safety_guard": "verify backup integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update_connection_strings",
+        "description": "Update application connection strings to point to us-west-2",
+        "action": "update",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "us-west-2 is the primary",
+            "fact": "us_west_2_primary",
+            "established_by": "promote_replica",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "connection string status",
+          "how": "check application configuration",
+          "expected": "application points to us-west-2"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "revert connection strings",
+          "safety_guard": "review previous configurations"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_data_consistency",
+        "description": "Verify data consistency between us-east-1 and us-west-2",
+        "action": "check",
+        "target": "databases",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Connection strings updated",
+            "fact": "connection_strings_updated",
+            "established_by": "update_connection_strings",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data hash comparison",
+          "how": "run checksum compare",
+          "expected": "hashes match"
+        },
+        "rollback": {
+          "trigger": "data inconsistency detected",
+          "action": "restore data from us-east-1",
+          "safety_guard": "verify recovery process"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_for_write_conflicts",
+        "description": "Monitor for write conflicts during operation",
+        "action": "monitor",
+        "target": "Prometheus",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data verification completed",
+            "fact": "data_verified",
+            "established_by": "verify_data_consistency",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "monitor logs",
+          "how": "check Prometheus metrics",
+          "expected": "no write conflicts in metrics"
+        },
+        "rollback": {
+          "trigger": "write conflict detected",
+          "action": "alert and stop writes",
+          "safety_guard": "ensure alerting works"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "failback",
+        "description": "Failback to us-east-1 primary with reverse replication",
+        "action": "failback",
+        "target": "RDS",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Monitoring completed without conflicts",
+            "fact": "monitoring_successful",
+            "established_by": "monitor_for_write_conflicts",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "primary status after failback",
+          "how": "check replication status",
+          "expected": "us-east-1 is primary again"
+        },
+        "rollback": {
+          "trigger": "failback fails",
+          "action": "manual recovery to us-west-2",
+          "safety_guard": "manual check before failback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_split_brain_protection",
+        "description": "Verify split-brain protection is in place",
+        "action": "check",
+        "target": "RDS",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Failback completed",
+            "fact": "failback_successful",
+            "established_by": "failback",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "split-brain status",
+          "how": "check state of replicas",
+          "expected": "no split-brain condition"
+        },
+        "rollback": {
+          "trigger": "split-brain detected",
+          "action": "disable writes until resolved",
+          "safety_guard": "document findings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "lower_dns_ttl",
+        "to_task": "check_no_writes",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check_no_writes",
+        "to_task": "promote_replica",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote_replica",
+        "to_task": "update_connection_strings",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_connection_strings",
+        "to_task": "verify_data_consistency",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_data_consistency",
+        "to_task": "monitor_for_write_conflicts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_for_write_conflicts",
+        "to_task": "failback",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "failback",
+        "to_task": "verify_split_brain_protection",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:promote_replica",
+      "task_id": "promote_replica",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Promotion of the replica to primary is executed before confirmation that there are no ongoing writes.",
+      "suggested_fix": "Ensure 'check_no_writes' is completed and verified before 'promote_replica'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:promote_replica",
+      "task_id": "promote_replica",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task depends on unverified condition regarding ongoing writes checking.",
+      "suggested_fix": "Establish and validate a fact confirming there are no ongoing writes prior to promoting the replica.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:weak_rollback:promote_replica",
+      "task_id": "promote_replica",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback to the original primary upon failure does not specify the integrity check of available backups.",
+      "suggested_fix": "Implement verification steps to ensure backup integrity before rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:missing_steps:update_connection_strings",
+      "task_id": "update_connection_strings",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Could include validation of application functionality after updating the connection strings.",
+      "suggested_fix": "Add a step to verify application functionality against the new primary after the connections are updated.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:missing_steps:monitor_for_write_conflicts",
+      "task_id": "monitor_for_write_conflicts",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No detailed verification of alerting mechanism before continuing operations.",
+      "suggested_fix": "Include a step to verify that alerting mechanisms are functional before monitoring for write conflicts.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:weak_rollback:failback",
+      "task_id": "failback",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback mechanism requires a manual check but lacks detailed procedure on how to handle the situation if failback is unsuccessful.",
+      "suggested_fix": "Document step-by-step instructions on manual recovery and checks following a failed failback attempt.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:dr-01-failover-drill:4:4",
+    "plan_id": "plan-dr-01-failover-drill-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:promote_replica",
+    "question": "Plan for goal 'dr-01-failover-drill' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

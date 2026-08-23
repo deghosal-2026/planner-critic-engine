@@ -1,0 +1,151 @@
+{
+  "dimension": "core-api",
+  "goal_id": "idp-03-quota-multi-tenant",
+  "duration_seconds": 10.83,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-idp-03-quota-multi-tenant-r2",
+    "goal_id": "idp-03-quota-multi-tenant",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "idp-03-quota-multi-tenant-plan",
+    "created_at": "2026-08-23T22:03:39.540062Z",
+    "tasks": [
+      {
+        "id": "check-quota",
+        "description": "Check current resource quota",
+        "action": "check",
+        "target": "custom-quota-api",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "current quota status",
+          "how": "query custom-quota-api",
+          "expected": "quota is verified"
+        },
+        "rollback": {
+          "trigger": "quota check fails",
+          "action": "log error and halt scaling",
+          "safety_guard": "notify on-call team"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "scale-service",
+        "description": "Scale the service based on quota check",
+        "action": "scale",
+        "target": "kubernetes service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "quota check is successful",
+            "fact": "quota_verified",
+            "established_by": "check-quota",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "scaled service status",
+          "how": "query kubernetes service status",
+          "expected": "service is scaled successfully"
+        },
+        "rollback": {
+          "trigger": "scaling fails",
+          "action": "restore previous service state",
+          "safety_guard": "verify previous state integrity"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check-quota",
+        "to_task": "scale-service",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:scale-service",
+      "task_id": "scale-service",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'scale-service' depends on 'quota_verified' but the verification method does not ensure this fact is established explicitly before scaling.",
+      "suggested_fix": "Ensure that the 'check-quota' task explicitly sets 'quota_verified' before 'scale-service' executes.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:scale-service",
+      "task_id": "scale-service",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action for 'scale-service' does not account for potential data loss or state inconsistency.",
+      "suggested_fix": "Enhance the rollback action to include a mechanism that verifies the integrity of the previous state after restoration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:feasibility:check-quota",
+      "task_id": "check-quota",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "warning",
+      "reason_code": "llm_feasibility",
+      "message": "The action target 'custom-quota-api' requires proper access configuration; ensure API access and permissions are correctly set up in the staging environment.",
+      "suggested_fix": null,
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:risk:scale-service",
+      "task_id": "scale-service",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Scaling without a confirmed quota can lead to resource contention issues; consider implementing alerts for resource usage post-scaling.",
+      "suggested_fix": null,
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=2"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

@@ -1,0 +1,214 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-08-git-branch-strategy",
+  "duration_seconds": 16.86,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-ci-08-git-branch-strategy-r2",
+    "goal_id": "ci-08-git-branch-strategy",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "ci-08-git-branch-strategy-plan",
+    "created_at": "2026-08-23T21:51:00.379326Z",
+    "tasks": [
+      {
+        "id": "create-feature-branch",
+        "description": "Create a feature branch from the main branch",
+        "action": "create_branch",
+        "target": "feature",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "main branch is up to date",
+            "fact": "main_up_to_date",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "set-pr-checks",
+        "description": "Set required checks for pull requests in the feature branch",
+        "action": "configure_pr_checks",
+        "target": "repos",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "feature branch exists",
+            "fact": "feature_branch_created",
+            "established_by": "create-feature-branch",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "squash-merge-pr",
+        "description": "Squash merge the pull request into the main branch",
+        "action": "squash_merge",
+        "target": "repos",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "merge success",
+          "how": "check main branch commit history",
+          "expected": "latest commit matches feature branch final state"
+        },
+        "rollback": {
+          "trigger": "merge fails",
+          "action": "revert to previous commit",
+          "safety_guard": "verify commits intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "delete-source-branch",
+        "description": "Delete the source feature branch after merge",
+        "action": "delete_branch",
+        "target": "feature",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "pull request is merged",
+            "fact": "pr_merged",
+            "established_by": "squash-merge-pr",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "source branch deletion success",
+          "how": "check branch list",
+          "expected": "source feature branch no longer exists"
+        },
+        "rollback": {
+          "trigger": "branch delete fails",
+          "action": "restore feature branch",
+          "safety_guard": "ensure no ongoing work is lost"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "automate-branch-protection",
+        "description": "Automate branch protection rules across all repositories",
+        "action": "set_branch_protection",
+        "target": "all_repos",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "branch protection rules",
+          "how": "check all repos for settings",
+          "expected": "protection rules applied correctly"
+        },
+        "rollback": {
+          "trigger": "automation fails",
+          "action": "revert branch protection settings",
+          "safety_guard": "ensure no repos are left unprotected"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "create-feature-branch",
+        "to_task": "set-pr-checks",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set-pr-checks",
+        "to_task": "squash-merge-pr",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "squash-merge-pr",
+        "to_task": "delete-source-branch",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "delete-source-branch",
+        "to_task": "automate-branch-protection",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:set-pr-checks",
+      "task_id": "set-pr-checks",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'set-pr-checks' depends on 'create-feature-branch' being completed, but it does not verify the completion of that task before execution.",
+      "suggested_fix": "Ensure 'set-pr-checks' is executed only after 'create-feature-branch' has been successfully completed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:squash-merge-pr",
+      "task_id": "squash-merge-pr",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for 'squash-merge-pr' can fail if checks on 'main branch commit history' are not reliable post-merge.",
+      "suggested_fix": "Implement additional checks or confirmations for 'squash-merge-pr' rollback to ensure data integrity.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:automate-branch-protection",
+      "task_id": "automate-branch-protection",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider including a step to verify that branch protection rules are correctly set before completing this task, to prevent potential mistakes.",
+      "suggested_fix": "Add a verification task after 'automate-branch-protection' to confirm branch protection rules are correctly applied across all repositories.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

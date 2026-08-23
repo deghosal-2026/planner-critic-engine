@@ -1,0 +1,262 @@
+{
+  "dimension": "core-api",
+  "goal_id": "data-07-feature-store",
+  "duration_seconds": 21.13,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-data-07-feature-store-r2",
+    "goal_id": "data-07-feature-store",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "data-07-feature-store-v1",
+    "created_at": "2026-08-23T21:57:10.092712Z",
+    "tasks": [
+      {
+        "id": "define_feature_specs",
+        "description": "Define feature specifications for ML models",
+        "action": "define",
+        "target": "feature specifications",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "project scope is defined",
+            "fact": "scope_defined",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "backfill_historical_features",
+        "description": "Backfill historical features from the data warehouse",
+        "action": "backfill",
+        "target": "historical features",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data completeness",
+          "how": "run data quality checks",
+          "expected": "100% data verified"
+        },
+        "rollback": {
+          "trigger": "backfill fails",
+          "action": "revert changes",
+          "safety_guard": "verify historical data integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_feast_serving",
+        "description": "Deploy Feast for online feature serving",
+        "action": "deploy",
+        "target": "Feast",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Feast service availability",
+          "how": "ping Feast API",
+          "expected": "service responds"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "remove Feast deployment",
+          "safety_guard": "verify service rollback"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_online_offline_parity",
+        "description": "Verify online-offline feature parity",
+        "action": "verify",
+        "target": "feature parity",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "feature consistency",
+          "how": "compare online and offline features",
+          "expected": "no discrepancies"
+        },
+        "rollback": {
+          "trigger": "parity verification fails",
+          "action": "revert to previous feature definitions",
+          "safety_guard": "verify previous definitions integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "integrate_ml_pipeline",
+        "description": "Integrate Feast with ML training pipeline",
+        "action": "integrate",
+        "target": "ML pipeline",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Feast is deployed",
+            "fact": "feast_deployed",
+            "established_by": "deploy_feast_serving",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "integration success",
+          "how": "run integration tests",
+          "expected": "integration passes"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_feature_freshness",
+        "description": "Monitor feature freshness in real-time",
+        "action": "monitor",
+        "target": "feature freshness",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "integration with ML pipeline is complete",
+            "fact": "ml_integration_complete",
+            "established_by": "integrate_ml_pipeline",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define_feature_specs",
+        "to_task": "backfill_historical_features",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "backfill_historical_features",
+        "to_task": "deploy_feast_serving",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_feast_serving",
+        "to_task": "verify_online_offline_parity",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_feast_serving",
+        "to_task": "integrate_ml_pipeline",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "integrate_ml_pipeline",
+        "to_task": "monitor_feature_freshness",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:backfill_historical_features",
+      "task_id": "backfill_historical_features",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'backfill_historical_features' needs to occur after defining feature specifications.",
+      "suggested_fix": "Reorder the tasks to have 'define_feature_specs' complete before 'backfill_historical_features'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:integrate_ml_pipeline",
+      "task_id": "integrate_ml_pipeline",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "'integrate_ml_pipeline' depends on 'deploy_feast_serving' but the deployment could fail without verification of the previous task's success.",
+      "suggested_fix": "Ensure 'deploy_feast_serving' successfully completes before starting 'integrate_ml_pipeline' by adding a hard dependency.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:deploy_feast_serving",
+      "task_id": "deploy_feast_serving",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for 'deploy_feast_serving' lacks verification of the rollback success, risking service disruption.",
+      "suggested_fix": "Add a verification step to confirm the service is fully operational after rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:backfill_historical_features",
+      "task_id": "backfill_historical_features",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider scenarios where the data warehouse may not have all historical features required.",
+      "suggested_fix": "Include a step to handle missing historical features during the backfill process.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:risk:monitor_feature_freshness",
+      "task_id": "monitor_feature_freshness",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Monitoring feature freshness could lead to performance issues if not designed efficiently.",
+      "suggested_fix": "Evaluate the monitoring approach to minimize the impact on system performance.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

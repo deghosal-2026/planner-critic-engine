@@ -1,0 +1,261 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-02-loki-stack",
+  "duration_seconds": 20.1,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-obs-02-loki-stack-r2",
+    "goal_id": "obs-02-loki-stack",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "obs-02-loki-stack",
+    "created_at": "2026-08-23T21:56:21.066930Z",
+    "tasks": [
+      {
+        "id": "setup_infrastructure",
+        "description": "Set up the necessary Kubernetes infrastructure for Loki and Promtail",
+        "action": "deploy",
+        "target": "k8s",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kubernetes cluster is available",
+            "fact": "k8s_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "install_loki",
+        "description": "Install Loki using Helm chart",
+        "action": "install",
+        "target": "loki",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Loki service availability",
+          "how": "check service status",
+          "expected": "service running"
+        },
+        "rollback": {
+          "trigger": "installation fails",
+          "action": "uninstall loki",
+          "safety_guard": "verify no residual resources remain"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "install_promtail",
+        "description": "Install Promtail to ship logs",
+        "action": "install",
+        "target": "promtail",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Promtail service availability",
+          "how": "check service status",
+          "expected": "service running"
+        },
+        "rollback": {
+          "trigger": "installation fails",
+          "action": "uninstall promtail",
+          "safety_guard": "verify no residual resources remain"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_logging",
+        "description": "Configure log shipping from pods via Promtail",
+        "action": "configure",
+        "target": "promtail-logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Promtail is installed",
+            "fact": "promtail_installed",
+            "established_by": "install_promtail",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "log shipping configuration",
+          "how": "check Promtail configuration",
+          "expected": "logs are being shipped successfully"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "restore previous logging configuration",
+          "safety_guard": "verify previous settings"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_dashboards",
+        "description": "Build Grafana dashboard to visualize logs",
+        "action": "build",
+        "target": "grafana_dashboard",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Loki is installed",
+            "fact": "loki_installed",
+            "established_by": "install_loki",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Grafana dashboard availability",
+          "how": "check dashboard status",
+          "expected": "dashboard is accessible"
+        },
+        "rollback": {
+          "trigger": "dashboard setup fails",
+          "action": "delete dashboard",
+          "safety_guard": "verify no residual configurations remain"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_retention",
+        "description": "Configure 7-day retention policy with S3 backend",
+        "action": "configure",
+        "target": "loki_retention",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "retention settings",
+          "how": "check Loki configuration",
+          "expected": "7-day retention with S3"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "restore previous retention settings",
+          "safety_guard": "verify previous settings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup_infrastructure",
+        "to_task": "install_loki",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "install_loki",
+        "to_task": "install_promtail",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "install_promtail",
+        "to_task": "configure_logging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "install_loki",
+        "to_task": "setup_dashboards",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "install_loki",
+        "to_task": "configure_retention",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:setup_infrastructure",
+      "task_id": "setup_infrastructure",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Kubernetes cluster availability must be verified before proceeding.",
+      "suggested_fix": "Ensure the Kubernetes cluster is healthy before running the setup.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:configure_logging",
+      "task_id": "configure_logging",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Promtail installation status must be verified before configuring logging.",
+      "suggested_fix": "Add a verification step to ensure Promtail is installed successfully before configuration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:setup_dashboards",
+      "task_id": "setup_dashboards",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Loki installation status must be verified before setting up dashboards.",
+      "suggested_fix": "Add a verification step to ensure Loki is installed successfully before building dashboards.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:configure_retention",
+      "task_id": "configure_retention",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Loki installation status must be verified before configuring retention policy.",
+      "suggested_fix": "Add a verification step to ensure Loki is installed successfully before configuring retention.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

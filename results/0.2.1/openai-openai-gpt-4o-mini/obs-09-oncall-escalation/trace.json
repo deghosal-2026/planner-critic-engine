@@ -1,0 +1,279 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-09-oncall-escalation",
+  "duration_seconds": 22.54,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-obs-09-oncall-escalation-r2",
+    "goal_id": "obs-09-oncall-escalation",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "obs-09-oncall-escalation",
+    "created_at": "2026-08-23T21:58:13.937203Z",
+    "tasks": [
+      {
+        "id": "define_rotation",
+        "description": "Define on-call rotation for primary and secondary responders",
+        "action": "define",
+        "target": "on-call rotation",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "SRE team availability confirmed",
+            "fact": "team_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_escalation",
+        "description": "Configure escalation rules in PagerDuty",
+        "action": "configure",
+        "target": "escalation rules",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "On-call rotation defined",
+            "fact": "rotation_defined",
+            "established_by": "define_rotation",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "escalation workflow functionality",
+          "how": "test escalation in controlled scenario",
+          "expected": "escalation triggers correctly"
+        },
+        "rollback": {
+          "trigger": "misconfigured escalation rules",
+          "action": "restore previous escalation configuration",
+          "safety_guard": "verify old configuration works as expected"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_service_routing",
+        "description": "Set up service-to-team routing rules in PagerDuty",
+        "action": "setup",
+        "target": "service routing",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Escalation rules configured",
+            "fact": "escalation_configured",
+            "established_by": "configure_escalation",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "routing rules functionality",
+          "how": "test routing scenarios",
+          "expected": "routing works as intended"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_policies",
+        "description": "Configure business-hours vs after-hours policies",
+        "action": "configure",
+        "target": "policies",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Service routing rules set up",
+            "fact": "routing_setup",
+            "established_by": "setup_service_routing",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run_drill",
+        "description": "Run a drill to verify paging works as intended",
+        "action": "execute",
+        "target": "drill",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Policies configured",
+            "fact": "policies_configured",
+            "established_by": "configure_policies",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "paging response",
+          "how": "evaluate drill results",
+          "expected": "all pages received as configured"
+        },
+        "rollback": {
+          "trigger": "drill failures",
+          "action": "review logs and adjust configurations",
+          "safety_guard": "cross-reference logs with expected outcomes"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "document_runbook",
+        "description": "Document the runbook for on-call procedures",
+        "action": "document",
+        "target": "runbook",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Drill completed successfully",
+            "fact": "drill_verified",
+            "established_by": "run_drill",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "runbook completeness",
+          "how": "review runbook against procedures",
+          "expected": "runbook contains all necessary procedures"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define_rotation",
+        "to_task": "configure_escalation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_escalation",
+        "to_task": "setup_service_routing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_service_routing",
+        "to_task": "configure_policies",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_policies",
+        "to_task": "run_drill",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_drill",
+        "to_task": "document_runbook",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:run_drill",
+      "task_id": "run_drill",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The drill might not be representative of real incidents without proper evaluation criteria established beforehand.",
+      "suggested_fix": "Define clear evaluation metrics to ensure the drill accurately simulates a real incident.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:configure_escalation",
+      "task_id": "configure_escalation",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for misconfigured escalation rules lacks detailed steps to fully restore functionality.",
+      "suggested_fix": "Develop a comprehensive rollback plan that includes reverting all possible configurations to a known stable state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:configure_policies",
+      "task_id": "configure_policies",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "This task depends on an unverified fact (routing_setup), which is established by the previous task, but lacks verification itself before proceeding.",
+      "suggested_fix": "Add a verification step to confirm that service routing rules function correctly before configuring policies.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:document_runbook",
+      "task_id": "document_runbook",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider including validation steps for the runbook after documentation to ensure clarity and completeness.",
+      "suggested_fix": "Implement a review process where runbook is checked by multiple team members for accuracy after documentation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:risk:setup_service_routing",
+      "task_id": "setup_service_routing",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Routing rules may misroute pages if not thoroughly tested under various scenarios.",
+      "suggested_fix": "Conduct additional tests to cover edge cases and ensure routing behaves as expected under different conditions.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

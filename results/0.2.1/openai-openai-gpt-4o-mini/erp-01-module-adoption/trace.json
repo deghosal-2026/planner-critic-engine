@@ -1,0 +1,251 @@
+{
+  "dimension": "core-api",
+  "goal_id": "erp-01-module-adoption",
+  "duration_seconds": 41.47,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-erp-01-module-adoption-r4",
+    "goal_id": "erp-01-module-adoption",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-erp-01-module-adoption-r3",
+    "created_at": "2026-08-23T21:52:51.590483Z",
+    "tasks": [
+      {
+        "id": "configure-sap-ar",
+        "description": "Configure SAP Accounts Receivable module",
+        "action": "configure",
+        "target": "SAP AR",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "configuration settings",
+          "how": "review configuration audit logs",
+          "expected": "settings match requirements"
+        },
+        "rollback": {
+          "trigger": "configuration errors",
+          "action": "restore previous configuration",
+          "safety_guard": "verify configuration integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "migrate-data",
+        "description": "Migrate customer master data and open AR items",
+        "action": "migrate",
+        "target": "legacy to SAP AR",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data counts",
+          "how": "compare records pre and post migration",
+          "expected": "100K customers, 500K open items"
+        },
+        "rollback": {
+          "trigger": "migration failures",
+          "action": "revert to legacy data",
+          "safety_guard": "ensure legacy system integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "parallel-run",
+        "description": "Run both systems in parallel for one billing cycle",
+        "action": "run",
+        "target": "legacy and SAP AR",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "system outputs",
+          "how": "review parallel operation logs",
+          "expected": "no operational issues"
+        },
+        "rollback": {
+          "trigger": "operational issues",
+          "action": "stop parallel-run and revert to single system operation",
+          "safety_guard": "document system performance before parallel run"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "finance-reconciliation",
+        "description": "Verify trial balance AR account reconciliation",
+        "action": "reconcile",
+        "target": "legacy vs SAP AR",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "trial balance matches",
+          "how": "run reconciliation reports",
+          "expected": "AR accounts reconcile"
+        },
+        "rollback": {
+          "trigger": "discrepancies found",
+          "action": "stop cutover and review",
+          "safety_guard": "document discrepancies"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover",
+        "description": "Switch to SAP AR as primary system",
+        "action": "cutover",
+        "target": "SAP AR",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "finance reconciliation is successful",
+            "fact": "finance_reconciliation_verified",
+            "established_by": "finance-reconciliation",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "system operational status",
+          "how": "conduct usability tests",
+          "expected": "SAP AR operational, legacy read-only"
+        },
+        "rollback": {
+          "trigger": "cutover failures",
+          "action": "revert to legacy billing system",
+          "safety_guard": "ensure SAP is set to read-only"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "configure-sap-ar",
+        "to_task": "migrate-data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate-data",
+        "to_task": "parallel-run",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "parallel-run",
+        "to_task": "finance-reconciliation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "finance-reconciliation",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:cutover",
+      "task_id": "cutover",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Cutover task is sequenced before finance reconciliation verification is completed.",
+      "suggested_fix": "Ensure that the cutover task is scheduled to only initiate after successful completion and verification of the finance reconciliation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:weak_rollback:cutover",
+      "task_id": "cutover",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Cutover lacks a sound rollback; reverting to the legacy system should ensure SAP is properly set to read-only and not allowing new transactions.",
+      "suggested_fix": "Revise the rollback plan for the cutover task to include detailed steps for ensuring no new transactions can occur in SAP AR before cutting over.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:cutover",
+      "task_id": "cutover",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The cutover task relies on the successful verification of finance reconciliation, which must be confirmed before proceeding to cutover.",
+      "suggested_fix": "Establish verification steps that confirm finance reconciliation is completed successfully prior to allowing cutover task to proceed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:risk:plan",
+      "task_id": null,
+      "version": 4,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Risk identified due to hard scheduling constraint of finance close window which could delay cutover.",
+      "suggested_fix": "Implement a contingency plan to address potential delays in finance close impacting the cutover schedule.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:missing_steps:plan",
+      "task_id": null,
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding validation steps to ensure data integrity and reconciliation discrepancies are addressed before proceeding with cutover.",
+      "suggested_fix": "Add additional checks or validations prior to cutover to ensure data integrity and a smooth transition.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:erp-01-module-adoption:4:4",
+    "plan_id": "plan-erp-01-module-adoption-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:cutover",
+    "question": "Plan for goal 'erp-01-module-adoption' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

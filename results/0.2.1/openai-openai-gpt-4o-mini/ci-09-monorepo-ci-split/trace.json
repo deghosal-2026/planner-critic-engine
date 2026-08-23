@@ -1,0 +1,228 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-09-monorepo-ci-split",
+  "duration_seconds": 17.74,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-ci-09-monorepo-ci-split-r2",
+    "goal_id": "ci-09-monorepo-ci-split",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "ci-09-monorepo-ci-split",
+    "created_at": "2026-08-23T21:51:17.538330Z",
+    "tasks": [
+      {
+        "id": "configure-path-trigger",
+        "description": "Configure path-based trigger rules for CI pipeline.",
+        "action": "configure",
+        "target": "CI triggers",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CI pipeline is set up",
+            "fact": "ci_pipeline_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "set-up-dependency-caching",
+        "description": "Set up dependency caching for Go modules, npm, and pip.",
+        "action": "setup",
+        "target": "caching",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "cache effectiveness",
+          "how": "check cache hit rates",
+          "expected": "cache hits > 80%"
+        },
+        "rollback": {
+          "trigger": "caching fails",
+          "action": "remove caching configuration",
+          "safety_guard": "verify CI runs correctly without caching"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "parallelize-builds",
+        "description": "Parallelize independent service builds in the CI pipeline.",
+        "action": "parallelize",
+        "target": "service builds",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "build times",
+          "how": "compare build durations",
+          "expected": "build < 5 minutes"
+        },
+        "rollback": {
+          "trigger": "parallelization causes failures",
+          "action": "revert to sequential builds",
+          "safety_guard": "ensure no services are broken"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "add-merge-gate",
+        "description": "Add a merge-gate that aggregates results from all jobs.",
+        "action": "add",
+        "target": "merge-gate",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "aggregation accuracy",
+          "how": "run tests with known results",
+          "expected": "results correctly aggregated"
+        },
+        "rollback": {
+          "trigger": "merge-gate fails to aggregate results",
+          "action": "remove merge-gate",
+          "safety_guard": "confirm all jobs pass individually"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-pr-builds",
+        "description": "Verify that PR builds complete in under 5 minutes.",
+        "action": "verify",
+        "target": "PR builds",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "merge-gate is implemented",
+            "fact": "merge_gate_active",
+            "established_by": "add-merge-gate",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "PR build duration",
+          "how": "measure build time for PRs",
+          "expected": "PR builds < 5 minutes"
+        },
+        "rollback": {
+          "trigger": "PR verification fails",
+          "action": "reset metrics fetch",
+          "safety_guard": "confirm metrics are accurate"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "configure-path-trigger",
+        "to_task": "set-up-dependency-caching",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set-up-dependency-caching",
+        "to_task": "parallelize-builds",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "parallelize-builds",
+        "to_task": "add-merge-gate",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "add-merge-gate",
+        "to_task": "verify-pr-builds",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:set-up-dependency-caching",
+      "task_id": "set-up-dependency-caching",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'set-up-dependency-caching' is sequenced before 'configure-path-trigger', which it depends on.",
+      "suggested_fix": "Reorder the tasks to ensure 'configure-path-trigger' is completed before 'set-up-dependency-caching'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:parallelize-builds",
+      "task_id": "parallelize-builds",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'parallelize-builds' is sequenced before 'set-up-dependency-caching', which it depends on.",
+      "suggested_fix": "Reorder the tasks to ensure 'set-up-dependency-caching' is completed before 'parallelize-builds'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:add-merge-gate",
+      "task_id": "add-merge-gate",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'add-merge-gate' is sequenced before 'parallelize-builds', which it depends on.",
+      "suggested_fix": "Reorder the tasks to ensure 'parallelize-builds' is completed before 'add-merge-gate'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:verify-pr-builds",
+      "task_id": "verify-pr-builds",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'verify-pr-builds' is sequenced before 'add-merge-gate', which it depends on.",
+      "suggested_fix": "Reorder the tasks to ensure 'add-merge-gate' is completed before 'verify-pr-builds'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

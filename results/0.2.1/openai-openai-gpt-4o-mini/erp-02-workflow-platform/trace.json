@@ -1,0 +1,177 @@
+{
+  "dimension": "core-api",
+  "goal_id": "erp-02-workflow-platform",
+  "duration_seconds": 12.99,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-erp-02-workflow-platform-r2",
+    "goal_id": "erp-02-workflow-platform",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "erp-02-workflow-platform-plan",
+    "created_at": "2026-08-23T21:53:05.604173Z",
+    "tasks": [
+      {
+        "id": "remap_workflows",
+        "description": "Map ServiceNow workflows to the custom platform's workflow engine",
+        "action": "remap",
+        "target": "workflow engine",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "mapping correctness",
+          "how": "run consistency checks",
+          "expected": "all workflows remapped correctly"
+        },
+        "rollback": {
+          "trigger": "remap fails",
+          "action": "revert to previous mapping",
+          "safety_guard": "verify mapping validity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "export_data",
+        "description": "Export ServiceNow records to CSV/JSON",
+        "action": "export",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ServiceNow API is accessible",
+            "fact": "api_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data format and completeness",
+          "how": "check file integrity and completeness",
+          "expected": "all records exported correctly"
+        },
+        "rollback": {
+          "trigger": "export fails",
+          "action": "notify of failure",
+          "safety_guard": "log export attempt"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "import_data",
+        "description": "Import data into the custom platform and validate",
+        "action": "import",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "record counts and field mappings",
+          "how": "compare counts and mappings",
+          "expected": "counts and mappings match"
+        },
+        "rollback": {
+          "trigger": "import fails",
+          "action": "restore from backup",
+          "safety_guard": "verify backup integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "remap_workflows",
+        "to_task": "export_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "export_data",
+        "to_task": "import_data",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:export_data",
+      "task_id": "export_data",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'export_data' is sequenced before 'remap_workflows' is complete although it depends on its outcome for data integrity.",
+      "suggested_fix": "Reorder tasks to ensure 'remap_workflows' completes before 'export_data'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:import_data",
+      "task_id": "import_data",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'import_data' lacks verification of prerequisites as it doesn\u2019t check for the successful completion of 'export_data'.",
+      "suggested_fix": "Add a precondition to 'import_data' that confirms 'export_data' was successful.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:export_data",
+      "task_id": "export_data",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback plan for 'export_data' only logs the attempt and does not restore any previous state on failure, which might result in data inconsistencies.",
+      "suggested_fix": "Implement a more robust rollback action that restores the previous data state if 'export_data' fails.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:import_data",
+      "task_id": "import_data",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback plan for 'import_data' is to restore from a backup but does not ensure the integrity check of the current state prior to restore.",
+      "suggested_fix": "Add a detailed check to verify whether the backup is usable, along with the confirmatory actions on the current dataset.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

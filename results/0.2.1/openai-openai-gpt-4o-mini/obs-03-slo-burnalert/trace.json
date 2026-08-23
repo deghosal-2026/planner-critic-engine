@@ -1,0 +1,208 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-03-slo-burnalert",
+  "duration_seconds": 8.18,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-obs-03-slo-burnalert",
+    "goal_id": "obs-03-slo-burnalert",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T21:56:28.195942Z",
+    "tasks": [
+      {
+        "id": "define_sli",
+        "description": "Define the service-level indicator (SLI) for request latency p99",
+        "action": "define",
+        "target": "sli",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "service latency metrics are available",
+            "fact": "latency_metrics_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "set_targets",
+        "description": "Set the SLO targets for monthly and quarterly",
+        "action": "set",
+        "target": "slo_targets",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "SLI is defined",
+            "fact": "sli_defined",
+            "established_by": "define_sli",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "low",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_alerts",
+        "description": "Configure multi-window burn-rate alerts in Prometheus",
+        "action": "configure",
+        "target": "prometheus_alerts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "SLO targets are set",
+            "fact": "slo_targets_set",
+            "established_by": "set_targets",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "alert configuration",
+          "how": "check Prometheus configs",
+          "expected": "alerts are set correctly"
+        },
+        "rollback": {
+          "trigger": "alert configuration fails",
+          "action": "reset to previous alert configuration",
+          "safety_guard": "verify previous configuration integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "validate_alerts",
+        "description": "Validate that alerts fire when error budget burn exceeds threshold",
+        "action": "validate",
+        "target": "alert_firing",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "alerts are configured",
+            "fact": "alerts_configured",
+            "established_by": "configure_alerts",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "alert firing status",
+          "how": "simulate error budget burn and monitor alerts",
+          "expected": "alerts fire as expected"
+        },
+        "rollback": {
+          "trigger": "validation fails",
+          "action": "revert to previous validation state",
+          "safety_guard": "ensure previous state is intact"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define_sli",
+        "to_task": "set_targets",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set_targets",
+        "to_task": "configure_alerts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_alerts",
+        "to_task": "validate_alerts",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unverified_dependencies:set_targets",
+      "task_id": "set_targets",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task depends on the fact 'sli_defined' which needs to be verified but isn't established before this task.",
+      "suggested_fix": "Add a verification step to ensure that the SLI is defined before setting targets.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:configure_alerts",
+      "task_id": "configure_alerts",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'configure_alerts' is sequenced before validating that SLO targets are set, which is a hard prerequisite.",
+      "suggested_fix": "Reorder tasks to ensure 'set_targets' completes before 'configure_alerts'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:configure_alerts",
+      "task_id": "configure_alerts",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'configure_alerts' lacks sufficient detail to ensure all previous configurations maintain integrity during a rollback.",
+      "suggested_fix": "Enhance the rollback mechanism to include specific steps for restoring configurations cleanly.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:validate_alerts",
+      "task_id": "validate_alerts",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'validate_alerts' lacks specificity about what state needs to be reverted and how integrity is preserved.",
+      "suggested_fix": "Clarify rollback actions to ensure a reliable restoration of the previous validation state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

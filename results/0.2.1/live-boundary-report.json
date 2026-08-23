@@ -1,0 +1,1389 @@
+{
+  "cases_evaluated": 6,
+  "trials_per_plan": 5,
+  "label_flip_rate": 1.0,
+  "family_migration_rate": 0.0,
+  "evidence_drift_rate": 1.0,
+  "underclaim_approvals": 0,
+  "cases": [
+    {
+      "case_id": "triplet-pre-state-before-mutate",
+      "plans": {
+        "a": {
+          "trials": [
+            {
+              "trial": 0,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 'migrate schema' is ordered before verifying the presence of a backup snapshot."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "Task 'verify pre-state: backup snapshot present' has no established dependency before 'migrate schema'."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "The 'migrate schema' step lacks a sufficient rollback mechanism as it relies solely on a backup."
+                }
+              ]
+            },
+            {
+              "trial": 1,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 'migrate schema' (t1) is ordered before verifying the pre-state of backup snapshot present (t2), which is a hard prerequisite."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "warning",
+                  "explanation": "Task 'migrate schema' (t1) has a rollback plan that relies on a backup, which could fail if the backup is not valid or accessible at the time of rollback."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "The plan does not include a verification step for successful migration of schema after execution which is critical to ensure the change took effect as intended."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "warning",
+                  "explanation": "Task 'verify pre-state: backup snapshot present' (t2) relies on the assumption that a backup exists without prior verification in the plan."
+                }
+              ]
+            },
+            {
+              "trial": 2,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 'migrate schema' (t1) is ordered before verifying the backup snapshot (t2), which is a prerequisite."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "Task 'migrate schema' (t1) has a rollback plan triggered by failure but lacks a comprehensive fail-safe for successful completion."
+                }
+              ]
+            },
+            {
+              "trial": 3,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 'migrate schema' (t1) is ordered before its hard prerequisite 'verify pre-state: backup snapshot present' (t2), leading to potential data loss if migration occurs without verification."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "warning",
+                  "explanation": "Task 'migrate schema' (t1) has a rollback strategy that relies on a backup, which may not be guaranteed to restore the state in all scenarios."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "warning",
+                  "explanation": "Task 'migrate schema' (t1) does not verify that the backup snapshot is present before migrating, which is necessary to ensure data safety."
+                }
+              ]
+            },
+            {
+              "trial": 4,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 'migrate schema' must occur after verifying that a pre-state backup snapshot is present."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "Task 'verify pre-state: backup snapshot present' depends on task 'migrate schema' which does not guarantee a successful verification due to its rollback state."
+                }
+              ]
+            }
+          ]
+        },
+        "b": {
+          "trials": [
+            {
+              "trial": 0,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 't2' is ordered before its hard prerequisite task 't1' completes."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "Task 't1' has a rollback that relies on a backup, which may not guarantee complete recovery in case of a failure."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "Task 't2' depends on the successful execution of 't1' which has not been verified."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "Consider including a step for verifying the success of 't1' before proceeding to 't2'."
+                }
+              ]
+            },
+            {
+              "trial": 1,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 't2' depends on a backup snapshot being present, but it allows executing 't1' (migrate schema) first, which might result in data loss if 't1' fails and 't2' has not confirmed the precondition."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "Task 't1' (migrate schema) has a rollback step that relies on back-up which has not been verified yet. If migration fails, rollback may not restore to a safe state."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "Task 't1' is executed without verifying the existence of the backup, making it risky and potentially leading to unsafe migration."
+                },
+                {
+                  "family": "risk",
+                  "severity": "warning",
+                  "explanation": "The high blast radius of task 't1' should be closely monitored, especially considering no preconditions are confirmed prior to its execution."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "Consider adding a step to validate data integrity after schema migration (task 't1'), before proceeding to any further tasks."
+                }
+              ]
+            },
+            {
+              "trial": 2,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 'verify pre-state: backup snapshot present' must occur before 'migrate schema' to ensure the precondition is validated."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "Task 'migrate schema' has a high-blast-radius roll back action lacks a complete rollback process outlined."
+                }
+              ]
+            },
+            {
+              "trial": 3,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task t2 (verify pre-state: backup snapshot present) is sequenced before task t1 (migrate schema) is completed, which can lead to insufficient verification of prerequisites."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "Task t1 (migrate schema) relies on a successful verification from a prior task (backup snapshot) that has not been established, leading to potential failure."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "Task t1 (migrate schema) lacks a robust rollback mechanism beyond a backup, which may not effectively restore the previous state after migration if unforeseen issues arise."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "Task t1 (migrate schema) could also cover edge cases related to schema compatibility and data integrity during migration."
+                },
+                {
+                  "family": "risk",
+                  "severity": "warning",
+                  "explanation": "Task t1 (migrate schema) has a high blast radius, and a failure could affect multiple services due to dependency on the database migration."
+                }
+              ]
+            },
+            {
+              "trial": 4,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task t2 (verify pre-state) must be run before task t1 (migrate schema) due to its dependency on a backup snapshot."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "Task t1 (migrate schema) depends on a verified backup that should occur before it, which is not currently verified."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "Task t1 (migrate schema) has a rollback that lacks a full pre-state verification before migration, posing a rollback risk."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "case_id": "triplet-output-after-mutate",
+      "plans": {
+        "a": {
+          "trials": [
+            {
+              "trial": 0,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 't2' is sequenced before the completion of its prerequisite task 't1'."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "Consider adding a step for backing up the database before migration to ensure data safety in case of failure."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "warning",
+                  "explanation": "The rollback strategy for task 't1' relies on a backup, but no verification or integrity check of the backup process is detailed, which may lead to data inconsistencies."
+                }
+              ]
+            },
+            {
+              "trial": 1,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task t2 (verify row count) is sequenced before the confirmation that schema migration was successful."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "Task t2 has unverified dependency on the successful execution of task t1 (migrate schema). There's no guarantee that the schema migration was successful before the verification of row count occurs."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "Task t1 (migrate schema) has a weak rollback strategy that relies solely on a backup without confirming the rollback steps are sound, especially given the high blast radius."
+                }
+              ]
+            },
+            {
+              "trial": 2,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 'verify row count' cannot execute before successful migration of the schema in task 'migrate schema'."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "Task 'migrate schema' lacks a robust rollback mechanism for high-blast-radius operation."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "Task 'verify row count' depends on a condition that is not verified by prior tasks."
+                },
+                {
+                  "family": "feasibility",
+                  "severity": "warning",
+                  "explanation": "Plan does not specify environment or tools needed for migration, which may affect feasibility."
+                },
+                {
+                  "family": "risk",
+                  "severity": "warning",
+                  "explanation": "Task 'migrate schema' carries high risk due to potential database inconsistencies during migration."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "Plan lacks a comprehensive validation step after verification of row count."
+                }
+              ]
+            },
+            {
+              "trial": 3,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Verify row count task is sequenced before migrate schema which is a hard prerequisite for it."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "Verify row count depends on the schema migration, but there is no verification step confirming successful completion of schema migration before it starts."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "The rollback method for migrating schema lacks sound rollback for all potential failure scenarios."
+                },
+                {
+                  "family": "risk",
+                  "severity": "warning",
+                  "explanation": "The plan has a high blast radius due to the schema migration affecting multiple components of the service."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "The plan does not cover edge cases for data integrity checks or migrations failures that may occur."
+                }
+              ]
+            },
+            {
+              "trial": 4,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task t2 is sequenced before completing its prerequisite task t1, which is unsafe."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "Task t2 depends on the successful completion of task t1, but there is no verification to confirm task t1 executed successfully before t2 runs."
+                }
+              ]
+            }
+          ]
+        },
+        "b": {
+          "trials": [
+            {
+              "trial": 0,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 'verify row count' is sequenced before the hard prerequisite task 'migrate schema' is completed."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "warning",
+                  "explanation": "Task 'migrate schema' lacks a comprehensive rollback strategy to handle failures gracefully, though it includes a backup safety guard."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "warning",
+                  "explanation": "Task 'verify row count' depends on the successful execution of 'migrate schema' but does not explicitly verify it as a prerequisite."
+                }
+              ]
+            },
+            {
+              "trial": 1,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 'verify row count' cannot execute before 'migrate schema' is complete due to hard dependency."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "Task 'migrate schema' has a rollback mechanism but is not sound against all failure scenarios."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "Task 'verify row count' depends on a fact established by 'migrate schema', which is not verified before execution."
+                },
+                {
+                  "family": "feasibility",
+                  "severity": "blocker",
+                  "explanation": "The migration of the schema may not be feasible with the stated environment/tools since none are specified."
+                }
+              ]
+            },
+            {
+              "trial": 2,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 'verify row count' is sequenced before 'migrate schema', which it depends on."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "warning",
+                  "explanation": "Task 'migrate schema' lacks a robust rollback mechanism as it only triggers a revert on failure without a comprehensive recovery plan."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "warning",
+                  "explanation": "Task 'verify row count' does not have its dependencies verified before execution."
+                }
+              ]
+            },
+            {
+              "trial": 3,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 'verify row count' is ordered before its hard prerequisite 'migrate schema' is completed."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "Task 'migrate schema' lacks a comprehensive rollback plan for its high blast radius."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "Task 'verify row count' depends on verification of 'migrate schema' without it being established as completed."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "Plan could benefit from additional tasks for verification after schema migration before moving to verification of row count."
+                }
+              ]
+            },
+            {
+              "trial": 4,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 'verify row count' is sequenced before the completion of task 'migrate schema', which is a hard prerequisite."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "warning",
+                  "explanation": "Task 'migrate schema' has a rollback action, but the rollback does not account for potential issues with schema integrity or data loss."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "warning",
+                  "explanation": "Task 'verify row count' depends on the successful execution of task 'migrate schema', but 'migrate schema' does not verify data migration success before this check is performed."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "case_id": "credible-rollback-vs-post-consumed-window",
+      "plans": {
+        "a": {
+          "trials": [
+            {
+              "trial": 0,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 't2' is ordered before its hard prerequisite 't1'."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "warning",
+                  "explanation": "Task 't2' does not have a rollback procedure, which may lead to issues if the task fails."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "Task 't1' should include a verification step for the rollback to ensure safety after revert."
+                }
+              ]
+            },
+            {
+              "trial": 1,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task t2 (seed reference data) is sequenced before verifying the successful migration of schema in task t1, which is critical for data integrity."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "Task t2 (seed reference data) lacks a rollback mechanism, risking data integrity if issues arise during insertion."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "Task t2 (seed reference data) has a hard dependency on task t1, but verification of task t1 is not established before t2 is allowed to run."
+                }
+              ]
+            },
+            {
+              "trial": 2,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 't2' (seed reference data) is dependent on task 't1' (migrate schema) but is sequenced to occur before any actual migration occurs."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "warning",
+                  "explanation": "Task 't2' (seed reference data) lacks a rollback plan which could lead to inconsistencies if it fails after execution."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "warning",
+                  "explanation": "Task 't2' (seed reference data) is executed without confirming the successful completion of its prerequisite task 't1' (migrate schema)."
+                }
+              ]
+            },
+            {
+              "trial": 3,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task t2 is dependent on task t1 but is ordered before it in the execution sequence."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "warning",
+                  "explanation": "Task t2 does not have a specified rollback mechanism, which may lead to issues if it fails."
+                }
+              ]
+            },
+            {
+              "trial": 4,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 't2' (seed reference data) is dependent on 't1' (migrate schema) but is not sequenced after it. This creates a risk of data inconsistency."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "warning",
+                  "explanation": "Task 't2' (seed reference data) lacks a defined rollback strategy, which could lead to issues if an error occurs during data seeding."
+                }
+              ]
+            }
+          ]
+        },
+        "b": {
+          "trials": [
+            {
+              "trial": 0,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 'seed reference data' (t2) is dependent on the completion of 'migrate schema' (t1), but lacks a verification step to ensure schema migration is successful before data seeding."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "Task 'seed reference data' (t2) lacks a verification step to confirm the newly migrated schema is in the expected state before inserting reference data."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "Consider adding a rollback plan for task 'seed reference data' (t2) to ensure safe recovery if data insertion fails."
+                }
+              ]
+            },
+            {
+              "trial": 1,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 'seed reference data' is ordered before completing its prerequisite 'migrate schema'."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "Task 'seed reference data' lacks rollback strategy."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "warning",
+                  "explanation": "Task 'seed reference data' has no verification method to confirm successful execution after the migration schema."
+                }
+              ]
+            },
+            {
+              "trial": 2,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 't2' (seed reference data) is sequenced before the completion of its prerequisite 't1' (migrate schema)."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "Task 't2' (seed reference data) lacks a rollback plan."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "warning",
+                  "explanation": "Task 't2' (seed reference data) does not have verification mechanisms in place."
+                }
+              ]
+            },
+            {
+              "trial": 3,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 'seed reference data' (t2) is ordered before its hard prerequisite 'migrate schema' (t1)."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "Task 'seed reference data' (t2) depends on the successful execution of 'migrate schema' (t1), but there is no verification in place for its completion before 't2' executes."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "The plan lacks verification and rollback for task 'seed reference data' (t2)."
+                }
+              ]
+            },
+            {
+              "trial": 4,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 't2' (seed reference data) is sequenced before the successful completion of its hard prerequisite task 't1' (migrate schema)."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "Task 't2' depends on the outcome of task 't1', which lacks a verification step for the success of the migration."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "Task 't1' lacks a comprehensive rollback strategy, as the rollback only mentions reverting but does not detail how to handle potential failures safely."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "case_id": "verifies-before-consume-vs-consumes-before-verified",
+      "plans": {
+        "a": {
+          "trials": [
+            {
+              "trial": 0,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "The task 'deploy service' does not have any prerequisites and may need to be sequenced after verifying that the new environment is ready."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "The task 'rotate credentials' does not have a verification process, which could lead to unverified states post-deployment."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "The task 'rotate credentials' lacks a defined rollback mechanism, risking the inability to revert changes if needed."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "The plan does not cover the verification of service stability after deployment, which is crucial for migration success."
+                }
+              ]
+            },
+            {
+              "trial": 1,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "The 'rotate credentials' task is not sequenced after a prerequisite task that ensures the deployment is stable."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "The 'rotate credentials' task has no verification step, leading to potential issues if the service is not in a healthy state."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "warning",
+                  "explanation": "The 'rotate credentials' task lacks a rollback plan, which could lead to complications if it fails."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "The plan could also specify a step to verify the successful rotation of credentials after 't2' is executed."
+                }
+              ]
+            },
+            {
+              "trial": 2,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 'rotate credentials' should have a prerequisite of deploying the service first to ensure safety during credential rotation."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "Task 'rotate credentials' lacks a defined rollback mechanism, which poses a risk if the task fails."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "Task 'rotate credentials' is dependent on 'deploy service' being completed successfully, but this dependency is not verified."
+                },
+                {
+                  "family": "risk",
+                  "severity": "warning",
+                  "explanation": "Both tasks have high and medium blast radius, suggesting potential impact if failures occur; consider reducing risk through additional safety measures."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "Consider adding preconditions for safety checks between tasks to ensure system stability is maintained during transitions."
+                }
+              ]
+            },
+            {
+              "trial": 3,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 'deploy service' should not execute without established preconditions or validation of dependencies."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "Task 'rotate credentials' lacks any verification or rollback procedures, which could lead to unsafe outcomes."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "Rollback procedure for task 'deploy service' is weak; a backup alone may not suffice for full recovery."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "The plan lacks specific steps for verifying the success of credential rotation before proceeding with service deployment."
+                }
+              ]
+            },
+            {
+              "trial": 4,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "The 'deploy service' task should have a prerequisite confirmation before execution."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "The 'rotate credentials' task lacks verification and is dependent on the completion of 'deploy service'."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "The 'rotate credentials' task has no rollback strategy defined, increasing risk during failure."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "Consider including a validation step after deployment to ensure the service is functioning as expected."
+                }
+              ]
+            }
+          ]
+        },
+        "b": {
+          "trials": [
+            {
+              "trial": 0,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 'rotate credentials' cannot be executed before 'deploy service' is confirmed successful."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "Task 'rotate credentials' has no verification or rollback mechanism, risking system integrity post-deployment."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "Task 'deploy service' lacks detailed rollback steps if the revert fails or backup is inadequate."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "Consider including additional steps to verify the state of the service between deployment and credential rotation."
+                }
+              ]
+            },
+            {
+              "trial": 1,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 'rotate credentials' is not allowed before verifying deployment in 'deploy service'."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "Task 'rotate credentials' has no verification process established before execution."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "Task 'rotate credentials' lacks a rollback strategy which could lead to high impact in case of failure."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "Consider adding checks for edge cases during service deployment, such as network latency or service dependencies not being met."
+                },
+                {
+                  "family": "risk",
+                  "severity": "warning",
+                  "explanation": "The overall risk associated with this migration plan is high due to potential service disruption during the credential rotation."
+                },
+                {
+                  "family": "feasibility",
+                  "severity": "info",
+                  "explanation": "Ensure that necessary tools and resources are available in the stated environment to successfully complete the migration."
+                }
+              ]
+            },
+            {
+              "trial": 2,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 'rotate credentials' should not occur before 'deploy service' has been successfully verified and potentially rolled back if necessary."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "Task 'rotate credentials' lacks a defined rollback strategy, making recovery in case of failure impossible."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "Task 'rotate credentials' does not have any verification mechanisms to ensure its completion before other dependent actions."
+                },
+                {
+                  "family": "risk",
+                  "severity": "warning",
+                  "explanation": "Both tasks have high blast radius due to potential impact on the production environment."
+                }
+              ]
+            },
+            {
+              "trial": 3,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "The task 'rotate credentials' should occur after verifying the deployment's health."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "The task 'rotate credentials' lacks verification mechanisms."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "The task 'rotate credentials' has no defined rollback procedure, posing a risk in failure scenarios."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "Consider including a step to backup current configurations before deployment."
+                }
+              ]
+            },
+            {
+              "trial": 4,
+              "verdicts": [
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 'rotate credentials' is ordered before any verification step for task 'deploy service' which should validate its success first."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "Task 'rotate credentials' lacks any verification or rollback strategy, leading to unverified dependency on the successful deployment of the service."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "Rollback strategy for 'deploy service' does not specify any timeline or conditions beyond a failure trigger, leaving it ambiguous."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "Plan does not include a step for backing up existing service data before the deployment, which could lead to potential data loss."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "case_id": "optional-step-vs-required-dependency",
+      "plans": {
+        "a": {
+          "trials": [
+            {
+              "trial": 0,
+              "verdicts": [
+                {
+                  "family": "feasibility",
+                  "severity": "blocker",
+                  "explanation": "The task 'apply change' has no specified rollback procedure, making it unsafe in case of failure."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "The task 'apply change' lacks verification steps, which are necessary to ensure successful migration."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "The plan does not address how to handle potential failures during migration, which could impact service availability."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "Consider documenting dependencies on data integrity or service state before applying changes."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "The lack of a specified rollback procedure for 'apply change' results in high blast radius if migration fails."
+                }
+              ]
+            },
+            {
+              "trial": 1,
+              "verdicts": [
+                {
+                  "family": "feasibility",
+                  "severity": "blocker",
+                  "explanation": "The task 'apply change' is not achievable as there are no specified tools or environment constraints defined."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "The 'apply change' task lacks a defined rollback plan, which poses a high risk in case of failure."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "The 'apply change' task does not include verification for the changes applied, making it depend on unverified outcomes."
+                }
+              ]
+            },
+            {
+              "trial": 2,
+              "verdicts": [
+                {
+                  "family": "feasibility",
+                  "severity": "blocker",
+                  "explanation": "The task 'apply change' has no defined verification process which makes it infeasible to ensure successful implementation."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "The task 'apply change' lacks a rollback mechanism, which presents a risk in case of failure."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "The task 'apply change' has no preconditions or verified dependencies which could lead to unforeseen issues during execution."
+                }
+              ]
+            },
+            {
+              "trial": 3,
+              "verdicts": [
+                {
+                  "family": "feasibility",
+                  "severity": "blocker",
+                  "explanation": "The task 'apply change' does not specify required tools or environment, making it unachievable."
+                },
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "'apply change' lacks preconditions, suggesting potential unsafe execution order."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "The plan lacks verification steps for the 'apply change' task."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "'apply change' does not define any rollback strategy, posing a risk of failure without recovery."
+                }
+              ]
+            },
+            {
+              "trial": 4,
+              "verdicts": [
+                {
+                  "family": "feasibility",
+                  "severity": "blocker",
+                  "explanation": "The task 'apply change' lacks necessary verification and rollback steps, making it unachievable in its current form."
+                },
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "Task 'apply change' has no specified preconditions, implying it may be executed before necessary dependencies are met."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "The plan does not include a rollback strategy, which is essential for a stateful service migration."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "warning",
+                  "explanation": "The task does not verify the success of the apply change action, which increases risk in migration."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "warning",
+                  "explanation": "The rollback plan is unspecified; thus, it could lead to complications if the changes fail."
+                },
+                {
+                  "family": "risk",
+                  "severity": "info",
+                  "explanation": "The risk class is labeled low, but the lack of verification and rollback increases the actual risk involved."
+                }
+              ]
+            }
+          ]
+        },
+        "b": {
+          "trials": [
+            {
+              "trial": 0,
+              "verdicts": [
+                {
+                  "family": "feasibility",
+                  "severity": "blocker",
+                  "explanation": "The task 'apply change' cannot be completed without specified tools or environment settings."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "The rollback plan for 'apply change' lacks sufficient safety measures for high-blast-radius implications."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "The task 'apply change' relies on assumptions that have not been verified in earlier planning steps."
+                }
+              ]
+            },
+            {
+              "trial": 1,
+              "verdicts": [
+                {
+                  "family": "feasibility",
+                  "severity": "blocker",
+                  "explanation": "The action 'fix' lacks clarity on the required environment and tools for successful execution."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "The rollback action 'revert' does not define a clear process for restoring the state of the service."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "The task depends on a successful execution of unspecified prerequisites, yet none are defined."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "The plan lacks specific tests or checks for verifying the success of the 'apply change' task after execution."
+                }
+              ]
+            },
+            {
+              "trial": 2,
+              "verdicts": [
+                {
+                  "family": "feasibility",
+                  "severity": "blocker",
+                  "explanation": "The task 'apply change' lacks defined tools and environment, making it infeasible to execute in the stated conditions."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "The rollback plan for 'apply change' relies on a backup but does not specify the reliability or restoration process of the backup."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "The plan could also cover verification steps following the rollback to ensure service integrity post-reversion."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "warning",
+                  "explanation": "The task 'apply change' does not verify the state of the service before application, which could lead to unexpected issues if preconditions are not met."
+                }
+              ]
+            },
+            {
+              "trial": 3,
+              "verdicts": [
+                {
+                  "family": "feasibility",
+                  "severity": "blocker",
+                  "explanation": "The task 'apply change' may not be achievable without specified tools or environment requirements."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "The rollback action 'revert' may not safely restore the service due to lack of detailed rollback procedures."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "The task 'apply change' has no verifiable preconditions ensuring it can execute as planned."
+                },
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "The task 'apply change' is not appropriately sequenced; it must follow valid preconditions that are not defined."
+                }
+              ]
+            },
+            {
+              "trial": 4,
+              "verdicts": [
+                {
+                  "family": "feasibility",
+                  "severity": "blocker",
+                  "explanation": "The task 'apply change' does not specify the tools required for the action, making it unachievable."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "The rollback action 'revert' does not account for potential issues during the revert process, which could lead to data loss."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "The task 'apply change' has no preconditions, meaning it may execute without verifying necessary setup or status of the service."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "case_id": "rollback-improvement-vs-no-viable-rollback",
+      "plans": {
+        "a": {
+          "trials": [
+            {
+              "trial": 0,
+              "verdicts": [
+                {
+                  "family": "feasibility",
+                  "severity": "blocker",
+                  "explanation": "The deployment to production may not be achievable due to unknown constraints on the environment and tools."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "The rollback mechanism lacks sufficient details on the safety guard for the backup in case of failure."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "The task depends on the assumption that health checks will return 'pass', which has not been verified by an earlier task."
+                }
+              ]
+            },
+            {
+              "trial": 1,
+              "verdicts": [
+                {
+                  "family": "feasibility",
+                  "severity": "blocker",
+                  "explanation": "The deployment to production without any defined environment or tools is not achievable."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "The rollback mechanism lacks clarity on how the backup will be created and restored effectively."
+                },
+                {
+                  "family": "unverified_dependencies",
+                  "severity": "blocker",
+                  "explanation": "The plan does not establish dependencies or prerequisites for the deployment, leading to potential execution issues."
+                },
+                {
+                  "family": "risk",
+                  "severity": "warning",
+                  "explanation": "Deploying to production carries high risk due to undefined rollout strategy and potential impacts of failure."
+                },
+                {
+                  "family": "missing_steps",
+                  "severity": "warning",
+                  "explanation": "Consider adding steps for pre-deployment validation and post-deployment monitoring to enhance success chances."
+                }
+              ]
+            },
+            {
+              "trial": 2,
+              "verdicts": [
+                {
+                  "family": "feasibility",
+                  "severity": "blocker",
+                  "explanation": "The deployment action cannot be performed as there are no specified tools or environment defined for production deployment."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "The rollback mechanism relies on a backup but lacks a clear procedure for confirming the backup's integrity and validity before reversion."
+                }
+              ]
+            },
+            {
+              "trial": 3,
+              "verdicts": [
+                {
+                  "family": "feasibility",
+                  "severity": "blocker",
+                  "explanation": "The deployment to 'prod' lacks a specified environment and tools, making it uncertain whether the deployment is achievable."
+                },
+                {
+                  "family": "unsafe_sequencing",
+                  "severity": "blocker",
+                  "explanation": "The task 'deploy' is executed without any preconditions, which may lead to executing the deployment under unsafe conditions."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "The rollback mechanism does not ensure a proper state restoration, as it is reliant solely on a 'backup' without verifying its integrity or completeness."
+                }
+              ]
+            },
+            {
+              "trial": 4,
+              "verdicts": [
+                {
+                  "family": "feasibility",
+                  "severity": "blocker",
+                  "explanation": "Deploying directly to production without any stated environment or tools makes this task unachievable in the current context."
+                },
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "The rollback mechanism relies solely on a backup and lacks additional safety measures, making it risky in a high-blast-radius scenario."
+                }
+              ]
+            }
+          ]
+        },
+        "b": {
+          "trials": [
+            {
+              "trial": 0,
+              "verdicts": [
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "The deploy task lacks a defined rollback procedure, creating high risk in case of failure."
+                }
+              ]
+            },
+            {
+              "trial": 1,
+              "verdicts": [
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "The 'deploy' task lacks a defined rollback procedure, making it unsafe to execute without a recovery plan."
+                }
+              ]
+            },
+            {
+              "trial": 2,
+              "verdicts": [
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "The 'deploy' task lacks a defined rollback procedure, risking high impact if the deployment fails."
+                }
+              ]
+            },
+            {
+              "trial": 3,
+              "verdicts": [
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "The 'deploy' task lacks a defined rollback procedure, posing a high risk in case of failure."
+                }
+              ]
+            },
+            {
+              "trial": 4,
+              "verdicts": [
+                {
+                  "family": "weak_rollback",
+                  "severity": "blocker",
+                  "explanation": "The 'deploy' task lacks a defined rollback procedure, posing a high risk in case of failure."
+                },
+                {
+                  "family": "feasibility",
+                  "severity": "blocker",
+                  "explanation": "The deployment to 'prod' may not be achievable without specified tools or environment constraints."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "model": "openai/gpt-4o-mini"
+}

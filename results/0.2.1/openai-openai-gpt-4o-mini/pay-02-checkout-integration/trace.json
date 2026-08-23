@@ -1,0 +1,287 @@
+{
+  "dimension": "core-api",
+  "goal_id": "pay-02-checkout-integration",
+  "duration_seconds": 25.8,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-pay-02-checkout-integration-r2",
+    "goal_id": "pay-02-checkout-integration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "pay-02-checkout-integration-plan",
+    "created_at": "2026-08-23T21:59:26.789125Z",
+    "tasks": [
+      {
+        "id": "sdk_swap",
+        "description": "Replace Stripe Elements with Adyen Web Drop-in component",
+        "action": "replace",
+        "target": "checkout form",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Adyen SDK is available",
+            "fact": "adyen_sdk_installed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "checkout form loads correctly",
+          "how": "run UI tests",
+          "expected": "Adyen Drop-in appears"
+        },
+        "rollback": {
+          "trigger": "implementation fails",
+          "action": "revert to Stripe Elements",
+          "safety_guard": "ensure user experience is consistent"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "tokenization_migration",
+        "description": "Migrate from Stripe token to Adyen token format",
+        "action": "update backend",
+        "target": "payment processing",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Stripe tokenization process is established",
+            "fact": "stripe_token_processed",
+            "established_by": "sdk_swap",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "token format compatibility",
+          "how": "run integration tests",
+          "expected": "successfully process Adyen tokens"
+        },
+        "rollback": {
+          "trigger": "token format issues",
+          "action": "revert backend changes",
+          "safety_guard": "monitor backend logs for errors"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "three_ds_configuration",
+        "description": "Configure Strong Customer Authentication flow with Adyen's 3DS2 implementation",
+        "action": "setup",
+        "target": "3DS flow",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Adyen account is properly configured for 3DS",
+            "fact": "adyen_3ds_configured",
+            "established_by": "sdk_swap",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "3DS challenge handling",
+          "how": "simulate challenge flows",
+          "expected": "successful 3DS responses"
+        },
+        "rollback": {
+          "trigger": "3DS issues arise",
+          "action": "revert 3DS configuration",
+          "safety_guard": "ensure compliance with PCI"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "sandbox_testing",
+        "description": "Conduct testing in Adyen sandbox for all card networks and scenarios",
+        "action": "test",
+        "target": "payment flows",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Sandbox environment is accessible",
+            "fact": "adyen_sandbox_accessible",
+            "established_by": "three_ds_configuration",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "test results on various scenarios",
+          "how": "review sandbox testing outcomes",
+          "expected": "all scenarios pass"
+        },
+        "rollback": {
+          "trigger": "sandbox testing fails",
+          "action": "revert sandbox setup",
+          "safety_guard": "ensure backup of configurations"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "canary_release",
+        "description": "Deploy to 5% of users via feature flag and monitor error rates",
+        "action": "deploy",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Feature flag is functional",
+            "fact": "feature_flag_enabled",
+            "established_by": "sandbox_testing",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "full_rollout",
+        "description": "Roll out the Adyen integration to 100% of users",
+        "action": "deploy",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Canary release validated without issues",
+            "fact": "canary_validation_successful",
+            "established_by": "canary_release",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "sdk_swap",
+        "to_task": "tokenization_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "tokenization_migration",
+        "to_task": "three_ds_configuration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "three_ds_configuration",
+        "to_task": "sandbox_testing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "sandbox_testing",
+        "to_task": "canary_release",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "canary_release",
+        "to_task": "full_rollout",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:tokenization_migration",
+      "task_id": "tokenization_migration",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The tokenization migration task depends on sdk_swap, but does not verify that the Adyen token format is compatible before execution.",
+      "suggested_fix": "Ensure verification of compatibility of Adyen token format before executing tokenization_migration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:three_ds_configuration",
+      "task_id": "three_ds_configuration",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The three_ds_configuration task depends on tokenization_migration, but there is no check to confirm that tokenization migration was successful before proceeding.",
+      "suggested_fix": "Add verification step to confirm successful token format migration prior to executing three_ds_configuration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:sandbox_testing",
+      "task_id": "sandbox_testing",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The sandbox_testing task depends on three_ds_configuration, but it does not confirm the success of the 3DS setup before testing.",
+      "suggested_fix": "Include a verification step to ensure successful 3DS configuration before executing sandbox_testing.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:canary_release",
+      "task_id": "canary_release",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The canary_release task relies on sandbox_testing, yet there is no check to ensure that all scenarios passed the sandbox testing.",
+      "suggested_fix": "Add a verification to confirm successful sandbox testing results before proceeding with canary_release.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:full_rollout",
+      "task_id": "full_rollout",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The full_rollout task is dependent on canary_release, but does not verify that the canary release was validated without issues.",
+      "suggested_fix": "Implement a verification step to check the success of the canary release before executing full_rollout.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

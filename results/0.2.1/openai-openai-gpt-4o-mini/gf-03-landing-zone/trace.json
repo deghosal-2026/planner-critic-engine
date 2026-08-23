@@ -1,0 +1,259 @@
+{
+  "dimension": "core-api",
+  "goal_id": "gf-03-landing-zone",
+  "duration_seconds": 37.85,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-gf-03-landing-zone-r3",
+    "goal_id": "gf-03-landing-zone",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-gf-03-landing-zone-r2",
+    "created_at": "2026-08-23T21:59:36.939368Z",
+    "tasks": [
+      {
+        "id": "configure_organizations",
+        "description": "Configure AWS Organizations with 3 accounts",
+        "action": "create_accounts",
+        "target": "AWS Organizations",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "User has admin access to AWS Organizations",
+            "fact": "admin_access_granted",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "created accounts",
+          "how": "list accounts in AWS Organizations",
+          "expected": "3 accounts (audit, shared-services, prod)"
+        },
+        "rollback": {
+          "trigger": "failure to create accounts",
+          "action": "delete created accounts",
+          "safety_guard": "verify account deletion success"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_sso",
+        "description": "Set up AWS SSO with MFA enforcement",
+        "action": "configure_sso",
+        "target": "AWS SSO",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AWS Organizations are configured",
+            "fact": "organizations_configured",
+            "established_by": "configure_organizations",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "SSO configuration",
+          "how": "test SSO sign-in with MFA",
+          "expected": "successful SSO sign-in"
+        },
+        "rollback": {
+          "trigger": "SSO misconfiguration",
+          "action": "remove SSO configuration",
+          "safety_guard": "verify SSO access for admins"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "apply_guardrails",
+        "description": "Apply guardrails with SCP policies",
+        "action": "create_scp",
+        "target": "guardrails",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AWS Organizations are configured",
+            "fact": "organizations_configured",
+            "established_by": "configure_organizations",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "SCP policies",
+          "how": "audit SCP configurations",
+          "expected": "SCPs prevent public S3 buckets and restrict regions"
+        },
+        "rollback": {
+          "trigger": "SCP blocking legitimate operations",
+          "action": "remove SCP policies",
+          "safety_guard": "verify critical services are operational before and after SCP removal"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_network",
+        "description": "Configure network segmentation with VPCs and Transit Gateway",
+        "action": "create_networks",
+        "target": "VPCs and Transit Gateway",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Guardrails are applied",
+            "fact": "guardrails_applied",
+            "established_by": "apply_guardrails",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "network configuration validation",
+          "how": "check VPC and Transit Gateway settings",
+          "expected": "VPCs and Transit Gateway configured correctly"
+        },
+        "rollback": {
+          "trigger": "network configuration error",
+          "action": "delete VPCs and Transit Gateway",
+          "safety_guard": "verify all resources are deleted"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_guardrails",
+        "description": "Verify enforcement of guardrails",
+        "action": "verify_guardrails",
+        "target": "guardrails",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Network segmentation is configured",
+            "fact": "networks_configured",
+            "established_by": "configure_network",
+            "probe": null
+          },
+          {
+            "description": "Network configuration is validated",
+            "fact": "network_configuration_validated",
+            "established_by": "configure_network",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "guardrail enforcement",
+          "how": "run compliance checks",
+          "expected": "all guardrails enforced"
+        },
+        "rollback": {
+          "trigger": "guardrails not enforced",
+          "action": "review guardrail settings",
+          "safety_guard": "ensure S3 and encryption policies are active"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "configure_organizations",
+        "to_task": "setup_sso",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_sso",
+        "to_task": "apply_guardrails",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "apply_guardrails",
+        "to_task": "configure_network",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_network",
+        "to_task": "verify_guardrails",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:apply_guardrails",
+      "task_id": "apply_guardrails",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'apply_guardrails' is ordered before the hard prerequisite of 'setup_sso' being completed.",
+      "suggested_fix": "Reorder tasks to ensure 'setup_sso' is completed before 'apply_guardrails'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:configure_network",
+      "task_id": "configure_network",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'configure_network' depends on 'guardrails_applied' but there's no prior verification of 'apply_guardrails' confirming it was successful.",
+      "suggested_fix": "Add a verification step after 'apply_guardrails' to confirm guardrails are successfully applied before proceeding.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:weak_rollback:verify_guardrails",
+      "task_id": "verify_guardrails",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'verify_guardrails' lacks a sound rollback strategy if guardrails are not enforced.",
+      "suggested_fix": "Implement a rollback action to revert to a previous state if guardrails are not enforced instead of just reviewing settings.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:gf-03-landing-zone:3:3",
+    "plan_id": "plan-gf-03-landing-zone-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:apply_guardrails",
+    "question": "Plan for goal 'gf-03-landing-zone' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

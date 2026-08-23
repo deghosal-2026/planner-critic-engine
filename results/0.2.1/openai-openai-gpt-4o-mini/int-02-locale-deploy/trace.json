@@ -1,0 +1,262 @@
+{
+  "dimension": "core-api",
+  "goal_id": "int-02-locale-deploy",
+  "duration_seconds": 20.19,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-int-02-locale-deploy-r2",
+    "goal_id": "int-02-locale-deploy",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "int-02-locale-deploy-plan",
+    "created_at": "2026-08-23T22:00:33.387992Z",
+    "tasks": [
+      {
+        "id": "deploy_locale_files",
+        "description": "Deploy locale/key files for translation",
+        "action": "deploy",
+        "target": "locale files",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "source locale files are ready",
+            "fact": "files_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment success",
+          "how": "check file existence and integrity",
+          "expected": "all locale files deployed correctly"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "revert to previous locale files",
+          "safety_guard": "verify previous locale files integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run_translation_pipeline",
+        "description": "Run the translation pipeline for machine translation and human review",
+        "action": "run",
+        "target": "translation pipeline",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "all locale files are deployed",
+            "fact": "locale_files_deployed",
+            "established_by": "deploy_locale_files",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "translation output quality",
+          "how": "review translation reports",
+          "expected": "satisfactory translation for ja/zh/ko/ar/he"
+        },
+        "rollback": {
+          "trigger": "pipeline fails",
+          "action": "retry translation process",
+          "safety_guard": "verify translation completeness"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "per_locale_verification",
+        "description": "Verify each locale for proper rendering and rules",
+        "action": "verify",
+        "target": "locale rendering",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "translation pipeline has completed successfully",
+            "fact": "translation_completed",
+            "established_by": "run_translation_pipeline",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "locale rendering correctness",
+          "how": "conduct visual checks and automate tests",
+          "expected": "correct rendering for all locales with rules applied"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "restore previous locale settings",
+          "safety_guard": "confirm previous layouts"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "progressive_enable_locales",
+        "description": "Enable locales in batches progressively",
+        "action": "enable",
+        "target": "locales",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "verification of locales is complete",
+            "fact": "locales_verified",
+            "established_by": "per_locale_verification",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "locales enabled status",
+          "how": "check status of enabled locales",
+          "expected": "all verified locales enabled successfully"
+        },
+        "rollback": {
+          "trigger": "locales enable fails",
+          "action": "disable recently enabled locales",
+          "safety_guard": "verify previously enabled locales status"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_locales",
+        "description": "Monitor the multilingual support performance and usage",
+        "action": "monitor",
+        "target": "locale adoption metrics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "locales must be enabled first",
+            "fact": "locales_enabled",
+            "established_by": "progressive_enable_locales",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_locale_files",
+        "to_task": "run_translation_pipeline",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_translation_pipeline",
+        "to_task": "per_locale_verification",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "per_locale_verification",
+        "to_task": "progressive_enable_locales",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "progressive_enable_locales",
+        "to_task": "monitor_locales",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:deploy_locale_files",
+      "task_id": "deploy_locale_files",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The task presumes that source locale files are ready without adequately verifying their availability in the current environment.",
+      "suggested_fix": "Ensure a robust verification step to confirm the readiness of source locale files before deployment.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:run_translation_pipeline",
+      "task_id": "run_translation_pipeline",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for the translation pipeline does not include a way to recover from partial translation outputs, which presents a risk of inadequate or inconsistent translations being deployed.",
+      "suggested_fix": "Implement a rollback plan that can effectively revert to the last fully complete translation state in case of a failure.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:monitor_locales",
+      "task_id": "monitor_locales",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The monitoring task lacks a defined verification mechanism, potentially resulting in undetected issues with locale performance or usage post-deployment.",
+      "suggested_fix": "Add explicit verification criteria for the monitoring task to track performance metrics effectively.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:progressive_enable_locales",
+      "task_id": "progressive_enable_locales",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task is set to run before ensuring that all critical rendering and localization rules for each locale have been applied, which may lead to improperly enabled locales.",
+      "suggested_fix": "Reorder the tasks or insert additional checks to guarantee that locale correctness is established before enabling.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:per_locale_verification",
+      "task_id": "per_locale_verification",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task assumes that the translation pipeline has completed successfully without verifying that all translations meet quality expectations first.",
+      "suggested_fix": "Add verification for translation quality between the translation pipeline and the per-locale verification task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

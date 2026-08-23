@@ -1,0 +1,341 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-08-redis-migration",
+  "duration_seconds": 71.08,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 4,
+    "llm_calls": 4
+  },
+  "plan": {
+    "id": "plan-db-08-redis-migration-r4",
+    "goal_id": "db-08-redis-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-db-08-redis-migration-r3",
+    "created_at": "2026-08-23T22:01:13.714081Z",
+    "tasks": [
+      {
+        "id": "setup_redis",
+        "description": "Set up the managed Redis cluster ElastiCache",
+        "action": "setup",
+        "target": "Redis cluster",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AWS account is active and has permission to create ElastiCache resources",
+            "fact": "aws_account_valid",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "ElastiCache setup",
+          "how": "check AWS console for Redis cluster",
+          "expected": "Redis cluster is listed and active"
+        },
+        "rollback": {
+          "trigger": "setup fails",
+          "action": "log and notify failure",
+          "safety_guard": "verify no resources were created"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_dual_write",
+        "description": "Develop dual-write library configuration for Memcached and Redis",
+        "action": "configure",
+        "target": "dual-write library",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Redis cluster is set up",
+            "fact": "redis_setup_complete",
+            "established_by": "setup_redis",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "dual-write functionality",
+          "how": "run integration tests",
+          "expected": "both caches receive writes"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "revert writes back to Memcached with validation",
+          "safety_guard": "ensure no data loss during revert"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_dual_write",
+        "description": "Verify dual-write functionality",
+        "action": "verify",
+        "target": "dual-write library",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dual-write library configured",
+            "fact": "dual_write_configured",
+            "established_by": "configure_dual_write",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "dual-write implementation",
+          "how": "run test writes",
+          "expected": "writes are equally reflected in both caches"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "data_extraction",
+        "description": "Extract data from Memcached for migration",
+        "action": "extract",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dual-write library verified",
+            "fact": "dual_write_verified",
+            "established_by": "verify_dual_write",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data completeness",
+          "how": "compare key counts",
+          "expected": "500 GB extracted"
+        },
+        "rollback": {
+          "trigger": "extraction fails",
+          "action": "restore previous state",
+          "safety_guard": "data integrity checks pass"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "data_migration",
+        "description": "Migrate data from Memcached to Redis",
+        "action": "migrate",
+        "target": "Redis",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data extraction completed successfully",
+            "fact": "data_extracted",
+            "established_by": "data_extraction",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data integrity",
+          "how": "run checksum comparison",
+          "expected": "data matches original Memcached data"
+        },
+        "rollback": {
+          "trigger": "migration issues detected",
+          "action": "restore data to Memcached with validation",
+          "safety_guard": "validate data in Memcached"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "data_verification",
+        "description": "Verify data integrity post-migration",
+        "action": "verify",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data migration completed successfully",
+            "fact": "data_migrated",
+            "established_by": "data_migration",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data integrity verification",
+          "how": "run detailed comparison checks",
+          "expected": "data matches Memcached"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "notify failure and log issues",
+          "safety_guard": "ensure data is safe"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover",
+        "description": "Perform cutover to switch reads to Redis and decommission Memcached",
+        "action": "cutover",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data integrity verified post-migration",
+            "fact": "data_verified",
+            "established_by": "data_verification",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "cache hit rates",
+          "how": "monitor with Grafana",
+          "expected": "above 95%"
+        },
+        "rollback": {
+          "trigger": "cache hit rates drop below 95%",
+          "action": "revert reads to Memcached",
+          "safety_guard": "monitor cache hit rates"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup_redis",
+        "to_task": "configure_dual_write",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_dual_write",
+        "to_task": "verify_dual_write",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_dual_write",
+        "to_task": "data_extraction",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "data_extraction",
+        "to_task": "data_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "data_migration",
+        "to_task": "data_verification",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "data_verification",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:configure_dual_write",
+      "task_id": "configure_dual_write",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The dual-write library configuration task is ordered before the verification of its functionality, creating a risk of executing dependent tasks without confirmation of success.",
+      "suggested_fix": "Reorder the 'verify_dual_write' task before 'data_extraction'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:data_migration",
+      "task_id": "data_migration",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The data migration task depends on the fact that data extraction has been completed. However, the verification of extraction is only partially verified in previous tasks, creating uncertainty in executing this task safely.",
+      "suggested_fix": "Implement comprehensive checks to confirm data extraction has been reliably completed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:weak_rollback:data_migration",
+      "task_id": "data_migration",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for the data migration task only mentions restoring data to Memcached without specifying how data integrity will be assured during this process.",
+      "suggested_fix": "Add explicit steps to ensure data integrity is verified during the rollback process.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:risk:cutover",
+      "task_id": "cutover",
+      "version": 4,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "The cutover task's dependency on cache hit rates could lead to instability if not properly monitored during the transition period.",
+      "suggested_fix": "Establish a temporary fallback mechanism during cutover to prevent service disruption if cache hit rates falter.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:missing_steps:data_extraction",
+      "task_id": "data_extraction",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider incorporating a step to handle potential discrepancies in data formats between Memcached and Redis during data extraction.",
+      "suggested_fix": "Add a validation step to assure data compatibility and format correctness.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-08-redis-migration:4:4",
+    "plan_id": "plan-db-08-redis-migration-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:configure_dual_write",
+    "question": "Plan for goal 'db-08-redis-migration' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

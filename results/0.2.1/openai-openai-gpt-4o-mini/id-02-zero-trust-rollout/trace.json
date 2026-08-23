@@ -1,0 +1,342 @@
+{
+  "dimension": "core-api",
+  "goal_id": "id-02-zero-trust-rollout",
+  "duration_seconds": 66.18,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-id-02-zero-trust-rollout-r4",
+    "goal_id": "id-02-zero-trust-rollout",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-id-02-zero-trust-rollout-r3",
+    "created_at": "2026-08-23T22:02:40.853350Z",
+    "tasks": [
+      {
+        "id": "deploy-ca",
+        "description": "Deploy internal CA using cert-manager",
+        "action": "deploy",
+        "target": "internal CA",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "CA status",
+          "how": "check cert-manager logs",
+          "expected": "CA is healthy"
+        },
+        "rollback": {
+          "trigger": "CA deployment fails",
+          "action": "remove CA deployment",
+          "safety_guard": "confirm no services are using CA"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "issue-certs",
+        "description": "Issue mTLS certificates to all services",
+        "action": "issue",
+        "target": "mTLS certs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "mTLS certificates",
+          "how": "list issued certs",
+          "expected": "all services have certificates"
+        },
+        "rollback": {
+          "trigger": "cert issuance fails",
+          "action": "remove issued certificates",
+          "safety_guard": "verify services don't use the certs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-istio",
+        "description": "Configure Istio for STRICT mTLS",
+        "action": "configure",
+        "target": "Istio",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "mTLS enforcement status",
+          "how": "check Istio configuration",
+          "expected": "mTLS is enforced across services"
+        },
+        "rollback": {
+          "trigger": "mTLS configuration fails",
+          "action": "revert Istio config",
+          "safety_guard": "ensure monitoring shows no traffic disruption"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-configure-istio",
+        "description": "Verify that Istio is configured correctly",
+        "action": "verify",
+        "target": "Istio configuration",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Istio configuration status",
+          "how": "check Istio logs",
+          "expected": "Istio is configured successfully"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "revert to previous configuration",
+          "safety_guard": "ensure services are functioning normally"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy-iap",
+        "description": "Deploy identity-aware proxy",
+        "action": "deploy",
+        "target": "identity-aware proxy",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Istio is configured and verified",
+            "fact": "istio_verified",
+            "established_by": "verify-configure-istio",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "IAP deployment status",
+          "how": "check deployment logs",
+          "expected": "IAP is deployed successfully"
+        },
+        "rollback": {
+          "trigger": "IAP deployment fails",
+          "action": "remove IAP deployment",
+          "safety_guard": "ensure no services depend on IAP"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-dependencies",
+        "description": "Verify that no dependencies will be broken after configurations",
+        "action": "verify",
+        "target": "dependency check",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "dependencies status",
+          "how": "check service connectivity",
+          "expected": "no dependencies are broken"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "alert and halt deployment",
+          "safety_guard": "ensure traffic is managed"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-egress-firewall",
+        "description": "Configure egress firewall rules",
+        "action": "configure",
+        "target": "egress firewall",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "egress rules",
+          "how": "test service access",
+          "expected": "services access only allowed endpoints"
+        },
+        "rollback": {
+          "trigger": "egress rules break dependencies",
+          "action": "revert egress rules",
+          "safety_guard": "verify service connectivity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-mtls",
+        "description": "Verify all service-to-service traffic uses mTLS",
+        "action": "verify",
+        "target": "mTLS traffic",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service-to-service traffic",
+          "how": "monitor traffic logs",
+          "expected": "all traffic is mTLS"
+        },
+        "rollback": {
+          "trigger": "mTLS verification fails",
+          "action": "disable mTLS temporarily",
+          "safety_guard": "restore to previous config"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "establish-traffic-policies",
+        "description": "Establish traffic policies for services",
+        "action": "define",
+        "target": "traffic policies",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Istio is configured and verified",
+            "fact": "istio_verified",
+            "established_by": "verify-configure-istio",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Traffic policies",
+          "how": "check defined policies",
+          "expected": "all traffic policies are established"
+        },
+        "rollback": {
+          "trigger": "traffic policy establishment fails",
+          "action": "remove traffic policies",
+          "safety_guard": "ensure services fall back to default policies"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy-ca",
+        "to_task": "issue-certs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "issue-certs",
+        "to_task": "configure-istio",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-istio",
+        "to_task": "verify-configure-istio",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-configure-istio",
+        "to_task": "deploy-iap",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-configure-istio",
+        "to_task": "configure-egress-firewall",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-configure-istio",
+        "to_task": "establish-traffic-policies",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-egress-firewall",
+        "to_task": "verify-mtls",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-egress-firewall",
+        "to_task": "verify-dependencies",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-dependencies",
+        "to_task": "configure-egress-firewall",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "no_dep_cycles:plan-id-02-zero-trust-rollout-r4:4",
+      "task_id": null,
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "blocker",
+      "reason_code": "dependency_cycle",
+      "message": "dependency cycle detected among tasks: ['configure-egress-firewall', 'verify-dependencies', 'verify-mtls']",
+      "suggested_fix": "Break the cycle by removing or re-directing a hard dependency",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "ordering_sane:plan-id-02-zero-trust-rollout-r4:4:configure-egress-firewall",
+      "task_id": "verify-dependencies",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "blocker",
+      "reason_code": "unsafe_ordering",
+      "message": "task 'verify-dependencies' is ordered before its hard dependency 'configure-egress-firewall'",
+      "suggested_fix": "Reorder the plan so task 'verify-dependencies' appears after 'configure-egress-firewall'",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "verification_ordering:plan-id-02-zero-trust-rollout-r4:4:verify-dependencies:configure-egress-firewall",
+      "task_id": "verify-dependencies",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "blocker",
+      "reason_code": "verification_after_consumer",
+      "message": "task 'verify-dependencies' consumes the state produced by high-risk task 'configure-egress-firewall' without waiting for its verification point",
+      "suggested_fix": "Order task 'verify-dependencies' after 'configure-egress-firewall''s verification (or move it out of parallel group None)",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:id-02-zero-trust-rollout:4:4",
+    "plan_id": "plan-id-02-zero-trust-rollout-r4",
+    "version": 4,
+    "blocker_finding_id": "no_dep_cycles:plan-id-02-zero-trust-rollout-r4:4",
+    "question": "Plan for goal 'id-02-zero-trust-rollout' cannot be approved: blockers remain (dependency_cycle; unsafe_ordering; verification_after_consumer). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=9"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

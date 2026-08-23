@@ -1,0 +1,264 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mao-03-distributed-rollback",
+  "duration_seconds": 61.46,
+  "result": {
+    "status": "escalated",
+    "reason_code": "plan_oscillation_detected",
+    "revision_count": 4,
+    "llm_calls": 4
+  },
+  "plan": {
+    "id": "plan-mao-03-distributed-rollback-r4",
+    "goal_id": "mao-03-distributed-rollback",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-mao-03-distributed-rollback-r3",
+    "created_at": "2026-08-23T22:11:03.274824Z",
+    "tasks": [
+      {
+        "id": "deploy_traffic_agent",
+        "description": "Deploy the traffic agent",
+        "action": "deploy",
+        "target": "traffic-agent",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "traffic agent health status",
+          "how": "check status endpoint",
+          "expected": "inactive"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "teardown traffic agent",
+          "safety_guard": "verify traffic agent is inactive"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_api_agent",
+        "description": "Deploy the API agent",
+        "action": "deploy",
+        "target": "api-agent",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "API agent health status",
+          "how": "check status endpoint",
+          "expected": "inactive"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "teardown api agent",
+          "safety_guard": "verify api agent is inactive"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_schema_agent",
+        "description": "Deploy the schema agent",
+        "action": "deploy",
+        "target": "schema-agent",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "schema agent health status",
+          "how": "check status endpoint",
+          "expected": "inactive"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "teardown schema agent",
+          "safety_guard": "verify schema agent is inactive"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "teardown_schema_agent",
+        "description": "Tear down the schema agent",
+        "action": "teardown",
+        "target": "schema-agent",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "schema agent is deployed",
+            "fact": "schema_agent_deployed",
+            "established_by": "deploy_schema_agent",
+            "probe": null
+          },
+          {
+            "description": "schema agent is verified",
+            "fact": "schema_agent_verified",
+            "established_by": "deploy_schema_agent",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "schema agent health status",
+          "how": "check status endpoint",
+          "expected": "active"
+        },
+        "rollback": {
+          "trigger": "teardown fails",
+          "action": "redeploy schema agent",
+          "safety_guard": "verify schema agent is active"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "teardown_api_agent",
+        "description": "Tear down the API agent",
+        "action": "teardown",
+        "target": "api-agent",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "API agent is deployed",
+            "fact": "api_agent_deployed",
+            "established_by": "deploy_api_agent",
+            "probe": null
+          },
+          {
+            "description": "API agent is verified",
+            "fact": "api_agent_verified",
+            "established_by": "deploy_api_agent",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "API agent health status",
+          "how": "check status endpoint",
+          "expected": "active"
+        },
+        "rollback": {
+          "trigger": "teardown fails",
+          "action": "redeploy api agent",
+          "safety_guard": "verify api agent is active"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "teardown_traffic_agent",
+        "description": "Tear down the traffic agent",
+        "action": "teardown",
+        "target": "traffic-agent",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "traffic agent is deployed",
+            "fact": "traffic_agent_deployed",
+            "established_by": "deploy_traffic_agent",
+            "probe": null
+          },
+          {
+            "description": "traffic agent is verified",
+            "fact": "traffic_agent_verified",
+            "established_by": "deploy_traffic_agent",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic agent health status",
+          "how": "check status endpoint",
+          "expected": "active"
+        },
+        "rollback": {
+          "trigger": "teardown fails",
+          "action": "redeploy traffic agent",
+          "safety_guard": "verify traffic agent is active"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_traffic_agent",
+        "to_task": "deploy_api_agent",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_api_agent",
+        "to_task": "deploy_schema_agent",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "teardown_schema_agent",
+        "to_task": "teardown_api_agent",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "teardown_api_agent",
+        "to_task": "teardown_traffic_agent",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:teardown_schema_agent",
+      "task_id": "teardown_schema_agent",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Teardown of schema agent is sequenced before teardown of API agent, violating required teardown order C\u2192B\u2192A.",
+      "suggested_fix": "Reorder tasks to ensure teardown_api_agent occurs before teardown_schema_agent.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:teardown_api_agent",
+      "task_id": "teardown_api_agent",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Teardown of API agent is sequenced before teardown of traffic agent, violating required teardown order C\u2192B\u2192A.",
+      "suggested_fix": "Reorder tasks to ensure teardown_traffic_agent occurs after teardown_api_agent.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mao-03-distributed-rollback:4:4",
+    "plan_id": "plan-mao-03-distributed-rollback-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:teardown_schema_agent",
+    "question": "Plan for goal 'mao-03-distributed-rollback' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

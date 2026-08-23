@@ -1,0 +1,298 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mch-02-parallel-fanout",
+  "duration_seconds": 14.05,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "mch-02-parallel-fanout-v1",
+    "goal_id": "mch-02-parallel-fanout",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T22:11:52.110911Z",
+    "tasks": [
+      {
+        "id": "update-database",
+        "description": "Update the database schema",
+        "action": "migrate",
+        "target": "database",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "database is available",
+            "fact": "db_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "schema version",
+          "how": "run database migration checks",
+          "expected": "v2"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "rollback to previous schema",
+          "safety_guard": "ensure data integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update-cache",
+        "description": "Update the cache configuration",
+        "action": "deploy",
+        "target": "cache",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cache service is running",
+            "fact": "cache_running",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update-queue",
+        "description": "Update the message queue service",
+        "action": "deploy",
+        "target": "queue",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "queue service is operational",
+            "fact": "queue_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update-search-index",
+        "description": "Reindex the search service",
+        "action": "reindex",
+        "target": "search index",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "search service is reachable",
+            "fact": "search_service_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update-ml-model",
+        "description": "Deploy the new ML model",
+        "action": "deploy",
+        "target": "ML model",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "model training is complete",
+            "fact": "training_complete",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "model performance metrics",
+          "how": "run evaluation tests",
+          "expected": "improved accuracy"
+        },
+        "rollback": {
+          "trigger": "model deployment fails",
+          "action": "revert to previous model",
+          "safety_guard": "validate model performance"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update-cdn",
+        "description": "Refresh CDN content",
+        "action": "deploy",
+        "target": "CDN",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CDN is responsive",
+            "fact": "cdn_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "final-verification",
+        "description": "Perform final verification of all updates",
+        "action": "verify",
+        "target": "all subsystems",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "overall system integrity",
+          "how": "run integration tests",
+          "expected": "all services functional"
+        },
+        "rollback": {
+          "trigger": "final verification fails",
+          "action": "rollback all updates",
+          "safety_guard": "ensure no data loss"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "update-database",
+        "to_task": "final-verification",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-cache",
+        "to_task": "final-verification",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-queue",
+        "to_task": "final-verification",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-search-index",
+        "to_task": "final-verification",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-ml-model",
+        "to_task": "final-verification",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-cdn",
+        "to_task": "final-verification",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": [
+      {
+        "id": "update-subsystems",
+        "kind": "fan_out",
+        "tasks": [
+          "update-database",
+          "update-cache",
+          "update-queue",
+          "update-search-index",
+          "update-ml-model",
+          "update-cdn"
+        ],
+        "join": "all"
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:update-cache",
+      "task_id": "update-cache",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The update-cache task has no verification step, which risks proceeding without confirmation of successful deployment before final verification.",
+      "suggested_fix": "Add a verification step to the update-cache task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:update-queue",
+      "task_id": "update-queue",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The update-queue task has no verification step, which risks proceeding without confirmation of successful deployment before final verification.",
+      "suggested_fix": "Add a verification step to the update-queue task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:update-search-index",
+      "task_id": "update-search-index",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The update-search-index task has no verification step, which risks proceeding without confirmation of successful deployment before final verification.",
+      "suggested_fix": "Add a verification step to the update-search-index task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:update-cdn",
+      "task_id": "update-cdn",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The update-cdn task has no verification step, which risks proceeding without confirmation of successful deployment before final verification.",
+      "suggested_fix": "Add a verification step to the update-cdn task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

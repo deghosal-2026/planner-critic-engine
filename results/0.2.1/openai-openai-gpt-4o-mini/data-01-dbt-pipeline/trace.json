@@ -1,0 +1,182 @@
+{
+  "dimension": "core-api",
+  "goal_id": "data-01-dbt-pipeline",
+  "duration_seconds": 7.16,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "data-01-dbt-pipeline",
+    "goal_id": "data-01-dbt-pipeline",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T21:53:35.092432Z",
+    "tasks": [
+      {
+        "id": "extract",
+        "description": "Extract data from S3 to staging area",
+        "action": "extract",
+        "target": "staging",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "S3 is accessible",
+            "fact": "s3_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "transform",
+        "description": "Transform data in staging area",
+        "action": "transform",
+        "target": "transformed_data",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data consistency",
+          "how": "run checksums",
+          "expected": "checksums match original"
+        },
+        "rollback": {
+          "trigger": "transformation fails",
+          "action": "revert to original data",
+          "safety_guard": "validate transformed data"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "load",
+        "description": "Load transformed data to production",
+        "action": "load",
+        "target": "production_db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data integrity",
+          "how": "compare row counts",
+          "expected": "row counts match"
+        },
+        "rollback": {
+          "trigger": "loading fails",
+          "action": "purge production data",
+          "safety_guard": "confirm data purge"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify",
+        "description": "Verify data in production",
+        "action": "verify",
+        "target": "production_db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data correctness",
+          "how": "run validation queries",
+          "expected": "validation successful"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "isolate production data",
+          "safety_guard": "maintain rollback safety"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "extract",
+        "to_task": "transform",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "transform",
+        "to_task": "load",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "load",
+        "to_task": "verify",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unverified_dependencies:transform",
+      "task_id": "transform",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'transform' task does not have any preconditions established, which could lead to executing without valid data.",
+      "suggested_fix": "Add a precondition to verify that 'extract' has completed successfully and the data is available in the staging area.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:load",
+      "task_id": "load",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The 'load' task is executed before the 'transform' task verifies data integrity, creating a dependency violation.",
+      "suggested_fix": "Ensure the 'load' task can only execute after the successful verification of transformed data.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:load",
+      "task_id": "load",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback strategy for 'load' involves purging production data which can lead to data loss if not handled properly.",
+      "suggested_fix": "Implement a safer backup strategy or an incremental load approach instead of direct purging.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

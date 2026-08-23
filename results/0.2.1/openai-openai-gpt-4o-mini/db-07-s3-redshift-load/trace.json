@@ -1,0 +1,189 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-07-s3-redshift-load",
+  "duration_seconds": 9.61,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "db-07-s3-redshift-load-plan",
+    "goal_id": "db-07-s3-redshift-load",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T22:00:03.283314Z",
+    "tasks": [
+      {
+        "id": "fetch-manifest",
+        "description": "Fetch the manifest file from S3",
+        "action": "fetch",
+        "target": "S3 manifest",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "S3 bucket is accessible",
+            "fact": "s3_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "load-data",
+        "description": "Load data from S3 into Redshift",
+        "action": "copy",
+        "target": "redshift staging table",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Manifest file is fetched",
+            "fact": "manifest_fetched",
+            "established_by": "fetch-manifest",
+            "probe": null
+          },
+          {
+            "description": "Sufficient WLM slots are available",
+            "fact": "wlm_slots_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "row counts between source and staging",
+          "how": "compare manifest file with Redshift table",
+          "expected": "counts match"
+        },
+        "rollback": {
+          "trigger": "COPY command fails",
+          "action": "delete partial data from staging",
+          "safety_guard": "check for existing data in staging"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "swap-partitions",
+        "description": "Swap the staging table with the production table",
+        "action": "swap",
+        "target": "production table",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data is loaded into staging",
+            "fact": "data_loaded",
+            "established_by": "load-data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "row counts after swap",
+          "how": "count rows in production and staging",
+          "expected": "counts match"
+        },
+        "rollback": {
+          "trigger": "Swap fails or invalid data detected",
+          "action": "restore previous production table",
+          "safety_guard": "verify previous table integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "fetch-manifest",
+        "to_task": "load-data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "load-data",
+        "to_task": "swap-partitions",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:load-data",
+      "task_id": "load-data",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The task may encounter issues if the COPY command fails mid-load, potentially leaving partial data without adequate rollback handling.",
+      "suggested_fix": "Implement a more robust rollback mechanism for data restoration in case of COPY failure.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:swap-partitions",
+      "task_id": "swap-partitions",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task is ordered before its hard prerequisite is verified since the rollback for swap does not guarantee data integrity in case of failure.",
+      "suggested_fix": "Ensure the verification of the staging table integrity before performing the swap.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:load-data",
+      "task_id": "load-data",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The plan does not verify if sufficient WLM slots are actually available at the time of execution leading to potential queueing issues.",
+      "suggested_fix": "Add a verification step to ensure that WLM slots are available right before executing the load-data task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:load-data",
+      "task_id": "load-data",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action for the load-data task is insufficient as it may not cover all potential failure scenarios sufficiently.",
+      "suggested_fix": "Enhance the rollback process to handle potential integrity issues arising from partial data loads by incorporating additional safeguards.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

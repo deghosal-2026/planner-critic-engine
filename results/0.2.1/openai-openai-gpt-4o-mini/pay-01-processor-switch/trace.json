@@ -1,0 +1,360 @@
+{
+  "dimension": "core-api",
+  "goal_id": "pay-01-processor-switch",
+  "duration_seconds": 47.62,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-pay-01-processor-switch-r4",
+    "goal_id": "pay-01-processor-switch",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-pay-01-processor-switch-r3",
+    "created_at": "2026-08-23T21:59:01.769927Z",
+    "tasks": [
+      {
+        "id": "feature-flag-enable",
+        "description": "Enable feature flag for 5% routing to Adyen",
+        "action": "enable",
+        "target": "feature-flag",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "feature flag state",
+          "how": "check configuration",
+          "expected": "enabled"
+        },
+        "rollback": {
+          "trigger": "feature flag fails",
+          "action": "disable feature flag",
+          "safety_guard": "ensure flag is off"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "adyen-error-rate-check",
+        "description": "Check Adyen error rate",
+        "action": "check",
+        "target": "adyen-error-rate",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "adyen error rate",
+          "how": "check monitoring dashboard",
+          "expected": "within acceptable limits"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "transaction-routing",
+        "description": "Route 5% of transactions to Adyen",
+        "action": "route",
+        "target": "transactions",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "transaction logs",
+          "how": "compare logs",
+          "expected": "5% to Adyen"
+        },
+        "rollback": {
+          "trigger": "routing failure",
+          "action": "route back to Stripe",
+          "safety_guard": "check for doubled transactions"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "reconciliation-check",
+        "description": "Compare transaction records between Stripe and Adyen",
+        "action": "reconcile",
+        "target": "transactions",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "amounts, fees, settlement timing",
+          "how": "run reconciliation scripts",
+          "expected": "consistent records"
+        },
+        "rollback": {
+          "trigger": "reconciliation failure",
+          "action": "alert team",
+          "safety_guard": "monitor discrepancies"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "ramp-up-routing",
+        "description": "Increase routing to Adyen to 100%",
+        "action": "ramp",
+        "target": "feature-flag",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "error rates",
+          "how": "check monitoring tools",
+          "expected": "below threshold"
+        },
+        "rollback": {
+          "trigger": "high error rate",
+          "action": "switch all back to Stripe",
+          "safety_guard": "monitor error rates"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "settlement-cutover",
+        "description": "Switch primary settlement to Adyen",
+        "action": "settle",
+        "target": "transactions",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "settlement reports",
+          "how": "verify daily reports",
+          "expected": "correct amounts"
+        },
+        "rollback": {
+          "trigger": "settlement issues",
+          "action": "revert settlement to Stripe",
+          "safety_guard": "validate last settlements"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "fallback-plan",
+        "description": "Route back to Stripe if Adyen error threshold exceeded",
+        "action": "monitor",
+        "target": "transactions",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Adyen error rate checked",
+            "fact": "adyen_error_rate",
+            "established_by": "adyen-error-rate-check",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Adyen error rate",
+          "how": "check monitoring dashboard",
+          "expected": "within acceptable limits"
+        },
+        "rollback": {
+          "trigger": "fallback activated",
+          "action": "reset error tracking",
+          "safety_guard": "validate that routing reverted"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "no-stripe-transactions-check",
+        "description": "Verify no active Stripe transactions",
+        "action": "check",
+        "target": "stripe-transactions",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Stripe transaction status",
+          "how": "check transaction logs",
+          "expected": "no active transactions"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "retire-stripe",
+        "description": "Remove Stripe integration and close account",
+        "action": "retire",
+        "target": "Stripe integration",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "No active Stripe transactions",
+            "fact": "no_stripe_transactions",
+            "established_by": "no-stripe-transactions-check",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Stripe account status",
+          "how": "check account settings",
+          "expected": "closed"
+        },
+        "rollback": {
+          "trigger": "Stripe account need arises",
+          "action": "reopen Stripe account",
+          "safety_guard": "confirm account linked"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "feature-flag-enable",
+        "to_task": "transaction-routing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "adyen-error-rate-check",
+        "to_task": "fallback-plan",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "transaction-routing",
+        "to_task": "reconciliation-check",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "transaction-routing",
+        "to_task": "ramp-up-routing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "ramp-up-routing",
+        "to_task": "settlement-cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "settlement-cutover",
+        "to_task": "retire-stripe",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "no-stripe-transactions-check",
+        "to_task": "retire-stripe",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "adyen-error-rate-check",
+        "to_task": "fallback-plan",
+        "kind": "hard",
+        "reason": "Ensure Adyen error rate is acceptable before fallback."
+      },
+      {
+        "from_task": "no-stripe-transactions-check",
+        "to_task": "retire-stripe",
+        "kind": "hard",
+        "reason": "Confirm no active transactions before retiring Stripe."
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:feasibility:feature-flag-enable",
+      "task_id": "feature-flag-enable",
+      "version": 4,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "This task may fail if feature flag toggling is not supported in the production environment.",
+      "suggested_fix": "Confirm that the feature flagging tool is available and functional in the production environment.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:weak_rollback:settlement-cutover",
+      "task_id": "settlement-cutover",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan lacks a comprehensive strategy if issues arise during settlement cutover.",
+      "suggested_fix": "Develop a detailed rollback procedure for settlement cutover, including specific steps to revert to Stripe.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:fallback-plan",
+      "task_id": "fallback-plan",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The fallback plan depends on the adyen-error-rate-check, but there is no prior verification that the Adyen error rate is acceptable before executing this task.",
+      "suggested_fix": "Implement a prerequisite check to ensure the error rate is verified as acceptable before running the fallback plan.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:missing_steps:reconciliation-check",
+      "task_id": "reconciliation-check",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The reconciliation check does not cover edge cases involving discrepancy handling or late settling transactions that may affect the accuracy of the check.",
+      "suggested_fix": "Include steps to handle discrepancies during reconciliation and verify late settlements.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:missing_steps:retire-stripe",
+      "task_id": "retire-stripe",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The plan lacks explicit procedures for handling potential user impacts or transaction fallouts post-retirement of Stripe.",
+      "suggested_fix": "Add a step to assess user impact and provide customer support for transitions after Stripe retirement.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:pay-01-processor-switch:4:4",
+    "plan_id": "plan-pay-01-processor-switch-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:feasibility:feature-flag-enable",
+    "question": "Plan for goal 'pay-01-processor-switch' cannot be approved: blockers remain (llm_feasibility; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=9"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

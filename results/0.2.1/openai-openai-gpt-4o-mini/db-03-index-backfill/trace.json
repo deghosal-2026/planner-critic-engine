@@ -1,0 +1,208 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-03-index-backfill",
+  "duration_seconds": 24.65,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-db-03-index-backfill-r3",
+    "goal_id": "db-03-index-backfill",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-db-03-index-backfill-r2",
+    "created_at": "2026-08-23T21:58:32.444117Z",
+    "tasks": [
+      {
+        "id": "check_db_health",
+        "description": "Check database health and readiness for index creation",
+        "action": "check",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "db is reachable",
+            "fact": "db_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_autovacuum",
+        "description": "Monitor autovacuum activity to prevent deadlocks during index build",
+        "action": "monitor",
+        "target": "autovacuum",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "database is healthy",
+            "fact": "db_healthy",
+            "established_by": "check_db_health",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "autovacuum activity",
+          "how": "query pg_stat_activity",
+          "expected": "no active autovacuum processes"
+        },
+        "rollback": {
+          "trigger": "autovacuum pressure detected",
+          "action": "pause autovacuum",
+          "safety_guard": "ensure no long-running transactions"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create_index",
+        "description": "Create B-tree index on orders(customer_id, created_at) concurrently",
+        "action": "create_index",
+        "target": "orders",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "no autovacuum pressure",
+            "fact": "no_autovacuum_activity",
+            "established_by": "monitor_autovacuum",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "verify index creation",
+          "how": "check pg_stat_user_indexes",
+          "expected": "index exists"
+        },
+        "rollback": {
+          "trigger": "index creation fails or ongoing write detected",
+          "action": "DROP INDEX CONCURRENTLY IF EXISTS orders_customer_created_idx",
+          "safety_guard": "verify index existence or ensure no ongoing writes"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_index_usage",
+        "description": "Verify index usage post-creation",
+        "action": "verify",
+        "target": "orders",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "index successfully created",
+            "fact": "index_exists",
+            "established_by": "create_index",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "index usage",
+          "how": "query pg_stat_user_indexes",
+          "expected": "index is used"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_db_health",
+        "to_task": "monitor_autovacuum",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_autovacuum",
+        "to_task": "create_index",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_index",
+        "to_task": "verify_index_usage",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:create_index",
+      "task_id": "create_index",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The 'create_index' task is ordered before its hard prerequisite 'monitor_autovacuum' establishes the absence of autovacuum pressure, which is crucial for safe index creation.",
+      "suggested_fix": "Reorder the tasks to ensure 'monitor_autovacuum' is completed successfully before 'create_index'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:weak_rollback:create_index",
+      "task_id": "create_index",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for the 'create_index' task is insufficient since 'DROP INDEX CONCURRENTLY' does not ensure the system's safety without verifying ongoing writes, increasing the risk of data inconsistency.",
+      "suggested_fix": "Modify the rollback to include checks for any ongoing writes before executing 'DROP INDEX CONCURRENTLY'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:verify_index_usage",
+      "task_id": "verify_index_usage",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'verify_index_usage' task depends on the fact 'index_exists' being established by 'create_index', but there's no guarantee that 'create_index' completed successfully due to the prior blockers.",
+      "suggested_fix": "Ensure that 'create_index' successfully completes before proceeding with 'verify_index_usage', possibly by adding conditional checks.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-03-index-backfill:3:3",
+    "plan_id": "plan-db-03-index-backfill-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:create_index",
+    "question": "Plan for goal 'db-03-index-backfill' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

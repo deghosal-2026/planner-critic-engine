@@ -1,0 +1,296 @@
+{
+  "dimension": "core-api",
+  "goal_id": "net-01-vpc-peering-migration",
+  "duration_seconds": 54.31,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-net-01-vpc-peering-migration-r4",
+    "goal_id": "net-01-vpc-peering-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-net-01-vpc-peering-migration-r3",
+    "created_at": "2026-08-23T22:17:53.917172Z",
+    "tasks": [
+      {
+        "id": "deploy_tgw",
+        "description": "Deploy the AWS Transit Gateway",
+        "action": "deploy",
+        "target": "Transit Gateway",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Transit Gateway status",
+          "how": "describe Transit Gateway",
+          "expected": "available"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "destroy Transit Gateway",
+          "safety_guard": "ensure no VPC attachments are left"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "attach_vpcs",
+        "description": "Attach all VPCs to the Transit Gateway",
+        "action": "attach",
+        "target": "VPCs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "VPC attachment status",
+          "how": "describe Transit Gateway attachments",
+          "expected": "all VPCs attached"
+        },
+        "rollback": {
+          "trigger": "attachment fails",
+          "action": "remove Transit Gateway attachment",
+          "safety_guard": "verify VPC connectivity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_route_tables",
+        "description": "Configure route tables to route traffic through the Transit Gateway",
+        "action": "configure",
+        "target": "route tables",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "route table configurations",
+          "how": "check route tables",
+          "expected": "all routes point to TGW"
+        },
+        "rollback": {
+          "trigger": "misconfiguration detected",
+          "action": "restore previous route tables",
+          "safety_guard": "confirm restored connectivity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_tgw_routes",
+        "description": "Verify that Transit Gateway routes are active",
+        "action": "verify",
+        "target": "TGW routes",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "TGW route status",
+          "how": "describe TGW routes",
+          "expected": "all routes are active"
+        },
+        "rollback": {
+          "trigger": "routes are not active",
+          "action": "reconfigure routes",
+          "safety_guard": "validate route configurations"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_connectivity",
+        "description": "Verify connectivity between all VPC pairs",
+        "action": "verify",
+        "target": "VPC connectivity",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "connectivity status",
+          "how": "ping tests between VPC pairs",
+          "expected": "successful pings from all pairs"
+        },
+        "rollback": {
+          "trigger": "connectivity issues found",
+          "action": "revert to peering connections",
+          "safety_guard": "monitor traffic flow"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "remove_peering_connections",
+        "description": "Remove old VPC peering connections one-by-one",
+        "action": "remove",
+        "target": "VPC peering connections",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "TGW routes must be active",
+            "fact": "tgw_routes_active",
+            "established_by": "verify_tgw_routes",
+            "probe": null
+          },
+          {
+            "description": "Connectivity must be verified",
+            "fact": "connectivity_verified",
+            "established_by": "verify_connectivity",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "peering connection status",
+          "how": "describe VPC peering connections",
+          "expected": "peering removed only after TGW routing is confirmed"
+        },
+        "rollback": {
+          "trigger": "removal causes traffic blackout",
+          "action": "re-establish peering connections",
+          "safety_guard": "check traffic flow prior to removal"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "check_traffic_flow",
+        "description": "Verify no traffic blackholes exist",
+        "action": "check",
+        "target": "traffic flow",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "traffic validation",
+          "how": "monitor traffic logs",
+          "expected": "no drop in traffic"
+        },
+        "rollback": {
+          "trigger": "blackhole detected",
+          "action": "re-enable peering",
+          "safety_guard": "ensure all routes are valid"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_tgw",
+        "to_task": "attach_vpcs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "attach_vpcs",
+        "to_task": "configure_route_tables",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_route_tables",
+        "to_task": "verify_connectivity",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_tgw_routes",
+        "to_task": "remove_peering_connections",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_connectivity",
+        "to_task": "remove_peering_connections",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "remove_peering_connections",
+        "to_task": "check_traffic_flow",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:remove_peering_connections",
+      "task_id": "remove_peering_connections",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The removal of old VPC peering connections is scheduled before verifying no traffic blackholes exist, which could lead to a traffic blackout.",
+      "suggested_fix": "Ensure 'check_traffic_flow' is completed before 'remove_peering_connections'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:remove_peering_connections",
+      "task_id": "remove_peering_connections",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'remove_peering_connections' has hard dependencies on 'verify_tgw_routes' and 'verify_connectivity', but it lacks verification that these dependencies were successfully established.",
+      "suggested_fix": "Include verifications to ensure 'tgw_routes_active' and 'connectivity_verified' before proceeding with the removal of peering connections.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:weak_rollback:remove_peering_connections",
+      "task_id": "remove_peering_connections",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action for 'remove_peering_connections' only states to re-establish peering connections but does not include a safety guard to ensure that traffic flow is completely monitored prior to removal.",
+      "suggested_fix": "Add a detailed safety guard to monitor and validate traffic flow before executing the rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:missing_steps:check_traffic_flow",
+      "task_id": "check_traffic_flow",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The plan should include clear instructions for monitoring and mitigating any potential traffic blackholes during the transition from peering to TGW.",
+      "suggested_fix": "Consider including step-by-step monitoring actions to verify traffic flow during the transition.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:net-01-vpc-peering-migration:4:4",
+    "plan_id": "plan-net-01-vpc-peering-migration-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:remove_peering_connections",
+    "question": "Plan for goal 'net-01-vpc-peering-migration' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,127 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mao-02-state-sync-precondition",
+  "duration_seconds": 11.32,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-mao-02-state-sync-precondition-r2",
+    "goal_id": "mao-02-state-sync-precondition",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "mao-02-state-sync-precondition",
+    "created_at": "2026-08-23T22:10:02.684593Z",
+    "tasks": [
+      {
+        "id": "verify_migration",
+        "description": "Verify schema migration",
+        "action": "check_schema_migration",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "migration status",
+          "how": "check migration logs",
+          "expected": "migration successful"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "revert migration",
+          "safety_guard": "ensure backup integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "state_sync_precondition",
+        "description": "Check schema migration status before proceeding with API work",
+        "action": "check_status",
+        "target": "schema_migration_verified",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "schema migration verified",
+          "how": "query verification service",
+          "expected": "true"
+        },
+        "rollback": {
+          "trigger": "check fails",
+          "action": "abort API contract work",
+          "safety_guard": "log error"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "verify_migration",
+        "to_task": "state_sync_precondition",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:state_sync_precondition",
+      "task_id": "state_sync_precondition",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The state_sync_precondition task is ordered before the verify_migration task, which is a hard prerequisite for it.",
+      "suggested_fix": "Reorder the tasks so that 'verify_migration' is completed before 'state_sync_precondition'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:state_sync_precondition",
+      "task_id": "state_sync_precondition",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The state_sync_precondition task depends on schema migration verification but does not have an established verification step prior to its execution.",
+      "suggested_fix": "Ensure that the state_sync_precondition task waits for the successful completion of the verify_migration task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mao-02-state-sync-precondition:2:2",
+    "plan_id": "plan-mao-02-state-sync-precondition-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:state_sync_precondition",
+    "question": "Plan for goal 'mao-02-state-sync-precondition' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=2"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

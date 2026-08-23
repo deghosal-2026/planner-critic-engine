@@ -1,0 +1,213 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-07-dns-migration",
+  "duration_seconds": 22.09,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-inf-07-dns-migration-r3",
+    "goal_id": "inf-07-dns-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-inf-07-dns-migration-r2",
+    "created_at": "2026-08-23T21:56:23.966514Z",
+    "tasks": [
+      {
+        "id": "lower-ttl",
+        "description": "Lower the TTL for DNS records",
+        "action": "modify",
+        "target": "dns_records",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "TTL value",
+          "how": "retrieve current TTL using dig",
+          "expected": "lowered TTL value"
+        },
+        "rollback": {
+          "trigger": "TTL change fails",
+          "action": "restore previous TTL",
+          "safety_guard": "verify previous TTL value"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update-records",
+        "description": "Update DNS records to new server region",
+        "action": "update",
+        "target": "dns_records",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "TTL change verified",
+            "fact": "ttl_verified",
+            "established_by": "lower-ttl",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "DNS records",
+          "how": "compare with previous configuration",
+          "expected": "records point to eu-west-1"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "restore old DNS records",
+          "safety_guard": "verify old records exist"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor-traffic",
+        "description": "Monitor traffic shift to new DNS records",
+        "action": "monitor",
+        "target": "traffic_flow",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DNS records updated",
+            "fact": "records_updated",
+            "established_by": "update-records",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic flow",
+          "how": "analyze traffic metrics",
+          "expected": "traffic flow shifting towards new records"
+        },
+        "rollback": {
+          "trigger": "monitoring indicates issues",
+          "action": "revert to previous monitoring state",
+          "safety_guard": "ensure previous monitoring setup intact"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-failover",
+        "description": "Verify the failover functionality after migration",
+        "action": "test",
+        "target": "failover_mechanism",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Traffic monitoring completed successfully",
+            "fact": "monitoring_verified",
+            "established_by": "monitor-traffic",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "failover response",
+          "how": "simulate failure and observe",
+          "expected": "successful failover"
+        },
+        "rollback": {
+          "trigger": "failover test fails",
+          "action": "revert to previous configuration",
+          "safety_guard": "validate failover settings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "lower-ttl",
+        "to_task": "update-records",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-records",
+        "to_task": "monitor-traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor-traffic",
+        "to_task": "verify-failover",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:update-records",
+      "task_id": "update-records",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'update-records' is ordered before the hard prerequisite of verifying the TTL change, making it unsafe to execute without confirmation of the prerequisite.",
+      "suggested_fix": "Ensure the 'lower-ttl' task successfully verifies the new TTL before proceeding with the 'update-records' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:monitor-traffic",
+      "task_id": "monitor-traffic",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'monitor-traffic' depends on 'records_updated', which is not verified by the preceding tasks, leaving a gap in the execution chain.",
+      "suggested_fix": "Make sure that the 'update-records' task correctly verifies that the records have been updated before proceeding to the 'monitor-traffic' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:verify-failover",
+      "task_id": "verify-failover",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'verify-failover' relies on the 'monitoring_verified' fact, which needs to be validated by the successful completion of the 'monitor-traffic' task without earlier verification.",
+      "suggested_fix": "Include verification steps in 'monitor-traffic' to validate the monitoring outcome before proceeding to 'verify-failover'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:inf-07-dns-migration:3:3",
+    "plan_id": "plan-inf-07-dns-migration-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:update-records",
+    "question": "Plan for goal 'inf-07-dns-migration' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

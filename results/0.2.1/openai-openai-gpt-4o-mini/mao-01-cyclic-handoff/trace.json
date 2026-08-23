@@ -1,0 +1,173 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mao-01-cyclic-handoff",
+  "duration_seconds": 20.61,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-mao-01-cyclic-handoff-r3",
+    "goal_id": "mao-01-cyclic-handoff",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-mao-01-cyclic-handoff-r2",
+    "created_at": "2026-08-23T22:09:50.228908Z",
+    "tasks": [
+      {
+        "id": "migrate_schema",
+        "description": "Migrate the database schema",
+        "action": "migrate",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "schema version",
+          "how": "run checks",
+          "expected": "v2"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore from backup",
+          "safety_guard": "verify backup integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update_api",
+        "description": "Update API contracts",
+        "action": "update",
+        "target": "api",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "API contract version",
+          "how": "send test requests",
+          "expected": "v2"
+        },
+        "rollback": {
+          "trigger": "API update fails",
+          "action": "revert API contracts",
+          "safety_guard": "verify API functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "route_traffic",
+        "description": "Route traffic to new API",
+        "action": "route",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "API is updated",
+            "fact": "api_updated",
+            "established_by": "update_api",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic routing success",
+          "how": "check API response",
+          "expected": "new API responds correctly"
+        },
+        "rollback": {
+          "trigger": "traffic routing fails",
+          "action": "restore old traffic routing",
+          "safety_guard": "verify old API functionality"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "migrate_schema",
+        "to_task": "update_api",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_api",
+        "to_task": "route_traffic",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:route_traffic",
+      "task_id": "route_traffic",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The traffic routing step depends on the API update step, which is correctly ordered, but the schema migration does not have an established dependency. Ensure that schema migration is complete before updating API contracts and routing traffic to avoid implementing changes on outdated schema.",
+      "suggested_fix": "Establish a hard dependency from 'migrate_schema' to 'route_traffic'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:route_traffic",
+      "task_id": "route_traffic",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The traffic routing step depends on a fact (api_updated) that is derived from the update_api task but is not confirmed to be established correctly. This can lead to routing traffic before the API is properly updated.",
+      "suggested_fix": "Add verification of the api_updated fact to ensure it is established as intended before executing the traffic routing step.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:weak_rollback:update_api",
+      "task_id": "update_api",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for API update only reverts contracts without ensuring the system's overall state is functional post-reversion, which could lead to an inactive system if the update fails.",
+      "suggested_fix": "Include additional checks in the rollback procedure to ensure the system returns to a fully operational state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mao-01-cyclic-handoff:3:3",
+    "plan_id": "plan-mao-01-cyclic-handoff-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:route_traffic",
+    "question": "Plan for goal 'mao-01-cyclic-handoff' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

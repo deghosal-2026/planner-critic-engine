@@ -1,0 +1,130 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-05-rate-limiting",
+  "duration_seconds": 5.43,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "inf-05-rate-limiting-plan",
+    "goal_id": "inf-05-rate-limiting",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T21:55:44.395383Z",
+    "tasks": [
+      {
+        "id": "define-limits",
+        "description": "Define rate limiting parameters",
+        "action": "define",
+        "target": "API gateway",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "API gateway is configured",
+            "fact": "gateway_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy-rate-limiting",
+        "description": "Deploy rate limiting configuration",
+        "action": "deploy",
+        "target": "API gateway",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "rate limiting is active",
+          "how": "send burst requests and check response",
+          "expected": "rate limit exceeded errors"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "remove rate limiting configuration",
+          "safety_guard": "check for rollback success at the gateway"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define-limits",
+        "to_task": "deploy-rate-limiting",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:deploy-rate-limiting",
+      "task_id": "deploy-rate-limiting",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'deploy-rate-limiting' is ordered before its hard prerequisite 'define-limits'.",
+      "suggested_fix": "Move 'deploy-rate-limiting' after 'define-limits' to ensure all preconditions are met.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:deploy-rate-limiting",
+      "task_id": "deploy-rate-limiting",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'deploy-rate-limiting' lacks a sound rollback process for successful deployments.",
+      "suggested_fix": "Implement a rollback procedure that can revert to the previous stable state in case of failure.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:deploy-rate-limiting",
+      "task_id": "deploy-rate-limiting",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'deploy-rate-limiting' depends on the outcome of 'define-limits' but has no verification criteria for 'define-limits'.",
+      "suggested_fix": "Add verification to ensure 'define-limits' successfully sets the required rate limiting parameters before deployment.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=2"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

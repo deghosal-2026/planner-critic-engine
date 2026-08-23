@@ -1,0 +1,263 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-07-tf-provider-freeze",
+  "duration_seconds": 34.45,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-plat-07-tf-provider-freeze-r3",
+    "goal_id": "plat-07-tf-provider-freeze",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-plat-07-tf-provider-freeze-r2",
+    "created_at": "2026-08-23T22:02:43.518370Z",
+    "tasks": [
+      {
+        "id": "inventory",
+        "description": "Inventory all provider versions in use across stacks",
+        "action": "list",
+        "target": "providers",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Terraform configurations are accessible",
+            "fact": "config_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "backup_lockfiles",
+        "description": "Backup existing lock files before pinning versions",
+        "action": "backup",
+        "target": "lockfiles",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "backup file existence",
+          "how": "verify backup integrity",
+          "expected": "backup exists and is intact"
+        },
+        "rollback": {
+          "trigger": "backup fails",
+          "action": "notify user",
+          "safety_guard": "check backup system health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "pin_providers",
+        "description": "Pin provider versions in lock files",
+        "action": "pin",
+        "target": "lockfiles",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Backup of lock files exists and is verified",
+            "fact": "backup_verified",
+            "established_by": "backup_lockfiles",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "lock file content",
+          "how": "compare to expected versions",
+          "expected": "versions are pinned correctly"
+        },
+        "rollback": {
+          "trigger": "failed to pin versions",
+          "action": "revert lock files to previous state",
+          "safety_guard": "verify file integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "validate_plans",
+        "description": "Validate that pinned versions produce identical plans",
+        "action": "validate",
+        "target": "plans",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "terraform plan outputs",
+          "how": "compare plan outputs and log differences",
+          "expected": "no differences in plan outputs, log created"
+        },
+        "rollback": {
+          "trigger": "plan diff found",
+          "action": "revert to previous provider config",
+          "safety_guard": "confirm diff resolution"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "test_apply_staging",
+        "description": "Apply changes in the staging environment",
+        "action": "apply",
+        "target": "staging",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "staging state",
+          "how": "check application functionality",
+          "expected": "application runs as expected, verify staging state"
+        },
+        "rollback": {
+          "trigger": "apply fails or breaks staging",
+          "action": "revert staging environment",
+          "safety_guard": "ensure stability of last known state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rollout_production",
+        "description": "Roll out version-pinned providers to production",
+        "action": "deploy",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "production state",
+          "how": "monitor application behavior and verify functionality",
+          "expected": "application functions without issues after rollback"
+        },
+        "rollback": {
+          "trigger": "production issue",
+          "action": "restore previous provider versions",
+          "safety_guard": "validate production stability and backup integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "inventory",
+        "to_task": "backup_lockfiles",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "backup_lockfiles",
+        "to_task": "pin_providers",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "pin_providers",
+        "to_task": "validate_plans",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "validate_plans",
+        "to_task": "test_apply_staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test_apply_staging",
+        "to_task": "rollout_production",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:pin_providers",
+      "task_id": "pin_providers",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'pin_providers' is sequenced before the verification of the backup lock files, which is a prerequisite.",
+      "suggested_fix": "Reorder the plan to ensure 'backup_lockfiles' completes before 'pin_providers'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:validate_plans",
+      "task_id": "validate_plans",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'validate_plans' lacks a verification for prerequisites, which depends on successfully pinned provider versions.",
+      "suggested_fix": "Add a precondition to 'validate_plans' to ensure 'pin_providers' has completed successfully.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:test_apply_staging",
+      "task_id": "test_apply_staging",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'test_apply_staging' is unverified that conditions from previous tasks have succeeded, particularly 'validate_plans'.",
+      "suggested_fix": "Add a precondition to 'test_apply_staging' to confirm 'validate_plans' has completed successfully.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:rollout_production",
+      "task_id": "rollout_production",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'rollout_production' does not verify that 'test_apply_staging' has completed successfully, which is critical for safe deployment.",
+      "suggested_fix": "Add a precondition to 'rollout_production' to ensure 'test_apply_staging' has been validated.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:plat-07-tf-provider-freeze:3:3",
+    "plan_id": "plan-plat-07-tf-provider-freeze-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:pin_providers",
+    "question": "Plan for goal 'plat-07-tf-provider-freeze' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

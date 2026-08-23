@@ -1,0 +1,272 @@
+{
+  "dimension": "core-api",
+  "goal_id": "msg-01-kafka-pulsar-migration",
+  "duration_seconds": 41.86,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-msg-01-kafka-pulsar-migration-r3",
+    "goal_id": "msg-01-kafka-pulsar-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-msg-01-kafka-pulsar-migration-r2",
+    "created_at": "2026-08-23T22:13:25.176455Z",
+    "tasks": [
+      {
+        "id": "deploy_pulsar",
+        "description": "Deploy Pulsar cluster",
+        "action": "deploy",
+        "target": "Pulsar cluster",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Pulsar cluster status",
+          "how": "check cluster health metrics",
+          "expected": "healthy"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "restore previous state",
+          "safety_guard": "verify previous cluster health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_koala",
+        "description": "Configure Kafka compatibility endpoint (KOALA)",
+        "action": "configure",
+        "target": "KOALA",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Pulsar cluster is deployed",
+            "fact": "pulsar_deployed",
+            "established_by": "deploy_pulsar",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "KOALA configuration status",
+          "how": "check configuration logs",
+          "expected": "configured correctly"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "reset to default configuration",
+          "safety_guard": "verify previous configuration"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_dual_publish",
+        "description": "Set up dual-publish to both Kafka and Pulsar",
+        "action": "configure",
+        "target": "dual-publish",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kafka is reachable",
+            "fact": "kafka_healthy",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "KOALA is configured",
+            "fact": "koala_configured",
+            "established_by": "configure_koala",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "dual-publish functionality",
+          "how": "send test messages to both systems",
+          "expected": "messages received in both Kafka and Pulsar"
+        },
+        "rollback": {
+          "trigger": "setup fails",
+          "action": "disable dual-publish",
+          "safety_guard": "ensure no messages published during rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "replay_messages",
+        "description": "Replay historical messages from Kafka to Pulsar",
+        "action": "replay",
+        "target": "Pulsar",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dual-publish is set up and verified",
+            "fact": "dual_publish_verified",
+            "established_by": "setup_dual_publish",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "message integrity and ordering",
+          "how": "compare message hashes and timestamps",
+          "expected": "messages are consistent and ordered"
+        },
+        "rollback": {
+          "trigger": "replay causes issues",
+          "action": "roll back to last known good state",
+          "safety_guard": "verify message integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover_consumers",
+        "description": "Cutover consumers from Kafka to Pulsar in batches",
+        "action": "cutover",
+        "target": "consumers",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Messages have been replayed",
+            "fact": "messages_replayed",
+            "established_by": "replay_messages",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "consumer message receipt",
+          "how": "check consumer logs for message processing",
+          "expected": "no missed messages"
+        },
+        "rollback": {
+          "trigger": "cutover gap detected",
+          "action": "revert consumer connections to Kafka",
+          "safety_guard": "monitor for message reception immediately post-cutover"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "decommission_kafka",
+        "description": "Decommission Kafka",
+        "action": "decommission",
+        "target": "Kafka",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Consumers fully transitioned to Pulsar",
+            "fact": "consumers_cut_over",
+            "established_by": "cutover_consumers",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Kafka decommission status",
+          "how": "check decommission logs",
+          "expected": "decommissioned successfully"
+        },
+        "rollback": {
+          "trigger": "decommission fails",
+          "action": "revert to previous Kafka setup",
+          "safety_guard": "verify Kafka operational state"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_pulsar",
+        "to_task": "configure_koala",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_koala",
+        "to_task": "setup_dual_publish",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_dual_publish",
+        "to_task": "replay_messages",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "replay_messages",
+        "to_task": "cutover_consumers",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover_consumers",
+        "to_task": "decommission_kafka",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:cutover_consumers",
+      "task_id": "cutover_consumers",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Cutover consumers from Kafka to Pulsar should occur after verifying message integrity and ordering post-replay.",
+      "suggested_fix": "Ensure 'replay_messages' is fully verified before executing 'cutover_consumers'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:decommission_kafka",
+      "task_id": "decommission_kafka",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Decommissioning Kafka depends on consumers being fully transitioned, but there's no verification step to confirm that the cutover was successful without any missed messages.",
+      "suggested_fix": "Add a verification step after 'cutover_consumers' to ensure no missed messages before proceeding to 'decommission_kafka'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:msg-01-kafka-pulsar-migration:3:3",
+    "plan_id": "plan-msg-01-kafka-pulsar-migration-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:cutover_consumers",
+    "question": "Plan for goal 'msg-01-kafka-pulsar-migration' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

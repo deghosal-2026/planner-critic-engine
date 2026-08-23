@@ -1,0 +1,222 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-11-supply-chain-sbom",
+  "duration_seconds": 12.16,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-ci-11-supply-chain-sbom",
+    "goal_id": "ci-11-supply-chain-sbom",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T21:52:02.471489Z",
+    "tasks": [
+      {
+        "id": "integrate_syft",
+        "description": "Integrate Syft for SBOM generation in all CI pipelines",
+        "action": "integrate",
+        "target": "CI pipelines",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "SBOM generation functionality",
+          "how": "run CI pipelines with test code",
+          "expected": "valid SBOM output"
+        },
+        "rollback": {
+          "trigger": "integration fails",
+          "action": "remove Syft integration",
+          "safety_guard": "check pipeline functionality without Syft"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "sign_images",
+        "description": "Sign container images with Cosign",
+        "action": "sign",
+        "target": "container images",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "image signatures",
+          "how": "verify using Cosign",
+          "expected": "all images signed correctly"
+        },
+        "rollback": {
+          "trigger": "signing fails",
+          "action": "revert to unbranded images",
+          "safety_guard": "verify images lack signatures"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "generate_provenance",
+        "description": "Generate SLSA Level 3 provenance attestation",
+        "action": "generate",
+        "target": "provenance attestation",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "SLSA 3 compliance",
+          "how": "audit produced attestations",
+          "expected": "attestations meet SLSA Level 3 requirements"
+        },
+        "rollback": {
+          "trigger": "generation fails",
+          "action": "restore previous attestation process",
+          "safety_guard": "confirm old process operates without issues"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_policy_enforcement",
+        "description": "Configure policy enforcement to reject unsigned images in production",
+        "action": "configure",
+        "target": "policy",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "policy effectiveness",
+          "how": "attempt to deploy unsigned images",
+          "expected": "applications blocked as expected"
+        },
+        "rollback": {
+          "trigger": "policy blocks legitimate deployments",
+          "action": "disable enforcement temporarily",
+          "safety_guard": "monitor deployments during policy re-evaluation"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_images",
+        "description": "Verify that all deployed images have valid signatures and SBOM",
+        "action": "verify",
+        "target": "deployed images",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "image validity",
+          "how": "check image signatures and SBOMs",
+          "expected": "all images verified successfully"
+        },
+        "rollback": {
+          "trigger": "invalid signatures or SBOM",
+          "action": "remove problematic images",
+          "safety_guard": "ensure backup images are ready for deployment"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "integrate_syft",
+        "to_task": "sign_images",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "sign_images",
+        "to_task": "generate_provenance",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "generate_provenance",
+        "to_task": "configure_policy_enforcement",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_policy_enforcement",
+        "to_task": "verify_images",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:sign_images",
+      "task_id": "sign_images",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'sign_images' is ordered before its hard prerequisite 'integrate_syft'.",
+      "suggested_fix": "Reorder tasks to ensure 'integrate_syft' precedes 'sign_images'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:generate_provenance",
+      "task_id": "generate_provenance",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'generate_provenance' depends on 'sign_images' which has unverified reliance on 'integrate_syft'.",
+      "suggested_fix": "Ensure 'integrate_syft' is completed and verified before executing 'sign_images' and subsequently 'generate_provenance'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:configure_policy_enforcement",
+      "task_id": "configure_policy_enforcement",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'configure_policy_enforcement' is ordered before its hard prerequisite 'generate_provenance'.",
+      "suggested_fix": "Reorder tasks so that 'generate_provenance' is completed before 'configure_policy_enforcement'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:verify_images",
+      "task_id": "verify_images",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'verify_images' depends on 'configure_policy_enforcement' which has unverified reliance on 'generate_provenance'.",
+      "suggested_fix": "Confirm that 'generate_provenance' is complete and verified before executing 'configure_policy_enforcement' and then 'verify_images'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,229 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-01-schema-migration",
+  "duration_seconds": 47.68,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-db-01-schema-migration-r4",
+    "goal_id": "db-01-schema-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-db-01-schema-migration-r3",
+    "created_at": "2026-08-23T21:57:58.846417Z",
+    "tasks": [
+      {
+        "id": "check_disk_space",
+        "description": "Check available disk space for WAL",
+        "action": "check",
+        "target": "disk",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "System is online",
+            "fact": "system_up",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "disk space availability",
+          "how": "evaluate free space",
+          "expected": "greater than required for backfill"
+        },
+        "rollback": {
+          "trigger": "insufficient disk space",
+          "action": "notify admin",
+          "safety_guard": "ensure alert system is operational"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "backfill_nulls",
+        "description": "Backfill existing NULLs in `last_login_ip` column",
+        "action": "execute",
+        "target": "users table",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "disk space is sufficient",
+            "fact": "disk_space_checked",
+            "established_by": "check_disk_space",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "successful backfill",
+          "how": "check for NULL values",
+          "expected": "0 NULL values in `last_login_ip`"
+        },
+        "rollback": {
+          "trigger": "backfill fails",
+          "action": "revert changes",
+          "safety_guard": "ensure database can be restored"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_app_code",
+        "description": "Deploy updated application code referencing `last_login_ip`",
+        "action": "deploy",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Backfill completed successfully",
+            "fact": "backfill_successful",
+            "established_by": "backfill_nulls",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment success",
+          "how": "check application logs",
+          "expected": "no errors related to last_login_ip"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "alter_table",
+        "description": "Alter `users` table to add NOT NULL constraint",
+        "action": "alter",
+        "target": "users table",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Application code deployed successfully",
+            "fact": "deployment_successful",
+            "established_by": "deploy_app_code",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "table constraint",
+          "how": "query the schema",
+          "expected": "NOT NULL constraint exists on `last_login_ip`"
+        },
+        "rollback": {
+          "trigger": "alter fails",
+          "action": "remove NOT NULL constraint",
+          "safety_guard": "check table status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_disk_space",
+        "to_task": "backfill_nulls",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "backfill_nulls",
+        "to_task": "deploy_app_code",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_app_code",
+        "to_task": "alter_table",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:feasibility:backfill_nulls",
+      "task_id": "backfill_nulls",
+      "version": 4,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The backfill operation might not be feasible due to the risk of insufficient disk space during operation, which could lead to failure.",
+      "suggested_fix": "Ensure disk space is verified and sufficient for backfill before proceeding to avoid operational failure.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:weak_rollback:backfill_nulls",
+      "task_id": "backfill_nulls",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The backfill step lacks a sound rollback mechanism; reverting backfill changes could be problematic without a clear restore plan.",
+      "suggested_fix": "Implement a robust rollback strategy that ensures the database can revert to a previous state if backfill fails.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:alter_table",
+      "task_id": "alter_table",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The alter table task is dependent on the deployment of application code; if the deployment fails, it could lead to an unsafe state due to the added NOT NULL constraint without application readiness.",
+      "suggested_fix": "Consider moving the alter_table step before deploying application code or establishing additional checks to ensure application readiness before proceeding with the constraint alteration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:deploy_app_code",
+      "task_id": "deploy_app_code",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Deployment task is based on a dependency that has not been verified sufficiently, potentially leading to runtime errors after deployment.",
+      "suggested_fix": "Ensure that the backfill process is validated fully and confirmed successful before deploying application code that references the new column.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-01-schema-migration:4:4",
+    "plan_id": "plan-db-01-schema-migration-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:feasibility:backfill_nulls",
+    "question": "Plan for goal 'db-01-schema-migration' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

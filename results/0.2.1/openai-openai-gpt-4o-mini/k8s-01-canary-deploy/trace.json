@@ -1,0 +1,314 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-01-canary-deploy",
+  "duration_seconds": 47.13,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-k8s-01-canary-deploy-r3",
+    "goal_id": "k8s-01-canary-deploy",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-k8s-01-canary-deploy-r2",
+    "created_at": "2026-08-23T22:01:00.306269Z",
+    "tasks": [
+      {
+        "id": "set-up-env",
+        "description": "Set up the Kubernetes environment for deployment",
+        "action": "kubectl apply",
+        "target": "k8s",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "k8s cluster is running",
+            "fact": "k8s_cluster_running",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy-canary",
+        "description": "Deploy the new canary version of the web service",
+        "action": "kubectl apply",
+        "target": "web-service-canary",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "check if canary is running",
+          "how": "kubectl get pods",
+          "expected": "canary pod is running"
+        },
+        "rollback": {
+          "trigger": "canary deployment fails",
+          "action": "rollback to stable version",
+          "safety_guard": "verify stable version is healthy"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor-errors-5",
+        "description": "Monitor error rates at 5% traffic for canary",
+        "action": "monitor",
+        "target": "service",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "5xx error rate",
+          "how": "check logs",
+          "expected": "less than 1%"
+        },
+        "rollback": {
+          "trigger": "error rate exceeds 1%",
+          "action": "stop canary traffic",
+          "safety_guard": "ensure traffic returned to stable version"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "increase-traffic-20",
+        "description": "Increase traffic to canary version to 20%",
+        "action": "update traffic",
+        "target": "virtual-service",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "verify traffic split",
+          "how": "istioctl proxy-config",
+          "expected": "20% traffic to canary"
+        },
+        "rollback": {
+          "trigger": "health checks fail",
+          "action": "reduce traffic back to 5%",
+          "safety_guard": "verify health checks pass"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor-errors-20",
+        "description": "Monitor error rates at 20% traffic for canary",
+        "action": "monitor",
+        "target": "service",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "5xx error rate",
+          "how": "check logs",
+          "expected": "less than 1%"
+        },
+        "rollback": {
+          "trigger": "error rate exceeds 1%",
+          "action": "stop canary traffic",
+          "safety_guard": "ensure traffic returned to stable version"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "increase-traffic-50",
+        "description": "Increase traffic to canary version to 50%",
+        "action": "update traffic",
+        "target": "virtual-service",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "verify traffic split",
+          "how": "istioctl proxy-config",
+          "expected": "50% traffic to canary"
+        },
+        "rollback": {
+          "trigger": "health checks fail",
+          "action": "reduce traffic back to 20%",
+          "safety_guard": "verify health checks pass"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor-errors-50",
+        "description": "Monitor error rates at 50% traffic for canary",
+        "action": "monitor",
+        "target": "service",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "5xx error rate",
+          "how": "check logs",
+          "expected": "less than 1%"
+        },
+        "rollback": {
+          "trigger": "error rate exceeds 1%",
+          "action": "stop canary traffic",
+          "safety_guard": "ensure traffic returned to stable version"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "promote-canary",
+        "description": "Promote canary to stable after successful monitoring",
+        "action": "update traffic",
+        "target": "virtual-service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "all health checks passed at 50%",
+            "fact": "health_checks_passed_50",
+            "established_by": "monitor-errors-50",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "verify canary promotion",
+          "how": "check virtual service traffic configuration",
+          "expected": "canary is active"
+        },
+        "rollback": {
+          "trigger": "promotion fails",
+          "action": "revert to previous version",
+          "safety_guard": "ensure previous version is healthy"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "final-check",
+        "description": "Final health check on the stable version",
+        "action": "health-check",
+        "target": "service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary has been promoted",
+            "fact": "canary_promoted",
+            "established_by": "promote-canary",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "set-up-env",
+        "to_task": "deploy-canary",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-canary",
+        "to_task": "monitor-errors-5",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor-errors-5",
+        "to_task": "increase-traffic-20",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "increase-traffic-20",
+        "to_task": "monitor-errors-20",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor-errors-20",
+        "to_task": "increase-traffic-50",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "increase-traffic-50",
+        "to_task": "monitor-errors-50",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor-errors-50",
+        "to_task": "promote-canary",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote-canary",
+        "to_task": "final-check",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unverified_dependencies:promote-canary",
+      "task_id": "promote-canary",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The promotion of the canary to stable depends on 'health_checks_passed_50', which must be verified by prior monitoring but lacks a verification check.",
+      "suggested_fix": "Ensure that 'health_checks_passed_50' is verified by adding a verification step after 'monitor-errors-50' that confirms health checks passed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:final-check",
+      "task_id": "final-check",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The final health check on the stable version depends on 'canary_promoted', which must be verified by prior task but lacks a verification check.",
+      "suggested_fix": "Add a verification step after 'promote-canary' to confirm that the promotion was successful before executing the final health check.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-01-canary-deploy:3:3",
+    "plan_id": "plan-k8s-01-canary-deploy-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unverified_dependencies:promote-canary",
+    "question": "Plan for goal 'k8s-01-canary-deploy' cannot be approved: blockers remain (llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=9"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

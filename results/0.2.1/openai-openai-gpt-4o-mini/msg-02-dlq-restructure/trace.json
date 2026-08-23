@@ -1,0 +1,287 @@
+{
+  "dimension": "core-api",
+  "goal_id": "msg-02-dlq-restructure",
+  "duration_seconds": 27.21,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-msg-02-dlq-restructure-r2",
+    "goal_id": "msg-02-dlq-restructure",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "msg-02-dlq-restructure-plan",
+    "created_at": "2026-08-23T22:13:51.457116Z",
+    "tasks": [
+      {
+        "id": "define-dlq-policy",
+        "description": "Define the DLQ policy including max retries and backoff strategy",
+        "action": "define",
+        "target": "DLQ policy",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "all team members agree on DLQ policy",
+            "fact": "dlq_policy_agreed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-retry-topics",
+        "description": "Configure the retry topics with appropriate delay settings",
+        "action": "configure",
+        "target": "retry topics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DLQ policy is defined",
+            "fact": "dlq_policy_defined",
+            "established_by": "define-dlq-policy",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "topic configuration",
+          "how": "describe settings in logs",
+          "expected": "settings match the documented configuration"
+        },
+        "rollback": {
+          "trigger": "configuration causes issues",
+          "action": "reset to previous topic configuration",
+          "safety_guard": "verify topic settings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "route-failed-messages",
+        "description": "Route failed messages to DLQ according to the defined policy",
+        "action": "route",
+        "target": "failed messages",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "retry topics are configured",
+            "fact": "retry_topics_configured",
+            "established_by": "configure-retry-topics",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "message routing",
+          "how": "check DLQ for processed messages",
+          "expected": "all failed messages appear in DLQ"
+        },
+        "rollback": {
+          "trigger": "routing failures",
+          "action": "revert to old routing rules",
+          "safety_guard": "monitor for message loss"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "backfill-messages",
+        "description": "Backfill messages from the old DLQ to the new retry topology",
+        "action": "backfill",
+        "target": "new retry topology",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DLQ is routed correctly",
+            "fact": "failed_messages_routed_to_dlq",
+            "established_by": "route-failed-messages",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "backfill completion",
+          "how": "check logs for backfill events",
+          "expected": "no duplicates in retry topology"
+        },
+        "rollback": {
+          "trigger": "duplicate processing occurs",
+          "action": "halt backfill process",
+          "safety_guard": "ensure no further backfill occurs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-redelivery",
+        "description": "Verify that redelivery of messages works as expected",
+        "action": "verify",
+        "target": "message redelivery",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "backfill process completed",
+            "fact": "backfill_completed",
+            "established_by": "backfill-messages",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "redelivery success",
+          "how": "test sending messages and receiving them",
+          "expected": "all messages are redelivered successfully"
+        },
+        "rollback": {
+          "trigger": "redelivery fails",
+          "action": "review redelivery setup",
+          "safety_guard": "ensure message consistency"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor-dlq-depth",
+        "description": "Monitor the depth of the DLQ to ensure it remains within acceptable limits",
+        "action": "monitor",
+        "target": "DLQ depth",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "redelivery works as expected",
+            "fact": "redelivery_verified",
+            "established_by": "verify-redelivery",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define-dlq-policy",
+        "to_task": "configure-retry-topics",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-retry-topics",
+        "to_task": "route-failed-messages",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "route-failed-messages",
+        "to_task": "backfill-messages",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "backfill-messages",
+        "to_task": "verify-redelivery",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-redelivery",
+        "to_task": "monitor-dlq-depth",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:define-dlq-policy",
+      "task_id": "define-dlq-policy",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "DLQ policy definition depends on consensus, which may not be achievable in the production environment.",
+      "suggested_fix": "Establish a predefined DLQ policy to ensure feasibility.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:backfill-messages",
+      "task_id": "backfill-messages",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Backfill messages should not occur before verifying that redelivery works to avoid processing duplicates.",
+      "suggested_fix": "Reorder backfill-messages to occur after verify-redelivery.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:configure-retry-topics",
+      "task_id": "configure-retry-topics",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider including steps to handle error cases for retry topics configuration.",
+      "suggested_fix": "Add a failure handling step after topic configuration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:route-failed-messages",
+      "task_id": "route-failed-messages",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Could consider adding a validation step to confirm that messages are routed correctly before further processing.",
+      "suggested_fix": "Add a validation task after routing messages to DLQ.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:risk:monitor-dlq-depth",
+      "task_id": "monitor-dlq-depth",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Monitoring DLQ depth alone may not prevent message loss if redelivery fails.",
+      "suggested_fix": "Implement alerts for both DLQ depth and redelivery success.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

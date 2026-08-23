@@ -1,0 +1,173 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-05-chaos-experiment",
+  "duration_seconds": 19.76,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-obs-05-chaos-experiment-r3",
+    "goal_id": "obs-05-chaos-experiment",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-obs-05-chaos-experiment-r2",
+    "created_at": "2026-08-23T21:57:11.860068Z",
+    "tasks": [
+      {
+        "id": "inject-chaos",
+        "description": "Inject pod-kill chaos into the inventory service",
+        "action": "inject",
+        "target": "chaos-mesh",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "chaos injection status",
+          "how": "check chaos-mesh dashboard",
+          "expected": "chaos is active"
+        },
+        "rollback": {
+          "trigger": "chaos injection failed",
+          "action": "remove chaos injection",
+          "safety_guard": "verify chaos has been removed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "observe-recovery",
+        "description": "Observe recovery time from chaos injection",
+        "action": "observe",
+        "target": "prometheus",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "chaos injection is successful",
+            "fact": "chaos_injection_success",
+            "established_by": "inject-chaos",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service recovery time",
+          "how": "analyze Prometheus metrics",
+          "expected": "recovery within 30 seconds"
+        },
+        "rollback": {
+          "trigger": "recovery not detected",
+          "action": "restore original state",
+          "safety_guard": "ensure service is running and operational"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "generate-report",
+        "description": "Generate chaos experiment report",
+        "action": "generate",
+        "target": "chaos report",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "chaos injection is complete",
+            "fact": "chaos_injection_status",
+            "established_by": "inject-chaos",
+            "probe": null
+          },
+          {
+            "description": "recovery metrics are validated",
+            "fact": "recovery_metrics_validated",
+            "established_by": "observe-recovery",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "chaos report content",
+          "how": "check generated report",
+          "expected": "report includes metrics and outcomes"
+        },
+        "rollback": {
+          "trigger": "report generation failed",
+          "action": "remove incomplete report",
+          "safety_guard": "verify report integrity after removal"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "inject-chaos",
+        "to_task": "observe-recovery",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "observe-recovery",
+        "to_task": "generate-report",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unverified_dependencies:observe-recovery",
+      "task_id": "observe-recovery",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task depends on a fact (chaos_injection_success) that may not be reliably verified without explicit checks in the task itself.",
+      "suggested_fix": "Ensure that the chaos injection status is explicitly verified within this task before proceeding.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:missing_steps:generate-report",
+      "task_id": "generate-report",
+      "version": 3,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider including a validation step to confirm that the chaos injection was successful before generating the report.",
+      "suggested_fix": "Add a step to validate the status of chaos injection before generating the report.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:obs-05-chaos-experiment:3:3",
+    "plan_id": "plan-obs-05-chaos-experiment-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unverified_dependencies:observe-recovery",
+    "question": "Plan for goal 'obs-05-chaos-experiment' cannot be approved: blockers remain (llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

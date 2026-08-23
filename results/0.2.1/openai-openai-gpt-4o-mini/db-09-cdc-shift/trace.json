@@ -1,0 +1,240 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-09-cdc-shift",
+  "duration_seconds": 49.13,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-db-09-cdc-shift-r3",
+    "goal_id": "db-09-cdc-shift",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-db-09-cdc-shift-r2",
+    "created_at": "2026-08-23T22:01:58.021831Z",
+    "tasks": [
+      {
+        "id": "setup_replication_slot",
+        "description": "Set up logical replication slot on production PostgreSQL 14",
+        "action": "setup",
+        "target": "replication_slot",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replication slot existence",
+          "how": "run query",
+          "expected": "slot created"
+        },
+        "rollback": {
+          "trigger": "setup fails",
+          "action": "remove replication slot",
+          "safety_guard": "verify no lingering replication slots"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_replication_slot",
+        "description": "Verify the existence of the replication slot before capturing WAL changes",
+        "action": "verify",
+        "target": "replication_slot",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replication slot exists",
+          "how": "run query",
+          "expected": "slot exists"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "capture_wal_changes",
+        "description": "Capture WAL changes from production PostgreSQL",
+        "action": "capture",
+        "target": "wal_changes",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "WAL changes are flowing",
+          "how": "check replication lag",
+          "expected": "lag < 5s"
+        },
+        "rollback": {
+          "trigger": "capture fails",
+          "action": "stop capturing changes",
+          "safety_guard": "ensure WAL files are not truncated"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "backfill_historical_data",
+        "description": "Backfill historical data via snapshot",
+        "action": "backfill",
+        "target": "historical_data",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "historical data completeness",
+          "how": "compare row counts",
+          "expected": "total rows match source"
+        },
+        "rollback": {
+          "trigger": "backfill fails",
+          "action": "restore previous state",
+          "safety_guard": "check data integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "replicate_to_snowflake",
+        "description": "Replicate WAL changes to analytics warehouse (Snowflake)",
+        "action": "replicate",
+        "target": "analytics_warehouse",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data in Snowflake",
+          "how": "run verification queries",
+          "expected": "data matches with source"
+        },
+        "rollback": {
+          "trigger": "replication fails",
+          "action": "terminate replication",
+          "safety_guard": "validate no data loss"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover_consumers",
+        "description": "Cutover analytics consumers from batch ETL to CDC stream",
+        "action": "cutover",
+        "target": "analytics_consumers",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "consumer metrics",
+          "how": "monitor consumer lag",
+          "expected": "lag < 5s and no gaps"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "revert to batch ETL",
+          "safety_guard": "ensure no data loss during transition and data consistency checked"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup_replication_slot",
+        "to_task": "verify_replication_slot",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_replication_slot",
+        "to_task": "capture_wal_changes",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "capture_wal_changes",
+        "to_task": "backfill_historical_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "backfill_historical_data",
+        "to_task": "replicate_to_snowflake",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "replicate_to_snowflake",
+        "to_task": "cutover_consumers",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:verify_replication_slot",
+      "task_id": "verify_replication_slot",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'verify_replication_slot' is dependent on 'setup_replication_slot', but it is not verified that the slot was created successfully before verification.",
+      "suggested_fix": "Ensure 'verify_replication_slot' has a prerequisite check for 'setup_replication_slot'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:weak_rollback:replicate_to_snowflake",
+      "task_id": "replicate_to_snowflake",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback process for 'replicate_to_snowflake' lacks a sound mechanism to ensure full data integrity if replication fails.",
+      "suggested_fix": "Implement a more robust rollback strategy to validate no partial data exists in Snowflake.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:weak_rollback:cutover_consumers",
+      "task_id": "cutover_consumers",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'cutover_consumers' does not adequately address the potential data loss during the cutover from batch ETL to CDC stream.",
+      "suggested_fix": "Enhance the rollback process to ensure data consistency is guaranteed, possibly by implementing a verification step post-rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-09-cdc-shift:3:3",
+    "plan_id": "plan-db-09-cdc-shift-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:verify_replication_slot",
+    "question": "Plan for goal 'db-09-cdc-shift' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

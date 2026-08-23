@@ -1,0 +1,362 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dbm-03-sqlserver-dialect",
+  "duration_seconds": 35.49,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-dbm-03-sqlserver-dialect-r2",
+    "goal_id": "dbm-03-sqlserver-dialect",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "dbm-03-sqlserver-dialect-plan",
+    "created_at": "2026-08-23T22:06:47.885148Z",
+    "tasks": [
+      {
+        "id": "assess",
+        "description": "Assess SQL Server database for migration readiness",
+        "action": "assess",
+        "target": "sqlserver",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "SQL Server is operational",
+            "fact": "sqlserver_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "assessment report",
+          "how": "review findings",
+          "expected": "migration readiness criteria met"
+        },
+        "rollback": {
+          "trigger": "assessment fails",
+          "action": "maintain current SQL Server setup",
+          "safety_guard": "verify existing setup"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rewrite",
+        "description": "Rewrite stored procedures from T-SQL to PL/pgSQL",
+        "action": "rewrite",
+        "target": "stored_procedures",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Assessment completed successfully",
+            "fact": "assessment_completed",
+            "established_by": "assess",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "PL/pgSQL procedure functionality",
+          "how": "test execution",
+          "expected": "all procedures behave as expected"
+        },
+        "rollback": {
+          "trigger": "rewrite fails",
+          "action": "revert to original T-SQL procedures",
+          "safety_guard": "retain original procedure scripts"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "permissions",
+        "description": "Migrate SQL Server permissions to Postgres roles and grants",
+        "action": "migrate",
+        "target": "permissions",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Assessment completed successfully",
+            "fact": "assessment_completed",
+            "established_by": "assess",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "permissions setup",
+          "how": "perform access checks",
+          "expected": "users have correct access"
+        },
+        "rollback": {
+          "trigger": "permissions migration fails",
+          "action": "restore original SQL Server permissions",
+          "safety_guard": "capture current permissions configuration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "jobs",
+        "description": "Re-platform SQL Agent jobs to pg_cron or Airflow",
+        "action": "replatform",
+        "target": "jobs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Assessment completed successfully",
+            "fact": "assessment_completed",
+            "established_by": "assess",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "job functionality",
+          "how": "test job execution",
+          "expected": "all jobs run as expected"
+        },
+        "rollback": {
+          "trigger": "jobs re-platforming fails",
+          "action": "revert to original SQL Agent jobs",
+          "safety_guard": "retain original job scripts"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "data_migration",
+        "description": "Migrate data using AWS DMS or pgloader",
+        "action": "migrate",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "All schema changes completed",
+            "fact": "schema_ready",
+            "established_by": "rewrite",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data consistency checks",
+          "how": "run data validation scripts",
+          "expected": "data matches between SQL Server and PostgreSQL"
+        },
+        "rollback": {
+          "trigger": "data migration fails",
+          "action": "restore from backup",
+          "safety_guard": "verify backup integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "dual_run",
+        "description": "Perform dual-run validation to compare outputs",
+        "action": "validate",
+        "target": "outputs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data migration completed successfully",
+            "fact": "data_migrated",
+            "established_by": "data_migration",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "output consistency",
+          "how": "execute same queries on both databases",
+          "expected": "results match between SQL Server and PostgreSQL"
+        },
+        "rollback": {
+          "trigger": "dual run validation fails",
+          "action": "switch back to SQL Server",
+          "safety_guard": "monitor performance metrics"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover",
+        "description": "Cutover to the new PostgreSQL database",
+        "action": "cutover",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dual-run validation passed",
+            "fact": "dual_run_successful",
+            "established_by": "dual_run",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application functionality",
+          "how": "user acceptance testing",
+          "expected": "application runs without issues"
+        },
+        "rollback": {
+          "trigger": "cutover issues arise",
+          "action": "restore SQL Server as primary",
+          "safety_guard": "ensure data synchronization before rollback"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "retire",
+        "description": "Retire the SQL Server environment",
+        "action": "retire",
+        "target": "sqlserver",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Cutover completed successfully",
+            "fact": "cutover_successful",
+            "established_by": "cutover",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "environment status",
+          "how": "confirm SQL Server is no longer in use",
+          "expected": "SQL Server environment fully retired"
+        },
+        "rollback": {
+          "trigger": "retirement fails",
+          "action": "re-establish SQL Server environment",
+          "safety_guard": "verify restoration success"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "assess",
+        "to_task": "rewrite",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "assess",
+        "to_task": "permissions",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "assess",
+        "to_task": "jobs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rewrite",
+        "to_task": "data_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "permissions",
+        "to_task": "data_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "data_migration",
+        "to_task": "dual_run",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dual_run",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover",
+        "to_task": "retire",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:data_migration",
+      "task_id": "data_migration",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Data migration relies on successful schema changes but has no established path to ensure all necessary schemas, including those created during rewriting, are ready beforehand.",
+      "suggested_fix": "Ensure all schema changes are explicitly completed and validated before initiating data migration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:cutover",
+      "task_id": "cutover",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Cutover to PostgreSQL is scheduled before confirming the success of dual-run validation, which is critical for ensuring application stability.",
+      "suggested_fix": "Reorder tasks to ensure cutover only occurs after dual-run validation has confirmed success.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:cutover",
+      "task_id": "cutover",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback plan for cutover does not unambiguously guarantee rollback integrity or data consistency if issues arise during cutover.",
+      "suggested_fix": "Enhance the rollback plan to include detailed data synchronization steps before switching back to SQL Server.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:data_migration",
+      "task_id": "data_migration",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Data migration's reliance on successful completion of multiple previous tasks lacks verification of successful post-rewrite permissions setup.",
+      "suggested_fix": "Add verification steps to ensure all preconditions, especially for permissions and schemas, are validated before proceeding with data migration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

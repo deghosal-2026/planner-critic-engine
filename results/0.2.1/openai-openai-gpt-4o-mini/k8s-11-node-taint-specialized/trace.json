@@ -1,0 +1,361 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-11-node-taint-specialized",
+  "duration_seconds": 39.84,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-k8s-11-node-taint-specialized-r2",
+    "goal_id": "k8s-11-node-taint-specialized",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "k8s-11-node-taint-specialized-plan",
+    "created_at": "2026-08-23T22:09:27.551849Z",
+    "tasks": [
+      {
+        "id": "identify-gpu-nodes",
+        "description": "Identify GPU nodes in the EKS cluster",
+        "action": "get-nodes",
+        "target": "gpu-nodes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EKS cluster is accessible",
+            "fact": "eks_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "identify-spot-nodes",
+        "description": "Identify spot-instance nodes in the EKS cluster",
+        "action": "get-nodes",
+        "target": "spot-nodes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EKS cluster is accessible",
+            "fact": "eks_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "apply-gpu-taint",
+        "description": "Apply taint for GPU nodes",
+        "action": "kubectl taint",
+        "target": "gpu-nodes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "GPU nodes identified",
+            "fact": "gpu_nodes_identified",
+            "established_by": "identify-gpu-nodes",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "taint existence",
+          "how": "kubectl describe nodes",
+          "expected": "nvidia.com/gpu=true:NoSchedule"
+        },
+        "rollback": {
+          "trigger": "taint fails",
+          "action": "remove taint from GPU nodes",
+          "safety_guard": "verify taint removal"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "apply-spot-taint",
+        "description": "Apply taint for spot-instance nodes",
+        "action": "kubectl taint",
+        "target": "spot-nodes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Spot nodes identified",
+            "fact": "spot_nodes_identified",
+            "established_by": "identify-spot-nodes",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "taint existence",
+          "how": "kubectl describe nodes",
+          "expected": "spot=true:NoSchedule"
+        },
+        "rollback": {
+          "trigger": "taint fails",
+          "action": "remove taint from spot nodes",
+          "safety_guard": "verify taint removal"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update-workload-manifests",
+        "description": "Update workload manifests with tolerations and node selectors",
+        "action": "modify-manifests",
+        "target": "workload-manifests",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Taints applied",
+            "fact": "taints_applied",
+            "established_by": "apply-gpu-taint",
+            "probe": null
+          },
+          {
+            "description": "Taints applied",
+            "fact": "taints_applied",
+            "established_by": "apply-spot-taint",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "manifest validity",
+          "how": "kubectl apply --dry-run",
+          "expected": "no errors"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "roll back to previous manifests",
+          "safety_guard": "verify manifest rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-gpu-evictions",
+        "description": "Verify non-GPU workloads are evicted from GPU nodes",
+        "action": "check-evictions",
+        "target": "gpu-nodes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Workload manifests updated",
+            "fact": "workload_manifests_updated",
+            "established_by": "update-workload-manifests",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "workload status",
+          "how": "kubectl get pods -o wide",
+          "expected": "no non-GPU workloads on GPU nodes"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "remove taints from GPU nodes",
+          "safety_guard": "restore workloads"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-spot-scheduling",
+        "description": "Verify spot workloads only schedule on spot nodes",
+        "action": "check-scheduling",
+        "target": "spot-nodes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Workload manifests updated",
+            "fact": "workload_manifests_updated",
+            "established_by": "update-workload-manifests",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "workload status",
+          "how": "kubectl get pods -o wide",
+          "expected": "only spot workloads on spot nodes"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "remove taint from spot nodes",
+          "safety_guard": "restore workloads"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor-scheduling-failures",
+        "description": "Monitor for scheduling failures in Prometheus",
+        "action": "setup-monitoring",
+        "target": "prometheus",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Monitoring tools available",
+            "fact": "monitoring_tools_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "monitoring status",
+          "how": "check Prometheus dashboard",
+          "expected": "no critical alerts"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "identify-gpu-nodes",
+        "to_task": "apply-gpu-taint",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "identify-spot-nodes",
+        "to_task": "apply-spot-taint",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "apply-gpu-taint",
+        "to_task": "update-workload-manifests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "apply-spot-taint",
+        "to_task": "update-workload-manifests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-workload-manifests",
+        "to_task": "verify-gpu-evictions",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-workload-manifests",
+        "to_task": "verify-spot-scheduling",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-gpu-evictions",
+        "to_task": "monitor-scheduling-failures",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-spot-scheduling",
+        "to_task": "monitor-scheduling-failures",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:apply-gpu-taint",
+      "task_id": "apply-gpu-taint",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The action 'apply-gpu-taint' depends on 'gpu_nodes_identified', which has not been verified as an established fact from the task 'identify-gpu-nodes'.",
+      "suggested_fix": "Ensure that 'identify-gpu-nodes' task has proper verification to establish 'gpu_nodes_identified' before proceeding with 'apply-gpu-taint'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:apply-spot-taint",
+      "task_id": "apply-spot-taint",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The action 'apply-spot-taint' depends on 'spot_nodes_identified', which has not been verified as an established fact from the task 'identify-spot-nodes'.",
+      "suggested_fix": "Ensure that 'identify-spot-nodes' task has proper verification to establish 'spot_nodes_identified' before proceeding with 'apply-spot-taint'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:update-workload-manifests",
+      "task_id": "update-workload-manifests",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "'update-workload-manifests' has a rollback plan to restore previous manifests, but no verification process is detailed to ensure the rollback is successful.",
+      "suggested_fix": "Add a verification step after rollback to ensure the previous manifests are correctly restored and workloads are functioning as expected.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:verify-gpu-evictions",
+      "task_id": "verify-gpu-evictions",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "'verify-gpu-evictions' includes a rollback to remove taints from GPU nodes, but lacks verification of successful restoration of workloads, increasing risk of improper state after rollback.",
+      "suggested_fix": "Implement a verification process to ensure workloads are restored correctly after the rollback in 'verify-gpu-evictions'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:verify-spot-scheduling",
+      "task_id": "verify-spot-scheduling",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "'verify-spot-scheduling' has a rollback to remove taints from spot nodes, but lacks verification of successful restoration of workloads, increasing risk of improper state after rollback.",
+      "suggested_fix": "Implement a verification process to ensure workloads are restored correctly after the rollback in 'verify-spot-scheduling'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

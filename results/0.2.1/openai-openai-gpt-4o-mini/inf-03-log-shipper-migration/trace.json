@@ -1,0 +1,169 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-03-log-shipper-migration",
+  "duration_seconds": 5.93,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "inf-03-log-shipper-migration",
+    "goal_id": "inf-03-log-shipper-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T21:55:05.049363Z",
+    "tasks": [
+      {
+        "id": "check_env",
+        "description": "Check the production environment is suitable for migration",
+        "action": "check",
+        "target": "environment",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "nodes are reachable",
+            "fact": "nodes_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "dual_ship",
+        "description": "Deploy FluentBit alongside Fluentd for dual-shipping",
+        "action": "deploy",
+        "target": "fluentbit",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "FluentBit is processing logs",
+          "how": "check log metrics via Prometheus",
+          "expected": "logs received and processed"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to Fluentd",
+          "safety_guard": "confirm FluentD is running"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "compare_logs",
+        "description": "Compare logs from FluentBit and Fluentd",
+        "action": "compare",
+        "target": "logs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "logs consistency",
+          "how": "run comparison scripts",
+          "expected": "logs are identical"
+        },
+        "rollback": {
+          "trigger": "logs do not match",
+          "action": "revert to previous logging setup",
+          "safety_guard": "ensure no loss of logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_env",
+        "to_task": "dual_ship",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dual_ship",
+        "to_task": "compare_logs",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:check_env",
+      "task_id": "check_env",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The check for production environment suitability lacks a defined verification method to confirm that 'nodes are reachable'.",
+      "suggested_fix": "Define a specific action or tool to verify node connectivity before proceeding.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:dual_ship",
+      "task_id": "dual_ship",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback action for 'dual_ship' does not adequately ensure recovery as it only confirms FluentD is running without checking the state of other dependencies.",
+      "suggested_fix": "Implement a more detailed rollback procedure that checks the health of the entire logging system before confirming the rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:dual_ship",
+      "task_id": "dual_ship",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding a step to validate FluentBit deployment before initiating comparisons to ensure it is working correctly.",
+      "suggested_fix": "Include a verification task after 'dual_ship' to confirm FluentBit is processing logs before proceeding.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:compare_logs",
+      "task_id": "compare_logs",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "It may be beneficial to include additional logging metrics checks in 'compare_logs' to ensure data integrity before proceeding with any rollback.",
+      "suggested_fix": "Add a validation step to check the completeness of logs from both FluentBit and Fluentd.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

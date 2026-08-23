@@ -1,0 +1,164 @@
+{
+  "dimension": "core-api",
+  "goal_id": "scp-03-canary-internal-dep",
+  "duration_seconds": 13.51,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-scp-03-canary-internal-dep-r2",
+    "goal_id": "scp-03-canary-internal-dep",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "scp-03-canary-internal-dep-plan",
+    "created_at": "2026-08-23T22:04:26.267596Z",
+    "tasks": [
+      {
+        "id": "deploy-canary",
+        "description": "Deploy patched core library to canary services",
+        "action": "deploy",
+        "target": "canary services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "canary service functionality",
+          "how": "monitor logs and metrics",
+          "expected": "no errors in logs and positive metrics"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback canary deployment",
+          "safety_guard": "ensure previous version is intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-canary",
+        "description": "Verify functionality of canary deployment",
+        "action": "verify",
+        "target": "canary services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "canary service performance",
+          "how": "analyze performance metrics",
+          "expected": "performance within acceptable thresholds"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "rollback canary deployment",
+          "safety_guard": "ensure previous version is intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rollout",
+        "description": "Roll out the patched core library to all remaining services",
+        "action": "deploy",
+        "target": "remaining services",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary verification completed successfully",
+            "fact": "canary_verified",
+            "established_by": "verify-canary",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "remaining services functionality",
+          "how": "monitor logs and metrics",
+          "expected": "no errors in logs and positive metrics"
+        },
+        "rollback": {
+          "trigger": "rollout fails",
+          "action": "rollback rollout",
+          "safety_guard": "ensure previous versions are intact"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy-canary",
+        "to_task": "verify-canary",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-canary",
+        "to_task": "rollout",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:rollout",
+      "task_id": "rollout",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The 'rollout' task is dependent on 'canary verification completed successfully' but does not verify the actual success of the 'verify-canary' task before proceeding.",
+      "suggested_fix": "Ensure 'rollout' only proceeds if 'verify-canary' has verified that the canary deployment is successful.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:rollout",
+      "task_id": "rollout",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'rollout' task relies on 'canary_verified' without a clear establishment of this fact in the task sequence.",
+      "suggested_fix": "Establish a clear verification step that confirms 'canary_verified' is defined based on the outcomes of the 'verify-canary' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:rollout",
+      "task_id": "rollout",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The 'rollout' task has a rollback mechanism but lacks additional safeguards for a high-blast-radius operation.",
+      "suggested_fix": "Incorporate additional safeguards to verify the integrity of the rollout before deployment to all services.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

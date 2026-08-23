@@ -1,0 +1,221 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mob-02-forced-upgrade",
+  "duration_seconds": 38.14,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-mob-02-forced-upgrade-r4",
+    "goal_id": "mob-02-forced-upgrade",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-mob-02-forced-upgrade-r3",
+    "created_at": "2026-08-23T22:15:42.728678Z",
+    "tasks": [
+      {
+        "id": "deploy_api_gate",
+        "description": "Deploy the server API enforcement to reject API calls from old app versions",
+        "action": "deploy",
+        "target": "api_gateway",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "API gateway is reachable",
+            "fact": "api_gateway_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "API response status",
+          "how": "test API with old app versions",
+          "expected": "426 Upgrade Required"
+        },
+        "rollback": {
+          "trigger": "deployment fails or issues arise",
+          "action": "disable API version gate",
+          "safety_guard": "monitor logs for errors"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "send_push_notifications",
+        "description": "Trigger in-app upgrade prompts through push notifications",
+        "action": "send_notification",
+        "target": "FCM/APNs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Notification service is configured",
+            "fact": "notification_service_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "notification delivery status",
+          "how": "check logs for delivery success",
+          "expected": "notifications delivered successfully"
+        },
+        "rollback": {
+          "trigger": "notification failures",
+          "action": "retry sending notifications",
+          "safety_guard": "ensure users received prompts"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_upgrade_funnel",
+        "description": "Monitor conversion rates and remaining old-version users",
+        "action": "monitor",
+        "target": "analytics_tool",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Analytics tool is operational",
+            "fact": "analytics_service_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_sunset_window",
+        "description": "Verify that the sunset window has passed after API deployment",
+        "action": "check_time",
+        "target": "deployment",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "sunset window status",
+          "how": "check deployment timestamps",
+          "expected": "more than seven days have passed"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "decommission_old_api",
+        "description": "Decommission old API compatibility shims after the sunset window",
+        "action": "remove",
+        "target": "old_api_shims",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "The sunset window has passed",
+            "fact": "seven_days_passed_after_deploy",
+            "established_by": "verify_sunset_window",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "functionality of old API",
+          "how": "run tests on old API calls",
+          "expected": "responses from old API should be valid"
+        },
+        "rollback": {
+          "trigger": "issues arise post-decommission",
+          "action": "restore old API compatibility",
+          "safety_guard": "verify old version functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_api_gate",
+        "to_task": "send_push_notifications",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "send_push_notifications",
+        "to_task": "monitor_upgrade_funnel",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_upgrade_funnel",
+        "to_task": "verify_sunset_window",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_sunset_window",
+        "to_task": "decommission_old_api",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unverified_dependencies:decommission_old_api",
+      "task_id": "decommission_old_api",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'decommission_old_api' has a hard dependency on 'verify_sunset_window', which is not verified as the precondition is not set properly to ensure it is completed successfully before this task runs.",
+      "suggested_fix": "Ensure that 'verify_sunset_window' is properly defined to confirm that the sunset window has indeed passed before 'decommission_old_api' executes.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:decommission_old_api",
+      "task_id": "decommission_old_api",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'decommission_old_api' will execute without verifying that the sunset window has passed, making it a direct violation of task prerequisites.",
+      "suggested_fix": "Reorder the tasks to ensure 'verify_sunset_window' completes successfully before executing 'decommission_old_api'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mob-02-forced-upgrade:4:4",
+    "plan_id": "plan-mob-02-forced-upgrade-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unverified_dependencies:decommission_old_api",
+    "question": "Plan for goal 'mob-02-forced-upgrade' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

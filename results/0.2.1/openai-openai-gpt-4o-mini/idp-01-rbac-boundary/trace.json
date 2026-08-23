@@ -1,0 +1,166 @@
+{
+  "dimension": "core-api",
+  "goal_id": "idp-01-rbac-boundary",
+  "duration_seconds": 14.05,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-idp-01-rbac-boundary-r2",
+    "goal_id": "idp-01-rbac-boundary",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "idp-01-rbac-boundary-plan",
+    "created_at": "2026-08-23T22:02:52.722963Z",
+    "tasks": [
+      {
+        "id": "create_ns",
+        "description": "Create a Kubernetes namespace for the new service",
+        "action": "create",
+        "target": "namespace",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kubernetes cluster is accessible",
+            "fact": "cluster_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create_sa",
+        "description": "Create a ServiceAccount within the new namespace",
+        "action": "create",
+        "target": "serviceaccount",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "namespace is created",
+            "fact": "namespace_created",
+            "established_by": "create_ns",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service account existence",
+          "how": "kubectl get serviceaccount -n <namespace>",
+          "expected": "service account is listed"
+        },
+        "rollback": {
+          "trigger": "service account creation fails",
+          "action": "delete service account",
+          "safety_guard": "check service account exists"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "attach_rbac",
+        "description": "Attach least-privilege RBAC to the new ServiceAccount",
+        "action": "apply",
+        "target": "rbac",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ServiceAccount is created",
+            "fact": "service_account_created",
+            "established_by": "create_sa",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "role binding status",
+          "how": "kubectl get rolebinding -n <namespace>",
+          "expected": "role binding is correctly applied"
+        },
+        "rollback": {
+          "trigger": "RBAC application fails",
+          "action": "delete specific role binding",
+          "safety_guard": "check role binding exists"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "create_ns",
+        "to_task": "create_sa",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_sa",
+        "to_task": "attach_rbac",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:attach_rbac",
+      "task_id": "attach_rbac",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'attach_rbac' is ordered before its prerequisite 'create_sa' establishes the necessary ServiceAccount.",
+      "suggested_fix": "Reorder the task 'attach_rbac' to execute only after 'create_sa' is successfully completed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:attach_rbac",
+      "task_id": "attach_rbac",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'attach_rbac' depends on 'service_account_created' which is not verified during 'create_sa'.",
+      "suggested_fix": "Add a verification step in 'create_sa' to confirm the ServiceAccount creation is successful before proceeding to 'attach_rbac'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:idp-01-rbac-boundary:2:2",
+    "plan_id": "plan-idp-01-rbac-boundary-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:attach_rbac",
+    "question": "Plan for goal 'idp-01-rbac-boundary' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

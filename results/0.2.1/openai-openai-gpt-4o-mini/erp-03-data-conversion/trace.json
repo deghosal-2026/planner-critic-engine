@@ -1,0 +1,313 @@
+{
+  "dimension": "core-api",
+  "goal_id": "erp-03-data-conversion",
+  "duration_seconds": 11.38,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "erp-03-data-conversion-plan",
+    "goal_id": "erp-03-data-conversion",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T21:53:16.635491Z",
+    "tasks": [
+      {
+        "id": "extract-master-data",
+        "description": "Extract master data from Oracle EBS",
+        "action": "export",
+        "target": "Oracle EBS",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "number of records extracted",
+          "how": "run count query on source",
+          "expected": "200K materials, 150K customers, 100K vendors"
+        },
+        "rollback": {
+          "trigger": "extraction fails",
+          "action": "rollback to last successful extraction",
+          "safety_guard": "confirm previous extraction success"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "extract-transaction-history",
+        "description": "Extract transactional history from Oracle EBS",
+        "action": "export",
+        "target": "Oracle EBS",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "number of records extracted",
+          "how": "run count query on source",
+          "expected": "5M transactional history records"
+        },
+        "rollback": {
+          "trigger": "extraction fails",
+          "action": "rollback to last successful extraction",
+          "safety_guard": "confirm previous extraction success"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "transform-validate",
+        "description": "Transform and validate the extracted data",
+        "action": "transform",
+        "target": "SAP",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data integrity and type correctness",
+          "how": "run validation scripts",
+          "expected": "all data types match required formats"
+        },
+        "rollback": {
+          "trigger": "transformation fails",
+          "action": "restore backup of original data",
+          "safety_guard": "validate backup integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "map-migrate-materials",
+        "description": "Load materials data into SAP",
+        "action": "migrate",
+        "target": "SAP",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "materials record count",
+          "how": "run count query in SAP",
+          "expected": "200K materials"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "rollback to pre-migration state",
+          "safety_guard": "confirm migration logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "map-migrate-customers-vendors",
+        "description": "Load customers and vendors data into SAP",
+        "action": "migrate",
+        "target": "SAP",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "customers and vendors record count",
+          "how": "run count query in SAP",
+          "expected": "150K customers and 100K vendors"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "rollback to pre-migration state",
+          "safety_guard": "confirm migration logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "map-migrate-transaction-history",
+        "description": "Load transactional history into SAP",
+        "action": "migrate",
+        "target": "SAP",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "transactional history record count",
+          "how": "run count query in SAP",
+          "expected": "5M transactional history records"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "rollback to pre-migration state",
+          "safety_guard": "confirm migration logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "reconcile-data",
+        "description": "Reconcile data between Oracle EBS and SAP",
+        "action": "reconcile",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "record counts and financial totals",
+          "how": "compare reports from both systems",
+          "expected": "data matches in both systems"
+        },
+        "rollback": {
+          "trigger": "reconciliation fails",
+          "action": "restore backup of original data",
+          "safety_guard": "validate backup integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-business-user-approval",
+        "description": "Have business users validate sample records and trial balance",
+        "action": "verify",
+        "target": "SAP",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "business user confirmation",
+          "how": "collect feedback from users",
+          "expected": "users sign off on data integrity"
+        },
+        "rollback": {
+          "trigger": "approval fails",
+          "action": "revert SAP to pre-conversion state",
+          "safety_guard": "confirm backup restored"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "extract-master-data",
+        "to_task": "transform-validate",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "extract-transaction-history",
+        "to_task": "transform-validate",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "transform-validate",
+        "to_task": "map-migrate-materials",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "map-migrate-materials",
+        "to_task": "map-migrate-customers-vendors",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "map-migrate-customers-vendors",
+        "to_task": "map-migrate-transaction-history",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "map-migrate-transaction-history",
+        "to_task": "reconcile-data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "reconcile-data",
+        "to_task": "verify-business-user-approval",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:map-migrate-materials",
+      "task_id": "map-migrate-materials",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'map-migrate-materials' is sequenced before task 'transform-validate', which is a hard prerequisite.",
+      "suggested_fix": "Reorder the tasks to ensure 'transform-validate' occurs before 'map-migrate-materials'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:map-migrate-customers-vendors",
+      "task_id": "map-migrate-customers-vendors",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'map-migrate-customers-vendors' is sequenced before task 'map-migrate-materials', which is a hard prerequisite.",
+      "suggested_fix": "Reorder the tasks to ensure 'map-migrate-materials' occurs before 'map-migrate-customers-vendors'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:map-migrate-transaction-history",
+      "task_id": "map-migrate-transaction-history",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'map-migrate-transaction-history' is sequenced before task 'map-migrate-customers-vendors', which is a hard prerequisite.",
+      "suggested_fix": "Reorder the tasks to ensure 'map-migrate-customers-vendors' occurs before 'map-migrate-transaction-history'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:reconcile-data",
+      "task_id": "reconcile-data",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'reconcile-data' is sequenced before task 'map-migrate-transaction-history', which is a hard prerequisite.",
+      "suggested_fix": "Reorder the tasks to ensure 'map-migrate-transaction-history' occurs before 'reconcile-data'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:verify-business-user-approval",
+      "task_id": "verify-business-user-approval",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'verify-business-user-approval' is sequenced before task 'reconcile-data', which is a hard prerequisite.",
+      "suggested_fix": "Reorder the tasks to ensure 'reconcile-data' occurs before 'verify-business-user-approval'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

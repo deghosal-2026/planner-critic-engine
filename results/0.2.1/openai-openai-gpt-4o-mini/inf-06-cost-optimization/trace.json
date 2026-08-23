@@ -1,0 +1,223 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-06-cost-optimization",
+  "duration_seconds": 17.89,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-inf-06-cost-optimization-r2",
+    "goal_id": "inf-06-cost-optimization",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plan-inf-06-cost-optimization",
+    "created_at": "2026-08-23T21:56:01.273540Z",
+    "tasks": [
+      {
+        "id": "identify_resources",
+        "description": "Identify idle and oversized resources",
+        "action": "scan",
+        "target": "cloud_resources",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cloud environment is accessible",
+            "fact": "cloud_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "resize_resources",
+        "description": "Resize identified oversized resources",
+        "action": "resize",
+        "target": "over_size_resources",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "resource size",
+          "how": "run size checks",
+          "expected": "optimized size"
+        },
+        "rollback": {
+          "trigger": "resize fails",
+          "action": "revert to original size",
+          "safety_guard": "check resource status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "terminate_idle_resources",
+        "description": "Terminate identified idle resources",
+        "action": "terminate",
+        "target": "idle_resources",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "resource state",
+          "how": "run status checks",
+          "expected": "terminated"
+        },
+        "rollback": {
+          "trigger": "termination fails",
+          "action": "restore idle resource",
+          "safety_guard": "verify resource state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_no_impact",
+        "description": "Verify no impact on performance after resizing or terminating resources",
+        "action": "check",
+        "target": "service_performance",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "resources have been modified",
+            "fact": "resources_modified",
+            "established_by": "resize_resources",
+            "probe": null
+          },
+          {
+            "description": "resources have been modified",
+            "fact": "resources_modified",
+            "established_by": "terminate_idle_resources",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service performance metrics",
+          "how": "run performance checks",
+          "expected": "performance within acceptable limits"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "identify_resources",
+        "to_task": "resize_resources",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "identify_resources",
+        "to_task": "terminate_idle_resources",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "resize_resources",
+        "to_task": "verify_no_impact",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "terminate_idle_resources",
+        "to_task": "verify_no_impact",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:resize_resources",
+      "task_id": "resize_resources",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'resize_resources' is executed before verification that resources were actually identified and modified by 'identify_resources'.",
+      "suggested_fix": "Ensure 'identify_resources' is complete and verified before proceeding to 'resize_resources'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:terminate_idle_resources",
+      "task_id": "terminate_idle_resources",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'terminate_idle_resources' is executed before verification that resources were actually identified and modified by 'identify_resources'.",
+      "suggested_fix": "Ensure 'identify_resources' is complete and verified before proceeding to 'terminate_idle_resources'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:verify_no_impact",
+      "task_id": "verify_no_impact",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'verify_no_impact' is reliant on the completion of previous tasks but lacks verification checks confirming that 'resize_resources' or 'terminate_idle_resources' were successful before execution.",
+      "suggested_fix": "Add verification to ensure resources were successfully resized or terminated before proceeding to 'verify_no_impact'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:resize_resources",
+      "task_id": "resize_resources",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback strategy for 'resize_resources' does not account for scenarios where the resource state is altered or dependencies might have changed but are not checked before reverting.",
+      "suggested_fix": "Enhance rollback for 'resize_resources' to include checks on resource state and dependencies before reverting to the original size.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:terminate_idle_resources",
+      "task_id": "terminate_idle_resources",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback strategy for 'terminate_idle_resources' does not ensure that the state of the resource can be reliably restored given potential state changes during termination.",
+      "suggested_fix": "Enhance rollback for 'terminate_idle_resources' to ensure a reliable check on the ability to restore the resource.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

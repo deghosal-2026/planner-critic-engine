@@ -19,6 +19,7 @@ Usage::
     python3 docs/field-test/v0.2.1/scripts/bench_live_boundary.py            # live, 5 trials
     python3 docs/field-test/v0.2.1/scripts/bench_live_boundary.py --trials 3
     python3 docs/field-test/v0.2.1/scripts/bench_live_boundary.py --self-test  # hermetic, $0
+    python3 docs/field-test/v0.2.1/scripts/bench_live_boundary.py --trials 5 --provider openai  # OpenRouter gpt-4o-mini
 
 Provider resolution order: a ``plancritic.toml`` registry ``critic`` role if
 present; otherwise the ``LLM_BASE_URL`` / ``LLM_MODEL`` / ``LLM_API_KEY`` env
@@ -38,9 +39,35 @@ from planner_critic.eval.label_migration import generate_boundary_cases
 from planner_critic.eval.live_boundary import run_live_boundary_cases
 from planner_critic.schema.goal import Goal, RiskTolerance
 
+API_KEY = os.environ.get("OPENROUTER_API_KEY")
+MLX_API_KEY = os.environ.get("MLX_API_KEY", "omlx-test")
+
 SCRIPTS_DIR = Path(__file__).resolve().parent          # docs/field-test/v0.2.1/scripts
-REPO_ROOT = SCRIPTS_DIR.parents[4]                      # repo root
+
+def _find_repo_root() -> Path:
+    """Walk up from ``SCRIPTS_DIR`` until we find ``pyproject.toml``."""
+    here = SCRIPTS_DIR
+    for _ in range(10):
+        if (here / "pyproject.toml").exists():
+            return here
+        here = here.parent
+    raise RuntimeError(f"cannot find repo root above {SCRIPTS_DIR}")
+
+REPO_ROOT = _find_repo_root()
 RESULTS_DIR = REPO_ROOT / "results" / "0.2.1"
+
+PROVIDERS: dict[str, dict] = {
+    "openai": {
+        "base_url": "https://openrouter.ai/api/v1",
+        "model": "openai/gpt-4o-mini",
+        "api_key": API_KEY,
+    },
+    "omlx": {
+        "base_url": "http://127.0.0.1:8000/v1",
+        "model": "mlx-community/Qwen3-4B-Instruct-2507-4bit",
+        "api_key": MLX_API_KEY,
+    },
+}
 
 #: A generic migration goal giving the critic prompt context. The boundary
 #: cases are all migration/rollback-flavored synthetic plans (goal_id="test");
@@ -75,16 +102,33 @@ class _StubCritic:
         ]
 
 
-def build_provider() -> tuple[Any, str]:
+def build_provider(provider_name: str | None = None) -> tuple[Any, str]:
     """Resolve a live critic provider + a human-readable model label.
+
+    Args:
+        provider_name: ``"openai"`` or ``"omlx"`` for known configs; None
+            falls back to plancritic.toml or LLM_* env vars.
 
     Returns:
         (provider, model_label) where provider is an LLMProvider-ready object.
 
     Raises:
-        RuntimeError: if no provider can be configured (no toml, no env).
+        RuntimeError: if no provider can be configured.
     """
     from planner_critic.llm.registry import ProviderRegistry
+    from planner_critic.llm.transport_openai import OpenAICompatibleProvider
+
+    if provider_name and provider_name in PROVIDERS:
+        spec = PROVIDERS[provider_name]
+        return (
+            OpenAICompatibleProvider(
+                name=provider_name,
+                base_url=spec["base_url"],
+                model=spec["model"],
+                api_key=spec["api_key"],
+            ),
+            spec["model"],
+        )
 
     toml_path = REPO_ROOT / "plancritic.toml"
     if toml_path.exists():
@@ -98,11 +142,9 @@ def build_provider() -> tuple[Any, str]:
     api_key = os.environ.get("LLM_API_KEY") or os.environ.get("OPENROUTER_API_KEY")
     if not base_url or not model:
         raise RuntimeError(
-            "no critic provider configured: create plancritic.toml or set "
-            "LLM_BASE_URL + LLM_MODEL (+ LLM_API_KEY)"
+            "no critic provider configured: pass --provider openai|omlx or "
+            "create plancritic.toml or set LLM_BASE_URL + LLM_MODEL (+ LLM_API_KEY)"
         )
-
-    from planner_critic.llm.transport_openai import OpenAICompatibleProvider
 
     return (
         OpenAICompatibleProvider(
@@ -115,11 +157,11 @@ def build_provider() -> tuple[Any, str]:
     )
 
 
-def build_live_critic() -> tuple[Any, str]:
+def build_live_critic(provider_name: str | None = None) -> tuple[Any, str]:
     """Build a live LLMCritic bound to the boundary goal + provider."""
     from planner_critic.critique.critic import LLMCritic
 
-    provider, model = build_provider()
+    provider, model = build_provider(provider_name)
     return LLMCritic(_BOUNDARY_GOAL, provider), model
 
 
@@ -238,12 +280,18 @@ def main(argv: list[str]) -> None:
         return
 
     trials = 5
+    model_label = None
+    provider = None
     for i, arg in enumerate(argv):
         if arg == "--trials" and i + 1 < len(argv):
             trials = int(argv[i + 1])
+        if arg == "--model-label" and i + 1 < len(argv):
+            model_label = argv[i + 1]
+        if arg == "--provider" and i + 1 < len(argv):
+            provider = argv[i + 1]
 
-    critic, model = build_live_critic()
-    run_boundary(critic, trials=trials, model=model)
+    critic, model = build_live_critic(provider_name=provider)
+    run_boundary(critic, trials=trials, model=model_label or model)
 
 
 if __name__ == "__main__":

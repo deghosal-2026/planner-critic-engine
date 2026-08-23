@@ -1,0 +1,192 @@
+{
+  "dimension": "core-api",
+  "goal_id": "idp-02-naming-tagging",
+  "duration_seconds": 37.02,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 4
+  },
+  "plan": {
+    "id": "plan-idp-02-naming-tagging-r4",
+    "goal_id": "idp-02-naming-tagging",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-idp-02-naming-tagging-r3",
+    "created_at": "2026-08-23T22:03:29.681415Z",
+    "tasks": [
+      {
+        "id": "check_env",
+        "description": "Check that the environment context is established for RDS configuration",
+        "action": "check_env",
+        "target": "env",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create_tags",
+        "description": "Create necessary tags for the RDS instance",
+        "action": "create_tags",
+        "target": "RDS_instance",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "RDS instance configuration is ready",
+            "fact": "rds_config_ready",
+            "established_by": "check_env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "tags exist",
+          "how": "check tags using aws-cli",
+          "expected": "cost-center, team-ownership, environment tags"
+        },
+        "rollback": {
+          "trigger": "tag creation fails",
+          "action": "remove tags",
+          "safety_guard": "verify existing tags before rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_tags",
+        "description": "Verify that the tags have been created successfully",
+        "action": "verify",
+        "target": "tags",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "tags have been created",
+            "fact": "tags_created",
+            "established_by": "create_tags",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "tags are verified",
+          "how": "check tags using aws-cli",
+          "expected": "cost-center, team-ownership, environment tags present"
+        },
+        "rollback": {
+          "trigger": "tags verification fails",
+          "action": "recreate tags",
+          "safety_guard": "ensure tags were indeed modified"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create_rds_instance",
+        "description": "Provision the RDS PostgreSQL instance",
+        "action": "create",
+        "target": "RDS_instance",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "tags are verified",
+            "fact": "tags_verified",
+            "established_by": "verify_tags",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "RDS instance is available",
+          "how": "check instance status using aws-cli",
+          "expected": "instance status is available"
+        },
+        "rollback": {
+          "trigger": "RDS creation fails",
+          "action": "delete RDS instance",
+          "safety_guard": "ensure no data loss"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_env",
+        "to_task": "create_tags",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_tags",
+        "to_task": "verify_tags",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_tags",
+        "to_task": "create_rds_instance",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:create_rds_instance",
+      "task_id": "create_rds_instance",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'create_rds_instance' is sequenced before verifying that tags have been successfully created.",
+      "suggested_fix": "Ensure that 'create_rds_instance' is preceded by successful completion of 'verify_tags'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:create_rds_instance",
+      "task_id": "create_rds_instance",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'create_rds_instance' depends on the 'tags_verified' fact, which must be validated in the earlier task.",
+      "suggested_fix": "Add a step to verify that tags are present and correctly set before proceeding with 'create_rds_instance'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:idp-02-naming-tagging:4:4",
+    "plan_id": "plan-idp-02-naming-tagging-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:create_rds_instance",
+    "question": "Plan for goal 'idp-02-naming-tagging' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": false,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

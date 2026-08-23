@@ -1,0 +1,192 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-06-monitoring-canary",
+  "duration_seconds": 6.68,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "obs-06-monitoring-canary",
+    "goal_id": "obs-06-monitoring-canary",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T21:57:17.747060Z",
+    "tasks": [
+      {
+        "id": "deploy_synthetic_check",
+        "description": "Deploy synthetic check pod for /health and /api/checkout endpoints",
+        "action": "deploy",
+        "target": "synthetic-check-pod",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kubernetes cluster is accessible",
+            "fact": "k8s_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "expose_metrics",
+        "description": "Expose canary metrics to Prometheus",
+        "action": "expose",
+        "target": "metrics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Synthetic check pod is deployed",
+            "fact": "pod_deployed",
+            "established_by": "deploy_synthetic_check",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create_dashboard",
+        "description": "Create Grafana dashboard for canary health",
+        "action": "create",
+        "target": "grafana-dashboard",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Metrics are exposed to Prometheus",
+            "fact": "metrics_exposed",
+            "established_by": "expose_metrics",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_alert",
+        "description": "Configure alert for 5xx rate exceeding 1%",
+        "action": "configure",
+        "target": "alert",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Grafana dashboard is created",
+            "fact": "dashboard_created",
+            "established_by": "create_dashboard",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_synthetic_check",
+        "to_task": "expose_metrics",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "expose_metrics",
+        "to_task": "create_dashboard",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_dashboard",
+        "to_task": "configure_alert",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unverified_dependencies:deploy_synthetic_check",
+      "task_id": "deploy_synthetic_check",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Deployment of synthetic check pod is dependent on Kubernetes cluster accessibility, which is not verified.",
+      "suggested_fix": "Add a verification step to confirm that the Kubernetes cluster is accessible before deploying the synthetic check pod.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:expose_metrics",
+      "task_id": "expose_metrics",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Exposing metrics to Prometheus depends on the synthetic check pod being deployed, but this verification is not established.",
+      "suggested_fix": "Implement a verification step to ensure the synthetic check pod is successfully deployed before exposing metrics.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:create_dashboard",
+      "task_id": "create_dashboard",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Creating the Grafana dashboard depends on metrics being exposed, but this verification is not established.",
+      "suggested_fix": "Add a verification step to confirm that metrics are successfully exposed to Prometheus before creating the dashboard.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:configure_alert",
+      "task_id": "configure_alert",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Configuring alert depends on the Grafana dashboard being created, but this verification is lacking.",
+      "suggested_fix": "Include a verification step to validate that the Grafana dashboard is created before configuring the alert.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

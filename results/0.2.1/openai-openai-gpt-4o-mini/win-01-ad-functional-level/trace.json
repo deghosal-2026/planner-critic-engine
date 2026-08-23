@@ -1,0 +1,426 @@
+{
+  "dimension": "core-api",
+  "goal_id": "win-01-ad-functional-level",
+  "duration_seconds": 74.84,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 4,
+    "llm_calls": 4
+  },
+  "plan": {
+    "id": "plan-win-01-ad-functional-level-r4",
+    "goal_id": "win-01-ad-functional-level",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-win-01-ad-functional-level-r3",
+    "created_at": "2026-08-23T22:09:56.631352Z",
+    "tasks": [
+      {
+        "id": "adprep_forestprep",
+        "description": "Run adprep /forestprep to prepare the forest for the upgrade",
+        "action": "execute",
+        "target": "adprep",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "forest schema version",
+          "how": "run get-schema-version",
+          "expected": "2019"
+        },
+        "rollback": {
+          "trigger": "adprep_forestprep fails",
+          "action": "restore original AD state",
+          "safety_guard": "ensure forest state is backed up"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "adprep_domainprep",
+        "description": "Run adprep /domainprep to prepare the domain for the upgrade",
+        "action": "execute",
+        "target": "adprep",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "domain schema version",
+          "how": "run get-schema-version",
+          "expected": "2019"
+        },
+        "rollback": {
+          "trigger": "adprep_domainprep fails",
+          "action": "restore original AD state",
+          "safety_guard": "ensure domain state is backed up"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_inter_site_replication",
+        "description": "Verify inter-site replication between all DCs",
+        "action": "execute",
+        "target": "repadmin",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replication status",
+          "how": "run repadmin /showrepl",
+          "expected": "all DCs replicate successfully"
+        },
+        "rollback": {
+          "trigger": "inter-site replication fails",
+          "action": "attempt manual sync",
+          "safety_guard": "check for replication health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "raise_functional_level",
+        "description": "Raise the domain functional level to Server 2019",
+        "action": "execute",
+        "target": "domain",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "domain functional level",
+          "how": "run get-functional-level",
+          "expected": "2016"
+        },
+        "rollback": {
+          "trigger": "functional level raise fails",
+          "action": "rollback domain functional level",
+          "safety_guard": "ensure current level status is confirmed"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_functional_level",
+        "description": "Verify the domain functional level after raising it",
+        "action": "execute",
+        "target": "domain",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "domain functional level",
+          "how": "run get-functional-level",
+          "expected": "2019"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "abort upgrade",
+          "safety_guard": "ensure rollback verification is completed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "upgrade_primary_site",
+        "description": "Upgrade the primary site domain controllers",
+        "action": "execute",
+        "target": "dc",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "primary site functional level",
+          "how": "run get-functional-level",
+          "expected": "2019"
+        },
+        "rollback": {
+          "trigger": "primary site upgrade fails",
+          "action": "revert to backup configuration",
+          "safety_guard": "complete site backup before upgrade"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_primary_site_upgrade",
+        "description": "Verify the primary site upgrade was successful",
+        "action": "execute",
+        "target": "dc",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "primary site upgrade status",
+          "how": "run check-upgrade-status",
+          "expected": "success"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "abort upgrade",
+          "safety_guard": "ensure rollback verification is completed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "upgrade_remote_site_1",
+        "description": "Upgrade the first remote site domain controller",
+        "action": "execute",
+        "target": "dc",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "remote site 1 functional level",
+          "how": "run get-functional-level",
+          "expected": "2019"
+        },
+        "rollback": {
+          "trigger": "remote site 1 upgrade fails",
+          "action": "revert to backup configuration",
+          "safety_guard": "complete site backup before upgrade"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_remote_site_1_upgrade",
+        "description": "Verify the upgrade for remote site 1 was successful",
+        "action": "execute",
+        "target": "dc",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "remote site 1 upgrade status",
+          "how": "run check-upgrade-status",
+          "expected": "success"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "abort upgrade",
+          "safety_guard": "ensure rollback verification is completed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "upgrade_remote_site_2",
+        "description": "Upgrade the second remote site domain controller",
+        "action": "execute",
+        "target": "dc",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "remote site 2 functional level",
+          "how": "run get-functional-level",
+          "expected": "2019"
+        },
+        "rollback": {
+          "trigger": "remote site 2 upgrade fails",
+          "action": "revert to backup configuration",
+          "safety_guard": "complete site backup before upgrade"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_remote_site_2_upgrade",
+        "description": "Verify the upgrade for remote site 2 was successful",
+        "action": "execute",
+        "target": "dc",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "remote site 2 upgrade status",
+          "how": "run check-upgrade-status",
+          "expected": "success"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "abort upgrade",
+          "safety_guard": "ensure rollback verification is completed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "adprep_forestprep",
+        "to_task": "adprep_domainprep",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "adprep_domainprep",
+        "to_task": "verify_inter_site_replication",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_inter_site_replication",
+        "to_task": "raise_functional_level",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "raise_functional_level",
+        "to_task": "verify_functional_level",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_functional_level",
+        "to_task": "upgrade_primary_site",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "upgrade_primary_site",
+        "to_task": "verify_primary_site_upgrade",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_primary_site_upgrade",
+        "to_task": "upgrade_remote_site_1",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "upgrade_remote_site_1",
+        "to_task": "verify_remote_site_1_upgrade",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_remote_site_1_upgrade",
+        "to_task": "upgrade_remote_site_2",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "upgrade_remote_site_2",
+        "to_task": "verify_remote_site_2_upgrade",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:raise_functional_level",
+      "task_id": "raise_functional_level",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'raise_functional_level' is sequenced before the required verification of schema preparation is confirmed as complete.",
+      "suggested_fix": "Ensure 'raise_functional_level' occurs only after successful verification of inter-site replication.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:raise_functional_level",
+      "task_id": "raise_functional_level",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'raise_functional_level' has dependencies on schema prep status that are not explicitly verified before execution.",
+      "suggested_fix": "Implement a verification step after 'verify_inter_site_replication' to ensure that the schema is correctly updated.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:weak_rollback:raise_functional_level",
+      "task_id": "raise_functional_level",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for 'raise_functional_level' fails to account for potential issues during the rollback process.",
+      "suggested_fix": "Ensure that the rollback process properly confirms that the domain functional level is reverted successfully and safely.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:upgrade_primary_site",
+      "task_id": "upgrade_primary_site",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'upgrade_primary_site' is sequenced before the verification of the functional level raise is complete.",
+      "suggested_fix": "Sequence 'upgrade_primary_site' to occur only after the successful execution of 'verify_functional_level'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:upgrade_primary_site",
+      "task_id": "upgrade_primary_site",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'upgrade_primary_site' is dependent on the 'raise_functional_level' task, which is not verified before its execution.",
+      "suggested_fix": "Add a verification step to confirm successful raising of the functional level prior to this upgrade activity.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:upgrade_remote_site_1",
+      "task_id": "upgrade_remote_site_1",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'upgrade_remote_site_1' is sequenced before confirmation of the primary site upgrade success.",
+      "suggested_fix": "Ensure 'upgrade_remote_site_1' only begins after successful completion of 'verify_primary_site_upgrade'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:upgrade_remote_site_2",
+      "task_id": "upgrade_remote_site_2",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'upgrade_remote_site_2' is sequenced before confirmation of the first remote site's upgrade success.",
+      "suggested_fix": "Ensure 'upgrade_remote_site_2' only begins after successful completion of 'verify_remote_site_1_upgrade'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:win-01-ad-functional-level:4:4",
+    "plan_id": "plan-win-01-ad-functional-level-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:raise_functional_level",
+    "question": "Plan for goal 'win-01-ad-functional-level' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=11"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

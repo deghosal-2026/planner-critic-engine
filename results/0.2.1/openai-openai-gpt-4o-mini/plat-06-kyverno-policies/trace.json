@@ -1,0 +1,251 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-06-kyverno-policies",
+  "duration_seconds": 21.52,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-plat-06-kyverno-policies-r2",
+    "goal_id": "plat-06-kyverno-policies",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plat-06-kyverno-policies-plan",
+    "created_at": "2026-08-23T22:02:08.863883Z",
+    "tasks": [
+      {
+        "id": "define_policies",
+        "description": "Define ClusterPolicy resources enforcing baseline/restricted Pod Security Standards",
+        "action": "define",
+        "target": "ClusterPolicy",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "environment is production",
+            "fact": "env_production",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_audit_mode",
+        "description": "Deploy the policies in audit mode for a 7-day observation period",
+        "action": "deploy",
+        "target": "policy",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ClusterPolicy resources are defined",
+            "fact": "policies_defined",
+            "established_by": "define_policies",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "review_reports",
+        "description": "Review violation reports generated during the observation period",
+        "action": "review",
+        "target": "reports",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Policies are deployed in audit mode",
+            "fact": "policies_audit_deployed",
+            "established_by": "deploy_audit_mode",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "remediate_violations",
+        "description": "Work with teams to remediate violations found in the reports",
+        "action": "remediate",
+        "target": "violations",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Violation reports have been reviewed",
+            "fact": "reports_reviewed",
+            "established_by": "review_reports",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "switch_enforce_mode",
+        "description": "Switch policies to enforce mode after sign-off from relevant teams",
+        "action": "switch",
+        "target": "policy",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "policy mode",
+          "how": "check policy status",
+          "expected": "enforce"
+        },
+        "rollback": {
+          "trigger": "sign-off not received",
+          "action": "revert to audit mode",
+          "safety_guard": "confirm teams are aligned"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_violations",
+        "description": "Monitor ongoing violations via custom metrics in Prometheus",
+        "action": "monitor",
+        "target": "violations",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Policies are in enforce mode",
+            "fact": "policies_enforce_mode",
+            "established_by": "switch_enforce_mode",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "monitoring status",
+          "how": "check metrics in Prometheus",
+          "expected": "no critical violations"
+        },
+        "rollback": {
+          "trigger": "policy violations exceed threshold",
+          "action": "switch back to audit mode",
+          "safety_guard": "validate metrics"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define_policies",
+        "to_task": "deploy_audit_mode",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_audit_mode",
+        "to_task": "review_reports",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "review_reports",
+        "to_task": "remediate_violations",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "remediate_violations",
+        "to_task": "switch_enforce_mode",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "switch_enforce_mode",
+        "to_task": "monitor_violations",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:switch_enforce_mode",
+      "task_id": "switch_enforce_mode",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'switch_enforce_mode' is not dependent on receiving a sign-off, making it susceptible to executing without required approval.",
+      "suggested_fix": "Add a precondition to ensure sign-off is received before executing 'switch_enforce_mode'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:switch_enforce_mode",
+      "task_id": "switch_enforce_mode",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for 'switch_enforce_mode' lacks a clear plan for reversing to a safe state if the sign-off is not received.",
+      "suggested_fix": "Ensure rollback to the previous state is solidified even when sign-off is not received, perhaps by explicitly stating necessary safety guards.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:monitor_violations",
+      "task_id": "monitor_violations",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'monitor_violations' depends on 'switch_enforce_mode' without verifying that it was actually switched to enforce mode.",
+      "suggested_fix": "Establish a verification process before proceeding to 'monitor_violations' to confirm the mode switch was successful.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:plan",
+      "task_id": null,
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider including additional edge case scenarios for remediation and monitoring in the planning stage.",
+      "suggested_fix": "Plan for various types of violations and define the steps to handle them explicitly in the task descriptions.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

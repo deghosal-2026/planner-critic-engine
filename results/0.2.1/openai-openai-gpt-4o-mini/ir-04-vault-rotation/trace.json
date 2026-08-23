@@ -1,0 +1,215 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-04-vault-rotation",
+  "duration_seconds": 38.46,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-ir-04-vault-rotation-r4",
+    "goal_id": "ir-04-vault-rotation",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-ir-04-vault-rotation-r3",
+    "created_at": "2026-08-23T22:05:35.203015Z",
+    "tasks": [
+      {
+        "id": "generate_password",
+        "description": "Generate a new password using Vault's dynamic secrets engine",
+        "action": "generate",
+        "target": "vault",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Vault is reachable",
+            "fact": "vault_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "new password generation",
+          "how": "check Vault for new secret",
+          "expected": "new password not empty"
+        },
+        "rollback": {
+          "trigger": "password generation fails",
+          "action": "reactivate old password",
+          "safety_guard": "ensure old password is still valid"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_database_access",
+        "description": "Verify that the application can execute a simple SELECT against the database with the new credential",
+        "action": "verify",
+        "target": "database",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "database SELECT execution",
+          "how": "run SELECT query",
+          "expected": "query returns expected result"
+        },
+        "rollback": {
+          "trigger": "database access verification fails",
+          "action": "restore previous credentials",
+          "safety_guard": "ensure database connection is retained"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update_services",
+        "description": "Update all consuming services to use the new password",
+        "action": "update",
+        "target": "services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service connectivity",
+          "how": "execute simple API calls to services",
+          "expected": "services respond successfully"
+        },
+        "rollback": {
+          "trigger": "service update fails",
+          "action": "revert service configuration to previous settings",
+          "safety_guard": "ensure services can access previous configuration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "revoke_old_password",
+        "description": "Revoke the old password lease in Vault",
+        "action": "revoke",
+        "target": "vault",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "new password is active and verified",
+            "fact": "db_access_verified",
+            "established_by": "update_services",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "old password lease status",
+          "how": "check Vault for old password lease",
+          "expected": "old password lease is revoked"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "generate_password",
+        "to_task": "verify_database_access",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_database_access",
+        "to_task": "update_services",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_services",
+        "to_task": "revoke_old_password",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:verify_database_access",
+      "task_id": "verify_database_access",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The 'verify_database_access' task is sequenced before the completion of the 'generate_password' task, which is a hard prerequisite. This could lead to verification attempts without a valid password.",
+      "suggested_fix": "Ensure 'generate_password' completes before 'verify_database_access'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:revoke_old_password",
+      "task_id": "revoke_old_password",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'revoke_old_password' task depends on 'db_access_verified' being established by 'update_services', but 'update_services' has not been verified before this task runs.",
+      "suggested_fix": "Re-structure the plan to ensure that 'db_access_verified' is confirmed via a verification step before executing 'revoke_old_password'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:weak_rollback:generate_password",
+      "task_id": "generate_password",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'generate_password' action depends on the old password being still valid, which is not guaranteed if the generation of a new password succeeds.",
+      "suggested_fix": "Implement a rollback that ensures both the validity of the old password and the proper deactivation of the new one.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:missing_steps:update_services",
+      "task_id": "update_services",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The 'update_services' task may need to include a verification step to confirm all services are correctly updated and functioning with the new password.",
+      "suggested_fix": "Add a verification step after updating services to confirm that all services can connect with the new credentials.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-04-vault-rotation:4:4",
+    "plan_id": "plan-ir-04-vault-rotation-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:verify_database_access",
+    "question": "Plan for goal 'ir-04-vault-rotation' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

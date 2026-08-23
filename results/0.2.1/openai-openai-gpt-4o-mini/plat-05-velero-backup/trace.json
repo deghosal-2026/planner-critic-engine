@@ -1,0 +1,277 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-05-velero-backup",
+  "duration_seconds": 35.94,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-plat-05-velero-backup-r3",
+    "goal_id": "plat-05-velero-backup",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-plat-05-velero-backup-r2",
+    "created_at": "2026-08-23T22:01:47.008190Z",
+    "tasks": [
+      {
+        "id": "install_velero",
+        "description": "Install Velero with object storage plugin (AWS S3)",
+        "action": "install",
+        "target": "velero",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Velero installation status",
+          "how": "check Velero CLI version",
+          "expected": "version_printed"
+        },
+        "rollback": {
+          "trigger": "install fails",
+          "action": "uninstall Velero",
+          "safety_guard": "check for leftover resources"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_backup_schedule",
+        "description": "Configure daily backup schedules with 30-day retention policy",
+        "action": "configure",
+        "target": "backup_schedule",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "backup schedule configuration",
+          "how": "check Velero configuration file",
+          "expected": "daily backups with 30-day retention"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "reset configuration",
+          "safety_guard": "confirm previous configuration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "manual_backup",
+        "description": "Execute a manual backup",
+        "action": "backup",
+        "target": "k8s_clusters",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "manual backup success",
+          "how": "check backup logs",
+          "expected": "backup completed successfully"
+        },
+        "rollback": {
+          "trigger": "backup fails",
+          "action": "revert to previous state",
+          "safety_guard": "ensure no resources were modified before backup"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "full_restore",
+        "description": "Perform full restore to validation namespace",
+        "action": "restore",
+        "target": "validation_namespace",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "restored application functionality",
+          "how": "check application health status",
+          "expected": "application running without errors"
+        },
+        "rollback": {
+          "trigger": "restore fails",
+          "action": "revert to previous state",
+          "safety_guard": "ensure validation namespace is untouched"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "validate_alerts",
+        "description": "Validate automated alerts on backup failures",
+        "action": "test",
+        "target": "alert_system",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "alerts are configured",
+            "fact": "alerts_configured",
+            "established_by": "configure_backup_schedule",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "alert system functionality",
+          "how": "trigger a backup failure and check alerts",
+          "expected": "alerts triggered successfully"
+        },
+        "rollback": {
+          "trigger": "validation fails",
+          "action": "reset alert configurations",
+          "safety_guard": "ensure previous alert configurations are intact"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "install_velero",
+        "to_task": "configure_backup_schedule",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_backup_schedule",
+        "to_task": "manual_backup",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "manual_backup",
+        "to_task": "full_restore",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "full_restore",
+        "to_task": "validate_alerts",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:missing_steps:install_velero",
+      "task_id": "install_velero",
+      "version": 3,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider verifying the AWS credentials and permissions before the Velero installation.",
+      "suggested_fix": "Add a preliminary check for AWS credentials and permissions.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:missing_steps:configure_backup_schedule",
+      "task_id": "configure_backup_schedule",
+      "version": 3,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Could also cover edge cases such as failed backup schedules due to misconfigurations.",
+      "suggested_fix": "Include a step to validate the backup schedule configurations after setting them.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:missing_steps:manual_backup",
+      "task_id": "manual_backup",
+      "version": 3,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding verification for backup integrity post manual backup execution.",
+      "suggested_fix": "Include a verification step to check the integrity of the backup files.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:missing_steps:full_restore",
+      "task_id": "full_restore",
+      "version": 3,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Could also check for data consistency in the restored application.",
+      "suggested_fix": "Add a step to verify data integrity as part of application functionality checks.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:missing_steps:validate_alerts",
+      "task_id": "validate_alerts",
+      "version": 3,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider validating the alert system's response time as part of the test.",
+      "suggested_fix": "Include a metric to measure response time of triggered alerts.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:feasibility:manual_backup",
+      "task_id": "manual_backup",
+      "version": 3,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The manual backup task lacks a prerequisite check ensuring that the Velero installation was successful.",
+      "suggested_fix": "Ensure a check for Velero installation success before proceeding to the manual backup.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:full_restore",
+      "task_id": "full_restore",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The full restore task is ordered before the manual backup is confirmed to have succeeded.",
+      "suggested_fix": "Reorder tasks to ensure that full restore only executes after a successful manual backup.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:plat-05-velero-backup:3:3",
+    "plan_id": "plan-plat-05-velero-backup-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:feasibility:manual_backup",
+    "question": "Plan for goal 'plat-05-velero-backup' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

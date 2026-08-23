@@ -1,0 +1,352 @@
+{
+  "dimension": "core-api",
+  "goal_id": "fin-02-spot-migration",
+  "duration_seconds": 55.07,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-fin-02-spot-migration-r3",
+    "goal_id": "fin-02-spot-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-fin-02-spot-migration-r2",
+    "created_at": "2026-08-23T21:54:29.961111Z",
+    "tasks": [
+      {
+        "id": "identify-workloads",
+        "description": "Identify spot-eligible workloads",
+        "action": "identify",
+        "target": "workloads",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EC2 instance data is accessible",
+            "fact": "ec2_data_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "list of identified workloads",
+          "how": "run queries against inventory",
+          "expected": "workloads marked as spot-eligible"
+        },
+        "rollback": {
+          "trigger": "identification fails",
+          "action": "revert to previous state",
+          "safety_guard": "verify workload remained unchanged"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "design-strategy",
+        "description": "Design instance diversification strategy",
+        "action": "design",
+        "target": "diversification",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "identified workloads exist",
+            "fact": "workloads_identified",
+            "established_by": "identify-workloads",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "diversification strategy details",
+          "how": "review strategy document",
+          "expected": "strategy is documented and approved"
+        },
+        "rollback": {
+          "trigger": "strategy design fails",
+          "action": "revert to previous strategy",
+          "safety_guard": "verify previous strategy is intact"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-spot-fleet",
+        "description": "Configure Spot Fleet with capacity rebalancing",
+        "action": "configure",
+        "target": "spot_fleet",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "diversification strategy is designed",
+            "fact": "strategy_designed",
+            "established_by": "design-strategy",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Spot Fleet configuration",
+          "how": "describe fleet via AWS CLI",
+          "expected": "configuration matches design"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "restore previous fleet config",
+          "safety_guard": "verify fleet health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup-interruption-handling",
+        "description": "Set up interruption handling",
+        "action": "setup",
+        "target": "interruption_handling",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "spot fleet is configured",
+            "fact": "fleet_configured",
+            "established_by": "configure-spot-fleet",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "interruption handling mechanism",
+          "how": "run tests for drain and reschedule",
+          "expected": "handling works within 2 minutes"
+        },
+        "rollback": {
+          "trigger": "interruption handling setup fails",
+          "action": "disable handling and revert settings",
+          "safety_guard": "verify default settings restored"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "launch-spot-fleet",
+        "description": "Launch Spot Fleet",
+        "action": "launch",
+        "target": "spot_fleet",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "interruption handling is set up",
+            "fact": "interruption_handling_set",
+            "established_by": "setup-interruption-handling",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "running Spot Fleet instances",
+          "how": "check fleet status via AWS CLI",
+          "expected": "fleet is running"
+        },
+        "rollback": {
+          "trigger": "launch fails",
+          "action": "delete fleet",
+          "safety_guard": "verify spot instances are terminated"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "drain-traffic",
+        "description": "Drain traffic from on-demand to spot",
+        "action": "drain",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "spot fleet is launched",
+            "fact": "fleet_launched",
+            "established_by": "launch-spot-fleet",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic flow stability",
+          "how": "monitor traffic metrics",
+          "expected": "no degradation in service"
+        },
+        "rollback": {
+          "trigger": "drain fails",
+          "action": "resume on-demand traffic",
+          "safety_guard": "verify traffic is stable"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-service-stability",
+        "description": "Verify service stability",
+        "action": "verify",
+        "target": "service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "traffic drain is completed",
+            "fact": "traffic_drain_completed",
+            "established_by": "drain-traffic",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service load metrics",
+          "how": "analyze service logs",
+          "expected": "service runs without issues"
+        },
+        "rollback": {
+          "trigger": "service instability detected",
+          "action": "restore previous service configuration",
+          "safety_guard": "verify previous service state is intact"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "maintain-on-demand-fallback",
+        "description": "Maintain on-demand fallback pool",
+        "action": "maintain",
+        "target": "on-demand_pool",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "service stability verified",
+            "fact": "service_stable",
+            "established_by": "verify-service-stability",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "on-demand pool status",
+          "how": "check instance health",
+          "expected": "on-demand pool is healthy"
+        },
+        "rollback": {
+          "trigger": "fallback pool maintenance fails",
+          "action": "revert to previous pool state",
+          "safety_guard": "verify previous pool state is intact"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "identify-workloads",
+        "to_task": "design-strategy",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "design-strategy",
+        "to_task": "configure-spot-fleet",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-spot-fleet",
+        "to_task": "setup-interruption-handling",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup-interruption-handling",
+        "to_task": "launch-spot-fleet",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "launch-spot-fleet",
+        "to_task": "drain-traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "drain-traffic",
+        "to_task": "verify-service-stability",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-service-stability",
+        "to_task": "maintain-on-demand-fallback",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:feasibility:setup-interruption-handling",
+      "task_id": "setup-interruption-handling",
+      "version": 3,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The task of setting up interruption handling lacks clarity on the exact mechanism for drain and reschedule, which may not be achievable within the required 2 minutes without a defined process.",
+      "suggested_fix": "Specify the interruption handling mechanism and include a step that outlines how to test the 2-minute requirement.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:drain-traffic",
+      "task_id": "drain-traffic",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task of draining traffic is scheduled after launching the Spot Fleet, but if the Spot Fleet fails to launch properly, there could be no mechanism to drain traffic, leading to potential service instability.",
+      "suggested_fix": "Add a verification step to ensure the Spot Fleet is successfully launched and operational before proceeding to drain traffic.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:setup-interruption-handling",
+      "task_id": "setup-interruption-handling",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The dependency on the Spot Fleet configuration being correct needs verification before setting up interruption handling; failure to establish this may lead to inadequate interruption handling mechanisms being applied.",
+      "suggested_fix": "Include a verification step that checks the correctness of the Spot Fleet configuration before setting up interruption handling.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:fin-02-spot-migration:3:3",
+    "plan_id": "plan-fin-02-spot-migration-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:feasibility:setup-interruption-handling",
+    "question": "Plan for goal 'fin-02-spot-migration' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

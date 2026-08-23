@@ -1,0 +1,341 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dc-02-app-decommission",
+  "duration_seconds": 24.76,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-dc-02-app-decommission-r2",
+    "goal_id": "dc-02-app-decommission",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "dc-02-app-decommission-v1",
+    "created_at": "2026-08-23T21:50:26.342844Z",
+    "tasks": [
+      {
+        "id": "identify_dependencies",
+        "description": "Identify all dependencies for the legacy application.",
+        "action": "list_dependencies",
+        "target": "legacy_app",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "legacy application is operational",
+            "fact": "app_running",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "dependency completeness",
+          "how": "cross-check with existing documentation",
+          "expected": "all dependencies identified"
+        },
+        "rollback": {
+          "trigger": "dependencies are missed",
+          "action": "revalidate dependency list",
+          "safety_guard": "consult dependency documentation"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "notify_teams",
+        "description": "Notify all teams depending on the legacy application.",
+        "action": "send_notifications",
+        "target": "teams",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dependencies identified",
+            "fact": "dependencies_listed",
+            "established_by": "identify_dependencies",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "notification status",
+          "how": "check response from team members",
+          "expected": "all teams notified"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_traffic_redirect",
+        "description": "Set up traffic redirect to the replacement service.",
+        "action": "configure_nginx",
+        "target": "nginx",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "notification sent to teams",
+            "fact": "teams_notified",
+            "established_by": "notify_teams",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic flow confirmation",
+          "how": "test requests to new service",
+          "expected": "traffic successfully directed"
+        },
+        "rollback": {
+          "trigger": "redirect fails",
+          "action": "restore previous nginx config",
+          "safety_guard": "keep backup of nginx config"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "handle_in_flight_transactions",
+        "description": "Handle in-flight transactions and billing reconciliation.",
+        "action": "reconcile_billing",
+        "target": "billing_system",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "traffic redirect established",
+            "fact": "traffic_redirected",
+            "established_by": "setup_traffic_redirect",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "billing records accuracy",
+          "how": "compare with transaction logs",
+          "expected": "no discrepancies"
+        },
+        "rollback": {
+          "trigger": "billing discrepancies found",
+          "action": "revert to last known good state in billing",
+          "safety_guard": "confirm integrity of billing data"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "export_archive_data",
+        "description": "Export and archive historical data.",
+        "action": "archive_data",
+        "target": "data_storage",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "billing reconciled",
+            "fact": "billing_reconciled",
+            "established_by": "handle_in_flight_transactions",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data integrity",
+          "how": "check archived data size",
+          "expected": "data matches source"
+        },
+        "rollback": {
+          "trigger": "archive incomplete",
+          "action": "retry export process",
+          "safety_guard": "verify data completeness"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "revoke_access",
+        "description": "Revoke access credentials for the legacy application.",
+        "action": "revoke_credentials",
+        "target": "credentials",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "data archived",
+            "fact": "data_archived",
+            "established_by": "export_archive_data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "access status",
+          "how": "audit access logs",
+          "expected": "all credentials revoked"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "shutdown_infrastructure",
+        "description": "Shut down infrastructure related to the legacy application.",
+        "action": "terminate_resources",
+        "target": "aws",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "access revoked",
+            "fact": "access_revoked",
+            "established_by": "revoke_access",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "resource termination status",
+          "how": "check AWS console",
+          "expected": "all resources terminated"
+        },
+        "rollback": {
+          "trigger": "shutdown fails",
+          "action": "restore resources",
+          "safety_guard": "document existing resource states"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "identify_dependencies",
+        "to_task": "notify_teams",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "notify_teams",
+        "to_task": "setup_traffic_redirect",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_traffic_redirect",
+        "to_task": "handle_in_flight_transactions",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "handle_in_flight_transactions",
+        "to_task": "export_archive_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "export_archive_data",
+        "to_task": "revoke_access",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "revoke_access",
+        "to_task": "shutdown_infrastructure",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:identify_dependencies",
+      "task_id": "identify_dependencies",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The task assumes the legacy application is operational without an explicit check for operational status before proceeding.",
+      "suggested_fix": "Add a precondition to ensure the application is confirmed operational.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:notify_teams",
+      "task_id": "notify_teams",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider a step for confirming that all teams have responded to the notifications sent.",
+      "suggested_fix": "Add a follow-up procedure to track responses from teams.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:feasibility:setup_traffic_redirect",
+      "task_id": "setup_traffic_redirect",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "This task is contingent on notifying teams, but there is no verification of successful notification before setting up the traffic redirect.",
+      "suggested_fix": "Ensure the notification is acknowledged before proceeding to traffic redirect.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:handle_in_flight_transactions",
+      "task_id": "handle_in_flight_transactions",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task assumes traffic redirect is established based on previous completion but lacks a verification step.",
+      "suggested_fix": "Add a verification step to confirm that the traffic redirect was successful before reconciling billing.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:export_archive_data",
+      "task_id": "export_archive_data",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for this task does not ensure data is fully verified before reattempting the archive.",
+      "suggested_fix": "Include a verification step after the retry for completeness of data during rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:shutdown_infrastructure",
+      "task_id": "shutdown_infrastructure",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The shutdown depends on revoking access without ensuring that all access has actually been revoked as verified.",
+      "suggested_fix": "Add a verification step to confirm all credentials have been revoked before shutting down infrastructure.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,284 @@
+{
+  "dimension": "core-api",
+  "goal_id": "fin-03-budget-alert-rollout",
+  "duration_seconds": 21.19,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-fin-03-budget-alert-rollout-r2",
+    "goal_id": "fin-03-budget-alert-rollout",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "fin-03-budget-alert-rollout-plan",
+    "created_at": "2026-08-23T21:54:50.761928Z",
+    "tasks": [
+      {
+        "id": "define_tag_policy",
+        "description": "Define the tag policy for the organization.",
+        "action": "define_policy",
+        "target": "tagging",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "apply_tag_policy_scp",
+        "description": "Apply the tag policy via Service Control Policies (SCP).",
+        "action": "apply_scp",
+        "target": "aws_organization",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Tag policy is defined",
+            "fact": "tag_policy_defined",
+            "established_by": "define_tag_policy",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "SCP policy application status",
+          "how": "check SCP status in AWS console",
+          "expected": "policy applied successfully"
+        },
+        "rollback": {
+          "trigger": "tag policy application fails",
+          "action": "revert tag policy SCP",
+          "safety_guard": "verify existing resource functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_aws_budgets",
+        "description": "Configure AWS Budgets per account and per team.",
+        "action": "configure_budgets",
+        "target": "aws_budgets",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Tag policy applied",
+            "fact": "tag_policy_applied",
+            "established_by": "apply_tag_policy_scp",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "budget configuration status",
+          "how": "check AWS Budgets for configuration",
+          "expected": "budgets configured correctly"
+        },
+        "rollback": {
+          "trigger": "budget configuration fails",
+          "action": "reset budget configuration",
+          "safety_guard": "verify budgets are not incorrectly configured"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_sns_alerts",
+        "description": "Set up SNS alerts for budget thresholds.",
+        "action": "setup_sns",
+        "target": "sns_alerts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Budgets are configured",
+            "fact": "budgets_configured",
+            "established_by": "configure_aws_budgets",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "SNS alert configuration status",
+          "how": "check SNS configurations",
+          "expected": "SNS alerts set up correctly"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "create_anomaly_detection_alerts",
+        "description": "Create anomaly detection alerts.",
+        "action": "create_anomaly_alerts",
+        "target": "anomaly_detection",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "SNS alerts setup",
+            "fact": "sns_alerts_configured",
+            "established_by": "setup_sns_alerts",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "anomaly detection alert configuration",
+          "how": "test alert triggering",
+          "expected": "alerts trigger only on anomalies"
+        },
+        "rollback": {
+          "trigger": "anomaly detection creation fails",
+          "action": "delete anomaly detection alert",
+          "safety_guard": "verify alerts are not being triggered"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_alerts_fire_correctly",
+        "description": "Verify that the alerts fire correctly.",
+        "action": "verify_alerts",
+        "target": "alerts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Anomaly detection alerts created",
+            "fact": "anomaly_alerts_created",
+            "established_by": "create_anomaly_detection_alerts",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "alert firing status",
+          "how": "simulate alert conditions",
+          "expected": "alerts fire as expected"
+        },
+        "rollback": {
+          "trigger": "alerts do not fire correctly",
+          "action": "reconfigure alerts",
+          "safety_guard": "ensure alerts are functional"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define_tag_policy",
+        "to_task": "apply_tag_policy_scp",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "apply_tag_policy_scp",
+        "to_task": "configure_aws_budgets",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_aws_budgets",
+        "to_task": "setup_sns_alerts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_sns_alerts",
+        "to_task": "create_anomaly_detection_alerts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_anomaly_detection_alerts",
+        "to_task": "verify_alerts_fire_correctly",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:define_tag_policy",
+      "task_id": "define_tag_policy",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The tag policy must be defined with specific tags including owner, environment, and cost-center as per requirements.",
+      "suggested_fix": "Ensure the tag policy includes definitions for owner, environment, and cost-center.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:apply_tag_policy_scp",
+      "task_id": "apply_tag_policy_scp",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The apply_tag_policy_scp task is sequenced before the tag policy is verified as defined.",
+      "suggested_fix": "Reorder tasks to ensure apply_tag_policy_scp is only executed after define_tag_policy is confirmed as successful.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:configure_aws_budgets",
+      "task_id": "configure_aws_budgets",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task configure_aws_budgets depends on tag_policy_applied from apply_tag_policy_scp, which lacks verification.",
+      "suggested_fix": "Add a verification step to the apply_tag_policy_scp task to ensure tag policy was applied successfully.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:setup_sns_alerts",
+      "task_id": "setup_sns_alerts",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The setup_sns_alerts task lacks rollback procedures, creating a risk if the task fails.",
+      "suggested_fix": "Implement rollback actions for setup_sns_alerts to revert any changes in case of a failure.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:risk:create_anomaly_detection_alerts",
+      "task_id": "create_anomaly_detection_alerts",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "There is a risk of false positives with anomaly detection alerts which could lead to unnecessary notifications.",
+      "suggested_fix": "Consider adjusting anomaly detection parameters to minimize false positives.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

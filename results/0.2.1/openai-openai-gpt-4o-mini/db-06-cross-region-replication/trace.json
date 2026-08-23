@@ -1,0 +1,251 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-06-cross-region-replication",
+  "duration_seconds": 31.34,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-db-06-cross-region-replication-r3",
+    "goal_id": "db-06-cross-region-replication",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-db-06-cross-region-replication-r2",
+    "created_at": "2026-08-23T21:59:53.135408Z",
+    "tasks": [
+      {
+        "id": "setup_replication",
+        "description": "Set up cross-region logical replication using pglogical",
+        "action": "configure",
+        "target": "pglogical",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replication status",
+          "how": "check pglogical logs",
+          "expected": "replication is active"
+        },
+        "rollback": {
+          "trigger": "replication setup fails",
+          "action": "delete replication slot and reconfigure",
+          "safety_guard": "verify replication status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "filter_databases",
+        "description": "Filter critical databases for replication",
+        "action": "filter",
+        "target": "pglogical",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "replication is configured",
+            "fact": "replication_setup_complete",
+            "established_by": "setup_replication",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "filtered databases",
+          "how": "check filter results",
+          "expected": "only critical databases are included"
+        },
+        "rollback": {
+          "trigger": "filtering fails",
+          "action": "revert to all databases",
+          "safety_guard": "confirm database integrity"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_latency",
+        "description": "Set up monitoring for replication latency",
+        "action": "monitor",
+        "target": "latency",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "latency metrics",
+          "how": "review monitoring reports",
+          "expected": "lag is within acceptable limits"
+        },
+        "rollback": {
+          "trigger": "monitoring fails",
+          "action": "revert to previous monitoring system",
+          "safety_guard": "check monitoring data"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "automate_failback",
+        "description": "Implement automated failback procedure",
+        "action": "configure",
+        "target": "failback",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "failback operation",
+          "how": "test failback scenarios",
+          "expected": "no data loss during failback"
+        },
+        "rollback": {
+          "trigger": "failback automation fails",
+          "action": "manual failback process",
+          "safety_guard": "ensure no data loss"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "dr_drill_automation",
+        "description": "Automate disaster recovery drill",
+        "action": "automate",
+        "target": "drill",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "drill success",
+          "how": "review drill reports",
+          "expected": "DR drill passes all checks"
+        },
+        "rollback": {
+          "trigger": "DR drill automation fails",
+          "action": "revert to manual drills",
+          "safety_guard": "log drill outcomes"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup_replication",
+        "to_task": "filter_databases",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "filter_databases",
+        "to_task": "monitor_latency",
+        "kind": "soft",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_latency",
+        "to_task": "automate_failback",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "automate_failback",
+        "to_task": "dr_drill_automation",
+        "kind": "soft",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:filter_databases",
+      "task_id": "filter_databases",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'filter_databases' is sequenced before 'setup_replication' is marked as complete, violating prerequisite dependencies.",
+      "suggested_fix": "Ensure 'setup_replication' completion is verified before allowing 'filter_databases' to execute.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:weak_rollback:automate_failback",
+      "task_id": "automate_failback",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for 'automate_failback' lacks a solid process to handle potential data loss in a failback scenario, making it highly risky.",
+      "suggested_fix": "Develop a comprehensive rollback strategy that includes data validation steps to ensure no data loss.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:filter_databases",
+      "task_id": "filter_databases",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'filter_databases' depends on 'setup_replication' being complete but lacks a verified dependency check that confirms this prior to execution.",
+      "suggested_fix": "Implement a verification step to check 'replication_setup_complete' before executing 'filter_databases'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:missing_steps:plan",
+      "task_id": null,
+      "version": 3,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The plan does not explicitly address the risk of schema changes on the primary breaking replication, which needs to be accounted for.",
+      "suggested_fix": "Include a step to manage and monitor schema changes during the replication process.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:risk:plan",
+      "task_id": null,
+      "version": 3,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "High risk involved in the failback procedure due to lack of detail on conflict resolution for bidirectional use cases.",
+      "suggested_fix": "Add strategies for conflict resolution in the failback procedure, particularly for scenarios involving bidirectional replication.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-06-cross-region-replication:3:3",
+    "plan_id": "plan-db-06-cross-region-replication-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:filter_databases",
+    "question": "Plan for goal 'db-06-cross-region-replication' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

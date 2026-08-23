@@ -1,0 +1,212 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-04-connection-pooling",
+  "duration_seconds": 17.57,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-db-04-connection-pooling-r2",
+    "goal_id": "db-04-connection-pooling",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plan-db-04-connection-pooling",
+    "created_at": "2026-08-23T21:58:50.385197Z",
+    "tasks": [
+      {
+        "id": "backup-config",
+        "description": "Back up current application configurations",
+        "action": "backup",
+        "target": "app_configs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "application configurations are accessible",
+            "fact": "configs_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy-pgbouncer",
+        "description": "Deploy PgBouncer in transaction-pooling mode",
+        "action": "deploy",
+        "target": "PgBouncer",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PgBouncer servers are provisioned",
+            "fact": "pgbouncer_provisioned",
+            "established_by": "backup-config",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "PgBouncer service status",
+          "how": "check service logs and health checks",
+          "expected": "PgBouncer is running"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to previous config",
+          "safety_guard": "verify PgBouncer is not in use"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update-dns",
+        "description": "Update DNS records to point to PgBouncer",
+        "action": "update",
+        "target": "DNS",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PgBouncer deployment is verified",
+            "fact": "pgbouncer_deployed",
+            "established_by": "deploy-pgbouncer",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "DNS propagation",
+          "how": "check DNS resolution from client servers",
+          "expected": "all app servers resolve to PgBouncer"
+        },
+        "rollback": {
+          "trigger": "DNS propagation fails",
+          "action": "revert DNS changes",
+          "safety_guard": "verify old DNS records are restored"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor-performance",
+        "description": "Monitor application performance post-deployment",
+        "action": "monitor",
+        "target": "app_performance",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DNS update is completed",
+            "fact": "dns_updated",
+            "established_by": "update-dns",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application performance metrics",
+          "how": "collect and analyze performance data",
+          "expected": "application performs within expected thresholds"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "backup-config",
+        "to_task": "deploy-pgbouncer",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-pgbouncer",
+        "to_task": "update-dns",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-dns",
+        "to_task": "monitor-performance",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:deploy-pgbouncer",
+      "task_id": "deploy-pgbouncer",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The deployment of PgBouncer depends on the verifiable state of its provisioning, but there's no verification for the fact 'pgbouncer_provisioned'.",
+      "suggested_fix": "Add a verification step to confirm that PgBouncer servers are provisioned before deployment.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:deploy-pgbouncer",
+      "task_id": "deploy-pgbouncer",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for PgBouncer deployment is not sound. It lacks verification that PgBouncer is not in use before executing the rollback.",
+      "suggested_fix": "Implement a verification step to ensure that no connections are active on PgBouncer before rolling back.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:update-dns",
+      "task_id": "update-dns",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider checking for DNS resolution across all application servers not just verifying DNS propagation from a single source.",
+      "suggested_fix": "Add a step to confirm DNS resolution from multiple application servers.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:monitor-performance",
+      "task_id": "monitor-performance",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Monitoring application performance metrics should include checks for connection pool utilization and application error rates post-deployment.",
+      "suggested_fix": "Include additional metrics to monitor such as connection pool metrics and error rates.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

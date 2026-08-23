@@ -1,0 +1,299 @@
+{
+  "dimension": "core-api",
+  "goal_id": "win-03-datacenter-exit",
+  "duration_seconds": 61.74,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-win-03-datacenter-exit-r4",
+    "goal_id": "win-03-datacenter-exit",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-win-03-datacenter-exit-r3",
+    "created_at": "2026-08-23T22:11:33.758790Z",
+    "tasks": [
+      {
+        "id": "provision_infrastructure",
+        "description": "Provision cloud infrastructure on AWS (EC2, RDS, EFS)",
+        "action": "provision",
+        "target": "AWS",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AWS account is set up",
+            "fact": "aws_account_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "infrastructure status",
+          "how": "check infrastructure setup logs",
+          "expected": "infrastructure provisioned successfully"
+        },
+        "rollback": {
+          "trigger": "provisioning fails",
+          "action": "delete provisioned resources",
+          "safety_guard": "verify no resources are left"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "replicate_data",
+        "description": "Replicate data (database backup/restore + file sync)",
+        "action": "replicate",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Backup of database is available",
+            "fact": "db_backup_ready",
+            "established_by": "provision_infrastructure",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data integrity",
+          "how": "compare checksums",
+          "expected": "checksums match"
+        },
+        "rollback": {
+          "trigger": "replication fails",
+          "action": "restore data from backup",
+          "safety_guard": "verify backup integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "establish_connectivity",
+        "description": "Establish network connectivity (VPN/DirectConnect)",
+        "action": "connect",
+        "target": "network",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Network settings are configured",
+            "fact": "network_configured",
+            "established_by": "provision_infrastructure",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "connectivity status",
+          "how": "ping test and trace route",
+          "expected": "connectivity established"
+        },
+        "rollback": {
+          "trigger": "connectivity fails",
+          "action": "revert network settings",
+          "safety_guard": "ensure systems can fall back to previous configuration"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "dual_run",
+        "description": "Run a dual-run period (traffic to both on-prem and cloud)",
+        "action": "run",
+        "target": "applications",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "All systems are operational",
+            "fact": "systems_ready",
+            "established_by": "establish_connectivity",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application performance",
+          "how": "analyze traffic logs",
+          "expected": "no significant issues"
+        },
+        "rollback": {
+          "trigger": "issues detected during dual-run",
+          "action": "redirect traffic back to on-prem",
+          "safety_guard": "monitor application performance"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_in_cloud",
+        "description": "Verify application and data functionality in cloud",
+        "action": "verify",
+        "target": "applications",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Cutover has been executed",
+            "fact": "cutover_executed",
+            "established_by": "execute_cutover",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application and data functionality",
+          "how": "perform functional tests",
+          "expected": "all functions operate correctly"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "revert to previous state",
+          "safety_guard": "ensure rollback does not disrupt functionality"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "execute_cutover",
+        "description": "Execute cutover (DNS flip + load balancer drain)",
+        "action": "cutover",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dual-run is successfully completed",
+            "fact": "dual_run_success",
+            "established_by": "dual_run",
+            "probe": null
+          },
+          {
+            "description": "Cloud functionality is verified",
+            "fact": "cloud_app_functional",
+            "established_by": "verify_in_cloud",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic routing",
+          "how": "monitor DNS resolution and traffic",
+          "expected": "all traffic goes to cloud"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "revert DNS settings and re-enable on-prem load balancer",
+          "safety_guard": "check on-prem application health"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "decommission_on_prem",
+        "description": "Decommission the on-prem datacenter (shut down servers, cancel rack lease, dispose of hardware)",
+        "action": "decommission",
+        "target": "datacenter",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "All applications are functional in cloud",
+            "fact": "cloud_app_functional",
+            "established_by": "verify_in_cloud",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "hardware inventory",
+          "how": "audit hardware disposal",
+          "expected": "all hardware disposed"
+        },
+        "rollback": {
+          "trigger": "business needs on-prem infrastructure",
+          "action": "re-provision on-prem servers",
+          "safety_guard": "assess current capacity needs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "provision_infrastructure",
+        "to_task": "replicate_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "replicate_data",
+        "to_task": "establish_connectivity",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "establish_connectivity",
+        "to_task": "dual_run",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dual_run",
+        "to_task": "verify_in_cloud",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_in_cloud",
+        "to_task": "execute_cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "execute_cutover",
+        "to_task": "decommission_on_prem",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "preconditions_referenced:plan-win-03-datacenter-exit-r4:4:verify_in_cloud:cutover_executed",
+      "task_id": "verify_in_cloud",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "blocker",
+      "reason_code": "unverified_precondition",
+      "message": "precondition 'cutover_executed' on task 'verify_in_cloud' references no established fact from an earlier task",
+      "suggested_fix": "Point the precondition at an earlier task that establishes 'cutover_executed'",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:win-03-datacenter-exit:4:4",
+    "plan_id": "plan-win-03-datacenter-exit-r4",
+    "version": 4,
+    "blocker_finding_id": "preconditions_referenced:plan-win-03-datacenter-exit-r4:4:verify_in_cloud:cutover_executed",
+    "question": "Plan for goal 'win-03-datacenter-exit' cannot be approved: blockers remain (unverified_precondition). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,219 @@
+{
+  "dimension": "core-api",
+  "goal_id": "arch-02-cms-migration",
+  "duration_seconds": 20.49,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-arch-02-cms-migration-r2",
+    "goal_id": "arch-02-cms-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plan-arch-02-cms-migration",
+    "created_at": "2026-08-23T21:54:33.601678Z",
+    "tasks": [
+      {
+        "id": "export_content",
+        "description": "Export all posts, pages, and media from WordPress",
+        "action": "export",
+        "target": "wordpress",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "WordPress is reachable",
+            "fact": "wp_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "exported content checksum",
+          "how": "compare checksums",
+          "expected": "matches original content checksums"
+        },
+        "rollback": {
+          "trigger": "export fails",
+          "action": "retry export",
+          "safety_guard": "check for export logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "transform_content",
+        "description": "Transform exported content to match Contentful content model",
+        "action": "transform",
+        "target": "contentful",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Exported content exists",
+            "fact": "export_complete",
+            "established_by": "export_content",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "transformed content validation",
+          "how": "run validation checks",
+          "expected": "content matches Contentful model"
+        },
+        "rollback": {
+          "trigger": "transformation fails",
+          "action": "restore original content",
+          "safety_guard": "verify original content integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "import_content",
+        "description": "Import transformed content into Contentful",
+        "action": "import",
+        "target": "contentful",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Transformation success",
+            "fact": "transformation_complete",
+            "established_by": "transform_content",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "imported content check",
+          "how": "query Contentful",
+          "expected": "all content correctly imported"
+        },
+        "rollback": {
+          "trigger": "import fails",
+          "action": "delete imported content",
+          "safety_guard": "ensure content was not partially imported"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "set_301_redirects",
+        "description": "Set up 301 redirects for SEO preservation",
+        "action": "setup_redirects",
+        "target": "web_server",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Content imported successfully",
+            "fact": "import_success",
+            "established_by": "import_content",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "redirects confirmation",
+          "how": "test redirects",
+          "expected": "all redirects functional"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "decommission_wp",
+        "description": "Decommission WordPress infrastructure",
+        "action": "decommission",
+        "target": "wordpress",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Redirects set up",
+            "fact": "redirects_complete",
+            "established_by": "set_301_redirects",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "export_content",
+        "to_task": "transform_content",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "transform_content",
+        "to_task": "import_content",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "import_content",
+        "to_task": "set_301_redirects",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set_301_redirects",
+        "to_task": "decommission_wp",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:set_301_redirects",
+      "task_id": "set_301_redirects",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "301 redirects setup task is sequenced before ensuring that imported content is successfully validated.",
+      "suggested_fix": "Move the set_301_redirects task after import_content to ensure content is ready before setting up redirects.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:decommission_wp",
+      "task_id": "decommission_wp",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Decommission task is sequenced before ensuring that redirects are set up successfully.",
+      "suggested_fix": "Move the decommission_wp task after set_301_redirects to ensure all necessary components are prepared before decommissioning.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,261 @@
+{
+  "dimension": "core-api",
+  "goal_id": "tel-02-call-routing-migration",
+  "duration_seconds": 22.35,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-tel-02-call-routing-migration-r2",
+    "goal_id": "tel-02-call-routing-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "tel-02-call-routing-migration-plan",
+    "created_at": "2026-08-23T22:08:43.503037Z",
+    "tasks": [
+      {
+        "id": "dial_map",
+        "description": "Rework dial-plan to map legacy dial patterns",
+        "action": "rework",
+        "target": "dial-plan",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "legacy dial patterns are documented",
+            "fact": "legacy_patterns_documented",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "import_rules",
+        "description": "Import routing rules to the new platform",
+        "action": "import",
+        "target": "routing_table",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dial-plan is reworked",
+            "fact": "dial_plan_reworked",
+            "established_by": "dial_map",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "number of imported rules",
+          "how": "run count check",
+          "expected": "500"
+        },
+        "rollback": {
+          "trigger": "import fails",
+          "action": "restore backup routing rules",
+          "safety_guard": "verify backup integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_queues",
+        "description": "Set up queues and IVR menus",
+        "action": "configure",
+        "target": "queues_and_menus",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "routing rules are imported",
+            "fact": "rules_imported",
+            "established_by": "import_rules",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "queue and menu configuration",
+          "how": "run configuration validation",
+          "expected": "valid configuration"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "test_routes",
+        "description": "Test major routing paths",
+        "action": "test",
+        "target": "routes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "queues and menus are configured",
+            "fact": "queues_configured",
+            "established_by": "configure_queues",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "route success rate",
+          "how": "place test calls",
+          "expected": "95% success"
+        },
+        "rollback": {
+          "trigger": "test fails",
+          "action": "revert to previous configuration",
+          "safety_guard": "monitor call performance"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "execute_cutover",
+        "description": "Switch inbound DIDs to the new platform",
+        "action": "cutover",
+        "target": "inbound_DIDs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "routes are tested and validated",
+            "fact": "routes_validated",
+            "established_by": "test_routes",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "call routing functionality",
+          "how": "monitor call traffic",
+          "expected": "no increase in failed calls"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "reroute DIDs to legacy PBX",
+          "safety_guard": "confirm DIDs are reachable"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_system",
+        "description": "Monitor call performance metrics",
+        "action": "monitor",
+        "target": "system",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DIDs have been cutover",
+            "fact": "DIDs_cutover",
+            "established_by": "execute_cutover",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "call performance metrics",
+          "how": "run system reports",
+          "expected": "metrics are within normal range"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "dial_map",
+        "to_task": "import_rules",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "import_rules",
+        "to_task": "configure_queues",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_queues",
+        "to_task": "test_routes",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test_routes",
+        "to_task": "execute_cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "execute_cutover",
+        "to_task": "monitor_system",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:import_rules",
+      "task_id": "import_rules",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'import_rules' depends on 'dial_map' being complete, but 'dial_map' does not ensure that the required legacy dial patterns are accurately documented.",
+      "suggested_fix": "Ensure documentation of legacy dial patterns is verified before proceeding with 'import_rules'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:configure_queues",
+      "task_id": "configure_queues",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The configuration of IVR menus and queues should also explicitly mention validation against edge cases such as holiday schedules.",
+      "suggested_fix": "Add steps to ensure queue and IVR menu configurations account for edge case scenarios.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:configure_queues",
+      "task_id": "configure_queues",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'configure_queues' lacks a rollback plan, which could be critical if the configuration introduces errors.",
+      "suggested_fix": "Develop a rollback plan for reverting queue and IVR menu configurations.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

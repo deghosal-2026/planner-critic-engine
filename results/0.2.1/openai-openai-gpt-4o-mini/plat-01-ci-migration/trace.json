@@ -1,0 +1,210 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-01-ci-migration",
+  "duration_seconds": 12.59,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-plat-01-ci-migration-r2",
+    "goal_id": "plat-01-ci-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plat-01-ci-migration-plan",
+    "created_at": "2026-08-23T21:59:55.590420Z",
+    "tasks": [
+      {
+        "id": "backup-repo-configs",
+        "description": "Back up current repository configuration files",
+        "action": "backup",
+        "target": "config-files",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "repos are accessible",
+            "fact": "repos_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "convert-workflows",
+        "description": "Convert .travis.yml files to GitHub Actions workflows",
+        "action": "convert",
+        "target": "workflows",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "workflow files validity",
+          "how": "run validation checks",
+          "expected": "valid workflows"
+        },
+        "rollback": {
+          "trigger": "conversion fails",
+          "action": "restore from backup",
+          "safety_guard": "verify backup integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "dry-run-tests",
+        "description": "Perform dry-run test runs for new workflows",
+        "action": "test",
+        "target": "workflows",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "test pass rate",
+          "how": "check test results",
+          "expected": "100% pass rate"
+        },
+        "rollback": {
+          "trigger": "tests fail",
+          "action": "disable workflows",
+          "safety_guard": "ensure workflows were not enabled"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "enable-workflows",
+        "description": "Enable the GitHub Actions workflows",
+        "action": "enable",
+        "target": "workflows",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "workflows must be validated",
+            "fact": "workflows_validated",
+            "established_by": "dry-run-tests",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "workflows are enabled",
+          "how": "check workflows status",
+          "expected": "enabled"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "disable-travis",
+        "description": "Disable Travis CI integration for the repositories",
+        "action": "disable",
+        "target": "travis",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "workflows are enabled",
+            "fact": "workflows_enabled",
+            "established_by": "enable-workflows",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "backup-repo-configs",
+        "to_task": "convert-workflows",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "convert-workflows",
+        "to_task": "dry-run-tests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dry-run-tests",
+        "to_task": "enable-workflows",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "enable-workflows",
+        "to_task": "disable-travis",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:enable-workflows",
+      "task_id": "enable-workflows",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'enable-workflows' is scheduled before its hard prerequisite 'dry-run-tests' is completed successfully.",
+      "suggested_fix": "Ensure 'enable-workflows' is executed only after 'dry-run-tests' has been verified.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:enable-workflows",
+      "task_id": "enable-workflows",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The task 'enable-workflows' lacks a proper rollback mechanism in case of failure.",
+      "suggested_fix": "Add a rollback strategy for 'enable-workflows' to revert to the previous state if enabling workflows fails.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:disable-travis",
+      "task_id": "disable-travis",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'disable-travis' depends on 'workflows_enabled' which is not established by a previous task. The verification for enabling workflows is not guaranteed to confirm this fact.",
+      "suggested_fix": "Ensure 'workflows_enabled' is strictly verified before proceeding to 'disable-travis'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

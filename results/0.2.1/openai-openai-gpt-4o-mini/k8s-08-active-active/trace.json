@@ -1,0 +1,295 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-08-active-active",
+  "duration_seconds": 60.48,
+  "result": {
+    "status": "escalated",
+    "reason_code": "plan_oscillation_detected",
+    "revision_count": 4,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-k8s-08-active-active-r4",
+    "goal_id": "k8s-08-active-active",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-k8s-08-active-active-r3",
+    "created_at": "2026-08-23T22:07:03.615016Z",
+    "tasks": [
+      {
+        "id": "deploy_k8s_us",
+        "description": "Deploy Kubernetes stack in us-east-1",
+        "action": "deploy",
+        "target": "k8s_us",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Kubernetes services health",
+          "how": "kubectl get services",
+          "expected": "All services should be running and healthy"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "remove us-east-1 stack",
+          "safety_guard": "verify previous state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_k8s_eu",
+        "description": "Deploy Kubernetes stack in eu-west-1",
+        "action": "deploy",
+        "target": "k8s_eu",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Kubernetes services health",
+          "how": "kubectl get services",
+          "expected": "All services should be running and healthy"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "remove eu-west-1 stack",
+          "safety_guard": "verify previous state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_global_traffic",
+        "description": "Set up global traffic routing with AWS Global Accelerator",
+        "action": "setup",
+        "target": "traffic_routing",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "traffic distribution",
+          "how": "analyze CloudWatch metrics",
+          "expected": "Traffic is evenly distributed"
+        },
+        "rollback": {
+          "trigger": "traffic setup fails",
+          "action": "remove global accelerator",
+          "safety_guard": "verify previous setup"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_replication",
+        "description": "Set up PostgreSQL streaming replication",
+        "action": "configure",
+        "target": "pg_replication",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kubernetes stacks deployed",
+            "fact": "k8s_stacks_deployed",
+            "established_by": "deploy_k8s_us",
+            "probe": null
+          },
+          {
+            "description": "Kubernetes stacks deployed",
+            "fact": "k8s_stacks_deployed",
+            "established_by": "deploy_k8s_eu",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replication status",
+          "how": "check pg_stat_replication",
+          "expected": "Active replication from both regions"
+        },
+        "rollback": {
+          "trigger": "replication setup fails",
+          "action": "rollback pg changes",
+          "safety_guard": "verify replication is not active"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "simulate_failure",
+        "description": "Simulate us-east-1 region failure",
+        "action": "simulate",
+        "target": "fail_us_east_1",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "traffic absorbed by eu-west-1",
+          "how": "monitor traffic logs",
+          "expected": "eu-west-1 absorbs 100% of traffic within 60 seconds"
+        },
+        "rollback": {
+          "trigger": "failure response incorrect",
+          "action": "restore us-east-1 traffic",
+          "safety_guard": "manually validate traffic routing"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "apply_affinity_rules",
+        "description": "Implement anti-affinity rules in deployments",
+        "action": "apply",
+        "target": "k8s_affinity_rules",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kubernetes stacks deployed",
+            "fact": "k8s_stacks_deployed",
+            "established_by": "deploy_k8s_us",
+            "probe": null
+          },
+          {
+            "description": "Kubernetes stacks deployed",
+            "fact": "k8s_stacks_deployed",
+            "established_by": "deploy_k8s_eu",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "affinity rules applied",
+          "how": "check Kubernetes deployment configurations",
+          "expected": "Anti-affinity rules should be present"
+        },
+        "rollback": {
+          "trigger": "affinity rules application fails",
+          "action": "remove affinity rules",
+          "safety_guard": "verify previous state"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "set_disruption_budget",
+        "description": "Set pod disruption budgets",
+        "action": "configure",
+        "target": "disruption_budget",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kubernetes stacks deployed",
+            "fact": "k8s_stacks_deployed",
+            "established_by": "deploy_k8s_us",
+            "probe": null
+          },
+          {
+            "description": "Kubernetes stacks deployed",
+            "fact": "k8s_stacks_deployed",
+            "established_by": "deploy_k8s_eu",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "pod disruption budgets set",
+          "how": "check Kubernetes configurations",
+          "expected": "Disruption budgets should be configured properly"
+        },
+        "rollback": {
+          "trigger": "disruption budget setup fails",
+          "action": "remove disruption budgets",
+          "safety_guard": "verify previous state"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_k8s_us",
+        "to_task": "apply_affinity_rules",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_k8s_eu",
+        "to_task": "apply_affinity_rules",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_k8s_us",
+        "to_task": "set_disruption_budget",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_k8s_eu",
+        "to_task": "set_disruption_budget",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_global_traffic",
+        "to_task": "configure_replication",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_global_traffic",
+        "to_task": "simulate_failure",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_global_traffic",
+        "to_task": "apply_affinity_rules",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_global_traffic",
+        "to_task": "set_disruption_budget",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unverified_dependencies:configure_replication",
+      "task_id": "configure_replication",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task depends on the Kubernetes stacks being deployed, but the prerequisite fact 'k8s_stacks_deployed' is not verified before this task executes.",
+      "suggested_fix": "Ensure 'k8s_stacks_deployed' is established by the prior tasks 'deploy_k8s_us' and 'deploy_k8s_eu' before executing 'configure_replication'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-08-active-active:4:4",
+    "plan_id": "plan-k8s-08-active-active-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unverified_dependencies:configure_replication",
+    "question": "Plan for goal 'k8s-08-active-active' cannot be approved: blockers remain (llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

@@ -1,0 +1,244 @@
+{
+  "dimension": "core-api",
+  "goal_id": "job-01-cron-to-airflow",
+  "duration_seconds": 20.87,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-job-01-cron-to-airflow-r2",
+    "goal_id": "job-01-cron-to-airflow",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "job-01-cron-to-airflow",
+    "created_at": "2026-08-23T21:59:33.553082Z",
+    "tasks": [
+      {
+        "id": "discover_inventory",
+        "description": "Discover and inventory all cron jobs",
+        "action": "extract crontab and analyze script dependencies",
+        "target": "cron jobs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "servers are accessible",
+            "fact": "servers_online",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "cron job list",
+          "how": "compare with existing records",
+          "expected": "complete and accurate job list"
+        },
+        "rollback": {
+          "trigger": "discovery fails",
+          "action": "revert to previous cron job inventory",
+          "safety_guard": "validate previous inventory"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "author_dags",
+        "description": "Author Airflow DAGs",
+        "action": "convert cron schedules to Airflow DAGs",
+        "target": "Airflow DAGs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cron jobs have been inventoried",
+            "fact": "cron_inventory_complete",
+            "established_by": "discover_inventory",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "DAG correctness",
+          "how": "run DAG validation checks",
+          "expected": "DAGs are functional and error-free"
+        },
+        "rollback": {
+          "trigger": "DAG creation fails",
+          "action": "restore original cron jobs",
+          "safety_guard": "validate cron job functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run_backfill",
+        "description": "Run a backfill parity check",
+        "action": "execute both cron and Airflow jobs and compare outputs",
+        "target": "job outputs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Airflow DAGs have been authored",
+            "fact": "DAGs_created",
+            "established_by": "author_dags",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "output comparison",
+          "how": "check outputs for consistency",
+          "expected": "outputs match between cron and Airflow"
+        },
+        "rollback": {
+          "trigger": "backfill fails",
+          "action": "re-enable cron jobs",
+          "safety_guard": "ensure Airflow DAGs are disabled"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "execute_cutover",
+        "description": "Execute cutover from cron to Airflow",
+        "action": "disable cron jobs and enable Airflow as primary",
+        "target": "cron jobs and Airflow",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "backfill parity check is successful",
+            "fact": "outputs_match",
+            "established_by": "run_backfill",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "job execution status",
+          "how": "monitor logs for both systems",
+          "expected": "Airflow jobs run successfully while cron jobs are disabled"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "re-enable cron jobs and disable Airflow",
+          "safety_guard": "verify cron functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_and_retire",
+        "description": "Verify Airflow jobs and retire cron jobs",
+        "action": "conduct final checks and disable cron jobs",
+        "target": "cron jobs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Airflow jobs have executed correctly",
+            "fact": "airflow_jobs_successful",
+            "established_by": "execute_cutover",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "cron job deactivation verification",
+          "how": "check cron job status after deactivation",
+          "expected": "cron jobs are fully disabled"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "reactivate cron jobs",
+          "safety_guard": "confirm cron jobs are running"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "discover_inventory",
+        "to_task": "author_dags",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "author_dags",
+        "to_task": "run_backfill",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_backfill",
+        "to_task": "execute_cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "execute_cutover",
+        "to_task": "verify_and_retire",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:author_dags",
+      "task_id": "author_dags",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'author_dags' is sequenced before completing 'discover_inventory', which is a prerequisite.",
+      "suggested_fix": "Ensure 'discover_inventory' is completed before starting 'author_dags'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:run_backfill",
+      "task_id": "run_backfill",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'run_backfill' depends on 'DAGs_created' which is not confirmed as a result of the previous task.",
+      "suggested_fix": "Add a verification step that ensures 'DAGs_created' is established before 'run_backfill' execution.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:execute_cutover",
+      "task_id": "execute_cutover",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'execute_cutover' relies on 'outputs_match' without prior verification of the backfill results.",
+      "suggested_fix": "Implement a check to confirm 'outputs_match' is verified before proceeding to 'execute_cutover'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

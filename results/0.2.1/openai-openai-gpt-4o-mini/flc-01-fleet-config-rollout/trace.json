@@ -1,0 +1,596 @@
+{
+  "dimension": "core-api",
+  "goal_id": "flc-01-fleet-config-rollout",
+  "duration_seconds": 114.97,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-flc-01-fleet-config-rollout-r4",
+    "goal_id": "flc-01-fleet-config-rollout",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-flc-01-fleet-config-rollout-r3",
+    "created_at": "2026-08-23T21:56:47.397544Z",
+    "tasks": [
+      {
+        "id": "validate_canary",
+        "description": "Validate configuration on canary hosts",
+        "action": "validate",
+        "target": "canary_hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary hosts are reachable",
+            "fact": "canary_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "config validation results",
+          "how": "check validation logs",
+          "expected": "no errors"
+        },
+        "rollback": {
+          "trigger": "validation fails",
+          "action": "revert to previous config",
+          "safety_guard": "ensure previous config is deployed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "canary_validation_passed",
+        "description": "Confirm canary validation passed",
+        "action": "confirm",
+        "target": "canary_validation",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "validation completed successfully",
+            "fact": "canary_validation_complete",
+            "established_by": "validate_canary",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "canary validation status",
+          "how": "check validation system",
+          "expected": "confirmed"
+        },
+        "rollback": {
+          "trigger": "validation invalid",
+          "action": "reconfirm canary validation",
+          "safety_guard": "ensure validation system integrity"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "health_verify_canary",
+        "description": "Verify health of canary hosts after config change",
+        "action": "verify_health",
+        "target": "canary_hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary validation passed",
+            "fact": "canary_validation_passed",
+            "established_by": "canary_validation_passed",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "services running and host reachable",
+          "how": "ping and service status check",
+          "expected": "all services online"
+        },
+        "rollback": {
+          "trigger": "health check fails",
+          "action": "revert to previous config",
+          "safety_guard": "ensure previous config is deployed"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "canary_health_verified",
+        "description": "Confirm canary hosts health is verified",
+        "action": "confirm",
+        "target": "canary_health",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "health verification completed successfully",
+            "fact": "canary_health_check_complete",
+            "established_by": "health_verify_canary",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "canary health status",
+          "how": "check health monitoring logs",
+          "expected": "confirmed healthy"
+        },
+        "rollback": {
+          "trigger": "health check invalid",
+          "action": "reconfirm canary health status",
+          "safety_guard": "ensure health monitoring system integrity"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rollout_ring1",
+        "description": "Roll out configuration to ring 1 hosts",
+        "action": "apply_config",
+        "target": "ring1_hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary hosts health verified",
+            "fact": "canary_health_verified",
+            "established_by": "canary_health_verified",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "ring 1 host configurations",
+          "how": "validate config via logs",
+          "expected": "no errors in logs"
+        },
+        "rollback": {
+          "trigger": "rollout fails",
+          "action": "revert to previous config",
+          "safety_guard": "ensure previous config is deployed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "ring1_config_applied",
+        "description": "Confirm ring 1 configuration was applied",
+        "action": "confirm",
+        "target": "ring1_config",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "rollout of ring 1 completed successfully",
+            "fact": "ring1_rollout_complete",
+            "established_by": "rollout_ring1",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "ring 1 configuration status",
+          "how": "validate config acceptance",
+          "expected": "confirmed applied"
+        },
+        "rollback": {
+          "trigger": "configuration not applied",
+          "action": "reverify ring 1 configuration",
+          "safety_guard": "ensure configuration consistency"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "health_verify_ring1",
+        "description": "Verify health of ring 1 hosts after config change",
+        "action": "verify_health",
+        "target": "ring1_hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ring 1 configuration applied",
+            "fact": "ring1_config_applied",
+            "established_by": "ring1_config_applied",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "services running and host reachable",
+          "how": "ping and service status check",
+          "expected": "all services online"
+        },
+        "rollback": {
+          "trigger": "health check fails",
+          "action": "revert to previous config",
+          "safety_guard": "ensure previous config is deployed"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "ring1_health_verified",
+        "description": "Confirm ring 1 hosts health is verified",
+        "action": "confirm",
+        "target": "ring1_health",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "health verification completed successfully",
+            "fact": "ring1_health_check_complete",
+            "established_by": "health_verify_ring1",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "ring 1 health status",
+          "how": "check health monitoring logs",
+          "expected": "confirmed healthy"
+        },
+        "rollback": {
+          "trigger": "health check invalid",
+          "action": "reconfirm ring 1 health status",
+          "safety_guard": "ensure health monitoring system integrity"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rollout_ring2",
+        "description": "Roll out configuration to ring 2 hosts",
+        "action": "apply_config",
+        "target": "ring2_hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ring 1 hosts health verified",
+            "fact": "ring1_health_verified",
+            "established_by": "ring1_health_verified",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "ring 2 host configurations",
+          "how": "validate config via logs",
+          "expected": "no errors in logs"
+        },
+        "rollback": {
+          "trigger": "rollout fails",
+          "action": "revert to previous config",
+          "safety_guard": "ensure previous config is deployed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "ring2_config_applied",
+        "description": "Confirm ring 2 configuration was applied",
+        "action": "confirm",
+        "target": "ring2_config",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "rollout of ring 2 completed successfully",
+            "fact": "ring2_rollout_complete",
+            "established_by": "rollout_ring2",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "ring 2 configuration status",
+          "how": "validate config acceptance",
+          "expected": "confirmed applied"
+        },
+        "rollback": {
+          "trigger": "configuration not applied",
+          "action": "reverify ring 2 configuration",
+          "safety_guard": "ensure configuration consistency"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "health_verify_ring2",
+        "description": "Verify health of ring 2 hosts after config change",
+        "action": "verify_health",
+        "target": "ring2_hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ring 2 configuration applied",
+            "fact": "ring2_config_applied",
+            "established_by": "ring2_config_applied",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "services running and host reachable",
+          "how": "ping and service status check",
+          "expected": "all services online"
+        },
+        "rollback": {
+          "trigger": "health check fails",
+          "action": "revert to previous config",
+          "safety_guard": "ensure previous config is deployed"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "ring2_health_verified",
+        "description": "Confirm ring 2 hosts health is verified",
+        "action": "confirm",
+        "target": "ring2_health",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "health verification completed successfully",
+            "fact": "ring2_health_check_complete",
+            "established_by": "health_verify_ring2",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "ring 2 health status",
+          "how": "check health monitoring logs",
+          "expected": "confirmed healthy"
+        },
+        "rollback": {
+          "trigger": "health check invalid",
+          "action": "reconfirm ring 2 health status",
+          "safety_guard": "ensure health monitoring system integrity"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rollout_ring3",
+        "description": "Roll out configuration to full fleet",
+        "action": "apply_config",
+        "target": "full_fleet_hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ring 2 hosts health verified",
+            "fact": "ring2_health_verified",
+            "established_by": "ring2_health_verified",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "full fleet configurations",
+          "how": "validate config via logs",
+          "expected": "no errors in logs"
+        },
+        "rollback": {
+          "trigger": "rollout fails",
+          "action": "revert to previous config",
+          "safety_guard": "ensure previous config is deployed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "full_fleet_config_applied",
+        "description": "Confirm full fleet configuration was applied",
+        "action": "confirm",
+        "target": "full_fleet_config",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "rollout of full fleet completed successfully",
+            "fact": "full_fleet_rollout_complete",
+            "established_by": "rollout_ring3",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "full fleet configuration status",
+          "how": "validate config acceptance",
+          "expected": "confirmed applied"
+        },
+        "rollback": {
+          "trigger": "configuration not applied",
+          "action": "reverify full fleet configuration",
+          "safety_guard": "ensure configuration consistency"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "health_verify_fleet",
+        "description": "Verify health of full fleet after config change",
+        "action": "verify_health",
+        "target": "full_fleet_hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "full fleet configuration applied",
+            "fact": "full_fleet_config_applied",
+            "established_by": "full_fleet_config_applied",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "services running and host reachable",
+          "how": "ping and service status check",
+          "expected": "all services online"
+        },
+        "rollback": {
+          "trigger": "health check fails",
+          "action": "revert to previous config",
+          "safety_guard": "ensure previous config is deployed"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "validate_canary",
+        "to_task": "canary_validation_passed",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "canary_validation_passed",
+        "to_task": "health_verify_canary",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "health_verify_canary",
+        "to_task": "canary_health_verified",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "canary_health_verified",
+        "to_task": "rollout_ring1",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rollout_ring1",
+        "to_task": "ring1_config_applied",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "ring1_config_applied",
+        "to_task": "health_verify_ring1",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "health_verify_ring1",
+        "to_task": "ring1_health_verified",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "ring1_health_verified",
+        "to_task": "rollout_ring2",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rollout_ring2",
+        "to_task": "ring2_config_applied",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "ring2_config_applied",
+        "to_task": "health_verify_ring2",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "health_verify_ring2",
+        "to_task": "ring2_health_verified",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "ring2_health_verified",
+        "to_task": "rollout_ring3",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rollout_ring3",
+        "to_task": "full_fleet_config_applied",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "full_fleet_config_applied",
+        "to_task": "health_verify_fleet",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:health_verify_canary",
+      "task_id": "health_verify_canary",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Health verification of canary hosts should occur only after canary validation has passed.",
+      "suggested_fix": "Ensure health verification task is properly sequenced after canary validation task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:ring1_health_verified",
+      "task_id": "ring1_health_verified",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Health verification of ring 1 hosts should occur only after health verification of ring 1 hosts has completed successfully.",
+      "suggested_fix": "Ensure health verification task is properly sequenced after the health verification completion.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:ring2_health_verified",
+      "task_id": "ring2_health_verified",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Health verification of ring 2 hosts should occur only after health verification of ring 2 hosts has completed successfully.",
+      "suggested_fix": "Ensure health verification task is properly sequenced after the health verification completion.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:health_verify_fleet",
+      "task_id": "health_verify_fleet",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Health verification of the full fleet should occur only after the full fleet configuration has been applied successfully.",
+      "suggested_fix": "Ensure health verification task is properly sequenced after the configuration application.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:flc-01-fleet-config-rollout:4:4",
+    "plan_id": "plan-flc-01-fleet-config-rollout-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:health_verify_canary",
+    "question": "Plan for goal 'flc-01-fleet-config-rollout' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=15"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

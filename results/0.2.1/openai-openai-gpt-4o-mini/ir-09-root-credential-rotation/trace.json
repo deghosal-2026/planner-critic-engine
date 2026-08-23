@@ -1,0 +1,312 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-09-root-credential-rotation",
+  "duration_seconds": 46.79,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-ir-09-root-credential-rotation-r3",
+    "goal_id": "ir-09-root-credential-rotation",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-ir-09-root-credential-rotation-r2",
+    "created_at": "2026-08-23T22:08:13.446068Z",
+    "tasks": [
+      {
+        "id": "revoke-credentials",
+        "description": "Revoke all compromised credentials",
+        "action": "revoke",
+        "target": "credentials",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "credentials are accessible",
+            "fact": "credentials_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "credential status",
+          "how": "check credential listings",
+          "expected": "no compromised credentials present"
+        },
+        "rollback": {
+          "trigger": "revoke fails",
+          "action": "restore previous credentials",
+          "safety_guard": "verify restoration process"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rotate-iam-keys",
+        "description": "Rotate IAM keys and other dependent credentials",
+        "action": "rotate",
+        "target": "IAM keys",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "previous IAM keys are revoked",
+            "fact": "credentials_revoke_completed",
+            "established_by": "revoke-credentials",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "IAM keys functionality",
+          "how": "test access with new keys",
+          "expected": "access granted without issues"
+        },
+        "rollback": {
+          "trigger": "rotation fails",
+          "action": "revert to old IAM keys",
+          "safety_guard": "ensure old IAM keys are still operational"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "audit-logs",
+        "description": "Audit CloudTrail and GitHub audit logs for unauthorized actions",
+        "action": "audit",
+        "target": "logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "new credentials are in use",
+            "fact": "new_credentials_active",
+            "established_by": "rotate-iam-keys",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "unauthorized actions",
+          "how": "check for anomalies in logs",
+          "expected": "no unauthorized actions detected"
+        },
+        "rollback": {
+          "trigger": "audit fails",
+          "action": "re-evaluate logs",
+          "safety_guard": "involve audit team"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "identify-revert-unauthorized",
+        "description": "Identify and revert any unauthorized changes",
+        "action": "revert",
+        "target": "unauthorized changes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "audit process is completed",
+            "fact": "audit_completed",
+            "established_by": "audit-logs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "system integrity",
+          "how": "run integrity checks",
+          "expected": "no unauthorized changes present"
+        },
+        "rollback": {
+          "trigger": "reversion fails",
+          "action": "log issue and escalate",
+          "safety_guard": "involve security team"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-services",
+        "description": "Verify all dependent services function with new credentials",
+        "action": "verify",
+        "target": "services",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "unauthorized changes are reverted",
+            "fact": "unauthorized_changes_reverted",
+            "established_by": "identify-revert-unauthorized",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service functionality",
+          "how": "check service status",
+          "expected": "all services operational"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "revert to old credentials",
+          "safety_guard": "validate service dependencies"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "implement-controls",
+        "description": "Implement preventive controls (MFA, credential scanning)",
+        "action": "implement",
+        "target": "controls",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "service verification is successful",
+            "fact": "services_verified",
+            "established_by": "verify-services",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "control implementation status",
+          "how": "check for new controls in place",
+          "expected": "all controls successfully implemented"
+        },
+        "rollback": {
+          "trigger": "implementation fails",
+          "action": "remove any incomplete controls",
+          "safety_guard": "ensure security posture is maintained"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "revoke-credentials",
+        "to_task": "rotate-iam-keys",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rotate-iam-keys",
+        "to_task": "audit-logs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "audit-logs",
+        "to_task": "identify-revert-unauthorized",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "identify-revert-unauthorized",
+        "to_task": "verify-services",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-services",
+        "to_task": "implement-controls",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:risk:rotate-iam-keys",
+      "task_id": "rotate-iam-keys",
+      "version": 3,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Rotation of IAM keys carries high risk due to potential service outages if dependent services are not updated in tandem.",
+      "suggested_fix": "Ensure thorough documentation and communication of IAM key rotation to all relevant teams to prepare for potential issues.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:missing_steps:implement-controls",
+      "task_id": "implement-controls",
+      "version": 3,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Implementation of preventive controls could also cover additional measures like logging configurations and review processes beyond MFA and credential scanning.",
+      "suggested_fix": "Consider including additional preventive measures in the implementation step.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:identify-revert-unauthorized",
+      "task_id": "identify-revert-unauthorized",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The need for audit completion as a prerequisite lacks verification that unauthorized changes do not exist beforehand.",
+      "suggested_fix": "Establish a verification step to ensure no unauthorized changes exist before beginning the identification and reversion process.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:weak_rollback:identify-revert-unauthorized",
+      "task_id": "identify-revert-unauthorized",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback plan involves logging and escalating but lacks a clear method for reverting unauthorized changes.",
+      "suggested_fix": "Implement a concrete rollback process that allows for restoration of the system to a known good state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:feasibility:rotate-iam-keys",
+      "task_id": "rotate-iam-keys",
+      "version": 3,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Rotating IAM keys requires that previous keys must be actively revoked, which may not be feasible if services are in critical use.",
+      "suggested_fix": "Ensure that IAM key rotation is scheduled during a maintenance window to mitigate risks of service disruption.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-09-root-credential-rotation:3:3",
+    "plan_id": "plan-ir-09-root-credential-rotation-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:feasibility:rotate-iam-keys",
+    "question": "Plan for goal 'ir-09-root-credential-rotation' cannot be approved: blockers remain (llm_feasibility). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

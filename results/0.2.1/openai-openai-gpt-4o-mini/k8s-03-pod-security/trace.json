@@ -1,0 +1,239 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-03-pod-security",
+  "duration_seconds": 21.84,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-k8s-03-pod-security-r2",
+    "goal_id": "k8s-03-pod-security",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "k8s-03-pod-security-v1",
+    "created_at": "2026-08-23T22:02:49.267273Z",
+    "tasks": [
+      {
+        "id": "enable_audit_mode",
+        "description": "Enable audit mode across all namespaces for 72 hours",
+        "action": "enable",
+        "target": "audit mode",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "k8s cluster is accessible",
+            "fact": "k8s_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_audit_logs",
+        "description": "Monitor audit logs to identify violations for 72 hours",
+        "action": "monitor",
+        "target": "audit logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "audit mode is enabled",
+            "fact": "audit_mode_enabled",
+            "established_by": "enable_audit_mode",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "switch_to_warn_mode",
+        "description": "Switch to warn mode for the next 48 hours",
+        "action": "switch",
+        "target": "warn mode",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "warn mode status",
+          "how": "check k8s configuration",
+          "expected": "warn mode enabled"
+        },
+        "rollback": {
+          "trigger": "switch fails or causes issues",
+          "action": "revert to audit mode",
+          "safety_guard": "verify audit mode status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "generate_compliance_report",
+        "description": "Generate compliance audit report for stakeholders",
+        "action": "generate",
+        "target": "compliance report",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "audit logs have been monitored for 72 hours",
+            "fact": "logs_monitored",
+            "established_by": "monitor_audit_logs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "compliance report status",
+          "how": "check report generation logs",
+          "expected": "report successfully generated"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "enforce_baseline_profile",
+        "description": "Enforce the baseline profile on all namespaces",
+        "action": "enforce",
+        "target": "baseline profile",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "baseline profile enforcement",
+          "how": "check k8s configuration",
+          "expected": "baseline profile enforced"
+        },
+        "rollback": {
+          "trigger": "enforcement fails",
+          "action": "revert to warn mode",
+          "safety_guard": "verify warn mode status"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "handle_legacy_namespaces",
+        "description": "Handle legacy namespaces with privileged workloads",
+        "action": "label exemption",
+        "target": "legacy namespaces",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "baseline profile enforcement is confirmed",
+            "fact": "baseline_profile_enforcement_confirmed",
+            "established_by": "enforce_baseline_profile",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "legacy namespaces handling status",
+          "how": "check exemption labels",
+          "expected": "exemption labels applied successfully"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "enable_audit_mode",
+        "to_task": "monitor_audit_logs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_audit_logs",
+        "to_task": "switch_to_warn_mode",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "switch_to_warn_mode",
+        "to_task": "generate_compliance_report",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "generate_compliance_report",
+        "to_task": "enforce_baseline_profile",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "enforce_baseline_profile",
+        "to_task": "handle_legacy_namespaces",
+        "kind": "soft",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:switch_to_warn_mode",
+      "task_id": "switch_to_warn_mode",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'switch_to_warn_mode' has no hard prerequisite established before execution.",
+      "suggested_fix": "Add a prerequisite that requires 'monitor_audit_logs' to be completed before 'switch_to_warn_mode' can begin.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:handle_legacy_namespaces",
+      "task_id": "handle_legacy_namespaces",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'handle_legacy_namespaces' relies on the fact 'baseline_profile_enforcement_confirmed' which has not been established by an earlier task.",
+      "suggested_fix": "Ensure that 'baseline_profile_enforcement_confirmed' is established by a verification step following 'enforce_baseline_profile'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:enforce_baseline_profile",
+      "task_id": "enforce_baseline_profile",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'enforce_baseline_profile' lacks a sound rollback procedure to safely revert changes made if enforcement fails.",
+      "suggested_fix": "Develop a more robust rollback plan that details how to restore previous configurations and ensure system stability.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

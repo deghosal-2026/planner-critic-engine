@@ -1,0 +1,383 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-09-ami-pipeline",
+  "duration_seconds": 34.39,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-inf-09-ami-pipeline-r2",
+    "goal_id": "inf-09-ami-pipeline",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "inf-09-ami-pipeline",
+    "created_at": "2026-08-23T21:58:18.344241Z",
+    "tasks": [
+      {
+        "id": "build_base_ami",
+        "description": "Build base AMI from Amazon Linux 2",
+        "action": "build",
+        "target": "base_ami",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Packer is configured",
+            "fact": "packer_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "bake_dependencies",
+        "description": "Bake application dependencies into the AMI",
+        "action": "bake",
+        "target": "base_ami",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Base AMI is built",
+            "fact": "base_ami_built",
+            "established_by": "build_base_ami",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application dependencies installed",
+          "how": "run dependency checks",
+          "expected": "all dependencies met"
+        },
+        "rollback": {
+          "trigger": "baking fails",
+          "action": "retry baking process",
+          "safety_guard": "check for dependency conflicts"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "apply_hardening",
+        "description": "Apply CIS hardening baseline to AMI",
+        "action": "harden",
+        "target": "base_ami",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Application dependencies are baked",
+            "fact": "dependencies_baked",
+            "established_by": "bake_dependencies",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "CIS compliance status",
+          "how": "run CIS checks",
+          "expected": "compliance report contains no critical issues"
+        },
+        "rollback": {
+          "trigger": "hardening fails",
+          "action": "restore previous AMI",
+          "safety_guard": "verify previous AMI integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run_security_scans",
+        "description": "Run security scans using Trivy and CIS-CAT",
+        "action": "scan",
+        "target": "base_ami",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CIS hardening applied",
+            "fact": "hardening_completed",
+            "established_by": "apply_hardening",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "security scan results",
+          "how": "analyze scan reports",
+          "expected": "no critical vulnerabilities found"
+        },
+        "rollback": {
+          "trigger": "scan fails",
+          "action": "check logs for issues",
+          "safety_guard": "ensure no critical vulnerabilities present"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "promote_to_dev",
+        "description": "Promote AMI to development environment",
+        "action": "promote",
+        "target": "dev_environment",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Security scans completed",
+            "fact": "scans_completed",
+            "established_by": "run_security_scans",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "dev environment has latest AMI",
+          "how": "check AMI versions",
+          "expected": "latest AMI version is in dev"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "automated_testing_dev",
+        "description": "Run automated tests in development",
+        "action": "test",
+        "target": "dev_environment",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AMI promoted to development",
+            "fact": "ami_promoted_to_dev",
+            "established_by": "promote_to_dev",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "promote_to_staging",
+        "description": "Promote AMI to staging environment",
+        "action": "promote",
+        "target": "staging_environment",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Automated tests passed in development",
+            "fact": "tests_passed_dev",
+            "established_by": "automated_testing_dev",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "automated_testing_staging",
+        "description": "Run automated tests in staging",
+        "action": "test",
+        "target": "staging_environment",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AMI promoted to staging",
+            "fact": "ami_promoted_to_staging",
+            "established_by": "promote_to_staging",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "promote_to_prod",
+        "description": "Promote AMI to production environment",
+        "action": "promote",
+        "target": "prod_environment",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Automated tests passed in staging",
+            "fact": "tests_passed_staging",
+            "established_by": "automated_testing_staging",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update_auto_scaling_groups",
+        "description": "Update auto-scaling groups to use the new AMI",
+        "action": "update",
+        "target": "auto_scaling_groups",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AMI promoted to production",
+            "fact": "ami_promoted_to_prod",
+            "established_by": "promote_to_prod",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "build_base_ami",
+        "to_task": "bake_dependencies",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "bake_dependencies",
+        "to_task": "apply_hardening",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "apply_hardening",
+        "to_task": "run_security_scans",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_security_scans",
+        "to_task": "promote_to_dev",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote_to_dev",
+        "to_task": "automated_testing_dev",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "automated_testing_dev",
+        "to_task": "promote_to_staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote_to_staging",
+        "to_task": "automated_testing_staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "automated_testing_staging",
+        "to_task": "promote_to_prod",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote_to_prod",
+        "to_task": "update_auto_scaling_groups",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:build_base_ami",
+      "task_id": "build_base_ami",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Packer is not verified as configured, leading to feasibility issues for building the AMI.",
+      "suggested_fix": "Ensure that the Packer configuration is properly verified before executing the build.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:bake_dependencies",
+      "task_id": "bake_dependencies",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider including a step to validate application dependencies before baking to avoid potential conflicts during the process.",
+      "suggested_fix": "Add a preliminary validation step for application dependencies.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:apply_hardening",
+      "task_id": "apply_hardening",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback action for 'apply_hardening' does not include verification of the integrity of the previous AMI, which could lead to unsafe recovery.",
+      "suggested_fix": "Implement an integrity check for the previous AMI before rollback action.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:promote_to_dev",
+      "task_id": "promote_to_dev",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No automated checks for successful promotion to the dev environment, which can lead to undetected issues in further stages.",
+      "suggested_fix": "Introduce a verification step to validate that the AMI has been correctly promoted to the development environment.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:update_auto_scaling_groups",
+      "task_id": "update_auto_scaling_groups",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Updating auto-scaling groups occurs without proper verification of successful AMI promotion, leading to potential for deploying an untested AMI.",
+      "suggested_fix": "Ensure that verification for successful promotion to production is completed before updating auto-scaling groups.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=10"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

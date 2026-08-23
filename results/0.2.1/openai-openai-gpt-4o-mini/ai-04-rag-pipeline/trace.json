@@ -1,0 +1,354 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ai-04-rag-pipeline",
+  "duration_seconds": 33.78,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-ai-04-rag-pipeline-r2",
+    "goal_id": "ai-04-rag-pipeline",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "ai-04-rag-pipeline-v1",
+    "created_at": "2026-08-23T21:53:52.288064Z",
+    "tasks": [
+      {
+        "id": "ingest_docs",
+        "description": "Ingest documentation into vector store",
+        "action": "ingest",
+        "target": "vector_store",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "documents are accessible",
+            "fact": "docs_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "number of ingested documents",
+          "how": "count stored documents",
+          "expected": "5000"
+        },
+        "rollback": {
+          "trigger": "ingestion fails",
+          "action": "clear vector store",
+          "safety_guard": "verify vector store is empty"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "chunk_documents",
+        "description": "Chunk documents with overlap",
+        "action": "chunk",
+        "target": "document_chunks",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "total chunks created",
+          "how": "count chunks",
+          "expected": "calculated based on overlap"
+        },
+        "rollback": {
+          "trigger": "chunking fails",
+          "action": "revert to full documents",
+          "safety_guard": "verify chunking output is valid"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "generate_embeddings",
+        "description": "Generate embeddings for the document chunks",
+        "action": "generate",
+        "target": "embeddings",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "valid embeddings generated",
+          "how": "run diagnostic checks",
+          "expected": "all chunks have embeddings"
+        },
+        "rollback": {
+          "trigger": "embedding generation fails",
+          "action": "discard invalid embeddings",
+          "safety_guard": "verify embedding integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "index_embeddings",
+        "description": "Index the generated embeddings",
+        "action": "index",
+        "target": "vector_store",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "embeddings are generated",
+            "fact": "valid_embeddings",
+            "established_by": "generate_embeddings",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "indexing completeness",
+          "how": "check if all embeddings are indexed",
+          "expected": "all embeddings indexed successfully"
+        },
+        "rollback": {
+          "trigger": "indexing fails",
+          "action": "clear index",
+          "safety_guard": "verify index is clear"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_retrieval",
+        "description": "Configure the retrieval system",
+        "action": "configure",
+        "target": "retrieval_system",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "embeddings indexed",
+            "fact": "embeddings_indexed",
+            "established_by": "index_embeddings",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "retrieval configuration status",
+          "how": "check configuration settings",
+          "expected": "configuration is correctly set"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "reset to default settings",
+          "safety_guard": "verify defaults are restored"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "implement_generation",
+        "description": "Implement generation with GPT-4o-mini",
+        "action": "implement",
+        "target": "chatbot",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "model output quality",
+          "how": "run quality tests",
+          "expected": "acceptable output quality"
+        },
+        "rollback": {
+          "trigger": "generation implementation fails",
+          "action": "restore previous model version",
+          "safety_guard": "verify previous model works"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_evaluation",
+        "description": "Deploy evaluation pipeline for answer quality",
+        "action": "deploy",
+        "target": "evaluation_pipeline",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "evaluation pipeline running",
+          "how": "check pipeline status",
+          "expected": "evaluating responses"
+        },
+        "rollback": {
+          "trigger": "evaluation pipeline fails",
+          "action": "disable evaluation",
+          "safety_guard": "ensure monitoring is active"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_quality",
+        "description": "Monitor answer quality from the chatbot",
+        "action": "monitor",
+        "target": "quality_metrics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "evaluation pipeline is deployed",
+            "fact": "evaluation_active",
+            "established_by": "deploy_evaluation",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "quality metrics collected",
+          "how": "check metrics logs",
+          "expected": "metrics are available for review"
+        },
+        "rollback": {
+          "trigger": "monitoring fails",
+          "action": "disable monitoring",
+          "safety_guard": "ensure fallback monitoring is active"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "ingest_docs",
+        "to_task": "chunk_documents",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "chunk_documents",
+        "to_task": "generate_embeddings",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "generate_embeddings",
+        "to_task": "index_embeddings",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "index_embeddings",
+        "to_task": "configure_retrieval",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_retrieval",
+        "to_task": "implement_generation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "implement_generation",
+        "to_task": "deploy_evaluation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_evaluation",
+        "to_task": "monitor_quality",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:implement_generation",
+      "task_id": "implement_generation",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The task to implement generation with GPT-4o-mini may be unfeasible due to the lack of a confirmed availability of the model version you're intending to use.",
+      "suggested_fix": "Verify that GPT-4o-mini is accessible within the stated environment and tools.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:chunk_documents",
+      "task_id": "chunk_documents",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The chunking strategy is missing context which may lead to ineffective or irrelevant chunks being created.",
+      "suggested_fix": "Document the rationale behind the chosen chunking strategy to clarify how it maintains context.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:risk:monitor_quality",
+      "task_id": "monitor_quality",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "There is a risk that the metrics for monitoring answer quality may not sufficiently capture all potential issues with response quality.",
+      "suggested_fix": "Consider defining additional metrics or thresholds to detect problematic responses.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:index_embeddings",
+      "task_id": "index_embeddings",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Indexing embeddings depends on a verification of valid embeddings which has not been established yet.",
+      "suggested_fix": "Ensure that the task 'generate_embeddings' successfully verifies the embeddings before indexing.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:deploy_evaluation",
+      "task_id": "deploy_evaluation",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action to disable evaluation may not provide a strong recovery in case of evaluation pipeline failure; monitoring might not capture all necessary data in this scenario.",
+      "suggested_fix": "Consider implementing a rollback to a previous stable state of the evaluation pipeline instead.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:configure_retrieval",
+      "task_id": "configure_retrieval",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "This task is sequenced in a way that it can be attempted before validating the success of the embedding indexing, which is its prerequisite.",
+      "suggested_fix": "Reorder the tasks to ensure that 'index_embeddings' completes successfully before 'configure_retrieval'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,271 @@
+{
+  "dimension": "core-api",
+  "goal_id": "int-01-key-extraction",
+  "duration_seconds": 37.33,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-int-01-key-extraction-r3",
+    "goal_id": "int-01-key-extraction",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-int-01-key-extraction-r2",
+    "created_at": "2026-08-23T22:00:11.257894Z",
+    "tasks": [
+      {
+        "id": "scan",
+        "description": "Automated scan for hardcoded strings",
+        "action": "scan",
+        "target": "source code",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "number of hardcoded strings detected",
+          "how": "compare to expected count",
+          "expected": "X"
+        },
+        "rollback": {
+          "trigger": "scan fails",
+          "action": "revert to previous code version",
+          "safety_guard": "ensure code is intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "review",
+        "description": "Manual review of detected strings",
+        "action": "review",
+        "target": "scan results",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "consistency of hardcoded strings",
+          "how": "cross-check with stakeholders",
+          "expected": "approved list"
+        },
+        "rollback": {
+          "trigger": "review issues",
+          "action": "revalidate scan results",
+          "safety_guard": "ensure full string list"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "extract",
+        "description": "Extract strings to key files",
+        "action": "extract",
+        "target": "messages.en.json",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "keys in messages.en.json",
+          "how": "run parser check",
+          "expected": "all keys accounted for"
+        },
+        "rollback": {
+          "trigger": "extraction fails",
+          "action": "restore hardcoded strings",
+          "safety_guard": "verify integrity of string mapping and its extraction"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "replace",
+        "description": "Re-point application code to use i18n keys",
+        "action": "replace",
+        "target": "application code",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "i18n keys integration is verified",
+            "fact": "i18n_integration_verified",
+            "established_by": "extract",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application functionality with keys",
+          "how": "run integration tests",
+          "expected": "no errors, UI intact"
+        },
+        "rollback": {
+          "trigger": "replacement fails",
+          "action": "rollback to hardcoded strings and verify application functionality",
+          "safety_guard": "ensure code functionality"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_rendering",
+        "description": "Verify rendering of components",
+        "action": "verify",
+        "target": "UI",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "component rendering",
+          "how": "run rendering tests",
+          "expected": "all components display correctly"
+        },
+        "rollback": {
+          "trigger": "rendering issues",
+          "action": "revert to hardcoded strings",
+          "safety_guard": "ensure application integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "ship",
+        "description": "Deploy the changes",
+        "action": "deploy",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "all previous tasks complete",
+            "fact": "all_tasks_completed",
+            "established_by": "verify_rendering",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment success",
+          "how": "check deployment logs",
+          "expected": "no errors recorded"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to previous deployment",
+          "safety_guard": "verify deployment integrity"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "scan",
+        "to_task": "review",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "review",
+        "to_task": "extract",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "extract",
+        "to_task": "replace",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "replace",
+        "to_task": "verify_rendering",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_rendering",
+        "to_task": "ship",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:feasibility:extract",
+      "task_id": "extract",
+      "version": 3,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The extraction of strings to key files may not succeed if hardcoded strings are detected inconsistently, as this depends on proper implementation of the parser check which has not been established by a prior task.",
+      "suggested_fix": "Ensure that the extraction process includes validation checks for key formatting and structure.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:replace",
+      "task_id": "replace",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The replacement of application code with i18n keys relies on the successful completion of the extraction task, which is not guaranteed until verified.",
+      "suggested_fix": "Add verification steps to validate that extraction was completed successfully before the replacement task can begin.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:ship",
+      "task_id": "ship",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The deployment step should not occur until all prior tasks are not only complete but also verified to avoid issues with serialized dependencies that may cause runtime failures.",
+      "suggested_fix": "Introduce verification checks that confirm integral functionality of the application after the rendering task prior to shipping.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:weak_rollback:ship",
+      "task_id": "ship",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for the ship task does not address potential data integrity issues that may arise from a failed deployment, which could leave the application in an inconsistent state.",
+      "suggested_fix": "Implement a more robust rollback strategy that accounts for database and file system states.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:int-01-key-extraction:3:3",
+    "plan_id": "plan-int-01-key-extraction-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:feasibility:extract",
+    "question": "Plan for goal 'int-01-key-extraction' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,203 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-02-security-incident",
+  "duration_seconds": 26.42,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-ir-02-security-incident-r3",
+    "goal_id": "ir-02-security-incident",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-ir-02-security-incident-r2",
+    "created_at": "2026-08-23T22:04:42.575228Z",
+    "tasks": [
+      {
+        "id": "revoke_ingress",
+        "description": "Revoke security group ingress for the EC2 instance",
+        "action": "revoke",
+        "target": "security_group",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EC2 instance is linked to a security group",
+            "fact": "instance_security_group_linked",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "security group ingress rules",
+          "how": "fetch current security group configuration",
+          "expected": "no access to EC2 instance from unexpected geolocation"
+        },
+        "rollback": {
+          "trigger": "ingress revoke fails",
+          "action": "restore previous security group ingress",
+          "safety_guard": "verify security group configuration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rotate_iam_keys",
+        "description": "Rotate IAM keys for compromised user",
+        "action": "rotate",
+        "target": "iam_keys",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Compromised user IAM keys are identified",
+            "fact": "compromised_user_keys",
+            "established_by": "revoke_ingress",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "IAM key status",
+          "how": "check user key list",
+          "expected": "only new keys present for the user"
+        },
+        "rollback": {
+          "trigger": "key rotation fails",
+          "action": "revert to previous IAM keys",
+          "safety_guard": "verify previous IAM key functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "forensic_snapshot",
+        "description": "Take a forensic EBS snapshot of every attached volume",
+        "action": "snapshot",
+        "target": "ebs_volumes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "All EBS volumes attached to the instance are accessible",
+            "fact": "ebs_volumes_accessible",
+            "established_by": "rotate_iam_keys",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "EBS snapshot status",
+          "how": "verify snapshots are created successfully",
+          "expected": "all EBS volumes have corresponding snapshots"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_cloudtrail",
+        "description": "Verify no further anomalous API calls in CloudTrail for next 5 minutes",
+        "action": "verify",
+        "target": "cloudtrail",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CloudTrail is monitoring enabled for the account",
+            "fact": "cloudtrail_enabled",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "CloudTrail logs",
+          "how": "query API call logs for last 5 minutes",
+          "expected": "no anomalous calls detected"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "escalate to security team",
+          "safety_guard": "ensure secure communication with security team"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "revoke_ingress",
+        "to_task": "rotate_iam_keys",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rotate_iam_keys",
+        "to_task": "forensic_snapshot",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "forensic_snapshot",
+        "to_task": "verify_cloudtrail",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unverified_dependencies:forensic_snapshot",
+      "task_id": "forensic_snapshot",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'forensic_snapshot' depends on 'rotate_iam_keys' being successful but has no verification step to assert that 'ebs_volumes_accessible' is indeed true.",
+      "suggested_fix": "Add a verification step after 'rotate_iam_keys' to confirm that the EBS volumes are accessible before proceeding with 'forensic_snapshot'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:verify_cloudtrail",
+      "task_id": "verify_cloudtrail",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'verify_cloudtrail' depends on 'forensic_snapshot' being successful but has no verification step to ensure that earlier tasks were completed properly first.",
+      "suggested_fix": "Add a verification step after 'forensic_snapshot' to confirm that all snapshots have been created successfully before proceeding with 'verify_cloudtrail'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-02-security-incident:3:3",
+    "plan_id": "plan-ir-02-security-incident-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unverified_dependencies:forensic_snapshot",
+    "question": "Plan for goal 'ir-02-security-incident' cannot be approved: blockers remain (llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

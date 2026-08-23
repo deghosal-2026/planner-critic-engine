@@ -1,0 +1,328 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-06-service-mesh",
+  "duration_seconds": 72.13,
+  "result": {
+    "status": "escalated",
+    "reason_code": "plan_oscillation_detected",
+    "revision_count": 4,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-k8s-06-service-mesh-r4",
+    "goal_id": "k8s-06-service-mesh",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-k8s-06-service-mesh-r3",
+    "created_at": "2026-08-23T22:05:06.372287Z",
+    "tasks": [
+      {
+        "id": "kubectl_verification",
+        "description": "Verify kubectl operational status",
+        "action": "check",
+        "target": "kubectl",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "kubectl status",
+          "how": "run kubectl version",
+          "expected": "kubectl is operational"
+        },
+        "rollback": {
+          "trigger": "kubectl verification fails",
+          "action": "notify failure",
+          "safety_guard": "log the error"
+        },
+        "risk_class": "high",
+        "blast_radius": "low"
+      },
+      {
+        "id": "label-namespace",
+        "description": "Label the namespace for automatic sidecar injection",
+        "action": "label",
+        "target": "namespace",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "kubectl is available",
+            "fact": "kubectl_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "namespace labels",
+          "how": "check namespace configuration",
+          "expected": "namespace has sidecar injection label"
+        },
+        "rollback": {
+          "trigger": "labeling fails",
+          "action": "remove label from namespace",
+          "safety_guard": "verify namespace is labeled correctly"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup-virtualservice",
+        "description": "Configure VirtualService to route 1% of traffic",
+        "action": "create",
+        "target": "VirtualService",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "namespace is labeled for injection",
+            "fact": "namespace_labeled",
+            "established_by": "label-namespace",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "VirtualService configuration",
+          "how": "check VirtualService settings",
+          "expected": "VirtualService exists and routes 1% of traffic"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor-traffic",
+        "description": "Monitor traffic after initial routing",
+        "action": "observe",
+        "target": "latency and error rate",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "VirtualService is set up",
+            "fact": "virtualservice_created",
+            "established_by": "setup-virtualservice",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "ramp-traffic",
+        "description": "Ramp traffic to 50% and observe",
+        "action": "update",
+        "target": "VirtualService",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "initial monitoring is completed",
+            "fact": "traffic_monitored",
+            "established_by": "monitor-traffic",
+            "probe": null
+          },
+          {
+            "description": "monitoring results are satisfactory",
+            "fact": "monitoring_verified",
+            "established_by": "monitor-traffic",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic percentage",
+          "how": "check VirtualService configuration",
+          "expected": "VirtualService routes 50% traffic"
+        },
+        "rollback": {
+          "trigger": "ramp fails or issues detected",
+          "action": "rollback to 1% traffic routing",
+          "safety_guard": "verify traffic routing configuration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rollback-check",
+        "description": "Check if rollback criteria met",
+        "action": "check",
+        "target": "latency and error rate",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "traffic ramp completed",
+            "fact": "traffic_ramped",
+            "established_by": "ramp-traffic",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "error rate and latency",
+          "how": "measure and aggregate results",
+          "expected": "p99 latency <= 200ms and error rate within baseline"
+        },
+        "rollback": {
+          "trigger": "p99 latency > 200ms or error rate above baseline",
+          "action": "remove label and patch deployments",
+          "safety_guard": "verify that deployments are patched"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "finalize-traffic",
+        "description": "Route 100% of traffic through the mesh",
+        "action": "update",
+        "target": "VirtualService",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "rollback criteria not met",
+            "fact": "rollback_not_triggered",
+            "established_by": "rollback-check",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic routing",
+          "how": "check traffic metrics",
+          "expected": "all traffic flows through mesh"
+        },
+        "rollback": {
+          "trigger": "issues detected",
+          "action": "rollback to previous version",
+          "safety_guard": "check if system remains accessible"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "decommission-legacy",
+        "description": "Decommission legacy sidecar-free deployments",
+        "action": "delete",
+        "target": "legacy deployments",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "100% traffic routed through mesh",
+            "fact": "traffic_fully_routed",
+            "established_by": "finalize-traffic",
+            "probe": null
+          },
+          {
+            "description": "routing through mesh confirmed",
+            "fact": "routing_verified",
+            "established_by": "finalize-traffic",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "legacy deployments status",
+          "how": "check deployment status",
+          "expected": "no legacy deployments exist"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "kubectl_verification",
+        "to_task": "label-namespace",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "label-namespace",
+        "to_task": "setup-virtualservice",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup-virtualservice",
+        "to_task": "monitor-traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor-traffic",
+        "to_task": "ramp-traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "ramp-traffic",
+        "to_task": "rollback-check",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rollback-check",
+        "to_task": "finalize-traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "finalize-traffic",
+        "to_task": "decommission-legacy",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:ramp-traffic",
+      "task_id": "ramp-traffic",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'ramp-traffic' is ordered before verifying if rollback criteria are met (via 'rollback-check').",
+      "suggested_fix": "Reorder 'ramp-traffic' to occur only after 'rollback-check'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:finalize-traffic",
+      "task_id": "finalize-traffic",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'finalize-traffic' depends on facts established by 'rollback-check', which can only be met if rollback hasn't triggered but lacks a check before proceeding.",
+      "suggested_fix": "Add a verification step to ensure rollback criteria are not met before executing 'finalize-traffic'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-06-service-mesh:4:4",
+    "plan_id": "plan-k8s-06-service-mesh-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:ramp-traffic",
+    "question": "Plan for goal 'k8s-06-service-mesh' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

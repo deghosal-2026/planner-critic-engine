@@ -1,0 +1,283 @@
+{
+  "dimension": "core-api",
+  "goal_id": "tel-01-sip-trunk-migration",
+  "duration_seconds": 40.57,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-tel-01-sip-trunk-migration-r3",
+    "goal_id": "tel-01-sip-trunk-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-tel-01-sip-trunk-migration-r2",
+    "created_at": "2026-08-23T22:08:21.636666Z",
+    "tasks": [
+      {
+        "id": "submit_porting",
+        "description": "Submit porting request to Carrier B",
+        "action": "submit",
+        "target": "porting request",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "current numbers are in service",
+            "fact": "numbers_active",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "porting request status",
+          "how": "check with Carrier B",
+          "expected": "porting request accepted"
+        },
+        "rollback": {
+          "trigger": "submission fails",
+          "action": "resubmit porting request",
+          "safety_guard": "verify submission status"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_sip_trunk",
+        "description": "Configure the new SIP trunk on Carrier B",
+        "action": "configure",
+        "target": "SIP trunk",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Carrier B contract is in effect",
+            "fact": "contract_active",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "SIP trunk connectivity",
+          "how": "run connection tests",
+          "expected": "successful SIP signaling"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "revert to previous SIP configuration",
+          "safety_guard": "verify previous configuration stability"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run_dual_trunk",
+        "description": "Run dual-trunk period",
+        "action": "activate",
+        "target": "dual trunks",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "both SIP trunks configured",
+            "fact": "both_trunks_ready",
+            "established_by": "configure_sip_trunk",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "dual trunk status",
+          "how": "check trunk configuration",
+          "expected": "both trunks operational"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "execute_cutover",
+        "description": "Switch inbound routing to Carrier B only",
+        "action": "cutover",
+        "target": "inbound routing",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dual-trunk period validated",
+            "fact": "dual_trunk_verified",
+            "established_by": "run_dual_trunk",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "inbound call routing",
+          "how": "monitor call flow",
+          "expected": "all inbound calls through Carrier B"
+        },
+        "rollback": {
+          "trigger": "cutover issues",
+          "action": "re-route inbound to Carrier A",
+          "safety_guard": "confirm reroute functionality and check reroute operational status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_migration",
+        "description": "Verify migration success",
+        "action": "check",
+        "target": "call metrics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cutover successfully executed",
+            "fact": "cutover_completed",
+            "established_by": "execute_cutover",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "migration status",
+          "how": "check call metrics",
+          "expected": "successful migration"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "release_old_carrier",
+        "description": "Decommission Carrier A trunk",
+        "action": "release",
+        "target": "Carrier A",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "migration verified",
+            "fact": "migration_successful",
+            "established_by": "verify_migration",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "submit_porting",
+        "to_task": "configure_sip_trunk",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_sip_trunk",
+        "to_task": "run_dual_trunk",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_dual_trunk",
+        "to_task": "execute_cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "execute_cutover",
+        "to_task": "verify_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_migration",
+        "to_task": "release_old_carrier",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:execute_cutover",
+      "task_id": "execute_cutover",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The cutover task is sequenced before verifying the success of the dual-trunk period.",
+      "suggested_fix": "Ensure that the dual-trunk verification is completed before executing cutover.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:execute_cutover",
+      "task_id": "execute_cutover",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The execute_cutover task relies on the dual_trunk_verified fact, but no task verifies this fact prior to its execution.",
+      "suggested_fix": "Add a verification step to ensure dual_trunk_verified is established before cutover.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:weak_rollback:execute_cutover",
+      "task_id": "execute_cutover",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for cutover re-routing does not include a verification step after rerouting from Carrier B back to Carrier A, creating a risk during failure recovery.",
+      "suggested_fix": "Include a verification step after the rerouting to confirm functionality before proceeding.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:release_old_carrier",
+      "task_id": "release_old_carrier",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The release_old_carrier task depends on migration_successful, which has not been verified by the previous task.",
+      "suggested_fix": "Add verification for the migration success before releasing Carrier A.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:tel-01-sip-trunk-migration:3:3",
+    "plan_id": "plan-tel-01-sip-trunk-migration-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:execute_cutover",
+    "question": "Plan for goal 'tel-01-sip-trunk-migration' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

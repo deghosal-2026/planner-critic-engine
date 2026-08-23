@@ -1,0 +1,235 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-07-distributed-tracing",
+  "duration_seconds": 20.58,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-obs-07-distributed-tracing-r2",
+    "goal_id": "obs-07-distributed-tracing",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "obs-07-distributed-tracing-plan",
+    "created_at": "2026-08-23T21:57:38.461992Z",
+    "tasks": [
+      {
+        "id": "instrument_services",
+        "description": "Instrument all microservices with OpenTelemetry SDK",
+        "action": "install_sdk",
+        "target": "microservices",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "microservices are deployable",
+            "fact": "microservices_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service instrumentation logs",
+          "how": "check logs for OTel SDK initialization",
+          "expected": "all services report successful initialization"
+        },
+        "rollback": {
+          "trigger": "issues arise after instrumentation",
+          "action": "remove OpenTelemetry SDK",
+          "safety_guard": "verify service performance"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_jaeger",
+        "description": "Deploy Jaeger collector using Helm",
+        "action": "deploy",
+        "target": "jaeger",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kubernetes cluster is up and running",
+            "fact": "k8s_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_exporters",
+        "description": "Configure exporters for Jaeger",
+        "action": "configure",
+        "target": "jaeger_exporters",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "exporters connection status",
+          "how": "check connection logs",
+          "expected": "all exporters report successful connections"
+        },
+        "rollback": {
+          "trigger": "exporters fail to connect",
+          "action": "reset exporter configuration",
+          "safety_guard": "verify connection logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "add_trace_ids",
+        "description": "Add trace correlation IDs to logs",
+        "action": "update_logging",
+        "target": "microservices",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "log entries",
+          "how": "check log format for trace IDs",
+          "expected": "logs contain correct trace correlation IDs"
+        },
+        "rollback": {
+          "trigger": "logging issues arise",
+          "action": "revert logging changes",
+          "safety_guard": "verify log format"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "set_alerts",
+        "description": "Set up alerting on p99 latency anomalies",
+        "action": "configure_alerts",
+        "target": "prometheus",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "alert configuration status",
+          "how": "check alerting rules",
+          "expected": "alerting rules are correctly configured"
+        },
+        "rollback": {
+          "trigger": "alerts misfire",
+          "action": "reset alert configuration",
+          "safety_guard": "verify alert state"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_trace_propagation",
+        "description": "Verify trace propagation across service boundaries",
+        "action": "test_tracing",
+        "target": "microservices",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "trace records",
+          "how": "check Jaeger for trace continuity",
+          "expected": "traces correctly propagate across services"
+        },
+        "rollback": {
+          "trigger": "trace propagation fails",
+          "action": "diagnose and fix tracing configuration",
+          "safety_guard": "ensure service restart"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "instrument_services",
+        "to_task": "add_trace_ids",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_jaeger",
+        "to_task": "configure_exporters",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_exporters",
+        "to_task": "set_alerts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "add_trace_ids",
+        "to_task": "verify_trace_propagation",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:add_trace_ids",
+      "task_id": "add_trace_ids",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Add trace correlation IDs to logs occurs before verifying trace propagation, which requires adding trace IDs.",
+      "suggested_fix": "Reorder the tasks to ensure 'verify_trace_propagation' follows 'add_trace_ids'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:set_alerts",
+      "task_id": "set_alerts",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Setting up alerts depends on the successful configuration of exporters, which is not guaranteed.",
+      "suggested_fix": "Add verification step for 'configure_exporters' to ensure alerts can only be set if exporters are confirmed to be operational.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:configure_exporters",
+      "task_id": "configure_exporters",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback action for exporters does not account for restoring the previous state of systems relying on alerts.",
+      "suggested_fix": "Enhance rollback plan to revert associated alert configurations or dependencies when resetting exporter configuration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

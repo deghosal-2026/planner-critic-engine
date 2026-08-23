@@ -1,0 +1,275 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-05-registry-migration",
+  "duration_seconds": 48.46,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-k8s-05-registry-migration-r3",
+    "goal_id": "k8s-05-registry-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-k8s-05-registry-migration-r2",
+    "created_at": "2026-08-23T22:03:51.839274Z",
+    "tasks": [
+      {
+        "id": "pull_images",
+        "description": "Pull current images from Docker Hub",
+        "action": "pull",
+        "target": "docker_hub",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "images pulled",
+          "how": "check image list",
+          "expected": "list of images matches Docker Hub"
+        },
+        "rollback": {
+          "trigger": "pull fails",
+          "action": "notify and retry",
+          "safety_guard": "limited retries"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "retag_images",
+        "description": "Retag images with ECR repository URI",
+        "action": "retag",
+        "target": "ecr",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "images retagged",
+          "how": "verify ECR tags",
+          "expected": "tags correctly updated in ECR"
+        },
+        "rollback": {
+          "trigger": "retagging fails",
+          "action": "alert and revert changes",
+          "safety_guard": "check Docker Hub image existence"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "push_images",
+        "description": "Push retagged images to ECR",
+        "action": "push",
+        "target": "ecr",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "images pushed",
+          "how": "check push logs",
+          "expected": "no errors in push logs"
+        },
+        "rollback": {
+          "trigger": "push fails",
+          "action": "restore original image tags and notify team",
+          "safety_guard": "verify ECR repository status and access"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update_manifests",
+        "description": "Update manifests to reference new ECR images",
+        "action": "update",
+        "target": "k8s_deployments",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "manifests updated",
+          "how": "check deployments",
+          "expected": "deployments reflect new ECR images"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "revert to previous manifests and notify",
+          "safety_guard": "store manifest versions and ensure they are intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rolling_restart",
+        "description": "Trigger rolling restart of services",
+        "action": "restart",
+        "target": "k8s_services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "services restarted",
+          "how": "check service health",
+          "expected": "all services running"
+        },
+        "rollback": {
+          "trigger": "restart fails",
+          "action": "scale down and roll back to previous state",
+          "safety_guard": "monitor service status closely before and after"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_pods",
+        "description": "Verify all pods are pulling from ECR and serving traffic normally",
+        "action": "verify",
+        "target": "k8s_pods",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "pod status",
+          "how": "check logs and metrics",
+          "expected": "all pods active and serving traffic"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "switch back to Docker Hub after ensuring all services are healthy",
+          "safety_guard": "ensure ECR rollback is complete and validated before switching"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "maintain_old_refs",
+        "description": "Maintain old Docker Hub references for rollback",
+        "action": "store",
+        "target": "docker_hub_refs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "pull_images",
+        "to_task": "retag_images",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "retag_images",
+        "to_task": "push_images",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "push_images",
+        "to_task": "update_manifests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_manifests",
+        "to_task": "rolling_restart",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rolling_restart",
+        "to_task": "verify_pods",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "push_images",
+        "to_task": "maintain_old_refs",
+        "kind": "soft",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:weak_rollback:push_images",
+      "task_id": "push_images",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback procedure for 'push_images' lacks assurance that it will restore a fully operational state if the push fails, as it relies on the status of ECR repository and access verification.",
+      "suggested_fix": "Ensure that the rollback to original image tags guarantees operational continuity, perhaps by maintaining a backup of the last successfully pushed image or utilizing a specific tagging strategy.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:weak_rollback:rolling_restart",
+      "task_id": "rolling_restart",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'rolling_restart' may not be sufficient, as it only mentions scaling down without further details on restoring previous states.",
+      "suggested_fix": "Define a more robust rollback strategy that includes detailed steps to revert to the last stable deployment state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:weak_rollback:verify_pods",
+      "task_id": "verify_pods",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback strategy for 'verify_pods' introduces a risk by switching back to Docker Hub without defining checks for the health of services, which could leave the environment in an unstable state.",
+      "suggested_fix": "Incorporate a thorough validation of pod integrity and performance before switching back to Docker Hub to ensure service health.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:maintain_old_refs",
+      "task_id": "maintain_old_refs",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'maintain_old_refs' operates independently without verifying that it executed after 'push_images', which is crucial since it relies on images that must be confirmed pushed first.",
+      "suggested_fix": "Establish a hard dependency on 'push_images' to ensure that old references are maintained only after a successful image push.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-05-registry-migration:3:3",
+    "plan_id": "plan-k8s-05-registry-migration-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:weak_rollback:push_images",
+    "question": "Plan for goal 'k8s-05-registry-migration' cannot be approved: blockers remain (llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

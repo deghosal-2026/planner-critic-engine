@@ -1,0 +1,268 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-04-feature-flag",
+  "duration_seconds": 10.17,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "ci-04-feature-flag-plan",
+    "goal_id": "ci-04-feature-flag",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T21:49:53.534205Z",
+    "tasks": [
+      {
+        "id": "add-feature-flag",
+        "description": "Add feature flag to codebase",
+        "action": "add",
+        "target": "feature flag",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "git repository is accessible",
+            "fact": "git_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy-feature-flag-off",
+        "description": "Deploy with feature flag off",
+        "action": "deploy",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "code is ready for deployment",
+            "fact": "code_ready",
+            "established_by": "add-feature-flag",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "test-in-staging",
+        "description": "Test feature in staging environment",
+        "action": "test",
+        "target": "staging",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "deployment to staging is successful",
+            "fact": "staging_deployed",
+            "established_by": "deploy-feature-flag-off",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "enable-feature-for-beta",
+        "description": "Enable feature for beta users",
+        "action": "enable",
+        "target": "feature flag",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "staging tests passed",
+            "fact": "staging_test_success",
+            "established_by": "test-in-staging",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "ramp-to-100",
+        "description": "Ramp feature usage to 100%",
+        "action": "ramp",
+        "target": "feature flag",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "feature is enabled for beta",
+            "fact": "feature_enabled_beta",
+            "established_by": "enable-feature-for-beta",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cleanup-flag",
+        "description": "Remove feature flag cleanup PR",
+        "action": "create PR",
+        "target": "repository",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "feature ramp is complete",
+            "fact": "feature_ramp_complete",
+            "established_by": "ramp-to-100",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "low",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "add-feature-flag",
+        "to_task": "deploy-feature-flag-off",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-feature-flag-off",
+        "to_task": "test-in-staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test-in-staging",
+        "to_task": "enable-feature-for-beta",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "enable-feature-for-beta",
+        "to_task": "ramp-to-100",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "ramp-to-100",
+        "to_task": "cleanup-flag",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:deploy-feature-flag-off",
+      "task_id": "deploy-feature-flag-off",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'deploy-feature-flag-off' is ordered before verifying that the code is ready for deployment.",
+      "suggested_fix": "Ensure 'code_ready' is established by verifying the completion of 'add-feature-flag'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:cleanup-flag",
+      "task_id": "cleanup-flag",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'cleanup-flag' depends on 'feature_ramp_complete', which is not established by any prior task.",
+      "suggested_fix": "Add a step to verify that the feature ramp is complete before 'cleanup-flag' is executed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:feasibility:cleanup-flag",
+      "task_id": "cleanup-flag",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Task 'cleanup-flag' cannot be achieved if earlier tasks fail as there's no rollback defined.",
+      "suggested_fix": "Define a rollback strategy for earlier tasks to ensure plan feasibility.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:risk:test-in-staging",
+      "task_id": "test-in-staging",
+      "version": 1,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Testing in staging may not cover all edge cases if the feature flag has specific configurations not included in the testing plan.",
+      "suggested_fix": null,
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:plan",
+      "task_id": null,
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding a validation step for feature functionality before enabling for beta users.",
+      "suggested_fix": null,
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:ramp-to-100",
+      "task_id": "ramp-to-100",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Lacks a sound rollback plan should the ramping process encounter issues.",
+      "suggested_fix": null,
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

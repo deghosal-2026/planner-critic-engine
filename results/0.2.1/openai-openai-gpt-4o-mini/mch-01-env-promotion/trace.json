@@ -1,0 +1,342 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mch-01-env-promotion",
+  "duration_seconds": 34.66,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-mch-01-env-promotion-r2",
+    "goal_id": "mch-01-env-promotion",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "mch-01-env-promotion-plan",
+    "created_at": "2026-08-23T22:11:35.602624Z",
+    "tasks": [
+      {
+        "id": "deploy_dev",
+        "description": "Deploy new API version to dev environment",
+        "action": "deploy",
+        "target": "dev",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dev environment is ready",
+            "fact": "dev_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run_dev_verification",
+        "description": "Run unit tests in dev",
+        "action": "verify",
+        "target": "dev",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "new API version is deployed to dev",
+            "fact": "dev_deployed",
+            "established_by": "deploy_dev",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_staging",
+        "description": "Deploy new API version to staging environment",
+        "action": "deploy",
+        "target": "staging",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dev verification passed",
+            "fact": "dev_verified",
+            "established_by": "run_dev_verification",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "integration tests and smoke tests results",
+          "how": "execute test suite",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "staging deploy fails",
+          "action": "rollback to last stable version",
+          "safety_guard": "ensure last stable version is running"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run_staging_verification",
+        "description": "Run integration and smoke tests in staging",
+        "action": "verify",
+        "target": "staging",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "new API version is deployed to staging",
+            "fact": "staging_deployed",
+            "established_by": "deploy_staging",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "integration and smoke test results",
+          "how": "execute test suite",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "staging verification fails",
+          "action": "rollback to last stable version",
+          "safety_guard": "ensure last stable version is running"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_prod_canary_5",
+        "description": "Deploy new API version to 5% of prod",
+        "action": "deploy",
+        "target": "prod 5%",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "staging verification passed",
+            "fact": "staging_verified",
+            "established_by": "run_staging_verification",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "health check for canary 5%",
+          "how": "run health check scripts",
+          "expected": "all health checks pass"
+        },
+        "rollback": {
+          "trigger": "canary 5% fails",
+          "action": "rollback to last stable version for 5%",
+          "safety_guard": "ensure stability of last stable version"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_prod_canary_25",
+        "description": "Deploy new API version to 25% of prod",
+        "action": "deploy",
+        "target": "prod 25%",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary 5% deployment verified",
+            "fact": "canary_5_verified",
+            "established_by": "deploy_prod_canary_5",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "health check for canary 25%",
+          "how": "run health check scripts",
+          "expected": "all health checks pass"
+        },
+        "rollback": {
+          "trigger": "canary 25% fails",
+          "action": "rollback to last stable version for 25%",
+          "safety_guard": "ensure stability of last stable version"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_prod_full",
+        "description": "Deploy new API version to 100% of prod",
+        "action": "deploy",
+        "target": "prod 100%",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary 25% deployment verified",
+            "fact": "canary_25_verified",
+            "established_by": "deploy_prod_canary_25",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "health check for canary 100%",
+          "how": "run health check scripts",
+          "expected": "all health checks pass"
+        },
+        "rollback": {
+          "trigger": "full deployment fails",
+          "action": "rollback to last stable version for 100%",
+          "safety_guard": "ensure stability of last stable version"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_dev",
+        "to_task": "run_dev_verification",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_dev_verification",
+        "to_task": "deploy_staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_staging",
+        "to_task": "run_staging_verification",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_staging_verification",
+        "to_task": "deploy_prod_canary_5",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_prod_canary_5",
+        "to_task": "deploy_prod_canary_25",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_prod_canary_25",
+        "to_task": "deploy_prod_full",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:deploy_dev",
+      "task_id": "deploy_dev",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The task 'deploy_dev' cannot be executed as the 'dev' environment is not guaranteed to be ready.",
+      "suggested_fix": "Ensure that the dev environment readiness is verified before attempting to deploy.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:deploy_staging",
+      "task_id": "deploy_staging",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'deploy_staging' is ordered before the prerequisite 'run_dev_verification' has confirmed success.",
+      "suggested_fix": "Reorder the tasks to ensure 'run_dev_verification' completes successfully before 'deploy_staging'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:deploy_prod_canary_5",
+      "task_id": "deploy_prod_canary_5",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'deploy_prod_canary_5' depends on 'staging_verified', but 'run_staging_verification' does not clearly establish this fact.",
+      "suggested_fix": "Confirm that 'run_staging_verification' establishes 'staging_verified' before proceeding to 'deploy_prod_canary_5'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:deploy_prod_canary_5",
+      "task_id": "deploy_prod_canary_5",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'deploy_prod_canary_5' lacks a comprehensive plan in case the health checks fail, which could lead to a high blast radius.",
+      "suggested_fix": "Define a more detailed rollback strategy to account for potential health check failures.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:deploy_prod_canary_25",
+      "task_id": "deploy_prod_canary_25",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding verification steps after 'deploy_prod_canary_25' to ensure the stability of the deployment before proceeding to 'deploy_prod_full'.",
+      "suggested_fix": "Implement additional health checks and verification after 'deploy_prod_canary_25'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:risk:deploy_prod_full",
+      "task_id": "deploy_prod_full",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "The risk of deploying to 100% of production without verified canary deployment may lead to system-wide issues.",
+      "suggested_fix": "Enhance risk monitoring and introduce an additional verification layer before 'deploy_prod_full'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mch-01-env-promotion:2:2",
+    "plan_id": "plan-mch-01-env-promotion-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:feasibility:deploy_dev",
+    "question": "Plan for goal 'mch-01-env-promotion' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

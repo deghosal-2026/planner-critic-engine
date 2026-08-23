@@ -1,0 +1,264 @@
+{
+  "dimension": "core-api",
+  "goal_id": "id-01-idp-migration",
+  "duration_seconds": 57.65,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-id-01-idp-migration-r4",
+    "goal_id": "id-01-idp-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-id-01-idp-migration-r3",
+    "created_at": "2026-08-23T22:01:32.526185Z",
+    "tasks": [
+      {
+        "id": "configure_okta",
+        "description": "Configure Okta as the new IdP with SAML 2.0 and OIDC.",
+        "action": "configure",
+        "target": "okta",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Okta IdP configuration status",
+          "how": "check configuration logs",
+          "expected": "successful configuration"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "revert to legacy IdP configuration",
+          "safety_guard": "verify legacy IdP functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_mfa",
+        "description": "Set up MFA enforcement with TOTP and push notifications.",
+        "action": "setup",
+        "target": "mfa",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "MFA system response",
+          "how": "test user authentication with MFA",
+          "expected": "MFA prompts work as intended"
+        },
+        "rollback": {
+          "trigger": "MFA setup fails",
+          "action": "disable MFA and revert to previous settings",
+          "safety_guard": "confirm all users can authenticate without MFA"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_application_support",
+        "description": "Verify all applications support SAML 2.0 or OIDC before migration.",
+        "action": "verify",
+        "target": "applications",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application support status",
+          "how": "assess application compatibility for SAML 2.0 or OIDC",
+          "expected": "all applications confirmed to support SAML 2.0 or OIDC"
+        },
+        "rollback": {
+          "trigger": "support verification fails",
+          "action": "notify stakeholders of incompatible applications",
+          "safety_guard": "create a list of applications needing updates"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "migrate_apps",
+        "description": "Migrate all applications from SAML to Okta by updating SP entity IDs and ACS URLs.",
+        "action": "migrate",
+        "target": "applications",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application authentication status",
+          "how": "test each application against Okta",
+          "expected": "all applications authenticate successfully"
+        },
+        "rollback": {
+          "trigger": "migration fails for any application",
+          "action": "restore application configurations to SAML",
+          "safety_guard": "validate application accessibility after restore"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "test_session_compatibility",
+        "description": "Test session compatibility to ensure existing sessions are not force-logged-out.",
+        "action": "test",
+        "target": "session",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "session persistence status",
+          "how": "monitor user sessions during transition",
+          "expected": "no sessions are invalidated"
+        },
+        "rollback": {
+          "trigger": "testing fails",
+          "action": "revert to previous session handling code",
+          "safety_guard": "verify all users retain their sessions"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_authentication",
+        "description": "Verify all applications authenticate against Okta.",
+        "action": "verify",
+        "target": "applications",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "auth status of all applications",
+          "how": "run authentication tests",
+          "expected": "all applications authenticate without errors"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "roll back DNS cutover",
+          "safety_guard": "ensure legacy IdP is functional"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover_dns",
+        "description": "Cutover DNS for the IdP endpoint.",
+        "action": "update",
+        "target": "dns",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "MFA and application migrations are complete",
+            "fact": "migrations_complete",
+            "established_by": "migrate_apps",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "DNS operational status",
+          "how": "check DNS resolution",
+          "expected": "DNS points to new IdP"
+        },
+        "rollback": {
+          "trigger": "DNS cutover fails",
+          "action": "revert DNS settings to legacy IdP",
+          "safety_guard": "validate legacy IdP accessibility"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "configure_okta",
+        "to_task": "setup_mfa",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_mfa",
+        "to_task": "verify_application_support",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_application_support",
+        "to_task": "migrate_apps",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate_apps",
+        "to_task": "test_session_compatibility",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test_session_compatibility",
+        "to_task": "verify_authentication",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_authentication",
+        "to_task": "cutover_dns",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:setup_mfa",
+      "task_id": "setup_mfa",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "'setup_mfa' task is ordered before verifying application support, which is necessary since MFA functionality relies on application compatibility with SAML 2.0 or OIDC.",
+      "suggested_fix": "Reorder 'setup_mfa' to execute after 'verify_application_support'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:cutover_dns",
+      "task_id": "cutover_dns",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "'cutover_dns' task depends on the 'migrate_apps' task being marked as complete, but the completion fact is established later than its execution order.",
+      "suggested_fix": "Ensure 'migrate_apps' is fully verified before proceeding with 'cutover_dns'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:id-01-idp-migration:4:4",
+    "plan_id": "plan-id-01-idp-migration-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:setup_mfa",
+    "question": "Plan for goal 'id-01-idp-migration' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}
