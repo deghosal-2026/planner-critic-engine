@@ -15,7 +15,7 @@ import json
 from collections import Counter, defaultdict
 from pathlib import Path
 
-TRACE_DIR = Path(__file__).parents[1] / "docs" / "field-test" / "reports" / "0.1.0" / "full-sweep"
+TRACE_DIR = Path(__file__).parents[1] / "results" / "0.2.0" / "openai-openai-gpt-4o-mini"
 
 
 def _load_failures() -> list[dict]:

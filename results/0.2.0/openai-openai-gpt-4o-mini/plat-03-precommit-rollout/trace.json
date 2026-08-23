@@ -1,0 +1,168 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-03-precommit-rollout",
+  "duration_seconds": 8.36,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plat-03-precommit-rollout",
+    "goal_id": "plat-03-precommit-rollout",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:50:38.220798Z",
+    "tasks": [
+      {
+        "id": "define-config",
+        "description": "Define shared .pre-commit-config.yaml with hooks for linting, secrets scanning, and formatting",
+        "action": "create",
+        "target": "config",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "tools are available",
+            "fact": "tools_installed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "install-precommit",
+        "description": "Install pre-commit CI on all repositories",
+        "action": "install",
+        "target": "repos",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "pre-commit installation",
+          "how": "check for pre-commit existence",
+          "expected": "installed"
+        },
+        "rollback": {
+          "trigger": "installation fails",
+          "action": "remove pre-commit installation",
+          "safety_guard": "verify repositories are intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "enforce-rules",
+        "description": "Enforce hook passing in CI pipelines via branch protection rules",
+        "action": "enforce",
+        "target": "CI",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "branch protection rules",
+          "how": "review CI settings",
+          "expected": "rules enforced for pre-commit hooks"
+        },
+        "rollback": {
+          "trigger": "enforcement fails",
+          "action": "disable branch protection",
+          "safety_guard": "revert to previous CI configuration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "generate-report",
+        "description": "Generate adoption report showing compliance per team",
+        "action": "generate",
+        "target": "report",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "all teams have adopted hooks",
+            "fact": "teams_complied",
+            "established_by": "enforce-rules",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define-config",
+        "to_task": "install-precommit",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "install-precommit",
+        "to_task": "enforce-rules",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "enforce-rules",
+        "to_task": "generate-report",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unverified_dependencies:generate-report",
+      "task_id": "generate-report",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'generate-report' depends on 'teams_complied' which is not verified by previous tasks.",
+      "suggested_fix": "Ensure that 'teams_complied' is established before generating the report.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:define-config",
+      "task_id": "define-config",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding validation for the correctness of the .pre-commit-config.yaml after defining it.",
+      "suggested_fix": "Add a verification step to check the syntax and validity of the defined .pre-commit-config.yaml.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,207 @@
+{
+  "dimension": "core-api",
+  "goal_id": "cm-03-pii-redaction",
+  "duration_seconds": 9.41,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-cm-03-pii-redaction",
+    "goal_id": "cm-03-pii-redaction",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:38:19.945104Z",
+    "tasks": [
+      {
+        "id": "identify_pii",
+        "description": "Identify all PII fields in application logs",
+        "action": "scan",
+        "target": "logs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "identified PII fields",
+          "how": "run analysis script",
+          "expected": "all PII fields are listed"
+        },
+        "rollback": {
+          "trigger": "failure to identify PII",
+          "action": "revert to previous log configuration",
+          "safety_guard": "verify new configuration is stable"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_sidecar",
+        "description": "Deploy log redaction sidecar using FluentBit with Lua filter",
+        "action": "deploy",
+        "target": "sidecar",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "sidecar deployment status",
+          "how": "kubectl get pods",
+          "expected": "sidecar pod is running"
+        },
+        "rollback": {
+          "trigger": "deployment failure",
+          "action": "remove sidecar",
+          "safety_guard": "check application log functionality post-removal"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_pipeline",
+        "description": "Configure Elasticsearch ingest pipelines for redaction",
+        "action": "configure",
+        "target": "elasticsearch",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "sidecar is deployed",
+            "fact": "sidecar_deployed",
+            "established_by": "deploy_sidecar",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_redaction",
+        "description": "Verify redaction is working on sampled logs",
+        "action": "verify",
+        "target": "logs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "sample logs",
+          "how": "check for PII presence",
+          "expected": "no PII present in logs"
+        },
+        "rollback": {
+          "trigger": "redaction fails",
+          "action": "disable redaction in configuration",
+          "safety_guard": "backup current log configuration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "tune_false_positive",
+        "description": "Tune the false-positive rate of redaction",
+        "action": "tune",
+        "target": "regex",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "redaction verification completed",
+            "fact": "redaction_verified",
+            "established_by": "verify_redaction",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "identify_pii",
+        "to_task": "deploy_sidecar",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_sidecar",
+        "to_task": "configure_pipeline",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_sidecar",
+        "to_task": "verify_redaction",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_redaction",
+        "to_task": "tune_false_positive",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unverified_dependencies:configure_pipeline",
+      "task_id": "configure_pipeline",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'configure_pipeline' depends on 'deploy_sidecar' which has not been verified yet.",
+      "suggested_fix": "Add a verification step for 'deploy_sidecar' to confirm that it is operational before executing 'configure_pipeline'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:verify_redaction",
+      "task_id": "verify_redaction",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "'verify_redaction' lacks a robust rollback mechanism to ensure the system can revert to a known stable state if redaction fails.",
+      "suggested_fix": "Implement a rollback procedure that restores the entire previous log processing configuration if redaction verification fails.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:risk:tune_false_positive",
+      "task_id": "tune_false_positive",
+      "version": 1,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "The task to 'tune_false_positive' may introduce a risk of failing to adequately resolve false positives affecting legitimate data.",
+      "suggested_fix": "Consider additional sampling and testing methods to ensure that tuning does not degrade data quality.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

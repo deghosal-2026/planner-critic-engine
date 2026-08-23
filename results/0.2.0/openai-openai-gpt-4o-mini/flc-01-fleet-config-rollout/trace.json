@@ -1,0 +1,293 @@
+{
+  "dimension": "core-api",
+  "goal_id": "flc-01-fleet-config-rollout",
+  "duration_seconds": 70.91,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 4
+  },
+  "plan": {
+    "id": "plan-flc-01-fleet-config-rollout-r4",
+    "goal_id": "flc-01-fleet-config-rollout",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-flc-01-fleet-config-rollout-r3",
+    "created_at": "2026-08-23T06:52:05.096157Z",
+    "tasks": [
+      {
+        "id": "validate_canary",
+        "description": "Validate configuration on a canary of 100 hosts",
+        "action": "validate",
+        "target": "canary-hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary hosts are available",
+            "fact": "canary_hosts_reachable",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "validation success",
+          "how": "check validation logs",
+          "expected": "no errors"
+        },
+        "rollback": {
+          "trigger": "validation fails",
+          "action": "revert to previous config",
+          "safety_guard": "verify config integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "health_check_canary",
+        "description": "Perform health check on canary hosts",
+        "action": "check_health",
+        "target": "canary-hosts",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "health status",
+          "how": "run monitoring checks",
+          "expected": "all services running"
+        },
+        "rollback": {
+          "trigger": "health check fails",
+          "action": "revert to previous config",
+          "safety_guard": "verify config integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rollout_ring_1",
+        "description": "Roll out configuration to 500 hosts",
+        "action": "deploy",
+        "target": "ring-1-hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary health check passed",
+            "fact": "canary_health_verified",
+            "established_by": "health_check_canary",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment success",
+          "how": "check deployment logs",
+          "expected": "no errors"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "revert to previous config",
+          "safety_guard": "verify config integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "health_check_ring_1",
+        "description": "Perform health check on ring 1 hosts",
+        "action": "check_health",
+        "target": "ring-1-hosts",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "health status",
+          "how": "run monitoring checks",
+          "expected": "all services running"
+        },
+        "rollback": {
+          "trigger": "health check fails",
+          "action": "revert to previous config",
+          "safety_guard": "verify config integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rollout_ring_2",
+        "description": "Roll out configuration to 2500 hosts",
+        "action": "deploy",
+        "target": "ring-2-hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ring 1 health check passed",
+            "fact": "ring_1_health_verified",
+            "established_by": "health_check_ring_1",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment success",
+          "how": "check deployment logs",
+          "expected": "no errors"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "revert to previous config",
+          "safety_guard": "verify config integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "health_check_ring_2",
+        "description": "Perform health check on ring 2 hosts",
+        "action": "check_health",
+        "target": "ring-2-hosts",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "health status",
+          "how": "run monitoring checks",
+          "expected": "all services running"
+        },
+        "rollback": {
+          "trigger": "health check fails",
+          "action": "revert to previous config",
+          "safety_guard": "verify config integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rollout_ring_3",
+        "description": "Roll out configuration to the full fleet",
+        "action": "deploy",
+        "target": "full-fleet-hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ring 2 health check passed",
+            "fact": "ring_2_health_verified",
+            "established_by": "health_check_ring_2",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment success",
+          "how": "check deployment logs",
+          "expected": "no errors"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "revert to previous config for full fleet",
+          "safety_guard": "verify config integrity for fleet"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "health_check_full_fleet",
+        "description": "Perform health check on the full fleet",
+        "action": "check_health",
+        "target": "full-fleet-hosts",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "health status",
+          "how": "run monitoring checks",
+          "expected": "all services running"
+        },
+        "rollback": {
+          "trigger": "health check fails",
+          "action": "revert to previous config for full fleet",
+          "safety_guard": "verify config integrity for fleet"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "health_check_canary",
+        "to_task": "rollout_ring_1",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "health_check_ring_1",
+        "to_task": "rollout_ring_2",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "health_check_ring_2",
+        "to_task": "rollout_ring_3",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rollout_ring_3",
+        "to_task": "health_check_full_fleet",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:rollout_ring_3",
+      "task_id": "rollout_ring_3",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Rolling out configuration to the full fleet is ordered before verifying health check for the full fleet.",
+      "suggested_fix": "Change the task order to perform health_check_full_fleet before rollout_ring_3.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:health_check_full_fleet",
+      "task_id": "health_check_full_fleet",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Health check on the full fleet depends on the rollout_ring_3 which must be verified first.",
+      "suggested_fix": "Ensure that health_check_full_fleet is either moved to follow rollout_ring_3 after confirming it succeeded.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:flc-01-fleet-config-rollout:4:4",
+    "plan_id": "plan-flc-01-fleet-config-rollout-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:rollout_ring_3",
+    "question": "Plan for goal 'flc-01-fleet-config-rollout' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,235 @@
+{
+  "dimension": "core-api",
+  "goal_id": "bch-01-validator-setup",
+  "duration_seconds": 23.03,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-bch-01-validator-setup-r2",
+    "goal_id": "bch-01-validator-setup",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "bch-01-validator-setup-plan",
+    "created_at": "2026-08-23T06:34:55.272863Z",
+    "tasks": [
+      {
+        "id": "generate_keys",
+        "description": "Generate validator signing keys using EIP-2333",
+        "action": "generate",
+        "target": "validator_keys",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "validator keys presence",
+          "how": "check stored keys",
+          "expected": "keys exist"
+        },
+        "rollback": {
+          "trigger": "key generation fails",
+          "action": "retry key generation or alert for manual intervention if retries fail after 3 attempts",
+          "safety_guard": "confirm key storage"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "store_keys",
+        "description": "Store generated keys in a hardware security module",
+        "action": "store",
+        "target": "HSM",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "key storage confirmation",
+          "how": "check HSM status",
+          "expected": "keys accessible"
+        },
+        "rollback": {
+          "trigger": "storage fails",
+          "action": "transfer keys to secure backup",
+          "safety_guard": "verify backup integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_client",
+        "description": "Configure signing client (Prysm/Lighthouse/TEKU)",
+        "action": "configure",
+        "target": "signing_client",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "keys are stored successfully",
+            "fact": "keys_stored",
+            "established_by": "store_keys",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "register_validator",
+        "description": "Register the validator by submitting a deposit transaction of 32 ETH",
+        "action": "register",
+        "target": "validator_deposit",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "validator registration status",
+          "how": "query contract",
+          "expected": "validator registered"
+        },
+        "rollback": {
+          "trigger": "registration fails",
+          "action": "submit transaction again",
+          "safety_guard": "confirm transaction status"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "set_up_monitoring",
+        "description": "Set up monitoring for alerting on missed attestations and slashing warnings",
+        "action": "setup",
+        "target": "monitoring_system",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "client is configured",
+            "fact": "client_configured",
+            "established_by": "configure_client",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "establish_exit_plan",
+        "description": "Establish exit/stop plan via beacon chain exit message",
+        "action": "establish",
+        "target": "exit_plan",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "exit plan validity",
+          "how": "check exit message",
+          "expected": "exit message valid"
+        },
+        "rollback": {
+          "trigger": "exit plan fails",
+          "action": "reassess exit strategy",
+          "safety_guard": "verify exit eligibility"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "generate_keys",
+        "to_task": "store_keys",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "store_keys",
+        "to_task": "configure_client",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_client",
+        "to_task": "register_validator",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_client",
+        "to_task": "set_up_monitoring",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "generate_keys",
+        "to_task": "establish_exit_plan",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "register_validator",
+        "to_task": "set_up_monitoring",
+        "kind": "soft",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:configure_client",
+      "task_id": "configure_client",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'configure_client' is sequenced before ensuring that the keys are successfully stored.",
+      "suggested_fix": "Ensure 'store_keys' is completed successfully before starting 'configure_client'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:set_up_monitoring",
+      "task_id": "set_up_monitoring",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'set_up_monitoring' depends on 'configure_client' but lacks validation for the success of the configuration.",
+      "suggested_fix": "Add verification for 'configure_client' completion before proceeding to 'set_up_monitoring'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:bch-01-validator-setup:2:2",
+    "plan_id": "plan-bch-01-validator-setup-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:configure_client",
+    "question": "Plan for goal 'bch-01-validator-setup' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

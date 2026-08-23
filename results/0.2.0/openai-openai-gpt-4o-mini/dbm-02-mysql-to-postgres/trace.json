@@ -1,0 +1,227 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dbm-02-mysql-to-postgres",
+  "duration_seconds": 10.47,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "dbm-02-mysql-to-postgres-v1",
+    "goal_id": "dbm-02-mysql-to-postgres",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:45:56.261472Z",
+    "tasks": [
+      {
+        "id": "setup_replication_bridge",
+        "description": "Set up a replication bridge from MySQL binlog to PostgreSQL",
+        "action": "setup",
+        "target": "replication_bridge",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "MySQL is accessible",
+            "fact": "mysql_accessible",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "PostgreSQL is accessible",
+            "fact": "postgres_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replication status",
+          "how": "check replication logs",
+          "expected": "no errors reported"
+        },
+        "rollback": {
+          "trigger": "replication bridge setup fails",
+          "action": "remove partial setups",
+          "safety_guard": "ensure no data loss during cleanup"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "schema_conversion",
+        "description": "Perform schema diff and conversion",
+        "action": "convert_schema",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "schema integrity",
+          "how": "run schema validation scripts",
+          "expected": "no discrepancies found"
+        },
+        "rollback": {
+          "trigger": "schema conversion fails",
+          "action": "restore original schema",
+          "safety_guard": "verify against schema backup"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "dual_write_period",
+        "description": "Run dual-write period where application writes to both databases",
+        "action": "enable_dual_write",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "replication bridge is operational",
+            "fact": "replication_operational",
+            "established_by": "setup_replication_bridge",
+            "probe": null
+          },
+          {
+            "description": "schema conversion is successful",
+            "fact": "schema_converted",
+            "established_by": "schema_conversion",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "reconciliation",
+        "description": "Run reconciliation for row counts and checksums",
+        "action": "reconcile_data",
+        "target": "database",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dual-write period is active",
+            "fact": "dual_write_active",
+            "established_by": "dual_write_period",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover",
+        "description": "Execute cutover with CHECK constraint exposure",
+        "action": "cutover",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Reconciliation completes successfully",
+            "fact": "reconciliation_successful",
+            "established_by": "reconciliation",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data integrity and CHECK constraints",
+          "how": "run data validation scripts",
+          "expected": "all CHECK constraints pass"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "fail back to MySQL and replay writes",
+          "safety_guard": "confirm all writes are recorded"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "schema_conversion",
+        "to_task": "dual_write_period",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dual_write_period",
+        "to_task": "reconciliation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "reconciliation",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:dual_write_period",
+      "task_id": "dual_write_period",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Dual-write period should not start until schema conversion has been verified and completed.",
+      "suggested_fix": "Ensure the 'schema_conversion' task must complete successfully before starting the 'dual_write_period'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:cutover",
+      "task_id": "cutover",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Cutover depends on reconciliation success, but reconciliation has no rollback plan if it fails.",
+      "suggested_fix": "Add a rollback procedure for the 'reconciliation' task to ensure you can revert to the previous state if needed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:cutover",
+      "task_id": "cutover",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The cutover rollback plan lacks thorough verification of write records before failing back to MySQL.",
+      "suggested_fix": "Enhance the rollback plan of 'cutover' to include pre-checks for all writes recorded.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

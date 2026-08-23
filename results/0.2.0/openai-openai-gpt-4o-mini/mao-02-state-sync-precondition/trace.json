@@ -1,0 +1,168 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mao-02-state-sync-precondition",
+  "duration_seconds": 30.96,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 4,
+    "llm_calls": 4
+  },
+  "plan": {
+    "id": "plan-mao-02-state-sync-precondition-r4",
+    "goal_id": "mao-02-state-sync-precondition",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-mao-02-state-sync-precondition-r3",
+    "created_at": "2026-08-23T07:01:36.662457Z",
+    "tasks": [
+      {
+        "id": "verify_migration",
+        "description": "Verify schema migration is complete",
+        "action": "verify",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "schema migration status",
+          "how": "check migration logs",
+          "expected": "migration successful"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "revert to previous version",
+          "safety_guard": "confirm schema rollback success"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "check_schema_migration_verified",
+        "description": "Set schema migration verification status",
+        "action": "set_status",
+        "target": "schema_migration_verified",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "schema migration must be verified",
+            "fact": "schema_migration_verified",
+            "established_by": "verify_migration",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "check_state_sync_precondition",
+        "description": "Check if schema migration is verified before proceeding",
+        "action": "check",
+        "target": "precondition",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Schema migration must be verified",
+            "fact": "schema_migration_verified",
+            "established_by": "check_schema_migration_verified",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": {
+          "trigger": "precondition check fails",
+          "action": "rollback to safe state",
+          "safety_guard": "ensure all changes are reverted"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "verify_migration",
+        "to_task": "check_schema_migration_verified",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check_schema_migration_verified",
+        "to_task": "check_state_sync_precondition",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:check_state_sync_precondition",
+      "task_id": "check_state_sync_precondition",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The check_state_sync_precondition task is sequenced before check_schema_migration_verified confirms the migration status.",
+      "suggested_fix": "Restructure the task order to ensure check_schema_migration_verified is completed before check_state_sync_precondition.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unverified_dependencies:check_schema_migration_verified",
+      "task_id": "check_schema_migration_verified",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task check_schema_migration_verified depends on a fact (schema_migration_verified) that is not verified by a preceding task.",
+      "suggested_fix": "Ensure check_schema_migration_verified is only executed after verify_migration has successfully completed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:weak_rollback:check_state_sync_precondition",
+      "task_id": "check_state_sync_precondition",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for check_state_sync_precondition does not ensure complete reversion to a safe state in the case of failure.",
+      "suggested_fix": "Enhance the rollback strategy for check_state_sync_precondition to ensure full reversion to the state prior to the execution.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mao-02-state-sync-precondition:4:4",
+    "plan_id": "plan-mao-02-state-sync-precondition-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:check_state_sync_precondition",
+    "question": "Plan for goal 'mao-02-state-sync-precondition' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

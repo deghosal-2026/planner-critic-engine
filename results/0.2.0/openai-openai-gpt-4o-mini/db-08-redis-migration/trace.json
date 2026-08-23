@@ -1,0 +1,217 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-08-redis-migration",
+  "duration_seconds": 19.48,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-db-08-redis-migration-r2",
+    "goal_id": "db-08-redis-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "db-08-redis-migration-plan",
+    "created_at": "2026-08-23T06:42:53.643193Z",
+    "tasks": [
+      {
+        "id": "setup_dual_write",
+        "description": "Set up dual-write code for both Memcached and Redis",
+        "action": "configure",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application writes to both caches",
+          "how": "monitor logs",
+          "expected": "no write errors"
+        },
+        "rollback": {
+          "trigger": "dual-write fails",
+          "action": "revert application code",
+          "safety_guard": "test application functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "initiate_data_migration",
+        "description": "Start data migration using Redis-Shake",
+        "action": "migrate",
+        "target": "cache",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data migration has started",
+          "how": "check migration status log",
+          "expected": "migration started successfully"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "stop migration and restore data",
+          "safety_guard": "verify data integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_migration",
+        "description": "Monitor migration process and dual-write latencies",
+        "action": "monitor",
+        "target": "metrics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "data migration has started",
+            "fact": "initiate_data_migration_completed",
+            "established_by": "initiate_data_migration",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "validate_cache_hit_rates",
+        "description": "Validate cache hit rates remain above 95% post-migration",
+        "action": "verify",
+        "target": "cache_hit_rates",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "cache hit rate",
+          "how": "analyze Grafana dashboards",
+          "expected": "> 95%"
+        },
+        "rollback": {
+          "trigger": "hit rate below 95%",
+          "action": "adjust Redis configurations and validate",
+          "safety_guard": "rollback settings to Memcached"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover_read_to_redis",
+        "description": "Cutover reads to Redis and decommission Memcached",
+        "action": "cutover",
+        "target": "cache_read",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application reading from Redis",
+          "how": "monitor application logs",
+          "expected": "all reads successful"
+        },
+        "rollback": {
+          "trigger": "cutover failure",
+          "action": "restore read from Memcached",
+          "safety_guard": "ensure no active user sessions are lost"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup_dual_write",
+        "to_task": "initiate_data_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "initiate_data_migration",
+        "to_task": "monitor_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_migration",
+        "to_task": "validate_cache_hit_rates",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "validate_cache_hit_rates",
+        "to_task": "cutover_read_to_redis",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:initiate_data_migration",
+      "task_id": "initiate_data_migration",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'initiate_data_migration' must not start until 'setup_dual_write' is completed, but there are no preconditions defined for this task.",
+      "suggested_fix": "Add a precondition for 'initiate_data_migration' that ensures 'setup_dual_write' is completed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:monitor_migration",
+      "task_id": "monitor_migration",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'monitor_migration' is dependent on 'initiate_data_migration', which does not verify that the data migration has successfully started.",
+      "suggested_fix": "Introduce a verification step in 'initiate_data_migration' that ensures data migration has begun before allowing 'monitor_migration' to proceed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:cutover_read_to_redis",
+      "task_id": "cutover_read_to_redis",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'cutover_read_to_redis' does not adequately ensure that no active user sessions are lost, which presents a risk during rollback.",
+      "suggested_fix": "Enhance rollback procedures for 'cutover_read_to_redis' to include a validation step for active user sessions before restoring reads from Memcached.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-08-redis-migration:2:2",
+    "plan_id": "plan-db-08-redis-migration-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:initiate_data_migration",
+    "question": "Plan for goal 'db-08-redis-migration' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

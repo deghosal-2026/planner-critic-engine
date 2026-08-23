@@ -1,0 +1,153 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mao-03-distributed-rollback",
+  "duration_seconds": 17.56,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-mao-03-distributed-rollback-r2",
+    "goal_id": "mao-03-distributed-rollback",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "mao-03-distributed-rollback",
+    "created_at": "2026-08-23T07:01:54.105510Z",
+    "tasks": [
+      {
+        "id": "manage_schema",
+        "description": "Manage database schema migration",
+        "action": "migrate",
+        "target": "schema-agent",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "schema version",
+          "how": "run migration checks",
+          "expected": "schema v2"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore last database backup",
+          "safety_guard": "verify backup integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "manage_api",
+        "description": "Manage API deployment",
+        "action": "deploy",
+        "target": "api-agent",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "API version",
+          "how": "check API endpoint",
+          "expected": "version 1.2"
+        },
+        "rollback": {
+          "trigger": "API rollout fails",
+          "action": "rollback to previous API version",
+          "safety_guard": "verify API functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "manage_traffic",
+        "description": "Manage traffic configuration",
+        "action": "configure",
+        "target": "traffic-agent",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "traffic flow",
+          "how": "monitor traffic logs",
+          "expected": "normal traffic flow"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "restore previous traffic settings",
+          "safety_guard": "verify traffic stability"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "manage_schema",
+        "to_task": "manage_api",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "manage_api",
+        "to_task": "manage_traffic",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:manage_api",
+      "task_id": "manage_api",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'manage_api' must not execute before 'manage_schema' is completed, as it depends on schema migration.",
+      "suggested_fix": "Reorder task 'manage_api' to execute after 'manage_schema'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:manage_traffic",
+      "task_id": "manage_traffic",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'manage_traffic' must not execute before 'manage_api' is completed, as it depends on API deployment.",
+      "suggested_fix": "Reorder task 'manage_traffic' to execute after 'manage_api'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mao-03-distributed-rollback:2:2",
+    "plan_id": "plan-mao-03-distributed-rollback-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:manage_api",
+    "question": "Plan for goal 'mao-03-distributed-rollback' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

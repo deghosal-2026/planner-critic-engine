@@ -1,0 +1,217 @@
+{
+  "dimension": "core-api",
+  "goal_id": "sre-01-blast-radius-guardrail",
+  "duration_seconds": 38.04,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-sre-01-blast-radius-guardrail-r3",
+    "goal_id": "sre-01-blast-radius-guardrail",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-sre-01-blast-radius-guardrail-r2",
+    "created_at": "2026-08-23T06:56:01.506619Z",
+    "tasks": [
+      {
+        "id": "check_health",
+        "description": "Check the health of the pod replicas",
+        "action": "check",
+        "target": "pod_replicas",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Pods are running",
+            "fact": "pods_running",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_batch_health",
+        "description": "Verify that the batch of replicas is healthy before draining",
+        "action": "check",
+        "target": "batch_health",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Batch health status is verified",
+            "fact": "batch_healthy",
+            "established_by": "check_health",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "batch health status",
+          "how": "check batch health",
+          "expected": "batch_healthy"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "none",
+          "safety_guard": "none"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "drain_replicas",
+        "description": "Drain a batch of pod replicas",
+        "action": "drain",
+        "target": "pod_replicas",
+        "parallel_group": "drain_batches",
+        "preconditions": [
+          {
+            "description": "Health check passed for the batch",
+            "fact": "batch_healthy",
+            "established_by": "verify_batch_health",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replica availability",
+          "how": "check status",
+          "expected": "all replicas in healthy state"
+        },
+        "rollback": {
+          "trigger": "drain fails",
+          "action": "undrain replicas after verifying each pod's state",
+          "safety_guard": "verify all replicas restored correctly"
+        },
+        "risk_class": "high",
+        "blast_radius": "25%"
+      },
+      {
+        "id": "health_check_probes",
+        "description": "Run health check probes after draining each batch",
+        "action": "probe",
+        "target": "pod_replicas",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Previous batch drained and health status confirmed",
+            "fact": "drain_replicas_completed",
+            "established_by": "drain_replicas",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_health",
+        "to_task": "verify_batch_health",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_batch_health",
+        "to_task": "drain_replicas",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "drain_replicas",
+        "to_task": "health_check_probes",
+        "kind": "soft",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:weak_rollback:verify_batch_health",
+      "task_id": "verify_batch_health",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback action on verification failure is set to 'none', which leaves no way to revert if health check fails.",
+      "suggested_fix": "Implement a rollback action to revert to the previous state if the health verification fails.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:drain_replicas",
+      "task_id": "drain_replicas",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Drain replicas step has an unverified dependency on the health of the batch, as it relies on the output of verify_batch_health which may not be confirmed effectively due to insufficient rollback.",
+      "suggested_fix": "Ensure that health verification includes a robust rollback to maintain safety.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:weak_rollback:drain_replicas",
+      "task_id": "drain_replicas",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback mechanism for 'drain_replicas' lacks a complete safety check, relying solely on verifying states after attempting to undrain, which may not prevent inconsistencies.",
+      "suggested_fix": "Implement a more comprehensive rollback that guarantees the safety of all replicas during the undrain process.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:missing_steps:health_check_probes",
+      "task_id": "health_check_probes",
+      "version": 3,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Health check probes do not specify actions to take if the health check does not meet expectations.",
+      "suggested_fix": "Include specific actions or fallback procedures if health check probes fail.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:sre-01-blast-radius-guardrail:3:3",
+    "plan_id": "plan-sre-01-blast-radius-guardrail-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:weak_rollback:verify_batch_health",
+    "question": "Plan for goal 'sre-01-blast-radius-guardrail' cannot be approved: blockers remain (llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

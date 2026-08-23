@@ -1,0 +1,131 @@
+{
+  "dimension": "core-api",
+  "goal_id": "idp-03-quota-multi-tenant",
+  "duration_seconds": 5.81,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "idp-03-quota-multi-tenant-plan",
+    "goal_id": "idp-03-quota-multi-tenant",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:43:21.181080Z",
+    "tasks": [
+      {
+        "id": "quota-check",
+        "description": "Check resource quota before scaling",
+        "action": "check",
+        "target": "quota",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "quota status",
+          "how": "query custom-quota-api",
+          "expected": "quota is sufficient"
+        },
+        "rollback": {
+          "trigger": "quota check fails",
+          "action": "do not scale",
+          "safety_guard": "revert to safe resource limits"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "scale-service",
+        "description": "Scale the service resource requests",
+        "action": "scale",
+        "target": "service",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service capacity",
+          "how": "check service metrics in prometheus",
+          "expected": "service scale updated successfully"
+        },
+        "rollback": {
+          "trigger": "scaling fails",
+          "action": "rollback scaling to previous state",
+          "safety_guard": "verify service health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "quota-check",
+        "to_task": "scale-service",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:scale-service",
+      "task_id": "scale-service",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The 'scale-service' task is ordered before the completion of the 'quota-check' task, which is its hard prerequisite. This can lead to scaling without a verified quota check, risking noisy-neighbor interference.",
+      "suggested_fix": "Reorder the tasks to ensure 'quota-check' is completed before 'scale-service'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:scale-service",
+      "task_id": "scale-service",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action for 'scale-service' does not specify specific actions to take in the event of failed scaling, which could lead to incomplete recovery scenarios.",
+      "suggested_fix": "Enhance the rollback procedure to include checks for service health and potentially revert resource requests.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:scale-service",
+      "task_id": "scale-service",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'scale-service' task relies on the previous performances and results of 'quota-check', but if 'quota-check' is not adequately verified, it might proceed improperly.",
+      "suggested_fix": "Ensure that the verification results of 'quota-check' are explicitly linked to conditional execution of 'scale-service'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=2"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

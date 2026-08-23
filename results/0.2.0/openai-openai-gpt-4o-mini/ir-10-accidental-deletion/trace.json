@@ -1,0 +1,234 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-10-accidental-deletion",
+  "duration_seconds": 12.63,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "ir-10-accidental-deletion-plan",
+    "goal_id": "ir-10-accidental-deletion",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:48:58.204145Z",
+    "tasks": [
+      {
+        "id": "stop-writes",
+        "description": "Stop all writes to the database",
+        "action": "stop_writes",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "db is reachable",
+            "fact": "db_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "write activity",
+          "how": "check database logs",
+          "expected": "no ongoing writes"
+        },
+        "rollback": {
+          "trigger": "unable to stop writes",
+          "action": "monitor write activity and alert",
+          "safety_guard": "check for active connections"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "identify-deletion-timestamp",
+        "description": "Identify the exact deletion timestamp from logs",
+        "action": "extract_timestamp",
+        "target": "logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "logs are accessible",
+            "fact": "logs_healthy",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "write activity has stopped",
+            "fact": "no_writes",
+            "established_by": "stop-writes",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "restore-pitr",
+        "description": "Restore the database to a point-in-time just before deletion",
+        "action": "restore",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "deletion timestamp is known",
+            "fact": "deletion_timestamp",
+            "established_by": "identify-deletion-timestamp",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "database state",
+          "how": "check database version",
+          "expected": "correct state prior to deletion"
+        },
+        "rollback": {
+          "trigger": "restore fails",
+          "action": "retry restore or switch to previous backup",
+          "safety_guard": "verify backup integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "reconcile-data",
+        "description": "Reconcile any data created after the restore point",
+        "action": "reapply_logs",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PITR restore is complete",
+            "fact": "pitr_restored",
+            "established_by": "restore-pitr",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data integrity",
+          "how": "run checks",
+          "expected": "all data matches application logs"
+        },
+        "rollback": {
+          "trigger": "reconciliation fails",
+          "action": "restore from backup before reconciliation",
+          "safety_guard": "verify both states against expected results"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "implement-preventive-controls",
+        "description": "Implement preventive controls",
+        "action": "secure_schema",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "stop-writes",
+        "to_task": "identify-deletion-timestamp",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "identify-deletion-timestamp",
+        "to_task": "restore-pitr",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "restore-pitr",
+        "to_task": "reconcile-data",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:risk:stop-writes",
+      "task_id": "stop-writes",
+      "version": 1,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Stopping writes might fail if there are ongoing transactions that can't be immediately terminated.",
+      "suggested_fix": "Ensure a procedure is in place to handle ongoing transactions if stopping writes fails.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:risk:identify-deletion-timestamp",
+      "task_id": "identify-deletion-timestamp",
+      "version": 1,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "If logs are not recoverable or insufficient, identifying the exact deletion timestamp could be impossible.",
+      "suggested_fix": "Verify the availability and completeness of logs before relying on them to identify the timestamp.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:restore-pitr",
+      "task_id": "restore-pitr",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan lacks adequate measures to prevent data inconsistencies in case the restore process fails.",
+      "suggested_fix": "Implement a robust rollback strategy that includes a full backup taken before the restore attempt.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:reconcile-data",
+      "task_id": "reconcile-data",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback procedure may not ensure data integrity if the reconciliation process fails.",
+      "suggested_fix": "Ensure the rollback plan allows for a clean restore of the database state before reconciliation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

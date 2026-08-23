@@ -1,0 +1,227 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ai-03-model-serving-migration",
+  "duration_seconds": 47.34,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-ai-03-model-serving-migration-r3",
+    "goal_id": "ai-03-model-serving-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-ai-03-model-serving-migration-r2",
+    "created_at": "2026-08-23T06:35:14.885678Z",
+    "tasks": [
+      {
+        "id": "deploy-vllm",
+        "description": "Deploy vLLM with model weights",
+        "action": "deploy",
+        "target": "vLLM",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "vLLM is deployed and healthy",
+          "how": "check deployment status and health checks",
+          "expected": "deployed successfully and healthy"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "roll back to previous version",
+          "safety_guard": "verify vLLM health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "shadow-inference",
+        "description": "Run shadow inference on both SageMaker and vLLM",
+        "action": "run_inference",
+        "target": "requests",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "vLLM is deployed and healthy",
+            "fact": "vLLM_healthy",
+            "established_by": "deploy-vllm",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": {
+          "trigger": "shadow inference fails",
+          "action": "reset shadow inference states",
+          "safety_guard": "ensure states are consistent"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-parity",
+        "description": "Verify prediction parity between SageMaker and vLLM",
+        "action": "verify",
+        "target": "predictions",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "cosine similarity of predictions",
+          "how": "calculate similarity",
+          "expected": "\u2265 0.99"
+        },
+        "rollback": {
+          "trigger": "parity verification fails",
+          "action": "revert to SageMaker only",
+          "safety_guard": "ensure no traffic to vLLM"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover-traffic",
+        "description": "Cutover traffic from SageMaker to vLLM",
+        "action": "cutover",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "prediction parity verified",
+            "fact": "parity_verified",
+            "established_by": "verify-parity",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "latency SLO",
+          "how": "check p99 latency",
+          "expected": "p99 < 200ms"
+        },
+        "rollback": {
+          "trigger": "latency regression detected",
+          "action": "reduce traffic back to SageMaker",
+          "safety_guard": "verify latency metrics"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "decommission-sagemaker",
+        "description": "Decommission SageMaker endpoint",
+        "action": "decommission",
+        "target": "SageMaker",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "traffic fully migrated to vLLM",
+            "fact": "traffic_cutover_complete",
+            "established_by": "cutover-traffic",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy-vllm",
+        "to_task": "shadow-inference",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "shadow-inference",
+        "to_task": "verify-parity",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-parity",
+        "to_task": "cutover-traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover-traffic",
+        "to_task": "decommission-sagemaker",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:shadow-inference",
+      "task_id": "shadow-inference",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Shadow inference task is scheduled before verifying vLLM deployment successfully.",
+      "suggested_fix": "Reorder the tasks to ensure 'deploy-vllm' is completed and verified before starting 'shadow-inference'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:weak_rollback:decommission-sagemaker",
+      "task_id": "decommission-sagemaker",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Decommissioning SageMaker endpoint lacks a rollback plan which could lead to service interruption if issues arise during traffic migration.",
+      "suggested_fix": "Implement a rollback procedure to revert to SageMaker endpoint if traffic migration fails.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:cutover-traffic",
+      "task_id": "cutover-traffic",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Cutover traffic task relies on 'parity_verified' fact, but there is no verification mechanism post task completion of 'verify-parity'.",
+      "suggested_fix": "Add a verification step after 'verify-parity' to ensure the 'parity_verified' fact is established.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ai-03-model-serving-migration:3:3",
+    "plan_id": "plan-ai-03-model-serving-migration-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:shadow-inference",
+    "question": "Plan for goal 'ai-03-model-serving-migration' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

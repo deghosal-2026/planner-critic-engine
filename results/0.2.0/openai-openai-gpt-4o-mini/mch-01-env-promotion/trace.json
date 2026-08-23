@@ -1,0 +1,526 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mch-01-env-promotion",
+  "duration_seconds": 89.91,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-mch-01-env-promotion-r4",
+    "goal_id": "mch-01-env-promotion",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-mch-01-env-promotion-r3",
+    "created_at": "2026-08-23T06:40:31.667331Z",
+    "tasks": [
+      {
+        "id": "check-dev-env",
+        "description": "Check if the development environment is ready",
+        "action": "check",
+        "target": "dev",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dev environment is reachable",
+            "fact": "dev_env_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "dev environment readiness",
+          "how": "check environment status",
+          "expected": "dev environment is ready"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy-dev",
+        "description": "Deploy the new API version to the development environment",
+        "action": "deploy",
+        "target": "dev",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dev environment is confirmed ready",
+            "fact": "dev_env_ready",
+            "established_by": "check-dev-env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-dev",
+        "description": "Run unit tests in dev environment",
+        "action": "verify",
+        "target": "dev",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dev deployment is successful",
+            "fact": "dev_deployed",
+            "established_by": "deploy-dev",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "unit test results",
+          "how": "check CI pipeline",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "unit tests fail",
+          "action": "rollback deployment in dev",
+          "safety_guard": "restore previous version"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy-staging",
+        "description": "Deploy the new API version to the staging environment",
+        "action": "deploy",
+        "target": "staging",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dev deployment is successful",
+            "fact": "dev_deployed",
+            "established_by": "deploy-dev",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "staging deployment status",
+          "how": "check deployment logs",
+          "expected": "deployment is successful"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback staging deployment",
+          "safety_guard": "monitor previous version"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-staging",
+        "description": "Run integration tests and smoke tests in staging environment",
+        "action": "verify",
+        "target": "staging",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "staging deployment is successful",
+            "fact": "staging_deployed",
+            "established_by": "deploy-staging",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "integration and smoke test results",
+          "how": "check CI pipeline",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "integration or smoke tests fail",
+          "action": "rollback deployment in staging",
+          "safety_guard": "restore previous version"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-canary-5",
+        "description": "Verify 5% canary deployment",
+        "action": "verify",
+        "target": "prod-canary-5",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "staging deployment is successful",
+            "fact": "staging_deployed",
+            "established_by": "deploy-staging",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "canary deployment status",
+          "how": "check canary logs",
+          "expected": "canary deployment is successful"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy-prod-canary-5",
+        "description": "Deploy the new API version to the 5% canary in production",
+        "action": "deploy",
+        "target": "prod-canary-5",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "5% canary verification is successful",
+            "fact": "canary_verified",
+            "established_by": "verify-canary-5",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "canary deployment status",
+          "how": "check canary logs",
+          "expected": "deployment is successful"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback canary deployment",
+          "safety_guard": "monitor previous version"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "health-check-prod-canary-5",
+        "description": "Perform health checks on the 5% canary deployment",
+        "action": "check",
+        "target": "prod-canary-5",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary 5 deployment is successful",
+            "fact": "canary-5_deployed",
+            "established_by": "deploy-prod-canary-5",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "canary health status",
+          "how": "query Prometheus",
+          "expected": "all services healthy"
+        },
+        "rollback": {
+          "trigger": "canary fails health check",
+          "action": "rollback canary deployment",
+          "safety_guard": "monitor service health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-canary-5-health",
+        "description": "Verify the health of the 5% canary deployment",
+        "action": "check",
+        "target": "prod-canary-5",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary health check has been performed",
+            "fact": "canary_5_health_checked",
+            "established_by": "health-check-prod-canary-5",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "health status",
+          "how": "query health metrics",
+          "expected": "canary health is verified"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy-prod-canary-25",
+        "description": "Promote the 5% canary to 25% in production",
+        "action": "deploy",
+        "target": "prod-canary-25",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "5% canary health checks pass",
+            "fact": "canary-5_healthy",
+            "established_by": "verify-canary-5-health",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "canary deployment status 25%",
+          "how": "check canary logs",
+          "expected": "deployment is successful"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback canary deployment",
+          "safety_guard": "monitor previous version"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "health-check-prod-canary-25",
+        "description": "Perform health checks on the 25% canary deployment",
+        "action": "check",
+        "target": "prod-canary-25",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary 25 deployment is successful",
+            "fact": "canary-25_deployed",
+            "established_by": "deploy-prod-canary-25",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "canary health status",
+          "how": "query Prometheus",
+          "expected": "all services healthy"
+        },
+        "rollback": {
+          "trigger": "canary fails health check",
+          "action": "rollback canary deployment",
+          "safety_guard": "monitor service health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-canary-25-health",
+        "description": "Verify the health of the 25% canary deployment",
+        "action": "check",
+        "target": "prod-canary-25",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary 25 health check has been performed",
+            "fact": "canary_25_health_checked",
+            "established_by": "health-check-prod-canary-25",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "health status",
+          "how": "query health metrics",
+          "expected": "canary health is verified"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy-prod-full",
+        "description": "Promote the canary to full production",
+        "action": "deploy",
+        "target": "prod",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "25% canary health checks pass",
+            "fact": "canary-25_healthy",
+            "established_by": "verify-canary-25-health",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "full production deployment status",
+          "how": "check production logs",
+          "expected": "deployment is successful"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback production deployment",
+          "safety_guard": "monitor previous version"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "health-check-prod-full",
+        "description": "Perform final health checks on full production deployment",
+        "action": "check",
+        "target": "prod",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "full production deployment is successful",
+            "fact": "prod_deployed",
+            "established_by": "deploy-prod-full",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "production health status",
+          "how": "query Prometheus",
+          "expected": "all services healthy"
+        },
+        "rollback": {
+          "trigger": "full production fails health check",
+          "action": "rollback production deployment",
+          "safety_guard": "monitor service health"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check-dev-env",
+        "to_task": "deploy-dev",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-dev",
+        "to_task": "verify-dev",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-dev",
+        "to_task": "deploy-staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-staging",
+        "to_task": "verify-staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-staging",
+        "to_task": "verify-canary-5",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-canary-5",
+        "to_task": "deploy-prod-canary-5",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-prod-canary-5",
+        "to_task": "health-check-prod-canary-5",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "health-check-prod-canary-5",
+        "to_task": "verify-canary-5-health",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-canary-5-health",
+        "to_task": "deploy-prod-canary-25",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-prod-canary-25",
+        "to_task": "health-check-prod-canary-25",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "health-check-prod-canary-25",
+        "to_task": "verify-canary-25-health",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-canary-25-health",
+        "to_task": "deploy-prod-full",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-prod-full",
+        "to_task": "health-check-prod-full",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:deploy-prod-canary-5",
+      "task_id": "deploy-prod-canary-5",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'deploy-prod-canary-5' is executed before 'health-check-prod-canary-5' is successfully performed, violating required health checks prior to deployment.",
+      "suggested_fix": "Ensure 'health-check-prod-canary-5' is completed successfully before proceeding with 'deploy-prod-canary-5'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:deploy-prod-canary-25",
+      "task_id": "deploy-prod-canary-25",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'deploy-prod-canary-25' is executed before 'verify-canary-5-health' is successfully performed, violating required health verifications prior to deployment.",
+      "suggested_fix": "Ensure 'verify-canary-5-health' is completed successfully before proceeding with 'deploy-prod-canary-25'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:deploy-prod-full",
+      "task_id": "deploy-prod-full",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'deploy-prod-full' is executed before 'verify-canary-25-health' is successfully performed, violating required health verifications prior to deployment.",
+      "suggested_fix": "Ensure 'verify-canary-25-health' is completed successfully before proceeding with 'deploy-prod-full'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mch-01-env-promotion:4:4",
+    "plan_id": "plan-mch-01-env-promotion-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:deploy-prod-canary-5",
+    "question": "Plan for goal 'mch-01-env-promotion' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=14"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,181 @@
+{
+  "dimension": "core-api",
+  "goal_id": "data-01-dbt-pipeline",
+  "duration_seconds": 6.32,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "data-01-dbt-pipeline",
+    "goal_id": "data-01-dbt-pipeline",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:38:25.543355Z",
+    "tasks": [
+      {
+        "id": "extract",
+        "description": "Extract data from S3 to staging area",
+        "action": "extract",
+        "target": "staging",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "S3 is accessible",
+            "fact": "s3_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "transform",
+        "description": "Transform the staged data",
+        "action": "transform",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "transformation success",
+          "how": "run validation tests",
+          "expected": "transformed data matches expectations"
+        },
+        "rollback": {
+          "trigger": "transformation fails",
+          "action": "revert to original data",
+          "safety_guard": "validate original data presence"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "load",
+        "description": "Load the transformed data into the warehouse",
+        "action": "load",
+        "target": "warehouse",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data integrity",
+          "how": "check count and hashes",
+          "expected": "data matches transformed count"
+        },
+        "rollback": {
+          "trigger": "loading fails",
+          "action": "delete incomplete data",
+          "safety_guard": "check data integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify",
+        "description": "Verify the data in the warehouse",
+        "action": "verify",
+        "target": "warehouse",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "data is loaded",
+            "fact": "data_loaded",
+            "established_by": "load",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "extract",
+        "to_task": "transform",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "transform",
+        "to_task": "load",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "load",
+        "to_task": "verify",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:transform",
+      "task_id": "transform",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The transform task is not ordered after the extract task, which is a hard prerequisite.",
+      "suggested_fix": "Reorder the tasks to ensure that 'transform' follows 'extract'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:verify",
+      "task_id": "verify",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The verify task depends on the data being loaded, but 'data_loaded' is not established by a preceding task.",
+      "suggested_fix": "Add a verification step in the 'load' task to establish 'data_loaded' or revise dependency to validate the data before verification.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:load",
+      "task_id": "load",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for the load task lacks a solid safety guard for when loading fails.",
+      "suggested_fix": "Enhance the rollback safety guard to ensure that data integrity is always confirmed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

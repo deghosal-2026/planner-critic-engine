@@ -1,0 +1,210 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mob-02-forced-upgrade",
+  "duration_seconds": 44.37,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 4
+  },
+  "plan": {
+    "id": "plan-mob-02-forced-upgrade-r4",
+    "goal_id": "mob-02-forced-upgrade",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-mob-02-forced-upgrade-r3",
+    "created_at": "2026-08-23T06:44:14.950632Z",
+    "tasks": [
+      {
+        "id": "deploy_api_gate",
+        "description": "Deploy the server API version enforcement to reject old app versions",
+        "action": "deploy",
+        "target": "API gateway",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "API gateway is operational",
+            "fact": "api_gateway_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "API responses for old versions",
+          "how": "check logs for 426 responses",
+          "expected": "all versions < 3.0 receive 426 Upgrade Required"
+        },
+        "rollback": {
+          "trigger": "API version gate malfunction",
+          "action": "disable the API version gate",
+          "safety_guard": "verify normal API functionality"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "push_upgrade_prompt",
+        "description": "Trigger in-app upgrade prompts via push notification and in-app banner",
+        "action": "push",
+        "target": "users",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Push notification service is operational",
+            "fact": "push_service_healthy",
+            "established_by": "deploy_api_gate",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "success of push notifications",
+          "how": "check delivery reports of push notifications",
+          "expected": "100% of users receive push notifications"
+        },
+        "rollback": {
+          "trigger": "push notification fails",
+          "action": "notify users manually for upgrade",
+          "safety_guard": "confirm users are informed"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_upgrade_funnel",
+        "description": "Monitor the upgrade funnel to track conversion rates and old-version users",
+        "action": "monitor",
+        "target": "upgrade stats",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Analytics tools are configured",
+            "fact": "analytics_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "tracking metrics",
+          "how": "review analytics dashboard for upgrade data",
+          "expected": "metrics reflect real-time upgrade conversion rates"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "decommission_old_shims",
+        "description": "Decommission old API compatibility shims after the sunset window",
+        "action": "decommission",
+        "target": "old API shims",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Sunset window has elapsed",
+            "fact": "sunset_window_ended",
+            "established_by": "monitor_upgrade_funnel",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "user version check",
+          "how": "run checks on user version distribution",
+          "expected": "no users on versions < 3.0"
+        },
+        "rollback": {
+          "trigger": "old API compatibility is still needed",
+          "action": "restore old API compatibility shims",
+          "safety_guard": "confirm no users are actively using versions < 3.0"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "push_upgrade_prompt",
+        "to_task": "monitor_upgrade_funnel",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_upgrade_funnel",
+        "to_task": "decommission_old_shims",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unverified_dependencies:push_upgrade_prompt",
+      "task_id": "push_upgrade_prompt",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'push_upgrade_prompt' task relies on 'deploy_api_gate' being established but does not verify the fact that the API gate was successfully deployed before execution.",
+      "suggested_fix": "Add a precondition to verify the successful completion of the 'deploy_api_gate' task before executing 'push_upgrade_prompt'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:weak_rollback:decommission_old_shims",
+      "task_id": "decommission_old_shims",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for 'decommission_old_shims' lacks a safety guard to confirm active users on old versions, which could result in service disruption if the rollback is triggered incorrectly.",
+      "suggested_fix": "Implement an additional verification step to check if any users are still using versions < 3.0 before proceeding with the rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:missing_steps:monitor_upgrade_funnel",
+      "task_id": "monitor_upgrade_funnel",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The 'monitor_upgrade_funnel' plan component does not mention actions taken if the actual upgrade metrics do not align with expected outcomes, such as a significant drop in conversion rates.",
+      "suggested_fix": "Include contingency steps for potential low conversion rates, detailing actions to improve user engagement.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mob-02-forced-upgrade:4:4",
+    "plan_id": "plan-mob-02-forced-upgrade-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unverified_dependencies:push_upgrade_prompt",
+    "question": "Plan for goal 'mob-02-forced-upgrade' cannot be approved: blockers remain (llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

@@ -1,0 +1,405 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-02-security-incident",
+  "duration_seconds": 50.31,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 4
+  },
+  "plan": {
+    "id": "plan-ir-02-security-incident-r4",
+    "goal_id": "ir-02-security-incident",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-ir-02-security-incident-r3",
+    "created_at": "2026-08-23T06:45:09.805036Z",
+    "tasks": [
+      {
+        "id": "isolate_instance",
+        "description": "Revoke security group ingress to isolate the EC2 instance",
+        "action": "revoke_ingress",
+        "target": "ec2_instance",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EC2 instance ID available",
+            "fact": "ec2_instance_id",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "User's key is confirmed to be compromised",
+            "fact": "user_key_compromised",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "security group rules",
+          "how": "check ingress rules in security group",
+          "expected": "previous rules restored"
+        },
+        "rollback": {
+          "trigger": "rollback needed",
+          "action": "restore security group ingress",
+          "safety_guard": "verify ingress rules"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "review_access_logs",
+        "description": "Review user's access logs",
+        "action": "review",
+        "target": "access_logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EC2 instance isolation confirmed",
+            "fact": "isolation_confirmed",
+            "established_by": "isolate_instance",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "access logs reviewed status",
+          "how": "check log review completion",
+          "expected": "logs reviewed successfully"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "confirm_user_key_compromise",
+        "description": "Confirm that the user's key is compromised",
+        "action": "verify_compromise",
+        "target": "user_key",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "User's access logs reviewed",
+            "fact": "access_logs_reviewed",
+            "established_by": "review_access_logs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "key compromise",
+          "how": "check security alerts",
+          "expected": "compromise confirmed"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "log error",
+          "safety_guard": "maintain current state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "identify_attached_volumes",
+        "description": "Identify attached volumes to the EC2 instance",
+        "action": "identify",
+        "target": "attached_volumes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EC2 instance isolated",
+            "fact": "ec2_instance_isolated",
+            "established_by": "isolate_instance",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "attached volumes identification",
+          "how": "check identified volume list",
+          "expected": "all attached volumes identified"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "take_forensic_snapshot",
+        "description": "Take a forensic EBS snapshot of each attached volume",
+        "action": "snapshot",
+        "target": "ebs_volumes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Attached volumes identified",
+            "fact": "attached_volumes",
+            "established_by": "identify_attached_volumes",
+            "probe": null
+          },
+          {
+            "description": "User's key is confirmed to be compromised",
+            "fact": "user_key_compromised",
+            "established_by": "confirm_user_key_compromise",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "snapshot creation status",
+          "how": "check snapshot completion",
+          "expected": "all snapshots created successfully"
+        },
+        "rollback": {
+          "trigger": "snapshot creation fails",
+          "action": "remove incomplete snapshots",
+          "safety_guard": "verify snapshot integrity"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "retrieve_compromised_user_details",
+        "description": "Retrieve details of the compromised user",
+        "action": "retrieve",
+        "target": "compromised_user",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "User's key compromised confirmed",
+            "fact": "key_compromise_confirmed",
+            "established_by": "confirm_user_key_compromise",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "compromised user details",
+          "how": "check detail retrieval status",
+          "expected": "user details retrieved"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rotate_iam_keys",
+        "description": "Rotate all IAM keys associated with the compromised user",
+        "action": "rotate_keys",
+        "target": "iam_user",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Compromised user details retrieved",
+            "fact": "compromised_user",
+            "established_by": "retrieve_compromised_user_details",
+            "probe": null
+          },
+          {
+            "description": "Key rotation confirmation received",
+            "fact": "key_rotation_confirmed",
+            "established_by": "take_forensic_snapshot",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "IAM key status",
+          "how": "confirm key rotation completed",
+          "expected": "all keys rotated successfully"
+        },
+        "rollback": {
+          "trigger": "key rotation fails",
+          "action": "restore old IAM keys",
+          "safety_guard": "verify old keys work"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "establish_monitoring_timeframe",
+        "description": "Establish monitoring timeframe for CloudTrail",
+        "action": "establish_timeframe",
+        "target": "monitoring_timeframe",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "monitoring timeframe",
+          "how": "check timeframe establishment",
+          "expected": "timeframe established successfully"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor_cloudtrail",
+        "description": "Monitor CloudTrail for anomalous API calls for the next 5 minutes",
+        "action": "monitor",
+        "target": "cloudtrail",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Monitoring timeframe established",
+            "fact": "monitoring_timeframe",
+            "established_by": "establish_monitoring_timeframe",
+            "probe": null
+          },
+          {
+            "description": "Monitoring timeframe confirmed",
+            "fact": "monitoring_timeframe_confirmed",
+            "established_by": "isolate_instance",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "number of anomalous calls",
+          "how": "check CloudTrail logs",
+          "expected": "no anomalous API calls"
+        },
+        "rollback": {
+          "trigger": "anomalous calls detected",
+          "action": "initiate incident response",
+          "safety_guard": "verify response is initiated"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "isolate_instance",
+        "to_task": "confirm_user_key_compromise",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "review_access_logs",
+        "to_task": "confirm_user_key_compromise",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "confirm_user_key_compromise",
+        "to_task": "take_forensic_snapshot",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "identify_attached_volumes",
+        "to_task": "take_forensic_snapshot",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "take_forensic_snapshot",
+        "to_task": "retrieve_compromised_user_details",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "retrieve_compromised_user_details",
+        "to_task": "rotate_iam_keys",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "take_forensic_snapshot",
+        "to_task": "rotate_iam_keys",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "establish_monitoring_timeframe",
+        "to_task": "monitor_cloudtrail",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "isolate_instance",
+        "to_task": "monitor_cloudtrail",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:confirm_user_key_compromise",
+      "task_id": "confirm_user_key_compromise",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'confirm_user_key_compromise' is sequenced before confirming that access logs have been reviewed, which is a hard prerequisite.",
+      "suggested_fix": "Reorder the tasks to ensure 'review_access_logs' is completed before 'confirm_user_key_compromise'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:take_forensic_snapshot",
+      "task_id": "take_forensic_snapshot",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'take_forensic_snapshot' is sequenced before confirming the user's key compromise, which is a hard prerequisite.",
+      "suggested_fix": "Reorder the tasks to ensure 'confirm_user_key_compromise' is completed before 'take_forensic_snapshot'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:rotate_iam_keys",
+      "task_id": "rotate_iam_keys",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'rotate_iam_keys' is sequenced before retrieving details of the compromised user, which is a hard prerequisite.",
+      "suggested_fix": "Reorder the tasks to ensure 'retrieve_compromised_user_details' is completed before 'rotate_iam_keys'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:4:missing_steps:monitor_cloudtrail",
+      "task_id": "monitor_cloudtrail",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding a step to confirm the integrity of CloudTrail monitoring configuration before starting the monitoring phase.",
+      "suggested_fix": "Add a task to verify the monitoring configuration of CloudTrail before executing 'monitor_cloudtrail'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-02-security-incident:4:4",
+    "plan_id": "plan-ir-02-security-incident-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:confirm_user_key_compromise",
+    "question": "Plan for goal 'ir-02-security-incident' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=9"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

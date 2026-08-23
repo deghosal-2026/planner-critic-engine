@@ -1,0 +1,228 @@
+{
+  "dimension": "core-api",
+  "goal_id": "job-01-cron-to-airflow",
+  "duration_seconds": 12.34,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "job-01-cron-to-airflow",
+    "goal_id": "job-01-cron-to-airflow",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:53:27.205739Z",
+    "tasks": [
+      {
+        "id": "discover_inventory",
+        "description": "Discover and inventory all cron jobs",
+        "action": "extract crontab",
+        "target": "cron jobs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Linux servers are accessible",
+            "fact": "servers_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "author_dags",
+        "description": "Author Airflow DAGs",
+        "action": "convert cron jobs to Airflow DAGs",
+        "target": "Airflow",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Cron job inventory exists",
+            "fact": "cron_jobs_discovered",
+            "established_by": "discover_inventory",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "DAG correctness",
+          "how": "run Airflow syntax checks",
+          "expected": "no errors"
+        },
+        "rollback": {
+          "trigger": "DAG authoring fails",
+          "action": "revert to previous state",
+          "safety_guard": "verify DAG structure"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "run_backfill_check",
+        "description": "Run a backfill parity check",
+        "action": "execute backfill",
+        "target": "cron and Airflow",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Airflow DAGs are authored",
+            "fact": "dags_created",
+            "established_by": "author_dags",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "job outputs",
+          "how": "compare log files",
+          "expected": "identical results"
+        },
+        "rollback": {
+          "trigger": "backfill incorrect",
+          "action": "restore previous outputs",
+          "safety_guard": "verify output consistency"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "execute_cutover",
+        "description": "Execute cutover to Airflow",
+        "action": "disable cron and enable Airflow",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Backfill check is completed",
+            "fact": "backfill_parity_verified",
+            "established_by": "run_backfill_check",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "system operation",
+          "how": "monitor application logs",
+          "expected": "no errors in logs"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "re-enable cron jobs",
+          "safety_guard": "verify cron functionality"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_and_retire",
+        "description": "Verify Airflow operation and retire cron jobs",
+        "action": "decommission cron jobs",
+        "target": "cron",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Cutover is successful",
+            "fact": "cutover_verified",
+            "established_by": "execute_cutover",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "discover_inventory",
+        "to_task": "author_dags",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "author_dags",
+        "to_task": "run_backfill_check",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_backfill_check",
+        "to_task": "execute_cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "execute_cutover",
+        "to_task": "verify_and_retire",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:execute_cutover",
+      "task_id": "execute_cutover",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The cutover execution should not proceed until the backfill check is verified.",
+      "suggested_fix": "Ensure 'run_backfill_check' is completed and its results verified before proceeding to 'execute_cutover'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:execute_cutover",
+      "task_id": "execute_cutover",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for cutover lacks sufficient safety measures for re-enabling cron jobs.",
+      "suggested_fix": "Add steps to confirm the state of cron jobs before re-enabling them as a rollback measure.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:verify_and_retire",
+      "task_id": "verify_and_retire",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task cannot verify Airflow operation if cutover success is not confirmed, leading to ambiguity.",
+      "suggested_fix": "Implement additional checks to ensure the system has transitioned smoothly to Airflow before retiring cron jobs.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

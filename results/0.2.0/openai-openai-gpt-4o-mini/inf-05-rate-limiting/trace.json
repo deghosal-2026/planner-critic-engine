@@ -1,0 +1,181 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-05-rate-limiting",
+  "duration_seconds": 5.83,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-inf-05-rate-limiting",
+    "goal_id": "inf-05-rate-limiting",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:50:46.083647Z",
+    "tasks": [
+      {
+        "id": "define_limits",
+        "description": "Define rate limiting thresholds",
+        "action": "define",
+        "target": "API gateway",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "API gateway is reachable",
+            "fact": "api_gateway_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_limits",
+        "description": "Deploy rate limiting configuration",
+        "action": "deploy",
+        "target": "API gateway",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "rate limiting configuration",
+          "how": "check gateway settings",
+          "expected": "limits applied correctly"
+        },
+        "rollback": {
+          "trigger": "deployment failure",
+          "action": "revert configuration",
+          "safety_guard": "verify gateway configuration integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "test_limits",
+        "description": "Test API limits to ensure functionality",
+        "action": "test",
+        "target": "API gateway",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "API response under load",
+          "how": "use jmeter",
+          "expected": "limits enforced as defined"
+        },
+        "rollback": {
+          "trigger": "test fails",
+          "action": "remove rate limiting",
+          "safety_guard": "verify API accessibility"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "tune_limits",
+        "description": "Tune rate limiting for optimal throughput",
+        "action": "tune",
+        "target": "API gateway",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "rate limiting is deployed",
+            "fact": "limits_deployed",
+            "established_by": "deploy_limits",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define_limits",
+        "to_task": "deploy_limits",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_limits",
+        "to_task": "test_limits",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test_limits",
+        "to_task": "tune_limits",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:tune_limits",
+      "task_id": "tune_limits",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Tuning limits should not occur before testing has confirmed that limits are correctly deployed and functional.",
+      "suggested_fix": "Reorder tasks to ensure 'test_limits' is completed before 'tune_limits'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:deploy_limits",
+      "task_id": "deploy_limits",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "'deploy_limits' lacks a defined rollback mechanism for successful deployment without integrity verification.",
+      "suggested_fix": "Define a rollback plan that addresses deployment issues without compromising API accessibility.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:test_limits",
+      "task_id": "test_limits",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "'test_limits' lacks a sound rollback plan for failed tests, potentially leaving API in a non-functional state.",
+      "suggested_fix": "Implement a rollback approach that restores the previous state of the API if testing fails.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

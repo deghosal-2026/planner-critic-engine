@@ -1,0 +1,367 @@
+{
+  "dimension": "core-api",
+  "goal_id": "win-01-ad-functional-level",
+  "duration_seconds": 32.74,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-win-01-ad-functional-level-r2",
+    "goal_id": "win-01-ad-functional-level",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "win-01-ad-functional-level",
+    "created_at": "2026-08-23T06:58:26.711877Z",
+    "tasks": [
+      {
+        "id": "adprep_forestprep",
+        "description": "Run adprep /forestprep",
+        "action": "run",
+        "target": "adprep /forestprep",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "adprep tool is available",
+            "fact": "adprep_available",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "current AD is healthy",
+            "fact": "ad_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "forest prep completed",
+          "how": "check logs",
+          "expected": "success without errors"
+        },
+        "rollback": {
+          "trigger": "adprep fails",
+          "action": "restore previous AD state",
+          "safety_guard": "validate AD state consistency"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "adprep_domainprep",
+        "description": "Run adprep /domainprep",
+        "action": "run",
+        "target": "adprep /domainprep",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "forest prep completed successfully",
+            "fact": "forest_prep_success",
+            "established_by": "adprep_forestprep",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "domain prep completed",
+          "how": "check logs",
+          "expected": "success without errors"
+        },
+        "rollback": {
+          "trigger": "adprep fails",
+          "action": "restore previous AD state",
+          "safety_guard": "validate AD state consistency"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "raise_functional_level",
+        "description": "Raise the domain functional level to 2019",
+        "action": "raise",
+        "target": "functional level",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "domain prep completed successfully",
+            "fact": "domain_prep_success",
+            "established_by": "adprep_domainprep",
+            "probe": null
+          },
+          {
+            "description": "schema replicated to all DCs",
+            "fact": "schema_replicated",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "functional level version",
+          "how": "check AD properties",
+          "expected": "2019"
+        },
+        "rollback": {
+          "trigger": "functional level raise fails",
+          "action": "restore functional level from backup",
+          "safety_guard": "ensure rollback has no data loss"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update_fsmos",
+        "description": "Update FSMO role holders and GC placements",
+        "action": "update",
+        "target": "FSMO roles and GCs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "functional level raised successfully",
+            "fact": "functional_level_raised",
+            "established_by": "raise_functional_level",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "FSMO role status",
+          "how": "run netdom query fsmo",
+          "expected": "roles assigned correctly"
+        },
+        "rollback": {
+          "trigger": "FSMO update fails",
+          "action": "reassign previous FSMO roles",
+          "safety_guard": "verify FSMO role health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "upgrade_primary_site",
+        "description": "Upgrade primary site domain controllers",
+        "action": "upgrade",
+        "target": "primary site DCs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "FSMO and GC updates completed",
+            "fact": "fsmos_updated",
+            "established_by": "update_fsmos",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "primary site DCs operational status",
+          "how": "run dcdiag",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "primary site upgrade fails",
+          "action": "restore backup of primary site DCs",
+          "safety_guard": "validate primary site backup integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_primary_site",
+        "description": "Verify the primary site upgrade",
+        "action": "verify",
+        "target": "primary site",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "primary site upgrade completed successfully",
+            "fact": "primary_site_upgraded",
+            "established_by": "upgrade_primary_site",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "upgrade_remote_sites",
+        "description": "Upgrade remote site domain controllers",
+        "action": "upgrade",
+        "target": "remote site DCs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "primary site verified",
+            "fact": "primary_site_verified",
+            "established_by": "verify_primary_site",
+            "probe": null
+          },
+          {
+            "description": "inter-site replication created successfully",
+            "fact": "inter_site_replication_success",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "remote site DCs operational status",
+          "how": "run dcdiag",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "remote site upgrade fails",
+          "action": "restore backup of remote site DCs",
+          "safety_guard": "validate remote site backup integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_remote_sites",
+        "description": "Verify the remote sites upgrades",
+        "action": "verify",
+        "target": "remote sites",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "remote sites upgraded successfully",
+            "fact": "remote_sites_upgraded",
+            "established_by": "upgrade_remote_sites",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "adprep_forestprep",
+        "to_task": "adprep_domainprep",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "adprep_domainprep",
+        "to_task": "raise_functional_level",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "raise_functional_level",
+        "to_task": "update_fsmos",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_fsmos",
+        "to_task": "upgrade_primary_site",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "upgrade_primary_site",
+        "to_task": "verify_primary_site",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_primary_site",
+        "to_task": "upgrade_remote_sites",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "upgrade_remote_sites",
+        "to_task": "verify_remote_sites",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:raise_functional_level",
+      "task_id": "raise_functional_level",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Raising the domain functional level occurs before verifying that the inter-site replication is successful.",
+      "suggested_fix": "Ensure 'inter-site replication created successfully' is factored into preconditions for raising the functional level.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:raise_functional_level",
+      "task_id": "raise_functional_level",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action for raising the functional level does not specify how to restore it without data loss in a non-transactional manner.",
+      "suggested_fix": "Detail a plan to ensure safe rollback, potentially using snapshots or advanced backup methods.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:verify_primary_site",
+      "task_id": "verify_primary_site",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Verification of the primary site upgrade should include specific checks or steps beyond just operational status.",
+      "suggested_fix": "Include detailed verification steps or criteria to ensure comprehensive validation of the primary site upgrade.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:missing_steps:verify_remote_sites",
+      "task_id": "verify_remote_sites",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Verification of remote site upgrades should also include checks for inter-site replication status after upgrades are completed.",
+      "suggested_fix": "Add checks for successful inter-site replication after verifying remote sites.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:win-01-ad-functional-level:2:2",
+    "plan_id": "plan-win-01-ad-functional-level-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:raise_functional_level",
+    "question": "Plan for goal 'win-01-ad-functional-level' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,303 @@
+{
+  "dimension": "core-api",
+  "goal_id": "pay-03-billing-subscription",
+  "duration_seconds": 17.38,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "pay-03-billing-subscription-plan",
+    "goal_id": "pay-03-billing-subscription",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:49:58.754726Z",
+    "tasks": [
+      {
+        "id": "export_data",
+        "description": "Export data from Stripe (customers, subscriptions, invoices, credit notes)",
+        "action": "export",
+        "target": "Stripe",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Stripe is reachable",
+            "fact": "stripe_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data completeness",
+          "how": "check records count",
+          "expected": "all records exported"
+        },
+        "rollback": {
+          "trigger": "export fails",
+          "action": "retry export",
+          "safety_guard": "check Stripe API status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "import_data",
+        "description": "Import data into Chargebee mapping Stripe subscription state to Chargebee's model",
+        "action": "import",
+        "target": "Chargebee",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data export is complete",
+            "fact": "export_data_complete",
+            "established_by": "export_data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "import accuracy",
+          "how": "cross-check with Stripe data",
+          "expected": "data matches"
+        },
+        "rollback": {
+          "trigger": "import fails",
+          "action": "restore previous state",
+          "safety_guard": "verify Chargebee data integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "proration_handling",
+        "description": "Handle proration for mid-cycle plan changes in Chargebee",
+        "action": "verify_proration",
+        "target": "Chargebee",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data import is complete",
+            "fact": "import_data_complete",
+            "established_by": "import_data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "proration correctness",
+          "how": "simulate plan changes",
+          "expected": "proration is calculated as expected"
+        },
+        "rollback": {
+          "trigger": "proration calculation incorrect",
+          "action": "revert to backend rules",
+          "safety_guard": "validate Stripe proration logic"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "dunning_migration",
+        "description": "Map Stripe dunning workflow to Chargebee's retry rules",
+        "action": "migrate_dunning",
+        "target": "Chargebee",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Proration handling has been verified",
+            "fact": "proration_verified",
+            "established_by": "proration_handling",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "dunning rules effectiveness",
+          "how": "compare with Stripe results",
+          "expected": "churn rates are stable"
+        },
+        "rollback": {
+          "trigger": "dunning behavior incorrect",
+          "action": "reinstall Stripe dunning rules",
+          "safety_guard": "check customer outcomes"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "reconciliation",
+        "description": "Verify MRR, subscription count, and invoice totals match between Stripe and Chargebee",
+        "action": "reconcile",
+        "target": "analytics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dunning workflow has been migrated",
+            "fact": "dunning_migration_complete",
+            "established_by": "dunning_migration",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "financial consistency",
+          "how": "run reconciliation SQL",
+          "expected": "data aligns"
+        },
+        "rollback": {
+          "trigger": "discrepancy detected",
+          "action": "revert changes until matched",
+          "safety_guard": "ensure prior totals are intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover",
+        "description": "Switch the application to use Chargebee for new billing events",
+        "action": "cutover",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Reconciliation has been completed",
+            "fact": "reconciliation_verified",
+            "established_by": "reconciliation",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "billing events",
+          "how": "track event logs",
+          "expected": "events flow to Chargebee without errors"
+        },
+        "rollback": {
+          "trigger": "issues with Chargebee",
+          "action": "switch back to Stripe for new events",
+          "safety_guard": "monitor for errors"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "export_data",
+        "to_task": "import_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "import_data",
+        "to_task": "proration_handling",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "proration_handling",
+        "to_task": "dunning_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dunning_migration",
+        "to_task": "reconciliation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "reconciliation",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:cutover",
+      "task_id": "cutover",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The cutover task is ordered before completion of critical verifications from reconciliation.",
+      "suggested_fix": "Ensure cutover occurs only after all verifications from reconciliation are confirmed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:cutover",
+      "task_id": "cutover",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for cutover lacks sufficient safeguards to ensure all billing events revert correctly.",
+      "suggested_fix": "Enhance the rollback plan to include database state snapshots prior to cutover.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:import_data",
+      "task_id": "import_data",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The import_data task has a dependency on data export completion but does not verify if all expected records were successfully exported.",
+      "suggested_fix": "Add verification to ensure all expected records have been exported from Stripe before proceeding.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:proration_handling",
+      "task_id": "proration_handling",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Proration handling verification relies on the outcomes of the data import but does not check the integrity of imported data.",
+      "suggested_fix": "Ensure verification of data integrity after import_data before executing proration_handling.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:dunning_migration",
+      "task_id": "dunning_migration",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Dunning migration should also account for variations in customer communication metrics between Stripe and Chargebee.",
+      "suggested_fix": "Include a step to validate communication efficiency metrics after migrating dunning workflows.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

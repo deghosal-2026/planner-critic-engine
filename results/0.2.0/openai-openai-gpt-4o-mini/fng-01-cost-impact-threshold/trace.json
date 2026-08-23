@@ -1,0 +1,147 @@
+{
+  "dimension": "core-api",
+  "goal_id": "fng-01-cost-impact-threshold",
+  "duration_seconds": 14.34,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-fng-01-cost-impact-threshold-r2",
+    "goal_id": "fng-01-cost-impact-threshold",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "fng-01-cost-impact-threshold-plan",
+    "created_at": "2026-08-23T06:52:25.973960Z",
+    "tasks": [
+      {
+        "id": "check_budget_threshold",
+        "description": "Check if estimated monthly cost exceeds the budget threshold",
+        "action": "check",
+        "target": "budget",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "cost impact",
+          "how": "read cost-explorer",
+          "expected": "<= $5K"
+        },
+        "rollback": {
+          "trigger": "budget check fails",
+          "action": "report error",
+          "safety_guard": "notify admin"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "scale_instances",
+        "description": "Scale up database instance classes if cost exceeds threshold",
+        "action": "scale",
+        "target": "database instances",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Budget threshold check was successful",
+            "fact": "budget_check_successful",
+            "established_by": "check_budget_threshold",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "instance classes",
+          "how": "query aws-rds",
+          "expected": "scaled classes"
+        },
+        "rollback": {
+          "trigger": "scaling fails",
+          "action": "revert instance classes",
+          "safety_guard": "validate instance states"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_budget_threshold",
+        "to_task": "scale_instances",
+        "kind": "hard",
+        "reason": "Scaling only occurs if budget threshold is exceeded"
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:scale_instances",
+      "task_id": "scale_instances",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'scale_instances' is ordered before its hard prerequisite check for budget status, which is a violation of the defined sequence.",
+      "suggested_fix": "Reorder the 'scale_instances' task to ensure it only executes after a successful budget check.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:scale_instances",
+      "task_id": "scale_instances",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'scale_instances' depends on a fact 'budget_check_successful' that is not established by a preceding task in the execution order.",
+      "suggested_fix": "Ensure the 'budget_check_successful' fact is verified and established by the 'check_budget_threshold' task prior to 'scale_instances'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:scale_instances",
+      "task_id": "scale_instances",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action for 'scale_instances' does not guarantee a full revert in the case of failure since it only validates instance states without a clear response plan if issues are found.",
+      "suggested_fix": "Enhance the rollback strategy for 'scale_instances' to include a contingency plan for instances that cannot be validated.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:fng-01-cost-impact-threshold:2:2",
+    "plan_id": "plan-fng-01-cost-impact-threshold-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:scale_instances",
+    "question": "Plan for goal 'fng-01-cost-impact-threshold' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=2"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

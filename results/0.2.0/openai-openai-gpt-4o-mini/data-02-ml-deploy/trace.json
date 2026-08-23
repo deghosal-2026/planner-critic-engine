@@ -1,0 +1,254 @@
+{
+  "dimension": "core-api",
+  "goal_id": "data-02-ml-deploy",
+  "duration_seconds": 16.02,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-data-02-ml-deploy-r2",
+    "goal_id": "data-02-ml-deploy",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "data-02-ml-deploy-plan",
+    "created_at": "2026-08-23T06:38:42.557168Z",
+    "tasks": [
+      {
+        "id": "train",
+        "description": "Train the ML model",
+        "action": "train",
+        "target": "model",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "model accuracy",
+          "how": "run validation dataset",
+          "expected": "accuracy > 90%"
+        },
+        "rollback": {
+          "trigger": "training fails",
+          "action": "revert to previous model",
+          "safety_guard": "validate model performance"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "validate",
+        "description": "Validate the trained model",
+        "action": "validate",
+        "target": "model",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "model performance metrics",
+          "how": "check metrics dashboard",
+          "expected": "metrics are within acceptable ranges"
+        },
+        "rollback": {
+          "trigger": "validation fails",
+          "action": "delete invalid model",
+          "safety_guard": "ensure training dataset is intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "package",
+        "description": "Package the model for deployment",
+        "action": "package",
+        "target": "model",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "model validation is successful",
+            "fact": "model_validated",
+            "established_by": "validate",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "ab_test",
+        "description": "Set up A/B testing for the new model",
+        "action": "setup_ab_test",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "model packaging is successful",
+            "fact": "model_packaged",
+            "established_by": "package",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "promote",
+        "description": "Promote the model to production",
+        "action": "promote",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "model performance in production",
+          "how": "monitor live traffic",
+          "expected": "performance not degrade"
+        },
+        "rollback": {
+          "trigger": "promotion fails",
+          "action": "rollback to previous model in production",
+          "safety_guard": "monitor user impact"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "check_user_impact",
+        "description": "Check user impact post-deployment",
+        "action": "monitor",
+        "target": "users",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "model promoted to production",
+            "fact": "model_promoted",
+            "established_by": "promote",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "train",
+        "to_task": "validate",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "validate",
+        "to_task": "package",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "package",
+        "to_task": "ab_test",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "ab_test",
+        "to_task": "promote",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote",
+        "to_task": "check_user_impact",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:package",
+      "task_id": "package",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The 'package' task is sequenced before checking the validation success. Ensure the validation task completes before packaging the model.",
+      "suggested_fix": "Add a hard dependency from 'validate' to 'package'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:ab_test",
+      "task_id": "ab_test",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The 'ab_test' task is not sequenced after confirmation of successful packaging. Ensure packaging is completed before setting up A/B testing.",
+      "suggested_fix": "Add a hard dependency from 'package' to 'ab_test'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:package",
+      "task_id": "package",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'package' task depends on 'model_validated' but it is not verified in any step. Establish a verification for the model before packaging.",
+      "suggested_fix": "Include a verification step in the 'validate' task that confirms 'model_validated'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:ab_test",
+      "task_id": "ab_test",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'ab_test' task requires 'model_packaged' but it's not verified. This can lead to using an invalid model if packaging fails.",
+      "suggested_fix": "Include a verification step to confirm successful packaging before proceeding to A/B testing.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:data-02-ml-deploy:2:2",
+    "plan_id": "plan-data-02-ml-deploy-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:package",
+    "question": "Plan for goal 'data-02-ml-deploy' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

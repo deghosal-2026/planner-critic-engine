@@ -1,0 +1,216 @@
+{
+  "dimension": "core-api",
+  "goal_id": "arch-01-microservice-extract",
+  "duration_seconds": 35.31,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-arch-01-microservice-extract-r3",
+    "goal_id": "arch-01-microservice-extract",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-arch-01-microservice-extract-r2",
+    "created_at": "2026-08-23T06:36:01.609959Z",
+    "tasks": [
+      {
+        "id": "identify-bounded-context",
+        "description": "Identify the bounded context for the payments microservice",
+        "action": "define",
+        "target": "bounded context",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "monolith architecture is understood",
+            "fact": "monolith_architecture",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "understanding of monolith architecture",
+          "how": "conduct an architecture review with stakeholders",
+          "expected": "architecture is clearly understood and documented"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "implement-dual-write",
+        "description": "Implement dual-write pattern for payments data",
+        "action": "dev",
+        "target": "dual-write",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "bounded context is identified",
+            "fact": "bounded_context_identified",
+            "established_by": "identify-bounded-context",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "bounded context identification confirmation",
+          "how": "confirm bounded context has been defined",
+          "expected": "bounded context is correctly identified"
+        },
+        "rollback": {
+          "trigger": "dual-write fails",
+          "action": "disable dual-write and revert to single write, validating data integrity before switching",
+          "safety_guard": "check data consistency before and after rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover-traffic",
+        "description": "Cutover traffic to the new payments microservice",
+        "action": "deploy",
+        "target": "new service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dual-write pattern is implemented",
+            "fact": "dual_write_implemented",
+            "established_by": "implement-dual-write",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "confirmation of dual-write implementation",
+          "how": "check consistency of data after dual-write",
+          "expected": "dual-write is operational and consistent"
+        },
+        "rollback": {
+          "trigger": "service degrades",
+          "action": "route traffic back to legacy service, validating service health before rollback",
+          "safety_guard": "monitor service health"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "decommission-legacy-code",
+        "description": "Decommission the legacy payments code",
+        "action": "cleanup",
+        "target": "legacy payments code",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "traffic is cutover to new service",
+            "fact": "traffic_cutover",
+            "established_by": "cutover-traffic",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "success of code decommissioning",
+          "how": "confirm absence of legacy code in production",
+          "expected": "no legacy payments code exists"
+        },
+        "rollback": {
+          "trigger": "issues arise from decommissioning",
+          "action": "restore legacy payments code if necessary",
+          "safety_guard": "validate service functionality after restoration"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "identify-bounded-context",
+        "to_task": "implement-dual-write",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "implement-dual-write",
+        "to_task": "cutover-traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover-traffic",
+        "to_task": "decommission-legacy-code",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:cutover-traffic",
+      "task_id": "cutover-traffic",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Cutover traffic to new service is ordered before verifying dual-write pattern implementation.",
+      "suggested_fix": "Reorder tasks to ensure 'implement-dual-write' completes and is verified before 'cutover-traffic'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:weak_rollback:cutover-traffic",
+      "task_id": "cutover-traffic",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for cutting over traffic lacks detailed plan for validation after restoration of legacy service.",
+      "suggested_fix": "Include a recovery plan with specific validation steps to ensure the functionality of the legacy service after rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:3:unverified_dependencies:decommission-legacy-code",
+      "task_id": "decommission-legacy-code",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Decommission legacy payments code depends on a condition (traffic cutover) that needs verification before proceeding.",
+      "suggested_fix": "Ensure that traffic has been confirmed to be cutover and validated before decommissioning legacy code.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:arch-01-microservice-extract:3:3",
+    "plan_id": "plan-arch-01-microservice-extract-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:cutover-traffic",
+    "question": "Plan for goal 'arch-01-microservice-extract' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

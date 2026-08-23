@@ -1,0 +1,235 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-11-supply-chain-sbom",
+  "duration_seconds": 14.51,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "ci-11-supply-chain-sbom-plan",
+    "goal_id": "ci-11-supply-chain-sbom",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:37:28.116989Z",
+    "tasks": [
+      {
+        "id": "generate-sbom",
+        "description": "Integrate Syft for SBOM generation in CI pipelines",
+        "action": "integrate",
+        "target": "Syft",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CI pipelines are functional",
+            "fact": "pipelines_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "SBOM generation success",
+          "how": "check pipeline logs",
+          "expected": "SBOM generated without errors"
+        },
+        "rollback": {
+          "trigger": "integration failure",
+          "action": "revert Syft integration",
+          "safety_guard": "ensure no pipeline failures"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "sign-images",
+        "description": "Sign container images with Cosign",
+        "action": "sign",
+        "target": "container images",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "SBOM generation successful",
+            "fact": "sbom_generated",
+            "established_by": "generate-sbom",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "image signing status",
+          "how": "query the signing service",
+          "expected": "all images should be signed"
+        },
+        "rollback": {
+          "trigger": "signing failure",
+          "action": "disable image signing",
+          "safety_guard": "ensure images are still deployable"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "attest-provenance",
+        "description": "Generate SLSA Level 3 provenance attestation",
+        "action": "attest",
+        "target": "provenance data",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "provenance attestation completeness",
+          "how": "validate attestation records",
+          "expected": "attestation meets SLSA Level 3 criteria"
+        },
+        "rollback": {
+          "trigger": "attestation failure",
+          "action": "revert to previous provenance records",
+          "safety_guard": "validate previous records"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "enforce-policy",
+        "description": "Configure policy enforcement to reject unsigned images in production",
+        "action": "configure",
+        "target": "Kyverno policies",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "All images signed",
+            "fact": "images_signed",
+            "established_by": "sign-images",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-signatures-sbom",
+        "description": "Verify that all deployed images have valid signatures and SBOM",
+        "action": "verify",
+        "target": "deployed images",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "valid signatures and SBOM presence",
+          "how": "run verification script",
+          "expected": "all images verified successfully"
+        },
+        "rollback": {
+          "trigger": "verification failure",
+          "action": "alert team and halt deployments",
+          "safety_guard": "ensure system stability"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "generate-sbom",
+        "to_task": "sign-images",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "sign-images",
+        "to_task": "attest-provenance",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "attest-provenance",
+        "to_task": "enforce-policy",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "enforce-policy",
+        "to_task": "verify-signatures-sbom",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:sign-images",
+      "task_id": "sign-images",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'sign-images' is dependent on 'generate-sbom' which does not have a prerequisite established before it executes.",
+      "suggested_fix": "Ensure 'generate-sbom' is executed and its successful completion is verified before 'sign-images'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:attest-provenance",
+      "task_id": "attest-provenance",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Task 'attest-provenance' lacks preconditions that ensure the necessary context to execute successfully.",
+      "suggested_fix": null,
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:enforce-policy",
+      "task_id": "enforce-policy",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'enforce-policy' does not define a rollback strategy, which could lead to system instability under error conditions.",
+      "suggested_fix": null,
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unverified_dependencies:verify-signatures-sbom",
+      "task_id": "verify-signatures-sbom",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'verify-signatures-sbom' has no preconditions established; it depends on results from 'enforce-policy' without verification.",
+      "suggested_fix": "Add explicit preconditions to ensure 'enforce-policy' has been successfully completed before executing 'verify-signatures-sbom'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

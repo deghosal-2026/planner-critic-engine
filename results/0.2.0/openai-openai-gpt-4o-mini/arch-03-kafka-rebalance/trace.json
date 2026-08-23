@@ -1,0 +1,192 @@
+{
+  "dimension": "core-api",
+  "goal_id": "arch-03-kafka-rebalance",
+  "duration_seconds": 31.06,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-arch-03-kafka-rebalance-r4",
+    "goal_id": "arch-03-kafka-rebalance",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-arch-03-kafka-rebalance-r3",
+    "created_at": "2026-08-23T06:36:49.126970Z",
+    "tasks": [
+      {
+        "id": "add_brokers",
+        "description": "Add 3 new brokers to the Kafka cluster",
+        "action": "add",
+        "target": "kafka_brokers",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "current brokers are healthy",
+            "fact": "brokers_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "broker list",
+          "how": "run kafka-cli to list brokers",
+          "expected": "6 brokers"
+        },
+        "rollback": {
+          "trigger": "broker addition fails",
+          "action": "remove newly added brokers",
+          "safety_guard": "ensure existing cluster is intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "reassign_partitions",
+        "description": "Reassign partition replicas across all brokers",
+        "action": "reassign",
+        "target": "kafka_partitions",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "new brokers are added successfully",
+            "fact": "brokers_added",
+            "established_by": "add_brokers",
+            "probe": null
+          },
+          {
+            "description": "ISR health verified",
+            "fact": "isr_health_verified",
+            "established_by": "verify_isr_health",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "partition assignment",
+          "how": "run kafka-reassign-partitions.sh",
+          "expected": "new replica assignment without errors"
+        },
+        "rollback": {
+          "trigger": "partition reassignment fails",
+          "action": "restore previous partition assignment",
+          "safety_guard": "verify partition mappings"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_isr_health",
+        "description": "Verify ISR health and replication factor",
+        "action": "verify",
+        "target": "kafka_isr",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "partition reassignment is completed",
+            "fact": "reassignment_completed",
+            "established_by": "reassign_partitions",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": {
+          "trigger": "ISR health check fails",
+          "action": "revert to previous ISR settings",
+          "safety_guard": "ensure previous ISR mappings are intact"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rebalance_consumer_groups",
+        "description": "Rebalance producer/consumer groups",
+        "action": "rebalance",
+        "target": "kafka_consumer_groups",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ISR health verified",
+            "fact": "isr_health_verified",
+            "established_by": "verify_isr_health",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": {
+          "trigger": "rebalance fails",
+          "action": "restore previous consumer group settings",
+          "safety_guard": "ensure previous configurations are intact"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "add_brokers",
+        "to_task": "reassign_partitions",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "reassign_partitions",
+        "to_task": "verify_isr_health",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_isr_health",
+        "to_task": "rebalance_consumer_groups",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "preconditions_referenced:plan-arch-03-kafka-rebalance-r4:4:reassign_partitions:isr_health_verified",
+      "task_id": "reassign_partitions",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "blocker",
+      "reason_code": "unverified_precondition",
+      "message": "precondition 'isr_health_verified' on task 'reassign_partitions' references no established fact from an earlier task",
+      "suggested_fix": "Point the precondition at an earlier task that establishes 'isr_health_verified'",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:arch-03-kafka-rebalance:4:4",
+    "plan_id": "plan-arch-03-kafka-rebalance-r4",
+    "version": 4,
+    "blocker_finding_id": "preconditions_referenced:plan-arch-03-kafka-rebalance-r4:4:reassign_partitions:isr_health_verified",
+    "question": "Plan for goal 'arch-03-kafka-rebalance' cannot be approved: blockers remain (unverified_precondition). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

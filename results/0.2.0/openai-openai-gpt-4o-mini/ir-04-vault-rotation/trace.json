@@ -1,0 +1,165 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-04-vault-rotation",
+  "duration_seconds": 12.7,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-ir-04-vault-rotation-r2",
+    "goal_id": "ir-04-vault-rotation",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "ir-04-vault-rotation",
+    "created_at": "2026-08-23T06:45:54.863624Z",
+    "tasks": [
+      {
+        "id": "generate_password",
+        "description": "Generate a new password using Vault's dynamic secrets engine",
+        "action": "generate_secret",
+        "target": "vault",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "new password validity",
+          "how": "check generated password format",
+          "expected": "valid password format"
+        },
+        "rollback": {
+          "trigger": "password generation fails",
+          "action": "notify failure to administrator",
+          "safety_guard": "log error details"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "update_services",
+        "description": "Update all consuming services to use the new password",
+        "action": "update_credentials",
+        "target": "services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service connectivity",
+          "how": "execute simple SELECT",
+          "expected": "successful SELECT response"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "revert services to old credentials",
+          "safety_guard": "ensure old credentials are still valid"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "revoke_old_password",
+        "description": "Revoke the old Vault lease",
+        "action": "revoke_secret",
+        "target": "vault",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "new password update is successful",
+            "fact": "services_updated",
+            "established_by": "update_services",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "generate_password",
+        "to_task": "update_services",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_services",
+        "to_task": "revoke_old_password",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:revoke_old_password",
+      "task_id": "revoke_old_password",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'revoke_old_password' is ordered before the successful update of services, which is a hard prerequisite.",
+      "suggested_fix": "Reorder the tasks to ensure 'revoke_old_password' executes only after 'update_services' is confirmed successful.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:update_services",
+      "task_id": "update_services",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action for 'update_services' does not ensure a reliable recovery of prior states in case of failure.",
+      "suggested_fix": "Implement additional safeguards to verify the integrity of the old credentials before reverting.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:revoke_old_password",
+      "task_id": "revoke_old_password",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'revoke_old_password' is dependent on 'services_updated' being established by 'update_services', but its verification method for completion is unverified within the plan.",
+      "suggested_fix": "Ensure that the 'update_services' task has a clear and coherent verification mechanism that confirms the updates are successful.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-04-vault-rotation:2:2",
+    "plan_id": "plan-ir-04-vault-rotation-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:revoke_old_password",
+    "question": "Plan for goal 'ir-04-vault-rotation' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

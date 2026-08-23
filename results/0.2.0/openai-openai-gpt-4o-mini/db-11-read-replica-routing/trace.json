@@ -1,0 +1,260 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-11-read-replica-routing",
+  "duration_seconds": 9.16,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "db-11-read-replica-routing-plan",
+    "goal_id": "db-11-read-replica-routing",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:44:13.554845Z",
+    "tasks": [
+      {
+        "id": "provision-replicas",
+        "description": "Provision 2 read replicas in different AZs",
+        "action": "provision",
+        "target": "read_replicas",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replicas provisioned",
+          "how": "check instance status",
+          "expected": "2 active read replicas"
+        },
+        "rollback": {
+          "trigger": "provisioning fails",
+          "action": "terminate all instances",
+          "safety_guard": "verify no resources are left running"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure-pgbouncer",
+        "description": "Configure PgBouncer for connection pooling and read/write split",
+        "action": "configure",
+        "target": "PgBouncer",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "PgBouncer configuration",
+          "how": "run tests and check logs",
+          "expected": "successful connection routing"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "reset to previous PgBouncer config",
+          "safety_guard": "backup current configuration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify-replica-lag",
+        "description": "Verify that the replica lag is less than 100ms",
+        "action": "check",
+        "target": "replica_lag",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replica lag",
+          "how": "monitor using Prometheus",
+          "expected": "lag < 100ms"
+        },
+        "rollback": {
+          "trigger": "lag exceeds 100ms",
+          "action": "alert on call team",
+          "safety_guard": "check replication setup"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "drain-read-traffic",
+        "description": "Slowly drain read traffic from primary to replicas",
+        "action": "adjust",
+        "target": "traffic_distribution",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "traffic distribution",
+          "how": "check metrics on Grafana",
+          "expected": "10% -> 50% -> 100% traffic to replicas over 4 hours"
+        },
+        "rollback": {
+          "trigger": "issues during traffic drain",
+          "action": "revert traffic split to 100% primary",
+          "safety_guard": "monitorlag after revert"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "monitor-stale-reads",
+        "description": "Monitor for stale-read issues during traffic drain",
+        "action": "monitor",
+        "target": "stale_reads",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "drain-read-traffic completed",
+            "fact": "traffic_drained",
+            "established_by": "drain-read-traffic",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "failover-verification",
+        "description": "Verify failover behavior if a replica goes down",
+        "action": "test",
+        "target": "failover",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "failover response",
+          "how": "simulate replica failure",
+          "expected": "primary takes over without issues"
+        },
+        "rollback": {
+          "trigger": "failover test fails",
+          "action": "revert failover settings",
+          "safety_guard": "verify system functionality afterward"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "provision-replicas",
+        "to_task": "configure-pgbouncer",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-pgbouncer",
+        "to_task": "verify-replica-lag",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-replica-lag",
+        "to_task": "drain-read-traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "drain-read-traffic",
+        "to_task": "monitor-stale-reads",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor-stale-reads",
+        "to_task": "failover-verification",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:unsafe_sequencing:configure-pgbouncer",
+      "task_id": "configure-pgbouncer",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "'configure-pgbouncer' task is ordered before 'provision-replicas' task is completed, which is a hard prerequisite.",
+      "suggested_fix": "Reorder the tasks to ensure 'provision-replicas' is completed before 'configure-pgbouncer'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:verify-replica-lag",
+      "task_id": "verify-replica-lag",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "'verify-replica-lag' task is ordered before 'configure-pgbouncer' task is completed, which is a hard prerequisite.",
+      "suggested_fix": "Reorder the tasks to ensure 'configure-pgbouncer' is completed before 'verify-replica-lag'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:drain-read-traffic",
+      "task_id": "drain-read-traffic",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "'drain-read-traffic' task is ordered before 'verify-replica-lag' task is completed, which is a hard prerequisite.",
+      "suggested_fix": "Reorder the tasks to ensure 'verify-replica-lag' is completed before 'drain-read-traffic'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:monitor-stale-reads",
+      "task_id": "monitor-stale-reads",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "'monitor-stale-reads' task is ordered before 'drain-read-traffic' task is completed, which is a hard prerequisite.",
+      "suggested_fix": "Reorder the tasks to ensure 'drain-read-traffic' is completed before 'monitor-stale-reads'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:failover-verification",
+      "task_id": "failover-verification",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "'failover-verification' task is ordered before 'monitor-stale-reads' task is completed, which is a hard prerequisite.",
+      "suggested_fix": "Reorder the tasks to ensure 'monitor-stale-reads' is completed before 'failover-verification'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

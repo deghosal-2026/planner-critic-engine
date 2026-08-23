@@ -1,0 +1,249 @@
+{
+  "dimension": "core-api",
+  "goal_id": "data-04-streaming-pipeline",
+  "duration_seconds": 25.19,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-data-04-streaming-pipeline-r2",
+    "goal_id": "data-04-streaming-pipeline",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "data-04-streaming-pipeline",
+    "created_at": "2026-08-23T06:39:13.073017Z",
+    "tasks": [
+      {
+        "id": "deploy_kafka",
+        "description": "Deploy Kafka cluster",
+        "action": "deploy",
+        "target": "kafka",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Kafka broker health",
+          "how": "check broker status via monitoring",
+          "expected": "all brokers are up and healthy"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "destroy kafka",
+          "safety_guard": "confirm kafka is not running"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "deploy_flink",
+        "description": "Deploy Flink cluster",
+        "action": "deploy",
+        "target": "flink",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Flink job manager health",
+          "how": "check job manager status via monitoring",
+          "expected": "job manager is up and healthy"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "destroy flink",
+          "safety_guard": "confirm flink is not running"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "configure_s3",
+        "description": "Configure connection to S3",
+        "action": "configure",
+        "target": "s3",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kafka is deployed",
+            "fact": "kafka_deployed",
+            "established_by": "deploy_kafka",
+            "probe": null
+          },
+          {
+            "description": "Flink is deployed",
+            "fact": "flink_deployed",
+            "established_by": "deploy_flink",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "setup_streaming_job",
+        "description": "Set up streaming job in Flink",
+        "action": "setup",
+        "target": "flink_job",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "streaming job status",
+          "how": "check job status in Flink dashboard",
+          "expected": "job is running smoothly"
+        },
+        "rollback": {
+          "trigger": "job setup fails",
+          "action": "remove job",
+          "safety_guard": "verify job is not running"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_throughput",
+        "description": "Verify throughput of the streaming pipeline",
+        "action": "verify",
+        "target": "throughput",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "throughput metrics",
+          "how": "analyze Prometheus metrics",
+          "expected": "throughput meets acceptable levels"
+        },
+        "rollback": {
+          "trigger": "throughput below threshold",
+          "action": "reconfigure streaming job",
+          "safety_guard": "verify new configuration does not degrade performance"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "verify_checkpointing",
+        "description": "Verify checkpointing in Flink",
+        "action": "verify",
+        "target": "checkpointing",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "checkpointing status",
+          "how": "check Flink's checkpointing metrics",
+          "expected": "checkpointing completes successfully"
+        },
+        "rollback": {
+          "trigger": "checkpointing fails",
+          "action": "adjust checkpointing settings",
+          "safety_guard": "ensure previous config is preserved"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_kafka",
+        "to_task": "deploy_flink",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_flink",
+        "to_task": "configure_s3",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_s3",
+        "to_task": "setup_streaming_job",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_streaming_job",
+        "to_task": "verify_throughput",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_streaming_job",
+        "to_task": "verify_checkpointing",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:configure_s3",
+      "task_id": "configure_s3",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'configure_s3' is sequenced before 'deploy_kafka' and 'deploy_flink' are completed, which are its prerequisites.",
+      "suggested_fix": "Reorder 'configure_s3' to occur after both 'deploy_kafka' and 'deploy_flink'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:unverified_dependencies:setup_streaming_job",
+      "task_id": "setup_streaming_job",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'setup_streaming_job' does not have verified prerequisites that ensure its dependencies are satisfied.",
+      "suggested_fix": "Add a verification step to guarantee that 'configure_s3' is successfully completed before proceeding.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:2:weak_rollback:verify_throughput",
+      "task_id": "verify_throughput",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action for 'verify_throughput' does not ensure the previous state is maintained if reconfiguration occurs.",
+      "suggested_fix": "Define a comprehensive rollback strategy that includes mechanisms to revert metrics to previously verified states.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": {
+    "id": "escalation:data-04-streaming-pipeline:2:2",
+    "plan_id": "plan-data-04-streaming-pipeline-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:configure_s3",
+    "question": "Plan for goal 'data-04-streaming-pipeline' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,323 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dbm-03-sqlserver-dialect",
+  "duration_seconds": 18.83,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-db-migration",
+    "goal_id": "dbm-03-sqlserver-dialect",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-23T06:46:12.815903Z",
+    "tasks": [
+      {
+        "id": "assess_schema",
+        "description": "Assess the existing SQL Server database schema for migration readiness",
+        "action": "assess",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "SQL Server database is accessible",
+            "fact": "sql_server_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "rewrite_t_sql",
+        "description": "Rewrite T-SQL stored procedures to PL/pgSQL",
+        "action": "rewrite",
+        "target": "code",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "number of successfully executed PL/pgSQL procedures",
+          "how": "run test cases",
+          "expected": "all procedures executed without errors"
+        },
+        "rollback": {
+          "trigger": "rewrite fails",
+          "action": "restore original procedures",
+          "safety_guard": "ensure backup of original procedures"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "permission_model_migration",
+        "description": "Migrate SQL Server logins and roles to PostgreSQL roles and grants",
+        "action": "migrate",
+        "target": "permissions",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Assess schema task completed",
+            "fact": "assess_schema_completed",
+            "established_by": "assess_schema",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "sql_agent_replatform",
+        "description": "Re-platform SQL Server Agent jobs to pg_cron or Airflow",
+        "action": "replatform",
+        "target": "scheduling",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "job execution logs",
+          "how": "check job outcomes in Airflow or pg_cron",
+          "expected": "all jobs complete successfully"
+        },
+        "rollback": {
+          "trigger": "replatforming fails",
+          "action": "restore SQL Agent jobs",
+          "safety_guard": "backup current SQL Agent jobs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "data_migration",
+        "description": "Migrate data using AWS DMS or pgloader",
+        "action": "migrate",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data consistency",
+          "how": "compare row counts and checksums",
+          "expected": "data is consistent between SQL Server and PostgreSQL"
+        },
+        "rollback": {
+          "trigger": "data migration fails",
+          "action": "restore from backup",
+          "safety_guard": "verify data integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "dual_run_validation",
+        "description": "Perform dual-run validation of application against both databases",
+        "action": "validate",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application performance metrics",
+          "how": "analyze logs and response times",
+          "expected": "performance metrics similar to SQL Server"
+        },
+        "rollback": {
+          "trigger": "validation fails",
+          "action": "switch back to SQL Server",
+          "safety_guard": "monitor application performance"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "cutover",
+        "description": "Cutover to PostgreSQL as the primary database",
+        "action": "cutover",
+        "target": "database",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application functionality",
+          "how": "user acceptance testing",
+          "expected": "application functions as expected with PostgreSQL"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "restore SQL Server as primary",
+          "safety_guard": "verify application functionality"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium"
+      },
+      {
+        "id": "retire_sql_server",
+        "description": "Retire the SQL Server database after successful cutover",
+        "action": "retire",
+        "target": "database",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Cutover was successful",
+            "fact": "cutover_successful",
+            "established_by": "cutover",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium"
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "assess_schema",
+        "to_task": "rewrite_t_sql",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "assess_schema",
+        "to_task": "sql_agent_replatform",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "permission_model_migration",
+        "to_task": "data_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rewrite_t_sql",
+        "to_task": "data_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "data_migration",
+        "to_task": "dual_run_validation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dual_run_validation",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover",
+        "to_task": "retire_sql_server",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:1:feasibility:assess_schema",
+      "task_id": "assess_schema",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The ability to assess the SQL Server database schema is critical, ensure SQL Server is always accessible.",
+      "suggested_fix": "Verify the accessibility of the SQL Server database before planning other tasks.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:rewrite_t_sql",
+      "task_id": "rewrite_t_sql",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback plan does not specify means to verify that the original procedures are intact if restoration is needed.",
+      "suggested_fix": "Include a step to confirm the integrity of original procedures before rollback is executed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:missing_steps:permission_model_migration",
+      "task_id": "permission_model_migration",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Missing verification steps for confirming the successful migration of permissions.",
+      "suggested_fix": "Add verification to ensure roles and grants are correctly migrated to PostgreSQL.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:weak_rollback:sql_agent_replatform",
+      "task_id": "sql_agent_replatform",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback plan lacks detail on how to handle partial replatforming failures.",
+      "suggested_fix": "Detail a recovery process for partially migrated SQL Agent jobs.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:feasibility:cutover",
+      "task_id": "cutover",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Cutover requires that all prior tasks are complete and validated; ensure this is strictly enforced.",
+      "suggested_fix": "Implement checks to prevent cutover without successful completion of dual run validation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:retire_sql_server",
+      "task_id": "retire_sql_server",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Retiring SQL Server must only happen after successful cutover; ensure correct task sequencing.",
+      "suggested_fix": "Enforce dependencies to only allow this task if cutover is confirmed successful.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}
