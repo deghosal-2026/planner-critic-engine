@@ -21,7 +21,7 @@
 | M7 | **Developer & Interactive Surfaces** | `plancritic check`, `plancritic diagnose`, `plancritic domains`, `plancritic policy`, `plancritic templates`, `@guardrail` decorator, seed Rego library | [#137](https://github.com/deghosal-2026/planner-critic-engine/issues/137), #153, #162, #175, #178, #179 | [part6](wbs-v0.2.0-part6-developer-surfaces.md) | ✅ COMPLETE (TUI/studio/IDE → v0.3.0) |
 | M8 | **Enterprise Integration & Adoption** | GitHub Action + GitLab CI, AutoGen adapter, webhook event bridge (notifier) | [#128](https://github.com/deghosal-2026/planner-critic-engine/issues/128), #134, #161 | [part7](wbs-v0.2.0-part7-integration-adoption.md) | ✅ COMPLETE (Backstage/Slack/dashboard → v0.3.0) |
 | M9 | **Fleet Observability & Scale Validation** | 5 new field-test corpora (IDP, MAO, SRE, SCP, FNG) — 14 goal files + 16 reason codes | [#144–148](https://github.com/deghosal-2026/planner-critic-engine/issues/144) | [part8](wbs-v0.2.0-part8-scale-validation.md) | ✅ COMPLETE (benchmarks → M10) |
-| **M10** | **Release Activities** | Packaging, security posture (OpenSSF Silver), release-gate sweep, migration, release notes, final quality gate, tag/ship | [#163–169](https://github.com/deghosal-2026/planner-critic-engine/issues/163) | [part9](wbs-v0.2.0-part9-release.md) | Planned |
+| **M10** | **Release Activities** | Packaging, security posture (OpenSSF Silver), release-gate sweep, migration, release notes, final quality gate, tag/ship | [#163–169](https://github.com/deghosal-2026/planner-critic-engine/issues/163) | [part9](wbs-v0.2.0-part9-release.md) | ✅ COMPLETE |
 
 ## 2. Dependency Graph
 
