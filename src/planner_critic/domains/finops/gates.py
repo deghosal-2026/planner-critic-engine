@@ -74,29 +74,47 @@ class BudgetBoundaryGate(BaseGate):
         has_override = any(t.action in OVERRIDE_ACTIONS for t in plan.tasks)
 
         spend = 0.0
+        scale_up_tasks = 0
         for task in plan.tasks:
             if task.action in ("scale_up", "scale_out", "provision", "add_capacity"):
+                scale_up_tasks += 1
+                # Parse cost from target if numeric; otherwise skip (cost metadata deferred to v0.3.0)
                 try:
                     spend += float(task.target or 0)
                 except ValueError:
-                    continue
+                    pass
 
-        if spend > self.budget_cap and not has_override:
-            findings.append(
-                Finding(
-                    id=f"finops_budget_boundary:{plan.id}:{plan.version}",
-                    version=plan.version,
-                    severity=Severity.BLOCKER,
-                    reason_code=FINOPS_BUDGET_BOUNDARY_BREACHED,
-                    message=(
-                        f"scale-up spend {spend:.0f} exceeds localized cap "
-                        f"{self.budget_cap:.0f} without executive override"
-                    ),
-                    suggested_fix=(
-                        "Add an executive_override step or stay within the cap"
-                    ),
+        # Flag when scale-ups exist without override and either spend exceeds cap
+        # or cost data is missing (target is non-numeric)
+        if not has_override:
+            if scale_up_tasks > 0 and spend <= 0:
+                findings.append(
+                    Finding(
+                        id=f"finops_budget_boundary:{plan.id}:{plan.version}",
+                        version=plan.version,
+                        severity=Severity.WARNING,
+                        reason_code=FINOPS_BUDGET_BOUNDARY_BREACHED,
+                        message=(
+                            f"{scale_up_tasks} scale-up action(s) without cost data or executive override"
+                        ),
+                    )
                 )
-            )
+            elif spend > self.budget_cap:
+                findings.append(
+                    Finding(
+                        id=f"finops_budget_boundary:{plan.id}:{plan.version}",
+                        version=plan.version,
+                        severity=Severity.BLOCKER,
+                        reason_code=FINOPS_BUDGET_BOUNDARY_BREACHED,
+                        message=(
+                            f"scale-up spend {spend:.0f} exceeds localized cap "
+                            f"{self.budget_cap:.0f} without executive override"
+                        ),
+                        suggested_fix=(
+                            "Add an executive_override step or stay within the cap"
+                        ),
+                    )
+                )
         return findings
 
 

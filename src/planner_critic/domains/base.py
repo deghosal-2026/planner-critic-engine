@@ -47,9 +47,7 @@ class DomainPack(Protocol):
     gate_evaluators: list[BaseGate]
     precondition_catalog: dict[str, str]
     critic_prompt_template: str | None
-
-
-pack_config: dict[str, Any]
+    pack_config: dict[str, Any]
 
 
 def pack_from_dict(manifest: dict[str, Any]) -> DomainPack:

@@ -76,36 +76,59 @@ class ResourceLock:
 
 
 class StateLock:
-    def __init__(self, strategy: LockStrategy = LockStrategy.WAIT, lock_timeout: float = 30.0) -> None:
+    def __init__(self, strategy: LockStrategy = LockStrategy.WAIT, lock_timeout: float = 30.0, wait_deadline: float = 30.0) -> None:
         self._strategy = strategy
         self._lock_timeout = lock_timeout
+        self._wait_deadline = wait_deadline
         self._locks: dict[str, ResourceLock] = {}
         self._lock_obj = threading.Lock()
 
     def acquire(self, resource_uri: str, plan_id: str) -> str | None:
-        with self._lock_obj:
-            existing = self._locks.get(resource_uri)
-            if existing is not None and existing.is_active:
-                reason = f"{RESOURCE_LOCKED_BY_CONCURRENT_EXECUTION}"
-                logger.info(
-                    "state lock: %s is locked by plan %s — strategy=%s",
-                    resource_uri,
-                    existing.plan_id,
-                    self._strategy.value,
-                )
-                if self._strategy is LockStrategy.FAIL_FAST:
-                    return CONCURRENT_RESOURCE_CONFLICT
-                if self._strategy is LockStrategy.ESCALATE:
-                    return reason
-                return reason
-            lock = ResourceLock(
-                resource_uri=resource_uri,
-                plan_id=plan_id,
-                lock_timeout=self._lock_timeout,
+        self._lock_obj.acquire()
+        existing = self._locks.get(resource_uri)
+        if existing is not None and existing.is_active:
+            reason = f"{RESOURCE_LOCKED_BY_CONCURRENT_EXECUTION}"
+            logger.info(
+                "state lock: %s is locked by plan %s — strategy=%s",
+                resource_uri,
+                existing.plan_id,
+                self._strategy.value,
             )
-            self._locks[resource_uri] = lock
-            logger.info("state lock: acquired %s for plan %s", resource_uri, plan_id)
-            return None
+            if self._strategy is LockStrategy.FAIL_FAST:
+                self._lock_obj.release()
+                return CONCURRENT_RESOURCE_CONFLICT
+            if self._strategy is LockStrategy.ESCALATE:
+                self._lock_obj.release()
+                return reason
+            if self._strategy is LockStrategy.WAIT:
+                self._lock_obj.release()
+                import time as _time
+                deadline = _time.monotonic() + self._wait_deadline
+                while _time.monotonic() < deadline:
+                    _time.sleep(0.5)
+                    self._lock_obj.acquire()
+                    existing = self._locks.get(resource_uri)
+                    if existing is None or not existing.is_active:
+                        lock = ResourceLock(
+                            resource_uri=resource_uri,
+                            plan_id=plan_id,
+                            lock_timeout=self._lock_timeout,
+                        )
+                        self._locks[resource_uri] = lock
+                        self._lock_obj.release()
+                        logger.info("state lock: acquired %s for plan %s", resource_uri, plan_id)
+                        return None
+                    self._lock_obj.release()
+                return reason  # timeout
+        lock = ResourceLock(
+            resource_uri=resource_uri,
+            plan_id=plan_id,
+            lock_timeout=self._lock_timeout,
+        )
+        self._locks[resource_uri] = lock
+        self._lock_obj.release()
+        logger.info("state lock: acquired %s for plan %s", resource_uri, plan_id)
+        return None
 
     def release(self, resource_uri: str) -> None:
         with self._lock_obj:

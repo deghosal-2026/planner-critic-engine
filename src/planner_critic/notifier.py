@@ -182,7 +182,8 @@ class SlackFormatter:
 
     def verify_signature(self, timestamp: str, body: str, signature: str) -> bool:
         if not self.signing_secret:
-            return True
+            logger.warning("SlackFormatter: no signing_secret configured — callbacks accepted without verification!")
+            return False
         if abs(time.time() - float(timestamp)) > 300:
             return False
         sig_basestring = f"v0:{timestamp}:{body}"
@@ -302,19 +303,24 @@ class Notifier:
         results = notifier.dispatch(event)
     """
 
+    DEDUP_TTL: float = 300.0  # 5 minutes
+
     def __init__(self) -> None:
         self._surfaces: dict[str, SurfaceFormatter] = {}
-        self._dedup: set[str] = set()
+        self._dedup: dict[str, float] = {}
 
     def register(self, name: str, formatter: SurfaceFormatter) -> None:
         self._surfaces[name] = formatter
 
     def dispatch(self, event: EscalationEvent, max_retries: int = 3) -> list[NotificationResult]:
         dedup_key = f"{event.escalation_id}:{event.plan_id}"
+        now = time.monotonic()
+        # Evict expired entries
+        self._dedup = {k: v for k, v in self._dedup.items() if now - v < self.DEDUP_TTL}
         if dedup_key in self._dedup:
             logger.info("notifier: dedup hit for %s — skipping", dedup_key)
             return []
-        self._dedup.add(dedup_key)
+        self._dedup[dedup_key] = now
 
         results: list[NotificationResult] = []
         for name, formatter in self._surfaces.items():

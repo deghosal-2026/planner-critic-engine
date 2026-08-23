@@ -15,6 +15,10 @@ Usage::
 
 from __future__ import annotations
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 from ..engine import Engine
 from ..loop import LoopResult
 from ..schema.goal import Goal
@@ -137,6 +141,7 @@ class AutoGenAdapter:
         return None
 
     def _check_precondition(self, precondition: object) -> bool:
+        logger.warning("re-gate: precondition check for %r is not implemented — always passing", precondition)
         return True
 
     def escalation_message(self) -> str | None:

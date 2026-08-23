@@ -157,10 +157,10 @@ class EscalationManager:
             seen.setdefault(finding.id, finding)
         findings = list(seen.values())
 
-        blockers = [f for f in findings if f.severity is Severity.BLOCKER]
+        blockers = [f for f in findings if f.severity is Severity.BLOCKER and not f.is_llm_finding]
         if blockers:
             raise ValueError(
-                f"patched plan is not clean: {len(blockers)} blocker(s) remain — "
+                f"patched plan is not clean: {len(blockers)} deterministic blocker(s) remain — "
                 "a deterministic-gate blocker can never be approved (F-73)"
             )
 

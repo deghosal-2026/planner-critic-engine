@@ -103,6 +103,7 @@ def guardrail(
 def re_gate(
     precondition_key: str = "",
     on_drift: Callable[[str], Any] | None = None,
+    ledger: Any = None,
 ) -> Callable[[F], F]:
     """Decorator that re-verifies a precondition before each function call.
 
@@ -110,6 +111,9 @@ def re_gate(
         precondition_key: The precondition fact to verify. If empty, uses the
             function name.
         on_drift: Optional callback receiving the precondition key on drift.
+        ledger: Optional PreconditionLedger to check against. When provided,
+            the function executes normally if the precondition is satisfied.
+            When omitted, drift is always assumed (backward-compatible).
 
     Raises:
         PreconditionDrift: When the precondition is no longer satisfied.
@@ -121,6 +125,17 @@ def re_gate(
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             pk = key or func.__name__
             logger.info("re_gate: verifying precondition %r for %s", pk, func.__name__)
+            if ledger is not None:
+                entry = ledger.read(pk)
+                if entry is None or not entry.get("satisfied", False):
+                    if on_drift is not None:
+                        return on_drift(pk)
+                    raise PreconditionDrift(
+                        f"precondition {pk!r} has drifted — replan required before {func.__name__}",
+                        precondition_key=pk,
+                    )
+                return func(*args, **kwargs)
+            # Backward-compatible: when no ledger, always assume drift
             if on_drift is not None:
                 return on_drift(pk)
             raise PreconditionDrift(

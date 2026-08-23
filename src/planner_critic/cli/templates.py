@@ -88,7 +88,9 @@ def run_templates(argv: list[str]) -> int:
             return 1
 
         from ..loop.autofix import apply_precondition_closer
-        closed_plan, findings = apply_precondition_closer(plan, [])
+        from ..gates import run_deterministic_gates
+        gate_findings = run_deterministic_gates(plan)
+        closed_plan, findings = apply_precondition_closer(plan, gate_findings)
         if closed_plan is None:
             print(f"Template {args.name}: did not trigger (no matching precondition gap)")
         else:

@@ -321,6 +321,11 @@ class PlannerCriticMCPServer:
 
     def _build_engine(self, goal: Goal) -> Engine:
         """Build an Engine from configured roles or provider config.
+        
+        When explicit roles are provided (planner + critic), they are used
+        directly and cached across requests. When roles are built from config,
+        the planner is cached (goal-agnostic) but the critic is rebuilt per
+        goal because its audit logic is bound to the specific goal.
 
         Raises:
             PlanningError: When neither explicit roles nor a valid provider
@@ -335,12 +340,13 @@ class PlannerCriticMCPServer:
         registry = ProviderRegistry.load(self.llm_config_path)
         from ..cli.plan import _build_roles
 
-        planner, critic = _build_roles(registry, goal)
+        if self._planner is None:
+            planner, _ = _build_roles(registry, goal)
+            self._planner = planner
 
-        self._planner = planner
-        self._critic = critic
+        _, critic = _build_roles(registry, goal)
 
-        return Engine(planner, critic, config=self.loop_config)
+        return Engine(self._planner, critic, config=self.loop_config)
 
 
 # -- helpers ---------------------------------------------------------------

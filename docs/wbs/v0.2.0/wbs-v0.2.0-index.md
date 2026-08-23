@@ -57,7 +57,7 @@ M1 (Field-Test Closure) — proven base
 | M7 Developer Surfaces | [#137](https://github.com/deghosal-2026/planner-critic-engine/issues/137), #153, #162, #175, #178, #179 | check/diagnose/domains/policy/templates CLI + decorator + seed Rego library |
 | M8 Integration & Adoption | [#128](https://github.com/deghosal-2026/planner-critic-engine/issues/128), #134, #161 | CI (GitHub Action + GitLab), AutoGen adapter, notifier |
 | M9 Scale Validation | [#144–#148](https://github.com/deghosal-2026/planner-critic-engine/issues/144), [#177](https://github.com/deghosal-2026/planner-critic-engine/issues/177) | fleet field-test corpora + auto-repair benchmark |
-| M10 Release Activities | [#163–#169](https://github.com/deghosal-2026/planner-critic-engine/issues/163), [#177](https://github.com/deghosal-2026/planner-critic-engine/issues/177), [#182](https://github.com/deghosal-2026/planner-critic-engine/issues/182), [#183](https://github.com/deghosal-2026/planner-critic-engine/issues/183) | packaging/security/sweep/migration/docs/gate/ship + benchmarks |
+| M10 Release Activities | [#163–#169](https://github.com/deghosal-2026/planner-critic-engine/issues/163), [#177](https://github.com/deghosal-2026/planner-critic-engine/issues/177), [#182](https://github.com/deghosal-2026/planner-critic-engine/issues/182), [#183](https://github.com/deghosal-2026/planner-critic-engine/issues/183), [#184–#214](https://github.com/deghosal-2026/planner-critic-engine/issues/184) | packaging/security/sweep/migration/docs/gate/ship + benchmarks + CodeReview bug-fix sweep |
 
 ## 4. Posture Toward v0.1.0 WBS
 

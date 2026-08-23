@@ -255,6 +255,10 @@ def apply_precondition_closer(
         if target_id is None:
             continue
 
+        # Skip if a task with this ID already exists (prevents duplicates)
+        if any(t.id == new_task.id for t in plan.tasks):
+            continue
+
         new_tasks: list[Task] = []
         injected = False
         for task in plan.tasks:

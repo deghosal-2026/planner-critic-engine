@@ -161,12 +161,12 @@ def _invert_task(
     reason_code: str = ""
     rev = registry.get(task.action)
     if rev is None:
-        reason_code = ROLLBACK_MISSING_ACTION_MAPPING
+        reason_code = ROLLBACK_NON_REVERSIBLE_STEP_SKIPPED
         return (
             Task.model_validate({
                 "id": f"rollback:{task.id}",
                 "description": f"rollback of {task.id}",
-                "action": "restore_snapshot",
+                "action": "sys.noop",
                 "target": task.target,
                 "risk_class": "low",
             }),

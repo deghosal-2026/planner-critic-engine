@@ -118,7 +118,7 @@ class TestStateLock:
         assert conflicts[0][1] == "concurrent_resource_conflict"
 
     def test_lock_strategy_wait(self) -> None:
-        lock = StateLock(strategy=LockStrategy.WAIT)
+        lock = StateLock(strategy=LockStrategy.WAIT, wait_deadline=0.1)
         lock.acquire("res-1", "plan-1")
         result = lock.acquire("res-1", "plan-2")
         assert result == "resource_locked_by_concurrent_execution"

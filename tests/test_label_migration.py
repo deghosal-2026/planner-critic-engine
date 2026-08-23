@@ -85,7 +85,7 @@ class TestIrreversibleInvariantGate:
         findings = gate.run(plan)
         assert len(findings) == 0
 
-    def test_critical_high_with_verification_only_passes(self) -> None:
+    def test_critical_high_with_verification_and_precondition_passes(self) -> None:
         task = Task.model_validate({
             "id": "t1", "description": "modify schema", "action": "alter",
             "target": "db", "risk_class": "critical",
@@ -93,6 +93,11 @@ class TestIrreversibleInvariantGate:
             "verification": {"what": "schema applied", "how": "check", "expected": "match"},
             "rollback": {"trigger": "verification_fails", "action": "revert",
                          "safety_guard": "backup_confirmed"},
+            "preconditions": [{
+                "description": "schema backup verified",
+                "fact": "backup_exists",
+                "established_by": "env:backup_status",
+            }],
         })
         plan = PlanVersion(id="p1", goal_id="g1", version=1, tasks=[task])
         gate = IrreversibleInvariantGate()
