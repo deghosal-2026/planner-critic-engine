@@ -35,7 +35,7 @@ from planner_critic.loop import LoopConfig
 from planner_critic.schema.goal import Goal
 
 API_KEY = os.environ.get("OPENROUTER_API_KEY")
-MLX_API_KEY = os.environ.get("MLX_API_KEY", "not-needed")
+MLX_API_KEY = os.environ.get("MLX_API_KEY", "omlx-test")
 
 GOALS_ROOT = Path(__file__).parent.parent / "goals"
 RESULTS_ROOT = Path(__file__).parent.parent.parent / "results"
@@ -46,9 +46,9 @@ PROVIDERS = {
         base_url="https://openrouter.ai/api/v1", model="openai/gpt-4o-mini",
         api_key=API_KEY, max_tokens=16384, timeout_s=300.0,
     ),
-    "mlx": ProviderSpec(
-        name="mlx", transport="openai-compatible",
-        base_url="http://127.0.0.1:8000/v1", model="mlx-community/DeepSeek-R1-0528-Qwen3-8B-MLX-4bit",
+    "omlx": ProviderSpec(
+        name="omlx", transport="openai-compatible",
+        base_url="http://127.0.0.1:8000/v1", model="mlx-community/Qwen3-4B-Instruct-2507-4bit",
         api_key=MLX_API_KEY, max_tokens=16384, timeout_s=300.0,
     ),
 }
