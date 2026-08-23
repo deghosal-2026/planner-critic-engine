@@ -4,20 +4,20 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
-[![PyPI](https://img.shields.io/badge/pypi-v0.1.0-blue)](https://pypi.org/project/planner-critic/)
+[![PyPI](https://img.shields.io/badge/pypi-v0.2.0-blue)](https://pypi.org/project/planner-critic/)
 [![Ruff](https://img.shields.io/badge/code%20style-ruff-000000)](https://github.com/astral-sh/ruff)
 [![Type checked](https://img.shields.io/badge/mypy-strict-blue)](https://github.com/python/mypy)
-[![Coverage](https://img.shields.io/badge/coverage-87%25-brightgreen)](https://github.com/deghosal-2026/planner-critic-engine/actions)
+[![Coverage](https://img.shields.io/badge/coverage-95%25-brightgreen)](https://github.com/deghosal-2026/planner-critic-engine/actions)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14184/badge)](https://www.bestpractices.dev/projects/14184)
-[![Field Test](https://img.shields.io/badge/field%20test-157%20goals%2C%200%20failures-brightgreen)](docs/field-test/field-test-results-0.1.0.md)
+[![Field Test](https://img.shields.io/badge/field%20test-170%20goals%2C%200%20failures-brightgreen)](docs/field-test/v0.2.0/field-test-results-0.2.0.md)
 
 **Hierarchical task planning with an independent LLM critic. A planner decomposes a goal into a structured plan; a critic audits every subtask; the plan is revised until approval — or escalated to a human.**
 
 </div>
 
 > [!NOTE]
-> **Status:** v0.1.0 released · [PyPI](https://pypi.org/project/planner-critic/) · `pip install planner-critic`
+> **Status:** v0.2.0 released · [PyPI](https://pypi.org/project/planner-critic/) · `pip install planner-critic`
 > **License:** MIT
 
 ---
@@ -55,15 +55,26 @@ The plan is a persisted, versioned artifact — you can diff revisions, see whic
 
 ### Key Features
 
-| Feature | Description |
-|---------|-------------|
-| **Risk tolerance** | `balanced` (findings are advisory warnings) or `strict` (zero tolerance, fail-closed) |
-| **Deterministic gates** | 7 injection-immune gates — ordering, branch-sanity, rollback, verification, preconditions, branch-tasks, high-risk completeness |
-| **Escalation management** | Human-in-the-loop with override, patch, and restart decisions |
-| **Convergence detection** | Early termination when the planner stops making progress — saves LLM calls |
-| **Provider registry** | Pluggable LLM providers (OpenRouter, OpenAI, oMLX, Ollama) via TOML config |
-| **StructuredEnforcer** | Retry mechanism for LLM JSON output — fail-closed after 3 retries |
-| **Plan versioning** | Every revision is a persisted artifact with diff support |
+| Feature | Description | Added |
+|---------|-------------|-------|
+| **Risk tolerance** | `balanced` (findings are advisory warnings) or `strict` (zero tolerance, fail-closed) | v0.1.0 |
+| **Deterministic gates** | 7 injection-immune gates — ordering, branch-sanity, rollback, verification, preconditions, branch-tasks, high-risk completeness | v0.1.0 |
+| **Escalation management** | Human-in-the-loop with override, patch, and restart decisions | v0.1.0 |
+| **Convergence detection** | Early termination when the planner stops making progress — saves LLM calls | v0.1.0 |
+| **Provider registry** | Pluggable LLM providers (OpenRouter, OpenAI, oMLX, Ollama) via TOML config | v0.1.0 |
+| **StructuredEnforcer** | Retry mechanism for LLM JSON output — fail-closed after 3 retries | v0.1.0 |
+| **Plan versioning** | Every revision is a persisted artifact with diff support | v0.1.0 |
+| **Deterministic auto-repair** | Topological re-ordering + precondition closure — fixes ordering/dependency defects without LLM cost (#130, #131) | v0.2.0 |
+| **Oscillation detection** | Detects structural cycling and auto-converges (#152) | v0.2.0 |
+| **Domain Pack framework** | Domain-specific gate packs (SecOps, Supply Chain, FinOps, Data Eng) with `plancritic init --template` (#139, #140–143) | v0.2.0 |
+| **Policy-as-Code engine** | OPA/Rego + CEL policy evaluation — deterministic gates for custom compliance (#129, #156) | v0.2.0 |
+| **Security oracle** | SWE-bench-derived security corpus validates gates against human ground truth (#123–127) | v0.2.0 |
+| **Enterprise safety** | Dynamic posture, run budgets, state locking, precondition ledger, blast-radius quotas, secret/PII redaction (#149–151, #158, #159) | v0.2.0 |
+| **Developer surfaces** | `plancritic check`, `diagnose`, `domains`, `policy`, `templates` CLI + `@guardrail` decorator + seed Rego library (#137, #153, #162) | v0.2.0 |
+| **CI/CD integrations** | GitHub Action, GitLab CI template, AutoGen adapter, webhook notifier (#128, #134, #161) | v0.2.0 |
+| **Probe system** | Health probes for pre-execution precondition validation (DB, deploy, env, HTTP) | v0.2.0 |
+| **Drift observability** | Finding-drift detection — track how findings change across revisions (#181) | v0.2.0 |
+| **pytest plugin** | `pytest-planner-critic` — use gate assertions in your test suite (#156) | v0.2.0 |
 
 ### What It Is Not
 
@@ -117,13 +128,26 @@ Requires an LLM provider (OpenRouter, OpenAI, or a local model). See the [User G
 ## CLI
 
 ```bash
-plancritic plan <goal.json>              # Plan a goal
-plancritic critique <plan.json>          # Critique a plan
-plancritic field-test run --goals <dir>   # Run field test
-plancritic demo                          # Run demo scenario
-plancritic quickstart                    # Quickstart demo
-plancritic migrate <old> <new>           # Migrate config
-plancritic serve                         # Start HTTP server
+plancritic plan <goal.json>                # Plan a goal
+plancritic critique <plan.json>            # Critique a plan
+plancritic check --plan <plan.json>        # Quality check a plan
+plancritic diagnose <plan-id>              # Diagnose plan issues
+plancritic domains list                    # List available domain packs
+plancritic policy check <plan.json>        # Evaluate Rego/CEL policies
+plancritic templates list                  # List scaffold templates
+plancritic field-test run --goals <dir>    # Run field test
+plancritic eval --regression               # Security oracle regression
+plancritic findings list                   # List plan findings
+plancritic lessons                         # List learned lesson codes
+plancritic plan replay <plan-id>           # Replay plan history
+plancritic escalate list                   # List escalations
+plancritic demo                            # Run demo scenario
+plancritic quickstart                      # Quickstart demo
+plancritic init [--dir]                    # Scaffold config + store
+plancritic providers add/list/rm           # Manage LLM providers
+plancritic migrate <old> <new>             # Migrate schema
+plancritic serve                           # Start HTTP server
+plancritic quota show                      # Show blast-radius quotas
 ```
 
 See [API Reference](docs/reference/api.md) for full CLI docs, HTTP endpoints, and MCP tools.
@@ -132,19 +156,20 @@ See [API Reference](docs/reference/api.md) for full CLI docs, HTTP endpoints, an
 
 ## Field Test
 
-157 goals across 35 domains, all run against a real LLM (gpt-4o-mini via OpenRouter):
+170 goals across 40 domains, all run against a real LLM (gpt-4o-mini via OpenRouter):
 
 | Metric | Result |
 |--------|--------|
-| Balanced goals approved | **71/71 (100%)** |
-| Strict goals escalated | **81/81 (100%)** |
+| Balanced goals approved | **73/73 (100%)** |
+| Strict goals escalated | **97/97 (100%)** |
 | Adversarial goals escalated | **8/8 (100%)** |
 | True failures | **0** |
-| Deterministic gate passes | **156/157 (99%)** |
-| **Scorecard A (post-amendment)** | **PASS** |
+| Deterministic gate passes | **170/170 (100%)** |
+| Security oracle (SWE-bench) | **7/7 correct, 35/35 flawed blocked, 21 traps** |
+| **Scorecard A (pre-amended)** | **PASS** |
 | **Scorecard B (pass\* semantics)** | **100%** |
 
-Full results: [field-test-results-0.1.0.md](docs/field-test/field-test-results-0.1.0.md)
+Full results: [field-test-results-0.2.0.md](docs/field-test/v0.2.0/field-test-results-0.2.0.md)
 
 ---
 
@@ -152,13 +177,21 @@ Full results: [field-test-results-0.1.0.md](docs/field-test/field-test-results-0
 
 | Doc | Path | Contents |
 |-----|------|----------|
-| **Field Test Results v0.1.0** | [results](docs/field-test/field-test-results-0.1.0.md) | BLUF, conclusions, per-goal data, scorecards, blocker analysis |
-| **Field Test Plan** | [plan](docs/field-test/field-test-plan.md) | 156-goal corpus, 35 capabilities, invariant assertions |
-| **Architecture v0.1.0** | [architecture](docs/architecture/architecture-v0.1.0.md) | Component diagram, module map, data flow |
+| **Field Test Results v0.2.0** | [results](docs/field-test/v0.2.0/field-test-results-0.2.0.md) | BLUF, conclusions, per-goal data, scorecards, blocker analysis |
+| **Field Test Results v0.1.0** | [results](docs/field-test/v0.1.0/field-test-results-0.1.0.md) | v0.1.0 results for reference |
+| **Field Test Plan** | [plan](docs/field-test/README.md) | Corpus, invariant assertions, execution guide |
+| **Release Notes v0.2.0** | [release-notes](docs/reference/release-notes-v0.2.0.md) | What's new, breaking changes, upgrade path |
+| **Release Notes v0.1.0** | [release-notes](docs/reference/release-notes-v0.1.0.md) | v0.1.0 release notes for reference |
+| **Architecture** | [architecture](docs/architecture/architecture-v0.1.0.md) | Component diagram, module map, data flow |
 | **API Reference** | [api](docs/reference/api.md) | CLI cheat-sheet, HTTP endpoints, MCP tools |
 | **Design Decisions** | [decisions](docs/design/design-decisions.md) | DD-01..N decision records |
-| **Demo Scenario** | [demo](docs/design/demo-scenario.md) | End-to-end walkthrough |
-| **WBS Index** | [wbs](docs/wbs/v0.1.0/wbs-v0.1.0-index.md) | Milestone overview, dependency graph |
+| **Domain Pack Design** | [domain-packs](docs/design/domain-pack-design.md) | Domain pack protocol, pack format, engine integration |
+| **Policy Engine Design** | [policy-engine](docs/design/policy-engine-design.md) | OPA/Rego/CEL integration |
+| **Enterprise Safety Design** | [enterprise-safety](docs/design/enterprise-safety-design.md) | Posture, budgets, state, ledger, quotas, redaction |
+| **Developer Surfaces Design** | [developer-surfaces](docs/design/developer-surfaces-design.md) | CLI commands, decorator, seed Rego |
+| **Integration Surfaces Design** | [integration](docs/design/integration-surfaces-design.md) | CI runners, AutoGen, notifier |
+| **Security** | [security](SECURITY.md) | Security policy, OWASP, OpenSSF |
+| **WBS Index (v0.2.0)** | [wbs](docs/wbs/v0.2.0/wbs-v0.2.0-index.md) | Milestone overview, dependency graph |
 
 ---
 
@@ -169,17 +202,23 @@ planner-critic-engine/
 ├── docs/                    Documentation
 │   ├── architecture/          System architecture and spec
 │   ├── design/                PRD, design spec, design decisions
-│   ├── field-test/            Field test plan + results (157 goals, 35 domains)
-│   ├── reference/             API reference, quickstart
+│   ├── field-test/            Field test plan + results (170 goals, 40 domains)
+│   ├── reference/             API reference, quickstart, release notes
 │   └── wbs/                   Work breakdown structure (M1–M10)
 ├── src/planner_critic/       Engine source
-│   ├── cli/                    CLI commands
+│   ├── adapters/               AutoGen, CrewAI, LangGraph, OpenAI Agents, PydanticAI adapters
+│   ├── cli/                    21 CLI commands
 │   ├── critique/               LLM critic with severity guardrail
+│   ├── domains/                Domain-specific gate packs (SecOps, Supply Chain, FinOps, Data Eng)
+│   ├── eval/                   Security oracle, injection harness, regression, label migration
 │   ├── gates/                  7 deterministic gates
 │   ├── llm/                    Provider registry, transport, logging
-│   ├── loop/                   Plan revision loop, convergence detection
-│   └── server/                 HTTP server
-├── tests/                    Test suite
+│   ├── loop/                   Plan revision loop, auto-repair, convergence, oscillation
+│   ├── probe/                  Health probes (DB, deploy, env, HTTP)
+│   ├── schema/                 Goal and plan schemas
+│   ├── server/                 HTTP + MCP servers
+│   └── store/                  SQLite plan store with versioning
+├── tests/                    Test suite (field test + 90 deterministic tests)
 ├── .github/                  Issue templates, PR template, CI workflows
 ├── CHANGELOG.md               Release history
 ├── CONTRIBUTING.md            How to contribute
@@ -189,13 +228,13 @@ planner-critic-engine/
 
 ---
 
-## Known Gaps (v0.2.0)
+## Known Gaps (v0.3.0)
 
-- **Planner capability gap** — 132 concrete blockers across 63 strict goals. A deterministic precondition closer would eliminate 48%.
-- CLI, HTTP, adapter surfaces — partial coverage
-- Multi-model sweeps — only gpt-4o-mini tested
-- Finding quality audit — not yet measured
-- Executor usability — not yet audited
+- **Planner capability gap** — the LLM critic still finds blockers on strict goals across all domains. Deterministic precondition closer and auto-repair (v0.2.0) partially address this, but strict mode = escalation for non-trivial plans.
+- **TUI / studio / IDE surfaces** — deferred to v0.3.0.
+- **Backstage developer portal plugin** — deferred to v0.3.0.
+- **Adaptive revision cap** — detect strict goals and reduce cap to 1, saving LLM calls.
+- **Local model support for planner** — Qwen3-4B can produce valid JSON; critic role still too weak.
 
 See [CHANGELOG.md](CHANGELOG.md) for full details.
 

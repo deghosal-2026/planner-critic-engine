@@ -1,11 +1,11 @@
 # D1 — Architecture v0.1.0
 
-> **Authored in:** M1 (Core Engine) — *seed* status · **Finalize:** M10 · **WBS:** D1 ·
+> **Authored in:** M1 (Core Engine) — finalized in M10 · **WBS:** D1 ·
 > **Refs:** [PRD §2.3 component diagram](../design/prd/02-architecture.md#23-component-diagram), §2.4 LLM provider, §2.5 critique engine
 
-This is the **seed** of the high-level architecture: the §2.3 component diagram with M1's
-built surface marked, and the module map for the currently shipped package. It is written
-during M1 and finalized in M10 as the remaining subsystems land.
+This is the high-level architecture: the §2.3 component diagram with each milestone's
+built surface marked, and the module map for the currently shipped package. It was written
+during M1 and finalized in M10 as the remaining subsystems landed.
 
 ## 1. Component diagram — M1 scope annotated
 
