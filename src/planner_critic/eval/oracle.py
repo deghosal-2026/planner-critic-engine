@@ -121,10 +121,12 @@ class OracleEvalHarness:
         aligned: list[Finding] = []
         missed: list[Finding] = []
         spurious: list[Finding] = []
+        covered_expected_codes: set[str] = set()
 
         for f in result.findings:
             if isinstance(f.reason_code, str) and f.reason_code in expected_codes:
                 aligned.append(f)
+                covered_expected_codes.add(f.reason_code)
             elif f.is_llm_finding and instance.expected_critic_signal is not None:
                 expected_signal = instance.expected_critic_signal.value
                 if f.heuristic_family and f.heuristic_family.value == expected_signal:
@@ -135,6 +137,8 @@ class OracleEvalHarness:
                 spurious.append(f)
 
         for code in expected_codes:
+            if code in covered_expected_codes:
+                continue
             if not any(
                 isinstance(f.reason_code, str) and f.reason_code == code
                 for f in result.findings

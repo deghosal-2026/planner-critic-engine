@@ -27,9 +27,11 @@ class BlastRadiusGate(BaseGate):
 
     def run(self, plan: PlanVersion) -> list[Finding]:
         findings: list[Finding] = []
-        has_drain = any(task.action == "drain" for task in plan.tasks)
+        seen_drain = False
         for task in plan.tasks:
-            if task.action == "isolate" and not has_drain:
+            if task.action == "drain":
+                seen_drain = True
+            if task.action == "isolate" and not seen_drain:
                 findings.append(
                     Finding(
                         id=f"secops_blast_radius:{plan.id}:{plan.version}:{task.id}",
@@ -98,7 +100,7 @@ class LeastPrivilegeGate(BaseGate):
         )
         for task in plan.tasks:
             is_broad = task.action.startswith("sts:") and any(
-                t in (task.target or "") for t in BROAD_TARGETS
+                _match_broad_target(task.target or "", t) for t in BROAD_TARGETS
             )
             if is_broad and not has_hitl:
                 findings.append(
@@ -118,6 +120,24 @@ class LeastPrivilegeGate(BaseGate):
                     )
                 )
         return findings
+
+
+def _match_broad_target(target: str, broad: str) -> bool:
+    """Match a broad target against a resource name.
+    
+    Uses anchored matching: ``*`` matches any target ending with ``:*`` or ``:*/*``,
+    ``all`` matches exactly, ``everything`` matches exactly,
+    ``arn:aws:iam::*`` matches any IAM account root.
+    """
+    if broad == "*":
+        return target == "*"
+    if broad == "all":
+        return target == "all"
+    if broad == "everything":
+        return target == "everything"
+    if broad == "arn:aws:iam::*":
+        return target == "arn:aws:iam::*" or target.startswith("arn:aws:iam::") and target.endswith(":root")
+    return False
 
 
 # ── Pack metadata ─────────────────────────────────────────────────────────

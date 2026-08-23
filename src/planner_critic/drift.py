@@ -8,6 +8,8 @@ from typing import Any
 from planner_critic.reason_codes import DRIFT_ALERT_TRIGGERED
 from planner_critic.types import Finding, Severity
 
+SEVERITY_MAP: dict[Severity, int] = {Severity.BLOCKER: 2, Severity.WARNING: 1, Severity.INFO: 0}
+
 
 def compute_drift(finding: Finding) -> Finding:
     """Compute drift_delta and normalized_severity for a finding.
@@ -31,7 +33,7 @@ def compute_drift(finding: Finding) -> Finding:
     raw = finding.raw_severity or finding.severity
     norm = finding.normalized_severity or finding.severity
 
-    severity_map = {Severity.BLOCKER: 2, Severity.WARNING: 1, Severity.INFO: 0}
+    severity_map = SEVERITY_MAP
     raw_val = severity_map.get(raw, 1)
     norm_val = severity_map.get(norm, 1)
     drift_delta = norm_val - raw_val
@@ -54,7 +56,7 @@ def compute_drift_summary(findings: list[Finding]) -> dict[str, Any]:
         per_family_breakdown, critical_underclaims.
     """
     total = len(findings)
-    drifted = [f for f in findings if f.drift_delta != 0]
+    drifted = [f for f in findings if f.drift_delta < 0]
     drifted_count = len(drifted)
     downgrade_rate = drifted_count / total if total > 0 else 0.0
 
@@ -73,6 +75,8 @@ def compute_drift_summary(findings: list[Finding]) -> dict[str, Any]:
     underclaims = [
         f for f in findings
         if f.raw_severity is not None and f.raw_severity is Severity.BLOCKER
+        and f.normalized_severity is not None
+        and SEVERITY_MAP.get(Severity.BLOCKER, 2) > SEVERITY_MAP.get(f.normalized_severity, 1)
         and f.heuristic_family and f.heuristic_family.value in ("risk", "missing_steps")
     ]
 

@@ -231,7 +231,7 @@ def _escalate(
     )
 
 
-def _build_auto_converged_plan(plan: PlanVersion) -> PlanVersion | None:
+def _build_auto_converged_plan(current_plan: PlanVersion, prior_plan: PlanVersion | None) -> PlanVersion | None:
     """Merge non-oscillating tasks into a single stable plan.
 
     When the loop detects structural oscillation, this function builds a
@@ -240,13 +240,31 @@ def _build_auto_converged_plan(plan: PlanVersion) -> PlanVersion | None:
     differ across oscillation shapes are excluded.
 
     Args:
-        plan: The current plan revision (one of the oscillating shapes).
+        current_plan: The current plan revision (one of the oscillating shapes).
+        prior_plan: The prior revision to compare against.
 
     Returns:
-        A new :class:`PlanVersion` with only stable tasks, or the original
-        plan unchanged when a stable subset cannot be determined.
+        A new :class:`PlanVersion` with only stable tasks, or None when a
+        stable subset cannot be determined.
     """
-    return plan
+    if prior_plan is None:
+        return None
+    from .oscillation import oscillating_task_ids
+
+    oscillating = oscillating_task_ids(prior_plan, current_plan)
+    if not oscillating:
+        return None
+
+    stable_tasks = [t for t in current_plan.tasks if t.id not in oscillating]
+    if not stable_tasks:
+        return None
+
+    stable_ids = {t.id for t in stable_tasks}
+    stable_deps = [d for d in current_plan.dependencies if d.from_task in stable_ids and d.to_task in stable_ids]
+    return current_plan.model_copy(update={
+        "tasks": stable_tasks,
+        "dependencies": stable_deps,
+    })
 
 
 def _compose_question(goal: Goal, blockers: list[Finding], reason: ReasonCode) -> str:
@@ -345,6 +363,7 @@ def _run(
             len(gate_findings),
             len(gate_blockers),
         )
+        accumulated_trace: list[Finding] = []
 
         if config.auto_repair and gate_blockers:
             repaired_plan, repair_findings = apply_ordering_auto_repair(plan, gate_findings)
@@ -353,7 +372,8 @@ def _run(
                 if not _has_blocker(recheck):
                     logger.info("loop: auto-repaired ordering → continue without revision")
                     plan = repaired_plan
-                    gate_findings = repair_findings + recheck
+                    accumulated_trace.extend(repair_findings)
+                    gate_findings = accumulated_trace + recheck
                     gate_blockers = []
 
         if config.precondition_closer:
@@ -364,7 +384,7 @@ def _run(
                     logger.info("loop: auto-closed precondition gap → continue without revision")
                     plan = closed_plan
                     recheck = run_deterministic_gates(plan, extra_gates=extra_gates)
-                    gate_findings = close_findings + recheck
+                    gate_findings = accumulated_trace + close_findings + recheck
                     gate_blockers = [f for f in recheck if f.severity is Severity.BLOCKER]
 
         sig_history.append(compute_plan_signature(plan))
@@ -456,7 +476,7 @@ def _run(
             if config.converge_policy == "auto_converge":
                 logger.info("loop: oscillation detected → auto-converge (partial approval)")
                 # Build a merged plan with only non-oscillating tasks
-                merged = _build_auto_converged_plan(plan)
+                merged = _build_auto_converged_plan(plan, prior_plan)
                 if merged is not None:
                     merged_findings = [
                         *findings,

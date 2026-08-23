@@ -128,7 +128,7 @@ class TestRegoGate:
         """A valid Rego module can be evaluated."""
         gate = RegoGate(
             name="test-rego",
-            module='package test\nviolation contains "no tasks" if count(data.tasks) == 0',
+            module='package test\nviolation contains "no tasks" if count(input.tasks) == 0',
             query="data.test.violation",
         )
         plan = make_plan()
@@ -139,7 +139,7 @@ class TestRegoGate:
         """When the Rego query returns results, findings are produced."""
         gate = RegoGate(
             name="must-have-tasks",
-            module='package test\nviolation contains "no tasks" if count(data.tasks) == 0',
+            module='package test\nviolation contains "no tasks" if count(input.tasks) == 0',
             query="data.test.violation",
             severity="blocker",
         )
@@ -156,7 +156,7 @@ class TestRegoGate:
         """When the Rego query returns empty, no findings."""
         gate = RegoGate(
             name="must-have-tasks",
-            module='package test\nviolation contains "no tasks" if count(data.tasks) == 0',
+            module='package test\nviolation contains "no tasks" if count(input.tasks) == 0',
             query="data.test.violation",
         )
         plan = make_plan(tasks=[make_task("t1")])

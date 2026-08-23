@@ -23,9 +23,9 @@ def _load_plan(path: str) -> PlanVersion | None:
 
 
 def _gate_verdict(findings: list[Finding], fail_severity: Severity) -> tuple[bool, list[Finding]]:
-    failures = [f for f in findings if f.severity is Severity.BLOCKER]
-    if fail_severity is Severity.WARNING:
-        failures = [f for f in findings if f.severity in (Severity.BLOCKER, Severity.WARNING)]
+    order = {Severity.INFO: 0, Severity.WARNING: 1, Severity.BLOCKER: 2}
+    threshold = order.get(fail_severity, 2)
+    failures = [f for f in findings if order.get(f.severity, 0) >= threshold]
     return (len(failures) == 0, failures)
 
 

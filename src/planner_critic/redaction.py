@@ -62,7 +62,6 @@ class SecretsRedactor:
         if self._mode is RedactMode.SKIP:
             return text
         result = text
-        self._audits.clear()
         for name, pattern in self._patterns.items():
             matches = list(pattern.finditer(result))
             if not matches:
@@ -75,7 +74,7 @@ class SecretsRedactor:
                     locations=[surface] if surface else [],
                 )
             )
-            for m in matches:
+            for m in reversed(matches):
                 if self._mode is RedactMode.HASH:
                     secret_hash = hashlib.sha256(m.group().encode()).hexdigest()[:16]
                     result = result[:m.start()] + secret_hash + result[m.end():]

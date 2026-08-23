@@ -46,6 +46,7 @@ class BlastRadiusQuotaConfig:
 
 
 _DESTRUCTIVE_ACTIONS = {"delete", "destroy", "drop", "terminate", "remove"}
+_DB_ALTERATIVE_ACTIONS = {"drop", "alter", "migrate", "truncate", "delete", "destroy"}
 
 
 class BlastRadiusQuotaGate(BaseGate):
@@ -71,12 +72,13 @@ class BlastRadiusQuotaGate(BaseGate):
 
             if action_lower in _DESTRUCTIVE_ACTIONS:
                 destructive_count += 1
-            if "schema" in target_lower or "database" in target_lower or "db" in target_lower:
+            is_db_target = "schema" in target_lower or "database" in target_lower or "db" in target_lower
+            if is_db_target and action_lower in _DB_ALTERATIVE_ACTIONS:
                 db_alterations += 1
 
             if self._config.restricted_actions:
                 for restricted in self._config.restricted_actions:
-                    if restricted.lower() in action_lower:
+                    if action_lower == restricted.lower():
                         is_strict = self._posture is RiskTolerance.STRICT
                         findings.append(
                             Finding(
@@ -91,7 +93,8 @@ class BlastRadiusQuotaGate(BaseGate):
 
             target_for_cluster = (task.target or "").lower()
             for cluster in self._config.restricted_clusters:
-                if cluster.lower() in target_for_cluster:
+                cluster_lower = cluster.lower()
+                if target_for_cluster == cluster_lower or target_for_cluster.endswith(f"-{cluster_lower}"):
                     is_strict = self._posture is RiskTolerance.STRICT
                     findings.append(
                         Finding(

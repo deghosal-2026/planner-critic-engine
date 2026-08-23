@@ -84,7 +84,7 @@ class TestBlastRadiusQuotaGate:
     def test_restricted_permits_warning(self) -> None:
         config = BlastRadiusQuotaConfig(restricted_clusters=["prod"])
         gate = BlastRadiusQuotaGate(config, posture=RiskTolerance.PERMISSIVE)
-        plan = _plan([_task("t1", target="prod-db")])
+        plan = _plan([_task("t1", target="prod")])
         findings = gate.run(plan)
         assert len(findings) == 1
         assert findings[0].severity is Severity.WARNING
@@ -92,7 +92,7 @@ class TestBlastRadiusQuotaGate:
     def test_db_alterations_breach(self) -> None:
         config = BlastRadiusQuotaConfig(max_database_alterations=1)
         gate = BlastRadiusQuotaGate(config)
-        plan = _plan([_task("t1", target="db-schema"), _task("t2", target="database-users")])
+        plan = _plan([_task("t1", action="migrate", target="db-schema"), _task("t2", action="drop", target="database-users")])
         findings = gate.run(plan)
         blockers = [f for f in findings if f.severity is Severity.BLOCKER]
         assert len(blockers) == 1

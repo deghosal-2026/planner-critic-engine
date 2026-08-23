@@ -93,7 +93,7 @@ class TestTraceFindings:
         synth = InverseRollbackSynthesizer()
         synth.build_rollback(plan)
         codes = {f.reason_code for f in synth.trace}
-        assert "rollback_missing_action_mapping" in codes
+        assert "rollback_non_reversible_step_skipped" in codes
 
     def test_trace_findings_are_info_severity(self) -> None:
         plan = make_plan(tasks=[_task("x", "create")])

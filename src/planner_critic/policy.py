@@ -204,7 +204,7 @@ def _run_opa_eval(
                 "json",
                 "--data",
                 str(rego_path),
-                "--data",
+                "--input",
                 str(input_path),
                 query,
             ],

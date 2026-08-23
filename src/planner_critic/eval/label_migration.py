@@ -78,7 +78,7 @@ class IrreversibleInvariantGate(BaseGate):
                 has_rollback = task.rollback is not None
                 has_verification = task.verification is not None
 
-                if not (has_rollback and (has_verification or has_precondition)):
+                if not (has_rollback and has_precondition):
                     findings.append(
                         Finding(
                             id=f"irreversible_invariant:{plan.id}:{plan.version}:{task.id}",
@@ -155,7 +155,7 @@ def generate_boundary_cases() -> list[BoundaryCase]:
             plan_a=base_plan,
             plan_b=high_plan,
             expected_blocker_family="missing_steps",
-            expected_reason_code="missing_verification",
+            expected_reason_code="irreversible_invariant_blocked",
         ),
         BoundaryCase(
             case_id="rollback-improvement-vs-no-viable-rollback",

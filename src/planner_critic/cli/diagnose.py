@@ -134,7 +134,7 @@ def _match_rule(rule: dict[str, Any], trace: ExecutionTrace, plan_data: dict[str
 def _diagnose_trace(trace: ExecutionTrace, plan_data: dict[str, Any] | None = None) -> dict[str, Any]:
     for rule in DIAGNOSTIC_RULES:
         if _match_rule(rule, trace, plan_data):
-            step_info = {"step": trace.task_id, "action": trace.outcome or "unknown"}
+            step_info = {"step": trace.task_id, "action": trace.outcome or "unknown", "precondition": "unknown"}
             root_cause = rule["root_cause_template"].format(**step_info)
             suggested_fix = rule["suggested_fix_template"].format(**step_info)
             return {
