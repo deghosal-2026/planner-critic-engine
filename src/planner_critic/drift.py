@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import statistics
-from collections import Counter
-from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from planner_critic.reason_codes import DRIFT_ALERT_TRIGGERED

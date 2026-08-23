@@ -2,16 +2,15 @@ from __future__ import annotations
 
 import pytest
 
+from conftest import ScriptedCritic, ScriptedPlanner, make_plan, make_task
+from planner_critic.adapters._audit import AuditTrail
 from planner_critic.adapters.autogen import (
     AutoGenAdapter,
     PlanNotApprovedError,
-    PreconditionDriftError,
 )
-from planner_critic.adapters._audit import AuditTrail
 from planner_critic.engine import Engine
 from planner_critic.loop import LoopConfig
 from planner_critic.schema.goal import Goal, RiskTolerance
-from conftest import ScriptedCritic, ScriptedPlanner, make_plan, make_task
 
 
 class TestAutoGenAdapter:
@@ -86,7 +85,6 @@ class TestAutoGenAdapter:
         assert events[1].event == "plan_approved"
 
     def test_precondition_drift_on_step(self) -> None:
-        from planner_critic.schema.plan import Precondition
         t1 = make_task("t1", preconditions=[{"description": "db ready", "fact": "db_healthy", "established_by": "env"}])
         planner = ScriptedPlanner([make_plan(tasks=[t1])])
         critic = ScriptedCritic([[]])

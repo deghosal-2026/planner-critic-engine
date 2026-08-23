@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
-
-import pytest
+from datetime import UTC, datetime
 
 from planner_critic.gates.base import BaseGate
-from planner_critic.schema.plan import PlanVersion, RiskClass, Task
-from planner_critic.types import Finding, Severity
+from planner_critic.schema.plan import PlanVersion
+from planner_critic.types import Finding
 
 
 class _TestGate(BaseGate):

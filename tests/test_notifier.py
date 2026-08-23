@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from planner_critic.notifier import (
     EscalationEvent,
     Notifier,
@@ -46,7 +44,9 @@ class TestSlackFormatter:
         assert "Review in Backstage" in blocks_text
 
     def test_verify_signature_valid(self) -> None:
-        import hmac, hashlib, time
+        import hashlib
+        import hmac
+        import time
         formatter = SlackFormatter("https://hooks.slack.com/test", signing_secret="secret123")
         ts = str(int(time.time()))
         body = '{"test": true}'

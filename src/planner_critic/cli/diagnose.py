@@ -6,11 +6,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from ..reason_codes import ReasonCode, REASON_CODE_DESCRIPTIONS
-from ..types import ExecutionTrace, Severity
 from ..store.base import PlanStore
 from ..store.sqlite import SQLiteStore
-
+from ..types import ExecutionTrace
 
 DIAGNOSTIC_RULES: list[dict[str, Any]] = [
     {
@@ -183,8 +181,8 @@ def _format_markdown(diag: dict[str, Any]) -> str:
     lines = []
     lines.append("## Execution Trace Diagnosis")
     lines.append("")
-    lines.append(f"| Field | Value |")
-    lines.append(f"|---|---|")
+    lines.append("| Field | Value |")
+    lines.append("|---|---|")
     lines.append(f"| Failing step | {diag['failing_step']} |")
     lines.append(f"| Failure class | {diag['failure_class'] or 'unknown'} |")
     lines.append(f"| Outcome | {diag['outcome'] or 'unknown'} |")
@@ -253,7 +251,7 @@ def run_diagnose(argv: list[str]) -> int:
 
     if args.export_otel:
         try:
-            from opentelemetry import trace as otel_trace  # type: ignore[import-not-found]
+            from opentelemetry import trace as otel_trace
             tracer = otel_trace.get_tracer("planner_critic.diagnose")
             for d in diagnoses:
                 with tracer.start_as_current_span("diagnose") as span:

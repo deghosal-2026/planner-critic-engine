@@ -87,8 +87,8 @@ def run_templates(argv: list[str]) -> int:
             print(f"error: failed to load plan: {err}", file=sys.stderr)
             return 1
 
-        from ..loop.autofix import apply_precondition_closer
         from ..gates import run_deterministic_gates
+        from ..loop.autofix import apply_precondition_closer
         gate_findings = run_deterministic_gates(plan)
         closed_plan, findings = apply_precondition_closer(plan, gate_findings)
         if closed_plan is None:

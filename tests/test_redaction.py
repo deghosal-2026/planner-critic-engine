@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from planner_critic.redaction import RedactMode, SecretsRedactor
 
 

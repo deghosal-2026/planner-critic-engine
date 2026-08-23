@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from planner_critic.cli.corpus import build_corpus_parser, run_corpus

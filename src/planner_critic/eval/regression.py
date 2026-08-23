@@ -30,7 +30,7 @@ def _make_task(
     blast_radius: str = "high",
     has_verification: bool = True,
     has_rollback: bool = True,
-    preconditions: list[dict] | None = None,
+    preconditions: list[dict[str, object]] | None = None,
 ) -> Task:
     """Build a task with deterministic structure for gate regression."""
     task_data: dict[str, Any] = {

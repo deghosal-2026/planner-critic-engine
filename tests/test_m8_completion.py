@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
-from planner_critic.notifier import EscalationEvent, Notifier, SlackFormatter, TeamsFormatter, WebhookFormatter
+from planner_critic.notifier import (
+    EscalationEvent,
+    Notifier,
+    SlackFormatter,
+)
 
 
 class TestM8ConfigSurfaces:

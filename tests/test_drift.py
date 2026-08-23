@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pytest
-
 from planner_critic.drift import check_drift_alert, compute_drift, compute_drift_summary
 from planner_critic.reason_codes import (
     DRIFT_ALERT_TRIGGERED,
@@ -16,7 +14,6 @@ def _finding(
     raw: Severity | None = Severity.BLOCKER,
     family: HeuristicFamily | None = HeuristicFamily.MISSING_STEPS,
 ) -> Finding:
-    from planner_critic.reason_codes import LLM_MISSING_STEPS
     return Finding(
         id="f1", version=1, severity=sev,
         reason_code=LLM_MISSING_STEPS, message="test",

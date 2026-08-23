@@ -18,7 +18,6 @@ from typing import cast
 from .reason_codes import (
     ROLLBACK_DAG_GENERATED,
     ROLLBACK_EXECUTION_TRIGGERED,
-    ROLLBACK_MISSING_ACTION_MAPPING,
     ROLLBACK_NON_REVERSIBLE_STEP_SKIPPED,
     ReasonCode,
 )

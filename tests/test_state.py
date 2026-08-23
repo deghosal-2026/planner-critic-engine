@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-import pytest
-
 from planner_critic.state import (
     LockStrategy,
     ResourceLock,

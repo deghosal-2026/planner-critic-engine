@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 
-from ..store.sqlite import SQLiteStore
 from ..store.base import StoreUnavailable
-from ..types import Finding
+from ..store.sqlite import SQLiteStore
 
 
 def build_findings_parser() -> argparse.ArgumentParser:

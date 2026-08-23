@@ -22,8 +22,7 @@ logger = logging.getLogger(__name__)
 from ..engine import Engine
 from ..loop import LoopResult
 from ..schema.goal import Goal
-from ..schema.plan import PlanVersion, Precondition, Task
-from ..types import Finding, Severity
+from ..schema.plan import PlanVersion, Task
 from ._audit import AuditEvent, AuditTrail
 
 

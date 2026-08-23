@@ -1,17 +1,13 @@
 from __future__ import annotations
 
-import json
-import tempfile
 from pathlib import Path
-
-import pytest
 
 from planner_critic.cli.eval import _run_regression_eval, build_eval_parser, run_eval
 from planner_critic.cli.lessons import build_lessons_parser, run_lessons
+from planner_critic.corpus import load_all_instances
 from planner_critic.eval.label_migration import generate_boundary_cases
 from planner_critic.eval.regression import generate_artifact
 from planner_critic.gates import run_deterministic_gates
-from planner_critic.corpus import load_all_instances
 
 CORPUS_DIR = str(Path(__file__).resolve().parent.parent / "docs" / "field-test" / "corpus" / "swebench-security")
 

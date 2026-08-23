@@ -509,7 +509,6 @@ def run_replan(goal, planner, registry, out):
 
 
 def run_adapters(goal, plan, out):
-    from .adapters.python import PlannerCriticPlan
 
     if plan is None:
         t = {"dimension": "adapters", "goal_id": goal.id, "pass": False, "error": "no plan"}

@@ -105,7 +105,7 @@ The following benchmarks were deferred from M9 and are executed as part of the r
 | 8 | Auto-repair benchmark (carried from M9) | ≥30% revision reduction on ordering-violation corpus | [#177](https://github.com/deghosal-2026/planner-critic-engine/issues/177) · [ ] |
 | 9 | Rollback credibility field test (carried from M9) | 21 goals across 8 domains, 3 credibility patterns; measure gate false-negative rate + critic recall | [#182](https://github.com/deghosal-2026/planner-critic-engine/issues/182) · [ ] |
 | 10 | Family-histogram stasis benchmark (carried from M9) | ≥20% revision reduction from family-based convergence signal across 85+ strict-goal traces | [#183](https://github.com/deghosal-2026/planner-critic-engine/issues/183) · [ ] |
-| 11 | **CodeReview bug-fix sweep** — fix or classify all 31 bugs | every [#184–#214](https://github.com/deghosal-2026/planner-critic-engine/issues/184) closed or filed as documented caveat | [#184–#214](https://github.com/deghosal-2026/planner-critic-engine/issues/184) · [ ] |
+| 11 | **CodeReview bug-fix sweep** — fix or classify all 31 bugs | every [#184–#214](https://github.com/deghosal-2026/planner-critic-engine/issues/184) closed or filed as documented caveat | [#184–#214](https://github.com/deghosal-2026/planner-critic-engine/issues/184) · [x] |
 
 ### M10 Success Metrics
 
@@ -122,7 +122,7 @@ The following benchmarks were deferred from M9 and are executed as part of the r
 ### M10 Exit Gate
 
 - [ ] Release-blocking issues: 0 (all gate failures resolved or filed as classified caveats)
-- [ ] All [#184–#214](https://github.com/deghosal-2026/planner-critic-engine/issues/184) CodeReview bugs fixed or filed as documented caveats
+- [x] All [#184–#214](https://github.com/deghosal-2026/planner-critic-engine/issues/184) CodeReview bugs fixed or filed as documented caveats
 - [ ] Coverage > 95; lint clean; code review passed
 - [ ] OpenSSF Silver + Hardened posture documented in SECURITY.md
 - [ ] Quickstart + release notes verified from a clean venv

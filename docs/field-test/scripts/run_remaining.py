@@ -7,7 +7,9 @@ Usage:
 --max N       Run at most N scenarios (default: all 61)
 --skip-existing  Skip goals that already have a trace.json in the output dir
 """
-import argparse, json, os, sys, time
+import argparse
+import json
+import time
 from pathlib import Path
 
 GOALS_ROOT = Path("docs/field-test/goals")
@@ -189,7 +191,7 @@ def main():
 
     # Summary
     print(f"\n{'='*60}")
-    print(f"  SUMMARY")
+    print("  SUMMARY")
     print(f"{'='*60}")
     from collections import Counter
     verdicts = Counter(r["verdict"] for r in results)
