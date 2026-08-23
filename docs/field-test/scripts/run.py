@@ -37,8 +37,8 @@ from planner_critic.schema.goal import Goal
 API_KEY = os.environ.get("OPENROUTER_API_KEY")
 MLX_API_KEY = os.environ.get("MLX_API_KEY", "omlx-test")
 
-GOALS_ROOT = Path(__file__).parent.parent / "goals"
-RESULTS_ROOT = Path(__file__).parent.parent.parent / "results"
+GOALS_ROOT = Path(__file__).resolve().parent.parent / "goals"
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 PROVIDERS = {
     "openai": ProviderSpec(
@@ -111,7 +111,7 @@ def _default_output(provider: str) -> Path:
     """Derive output directory from provider: results/<version>/<provider-model>/."""
     spec = PROVIDERS[provider]
     model_slug = spec.model.replace("/", "-").replace(".", "-")
-    return Path(__file__).parent.parent.parent / "results" / "0.2.0" / f"{provider}-{model_slug}"
+    return REPO_ROOT / "results" / "0.2.0" / f"{provider}-{model_slug}"
 
 
 def main() -> None:
@@ -151,7 +151,7 @@ def main() -> None:
     config = LoopConfig(mode="deterministic-first", revision_cap=args.revision_cap)
     results: list[dict] = []
     existing_outputs = set(output_dir.rglob("trace.json"))
-    existing_goals = {p.parent.parent.name for p in existing_outputs}
+    existing_goals = {p.parent.name for p in existing_outputs}
 
     for i, (domain, gid) in enumerate(scenarios, 1):
         if args.skip_existing and gid in existing_goals:
