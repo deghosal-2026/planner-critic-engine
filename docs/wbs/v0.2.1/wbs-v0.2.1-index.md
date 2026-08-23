@@ -82,10 +82,10 @@ Execution order: #222 quality gate → #223 field test/regression/docker → #22
 
 Scope note: `0.2.1-m11` was fast-forward-merged into `main` at `4029877` and CI-aligned at `42b5ada`; the M11 branch tracks `main`. **The release diff under review is `f2a5025..42b5ada` on `main`** (v0.2.0 merge → current tip).
 
-- [ ] **Step 1 — #222 Final quality gate.**
+- [x] **Step 1 — #222 Final quality gate.**
   Success criteria: (a) code review of the full release diff `f2a5025..42b5ada` completed — every finding resolved in-repo or filed as `[CodeReview]` issue triaged into this milestone; (b) full pytest suite green incl. P1 + M11 modules, zero unexplained skips; (c) `ruff check` + `ruff format --check` + mypy strict (`src/ tests/`) 0 errors on the release tip; (d) coverage **>91%** re-measured at the tip (M11 accepted the documented 0.38% gap at 91.62% — #222 must not regress below that without a filed issue); (e) docstring spot-check on every module added by M11; (f) evidence (commands + outputs) recorded in the issue.
   Carries two items deferred from M11 #228: the combined-diff code review and security spot-checks on new output surfaces.
-- [ ] **Step 2 — #223 Field test + regression sweep.**
+- [x] **Step 2 — #223 Field test + regression sweep.**
   Success criteria: (a) v0.2.0 matrix re-run on the release tip; per-goal verdict diff vs published v0.2.0 results committed under `docs/field-test/v0.2.1/`; (b) 100% of deltas attributable to P1 fixes or M11 features (#215–#217, #219), zero unexplained; (c) hermetic deterministic-gate regression + injection harness green in CI ($0 LLM); §7.1 held: blocker detection ≥90%, median revisions ≤2, no uncaught `PlanningError`; (d) docker integration suite green against the rebuilt 0.2.1 image.
   Env note: local docker suite needs `docker compose up -d` healthy or is covered by the remote `docker-integration.yml` workflow (currently green on main).
 - [ ] **Step 3 — #224 Security clean.**

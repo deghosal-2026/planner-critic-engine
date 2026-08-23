@@ -4,7 +4,7 @@
 > **Provider:** OpenRouter `openai/gpt-4o-mini` (both planner and critic roles)
 > **Loop:** deterministic-first · revision_cap=4
 > **Coverage:** 170 of 170 goals across 40 domains · **Full corpus complete**
-> **Cost:** ~$0.40 · **Duration:** ~90 minutes (batched)
+> **Cost:** ~$0.49 · **Duration:** ~30 minutes
 > **Config:** `OPENROUTER_API_KEY` env var
 
 ---
@@ -79,7 +79,7 @@ The field test was run in four phases, cost-tiered so hermetic ($0) work runs fi
 | P0 — validate | `run-field.py --validate --all` | $0 | 5 min |
 | P2 — subsystem | `run-field.py --subsystem --all` | $0 | 45 min |
 | P4 — benchmarks | `run-field.py --benchmarks --all` | $0 | 30 min |
-| P3 — LLM sweep | `run-field.py --subsystem --all --run-llm` | ~$0.40 | 90 min |
+| P3 — LLM sweep | `run-field.py --subsystem --all --run-llm` | ~$0.49 | 90 min |
 
 **P3** runs the 170-goal sweep through OpenRouter `openai/gpt-4o-mini` (both planner and critic roles, `deterministic-first` mode, `revision_cap=4`) plus the live-critic boundary run (#218, 6 cases × 5 trials × 2 plans = 60 audits). All traces written to `results/0.2.1/openai-openai-gpt-4o-mini/`.
 
