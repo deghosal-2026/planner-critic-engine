@@ -95,13 +95,13 @@ The following benchmarks were deferred from M9 and are executed as part of the r
 
 | # | Task | Verify | Issue | Status |
 |---|------|--------|-------|--------|
-| 1 | Packaging + pip release | fresh-venv install of base + extras; `--help` lists new commands | [#163](https://github.com/deghosal-2026/planner-critic-engine/issues/163) · [ ] |
-| 2 | Security posture (OpenSSF Silver + Hardened) | badge passing; callback signatures verified; redaction end-to-end | [#164](https://github.com/deghosal-2026/planner-critic-engine/issues/164) · [ ] |
+| 1 | Packaging + pip release | fresh-venv install of base + extras; `--help` lists new commands | [#163](https://github.com/deghosal-2026/planner-critic-engine/issues/163) · [x] |
+| 2 | Security posture (OpenSSF Silver + Hardened) | badge passing; callback signatures verified; redaction end-to-end | [#164](https://github.com/deghosal-2026/planner-critic-engine/issues/164) · [x] |
 | 3 | Release-gate sweep + hermetic CI | full matrix green; gate + injection hermetic; §7.1 met | [#165](https://github.com/deghosal-2026/planner-critic-engine/issues/165) · [x] |
-| 4 | Migration & backward-compat | v0.1.0 → v0.2.0 lossless; replay works | [#166](https://github.com/deghosal-2026/planner-critic-engine/issues/166) · [ ] |
+| 4 | Migration & backward-compat | v0.1.0 → v0.2.0 lossless; replay works | [#166](https://github.com/deghosal-2026/planner-critic-engine/issues/166) · [x] |
 | 5 | Release notes v0.2.0 | doc authored; API reference + quickstart current | [#167](https://github.com/deghosal-2026/planner-critic-engine/issues/167) · [x] |
-| 6 | Final quality gate | ruff/mypy/coverage ≥95; code review resolved; tagged | [#168](https://github.com/deghosal-2026/planner-critic-engine/issues/168) · [ ] |
-| 7 | Release coordination | milestones closed; tag + announcement + README updated | [#169](https://github.com/deghosal-2026/planner-critic-engine/issues/169) · [ ] |
+| 6 | Final quality gate | ruff/mypy/coverage ≥95; code review resolved; tagged | [#168](https://github.com/deghosal-2026/planner-critic-engine/issues/168) · [x] |
+| 7 | Release coordination | milestones closed; tag + announcement + README updated | [#169](https://github.com/deghosal-2026/planner-critic-engine/issues/169) · [x] |
 | 8 | Auto-repair benchmark (carried from M9) | ≥30% revision reduction on ordering-violation corpus | [#177](https://github.com/deghosal-2026/planner-critic-engine/issues/177) · [x] |
 | 9 | Rollback credibility field test (carried from M9) | 21 goals across 8 domains, 3 credibility patterns; measure gate false-negative rate + critic recall | [#182](https://github.com/deghosal-2026/planner-critic-engine/issues/182) · [x] |
 | 10 | Family-histogram stasis benchmark (carried from M9) | ≥20% revision reduction from family-based convergence signal across 85+ strict-goal traces | [#183](https://github.com/deghosal-2026/planner-critic-engine/issues/183) · [x] |
@@ -121,12 +121,12 @@ The following benchmarks were deferred from M9 and are executed as part of the r
 
 ### M10 Exit Gate
 
-- [ ] Release-blocking issues: 0 (all gate failures resolved or filed as classified caveats)
+- [x] Release-blocking issues: 0 (all gate failures resolved or filed as classified caveats)
 - [x] All [#184–#214](https://github.com/deghosal-2026/planner-critic-engine/issues/184) CodeReview bugs fixed or filed as documented caveats
-- [ ] Coverage > 95; lint clean; code review passed
-- [ ] OpenSSF Silver + Hardened posture documented in SECURITY.md
-- [ ] Quickstart + release notes verified from a clean venv
-- [ ] `pip install planner-critic==0.2.0` from PyPI verified
-- [ ] tag v0.2.0; all 0.2.0 milestones complete
+- [x] Coverage > 95; lint clean; code review passed
+- [x] OpenSSF Silver + Hardened posture documented in SECURITY.md
+- [x] Quickstart + release notes verified from a clean venv
+- [x] `pip install planner-critic==0.2.0` from PyPI verified
+- [x] tag v0.2.0; all 0.2.0 milestones complete
 
 **Dependency:** M1–M9. **Produces:** the **v0.2.0 release artifact** + foundation for v0.3.0 (P2 items — see [index](wbs-v0.2.0-index.md) and [09-roadmap §9.3](../../design/prd/09-roadmap.md#93-v030-p2)).
