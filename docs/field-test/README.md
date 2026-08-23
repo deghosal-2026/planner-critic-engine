@@ -1,8 +1,30 @@
 # Field Test
 
-Field test plans, reports, and validation matrices.
+Field test plans, reports, and validation matrices for all versions.
 
-- `omlx-critique-modes-field-test.md` — Critique-mode field test plan (real local OMLX LLM; three modes: all-heuristic, LLM+heuristic, all-LLM; does not run in CI)
-- `docker-integration.md` — Docker integration test guide (M8): containerized engine + CLI/HTTP/MCP vs a local LLM (to be authored in M8)
-- `field-test-plan.md` — Field test plan (real goals, real LLM models, real plans)
-- `field-test-report.md` — Field test report
+## Directory Structure
+
+```
+docs/field-test/
+├── README.md
+├── v0.1.0/          # v0.1.0 field test (156 goals, 8 adversarial)
+│   ├── README.md
+│   ├── field-test-plan.md
+│   ├── field-test-results-0.1.0.md
+│   ├── omlx-critique-modes-field-test.md
+│   └── reports/     # per-goal traces and report artifacts
+├── v0.2.0/          # v0.2.0 field test (176 goals, 11 adversarial)
+│   ├── field-test-plan.md
+│   └── README.md
+├── goals/           # shared goal corpus (domain JSON + assertion YAML)
+├── scripts/         # batch runners (shared across versions)
+├── corpus/          # SWE-bench security oracle corpus
+└── docker-integration.md
+```
+
+## Version History
+
+| Version | Goals | Adversarial | Status | Report |
+|---------|-------|-------------|--------|--------|
+| v0.1.0 | 156 | 8 | ✅ Complete | `v0.1.0/field-test-results-0.1.0.md` |
+| v0.2.0 | 176 | 11 | ⬜ Planned | `v0.2.0/field-test-plan.md` |
