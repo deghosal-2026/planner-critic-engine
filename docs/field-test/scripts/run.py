@@ -38,7 +38,7 @@ API_KEY = os.environ.get("OPENROUTER_API_KEY")
 MLX_API_KEY = os.environ.get("MLX_API_KEY", "not-needed")
 
 GOALS_ROOT = Path(__file__).parent.parent / "goals"
-DEFAULT_OUTPUT = Path(__file__).parent.parent / "v0.2.0" / "reports" / "sweep"
+RESULTS_ROOT = Path(__file__).parent.parent.parent / "results"
 
 PROVIDERS = {
     "openai": ProviderSpec(
@@ -55,14 +55,18 @@ PROVIDERS = {
 
 
 def discover_goals(domains: list[str] | None = None, goal_ids: list[str] | None = None) -> list[tuple[str, str]]:
-    """Discover goal files on disk. Returns [(domain, goal_id), ...] sorted."""
+    """Discover goal files on disk. Returns [(domain, goal_id), ...] sorted.
+
+    ``goal_ids`` are matched as substrings against the full goal ID
+    (e.g. ``--goals db-01`` matches ``db-01-schema-migration``).
+    """
     results: list[tuple[str, str]] = []
     for gfile in sorted(GOALS_ROOT.rglob("*.json")):
         domain = gfile.parent.name
         gid = gfile.stem
         if domains and domain not in domains:
             continue
-        if goal_ids and gid not in goal_ids:
+        if goal_ids and not any(pid in gid for pid in goal_ids):
             continue
         results.append((domain, gid))
     return results
@@ -103,6 +107,13 @@ def run_goal(domain: str, gid: str, registry: ProviderRegistry, config: LoopConf
     }
 
 
+def _default_output(provider: str) -> Path:
+    """Derive output directory from provider: results/<version>/<provider-model>/."""
+    spec = PROVIDERS[provider]
+    model_slug = spec.model.replace("/", "-").replace(".", "-")
+    return Path(__file__).parent.parent.parent / "results" / "0.2.0" / f"{provider}-{model_slug}"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run field-test goals against a live LLM")
     parser.add_argument("--all", action="store_true", help="Run all 170 goals")
@@ -110,8 +121,8 @@ def main() -> None:
     parser.add_argument("--goals", type=str, help="Comma-separated goal IDs to run")
     parser.add_argument("--provider", default="openai", choices=list(PROVIDERS),
                         help="LLM provider (default: openai/gpt-4o-mini)")
-    parser.add_argument("--output", type=str, default=str(DEFAULT_OUTPUT),
-                        help="Output directory for traces (default: v0.2.0/reports/sweep)")
+    parser.add_argument("--output", type=str, default=None,
+                        help="Output directory (default: results/0.2.0/<provider-model>/)")
     parser.add_argument("--revision-cap", type=int, default=4, help="Max revisions per goal")
     parser.add_argument("--skip-existing", action="store_true", help="Skip goals with existing traces")
     parser.add_argument("--dry-run", action="store_true", help="List goals without running")
@@ -123,7 +134,7 @@ def main() -> None:
 
     domains = args.domain.split(",") if args.domain else None
     goal_ids = args.goals.split(",") if args.goals else None
-    output_dir = Path(args.output)
+    output_dir = Path(args.output) if args.output else _default_output(args.provider)
 
     scenarios = discover_goals(domains, goal_ids)
     if not scenarios:
