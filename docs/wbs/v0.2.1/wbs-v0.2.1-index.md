@@ -78,6 +78,28 @@ Execution order: #222 quality gate → #223 field test/regression/docker → #22
 
 **Pre-release aggregate gate — all must be green before #227 tags:** code review clean on the full diff · all testcases green · lint clean (ruff + mypy strict) · security scans clean · special field tests green with intended-deltas-only regression diff · docker tests green · coverage >91% · docs complete and consistent.
 
+### 5.1 M12 execution checklist — strict order (2026-08-23)
+
+Scope note: `0.2.1-m11` was fast-forward-merged into `main` at `4029877` and CI-aligned at `42b5ada`; the M11 branch tracks `main`. **The release diff under review is `f2a5025..42b5ada` on `main`** (v0.2.0 merge → current tip).
+
+- [ ] **Step 1 — #222 Final quality gate.**
+  Success criteria: (a) code review of the full release diff `f2a5025..42b5ada` completed — every finding resolved in-repo or filed as `[CodeReview]` issue triaged into this milestone; (b) full pytest suite green incl. P1 + M11 modules, zero unexplained skips; (c) `ruff check` + `ruff format --check` + mypy strict (`src/ tests/`) 0 errors on the release tip; (d) coverage **>91%** re-measured at the tip (M11 accepted the documented 0.38% gap at 91.62% — #222 must not regress below that without a filed issue); (e) docstring spot-check on every module added by M11; (f) evidence (commands + outputs) recorded in the issue.
+  Carries two items deferred from M11 #228: the combined-diff code review and security spot-checks on new output surfaces.
+- [ ] **Step 2 — #223 Field test + regression sweep.**
+  Success criteria: (a) v0.2.0 matrix re-run on the release tip; per-goal verdict diff vs published v0.2.0 results committed under `docs/field-test/v0.2.1/`; (b) 100% of deltas attributable to P1 fixes or M11 features (#215–#217, #219), zero unexplained; (c) hermetic deterministic-gate regression + injection harness green in CI ($0 LLM); §7.1 held: blocker detection ≥90%, median revisions ≤2, no uncaught `PlanningError`; (d) docker integration suite green against the rebuilt 0.2.1 image.
+  Env note: local docker suite needs `docker compose up -d` healthy or is covered by the remote `docker-integration.yml` workflow (currently green on main).
+- [ ] **Step 3 — #224 Security clean.**
+  Success criteria: (a) OpenSSF badge passing or regression filed with mitigation; (b) dependency audit clean vs v0.2.0 pins (no new vulnerable versions introduced); (c) redaction verified end-to-end on new M11 surfaces — acceptance-contract audit events (#215), live-critic runner logs/reports (#218), drift/label-migration reports (#231); (d) secret scan of the release diff clean.
+  Read-only audit steps (badge, pip-audit, scan) may run in parallel with Step 2; redaction verification lands after Step 2 so field-test artifacts exist to inspect.
+- [ ] **Step 4 — #225 Docs sweep.**
+  Success criteria: (a) `release-notes-v0.2.1.md` written mirroring v0.2.0 structure — covers every P1 fix + M11 deliverable; breaking changes: none; upgrade path stated; (b) CHANGELOG `## v0.2.1` entry added (Bug Fixes / Hardening / Field Test / Known Issues→v0.3.0); (c) README updated (feature table rows with issue refs, status lines at 0.2.1, Known Gaps → failure-mode register pointer); (d) API reference lists new gates (`rollback_credible`, `verification_ordering`), reason codes, modules (`eval/live_boundary`, `eval/label_migration` extensions); (e) quickstart verified end-to-end from fresh clone; (f) no stale-doc contradictions (grep sweep for "0.2.0-only" claims).
+- [ ] **Step 5 — #226 Packaging & PyPI.**
+  Success criteria: (a) version bump applied at all five locations (`pyproject.toml`, `__init__.py`, Dockerfile wheel pin, README badge+status, quickstart); (b) `python -m build` succeeds under the pinned hatchling; (c) fresh-venv install green for base + each extra (`server`, `cel`, `rego`, `notifier`); (d) Docker image builds against the 0.2.1 wheel pin and passes `tests/docker/` smoke; (e) PyPI shows 0.2.1 with release-notes link.
+- [ ] **Step 6 — #227 Release coordination.**
+  Success criteria: (a) patch-invariant verified — zero plan/store schema changes in the release diff (`store/versions.py` untouched); any migration found → lossless-migration proof per F-27 or re-scope; (b) evidence bundle attached to the release (coverage report, lint/type outputs, regression diff, security audits); (c) tag `v0.2.1` + GitHub release published from release notes; (d) both 0.2.1 milestones closed, open issues == documented caveats only; (e) announcements live (PyPI, GitHub, dev.to crosslinks).
+
+Rule carried from M11: benchmark/measurement steps may close on negative results if honestly documented; nothing else closes on partial evidence.
+
 ## 6. Version Bump Checklist (applied by [#226](https://github.com/deghosal-2026/planner-critic-engine/issues/226))
 
 | Location | Change |
