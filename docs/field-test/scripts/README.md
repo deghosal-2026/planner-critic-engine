@@ -1,50 +1,29 @@
 # Field Test Scripts
 
-Shared batch runners for field-test execution across versions.
+> **This directory has been consolidated. See [../README.md](../README.md) for the full execution guide.**
 
-## Structure
+## What's here
 
-```
-docs/field-test/scripts/
-├── README.md
-├── run_remaining.py     # Runs remaining field-test scenarios (v0.1.0 / batch runners)
-├── batch-01.py          # Batch 1:  5 scenarios
-├── batch-02.py          # Batch 2:  5 scenarios
-├── ...                  # (batch-03 through batch-13)
-└── v0.2.0/             # v0.2.0-specific benchmark scripts
-    ├── bench_auto_repair.py    # Auto-repair benchmark (#177)
-    ├── bench_rollback.py       # Rollback credibility field test (#182)
-    └── bench_stasis.py         # Family-histogram stasis benchmark (#183)
-```
+| File | Description |
+|------|-------------|
+| `run.py` | **Single runner** for all 170 goals across 40 domains (replaces batch-01.py through batch-39.py and run_remaining.py) |
+| `v0.2.0/pre_run_validation.py` | P0: assertion YAML validation |
+| `v0.2.0/bench_auto_repair.py` | P4: auto-repair benchmark (#177) |
+| `v0.2.0/bench_rollback.py` | P4: rollback credibility field test (#182) |
+| `v0.2.0/bench_stasis.py` | P4: family-histogram stasis benchmark (#183) |
 
-## run_remaining.py
-
-Runs field-test scenarios one at a time. Output goes to version-specific report directories.
-
-### Prerequisites
-
-- Active OpenRouter API key in `plancritic-fieldtest.toml` (project root)
-- Python environment with `planner_critic` installed (`pip install -e .`)
-
-### Usage
+## Quick start
 
 ```bash
-# Run all scenarios
-python3 docs/field-test/scripts/run_remaining.py
+# All 170 goals (cloud LLM)
+export OPENROUTER_API_KEY="sk-or-..."
+python3 run.py --all
 
-# Run first 5 only
-python3 docs/field-test/scripts/run_remaining.py --max 5
+# Specific domains (local MLX)
+python3 run.py --domain idp,mao,sre --provider mlx
 
-# Skip goals that already have a trace.json (resume after interruption)
-python3 docs/field-test/scripts/run_remaining.py --skip-existing
+# Preview
+python3 run.py --all --dry-run
 ```
 
-### Output
-
-- Per-goal traces: `docs/field-test/v0.1.0/reports/...` or `docs/field-test/v0.2.0/reports/...`
-
-### Config
-
-- Model: `openai/gpt-4o-mini` (OpenRouter), both planner and critic
-- Loop: `deterministic-first`, `revision_cap=4`
-- Config file: `plancritic-fieldtest.toml` (project root)
+See [field-test README](../README.md) for full documentation.
