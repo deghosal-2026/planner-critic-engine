@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Run field-test scenarios for v0.2.0.
+"""Run LLM-based field tests for v0.2.0.
 
-Single entry point for all field test phases. Each --<phase> flag
-selects a test category; --all runs every test in that category.
+Only LLM-required tests. Deterministic tests are in pytest:
+    pytest tests/field_test_v0_2_0/ -v --no-cov
 
 Usage:
     # Goal sweep (170 goals through live LLM)
@@ -10,23 +10,11 @@ Usage:
     run-field.py --goals-sweep --domain idp,mao,sre
     run-field.py --goals-sweep --goals db-01,k8s-01 --skip-existing
 
-    # P0: Assertion validation (no LLM)
-    run-field.py --validate --all
-
-    # P2: Deterministic subsystem tests (50 tests, no LLM)
-    run-field.py --subsystem --all
-
-    # P3: LLM subsystem tests (requires live LLM)
-    run-field.py --subsystem --all --run-llm
-
     # Security oracle (SWE-bench critic evaluation)
     run-field.py --security --all
     run-field.py --security --adversarial
 
-    # Benchmarks (auto-repair, rollback, stasis — no LLM)
-    run-field.py --benchmarks --all
-
-    # Run EVERYTHING
+    # Both
     run-field.py --all
 """
 
@@ -49,8 +37,6 @@ MLX_API_KEY = os.environ.get("MLX_API_KEY", "omlx-test")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 GOALS_ROOT = Path(__file__).resolve().parent.parent / "goals"
-SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "v0.2.0" / "scripts"
-TESTS_DIR = REPO_ROOT / "tests" / "field_test_v0_2_0"
 RESULTS_ROOT = REPO_ROOT / "results" / "0.2.0"
 
 PROVIDERS = {
@@ -157,80 +143,10 @@ def run_goals_sweep(args) -> None:
     print(f"\n[goals-sweep] Done: {len(results)} results ({passed} passed)")
 
 
-# ── Skip-existing helpers ───────────────────────────────────────────────────
-
-
-def _has_results(path: Path) -> bool:
-    """Check if output already exists for skip-existing logic."""
-    if path.is_file():
-        return path.exists() and path.stat().st_size > 0
-    if path.is_dir():
-        return any(path.rglob("trace.json")) or (path / "results.json").exists()
-    return False
-
-
-def _should_skip(args, marker: str) -> bool:
-    """Check if a phase should be skipped (--skip-existing)."""
-    if not args.skip_existing:
-        return False
-    marker_path = RESULTS_ROOT / f".{marker}_done"
-    return marker_path.exists()
-
-
-def _mark_done(marker: str) -> None:
-    """Mark a phase as done (for --skip-existing)."""
-    marker_path = RESULTS_ROOT / f".{marker}_done"
-    marker_path.parent.mkdir(parents=True, exist_ok=True)
-    marker_path.write_text("done")
-
-
-# ── P0: Validation ─────────────────────────────────────────────────────────
-
-
-def run_validate(args) -> None:
-    if _should_skip(args, "validate"):
-        print("[validate] ✅ SKIP (already done)")
-        return
-    print("[validate] Checking all 170 assertion YAMLs...")
-    result = subprocess.run(
-        [sys.executable, str(SCRIPTS_DIR / "pre_run_validation.py")],
-        capture_output=False,
-    )
-    if result.returncode != 0:
-        print("[validate] ❌ FAILED")
-    else:
-        print("[validate] ✅ PASSED")
-        _mark_done("validate")
-
-
-# ── P2/P3: Subsystem tests ──────────────────────────────────────────────────
-
-
-def run_subsystem(args) -> None:
-    marker = "subsystem_llm" if args.run_llm else "subsystem"
-    if _should_skip(args, marker):
-        print(f"[subsystem] ✅ SKIP (already done, {marker})")
-        return
-    cmd = [sys.executable, "-m", "pytest", str(TESTS_DIR), "-v", "--no-cov"]
-    if args.run_llm:
-        print("[subsystem] Running with --run-llm (requires live LLM)")
-    else:
-        print("[subsystem] Running deterministic tests only (no LLM)")
-    result = subprocess.run(cmd)
-    if result.returncode != 0:
-        print("[subsystem] ❌ FAILED")
-    else:
-        print("[subsystem] ✅ PASSED")
-        _mark_done(marker)
-
-
 # ── Security oracle ─────────────────────────────────────────────────────────
 
 
 def run_security(args) -> None:
-    if _should_skip(args, "security"):
-        print("[security] ✅ SKIP (already done)")
-        return
     print("[security] Running SWE-bench security oracle evaluation...")
     if args.adversarial:
         print("[security] Running injection harness (adversarial)...")
@@ -239,9 +155,9 @@ def run_security(args) -> None:
         cmd = [sys.executable, "-m", "planner_critic.cli.eval", "swebench-security"]
     result = subprocess.run(cmd)
     if result.returncode != 0:
-        print("[security] ❌ FAILED or incomplete")
+        print("[security] FAILED or incomplete")
     else:
-        print("[security] ✅ DONE")
+        print("[security] DONE")
 
     if args.all:
         print("[security] Running injection harness...")
@@ -250,43 +166,7 @@ def run_security(args) -> None:
         subprocess.run([sys.executable, "-m", "planner_critic.cli.eval", "swebench-security", "--regression"])
         print("[security] Proposing standing rules...")
         subprocess.run([sys.executable, "-m", "planner_critic.cli.lessons", "propose"])
-        print("[security] ✅ ALL DONE")
-        _mark_done("security")
-
-
-# ── Benchmarks ───────────────────────────────────────────────────────────────
-
-
-def run_benchmarks(args) -> None:
-    if _should_skip(args, "benchmarks"):
-        print("[benchmarks] ✅ SKIP (already done)")
-        return
-    benchmarks = [
-        ("auto-repair", SCRIPTS_DIR / "bench_auto_repair.py"),
-        ("rollback", SCRIPTS_DIR / "bench_rollback.py"),
-        ("stasis", SCRIPTS_DIR / "bench_stasis.py"),
-    ]
-    all_ok = True
-    for name, script in benchmarks:
-        if not script.exists():
-            print(f"[benchmarks] ❌ {name}: script not found ({script})")
-            all_ok = False
-            continue
-        out_file = RESULTS_ROOT / f"bench_{name}.json"
-        if args.skip_existing and out_file.exists() and out_file.stat().st_size > 0:
-            print(f"[benchmarks] ✅ {name}: SKIP (results exist)")
-            continue
-        print(f"[benchmarks] Running {name}...")
-        out_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(out_file, "w") as f:
-            result = subprocess.run([sys.executable, str(script)], stdout=f, stderr=subprocess.PIPE)
-        if result.returncode != 0:
-            print(f"[benchmarks] ❌ {name}: {result.stderr.decode()[:200]}")
-            all_ok = False
-        else:
-            print(f"[benchmarks] ✅ {name}: results → {out_file}")
-    if all_ok:
-        _mark_done("benchmarks")
+        print("[security] ALL DONE")
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
@@ -294,34 +174,27 @@ def run_benchmarks(args) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Run v0.2.0 field tests — single entry point for all phases",
+        description="Run LLM-based field tests for v0.2.0",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
 Examples:
-  run-field.py --goals-sweep --all                          # All 170 goals (cloud)
-  run-field.py --goals-sweep --all --provider omlx          # All 170 goals (local)
-  run-field.py --goals-sweep --domain idp,mao,sre           # Specific domains
-  run-field.py --goals-sweep --goals db-01,k8s-01           # Specific goals
-  run-field.py --goals-sweep --all --skip-existing          # Resume
-  run-field.py --validate --all                             # P0 assertion validation
-  run-field.py --subsystem --all                            # P2 deterministic tests
-  run-field.py --subsystem --all --run-llm                  # P3 LLM tests
-  run-field.py --security --all                             # Security oracle (all)
-  run-field.py --security --adversarial                     # Injection harness only
-  run-field.py --benchmarks --all                           # All 3 benchmarks
-  run-field.py --all                                        # EVERYTHING
+  run-field.py --goals-sweep --all                    # All 170 goals (cloud)
+  run-field.py --goals-sweep --all --provider omlx    # All 170 goals (local)
+  run-field.py --goals-sweep --domain idp,mao,sre     # Specific domains
+  run-field.py --goals-sweep --goals db-01,k8s-01     # Specific goals
+  run-field.py --goals-sweep --all --skip-existing    # Resume
+  run-field.py --security --all                       # Security oracle (all)
+  run-field.py --security --adversarial               # Injection harness only
+  run-field.py --all                                  # Both goals + security
+
+  Deterministic tests (no LLM):
+  pytest tests/field_test_v0_2_0/ -v --no-cov
 """,
     )
 
-    # Phase selectors
     parser.add_argument("--goals-sweep", action="store_true", help="Run 170 goals through LLM")
-    parser.add_argument("--validate", action="store_true", help="P0: assertion YAML validation")
-    parser.add_argument("--subsystem", action="store_true", help="P2/P3: 50 WBS coverage tests")
-    parser.add_argument("--security", action="store_true", help="§4.3: SWE-bench security oracle")
-    parser.add_argument("--benchmarks", action="store_true", help="§4.6/4.7: auto-repair, rollback, stasis")
-
-    # Shared options
-    parser.add_argument("--all", action="store_true", help="Run all tests in selected phase(s)")
+    parser.add_argument("--security", action="store_true", help="SWE-bench security oracle (requires LLM)")
+    parser.add_argument("--all", action="store_true", help="Run all LLM phases")
     parser.add_argument("--domain", type=str, help="Comma-separated domains (goals-sweep only)")
     parser.add_argument("--goals", type=str, help="Comma-separated goal IDs (goals-sweep only)")
     parser.add_argument("--provider", default="openai", choices=list(PROVIDERS),
@@ -330,39 +203,23 @@ Examples:
     parser.add_argument("--revision-cap", type=int, default=4, help="Max revisions per goal")
     parser.add_argument("--skip-existing", action="store_true", help="Skip goals with existing traces")
     parser.add_argument("--dry-run", action="store_true", help="List without executing")
-    parser.add_argument("--run-llm", action="store_true", help="Run LLM-required subsystem tests")
     parser.add_argument("--adversarial", action="store_true", help="Run injection harness (security only)")
 
     args = parser.parse_args()
 
-    # If no phase selected, show help
-    if not any([args.goals_sweep, args.validate, args.subsystem, args.security, args.benchmarks, args.all]):
+    if not any([args.goals_sweep, args.security, args.all]):
         parser.print_help()
         sys.exit(1)
 
-    # If --all with no phase, run everything
-    if args.all and not any([args.goals_sweep, args.validate, args.subsystem, args.security, args.benchmarks]):
-        print("=== Running ALL phases ===\n")
-        run_validate(args)
-        print()
-        run_subsystem(args)
-        print()
-        run_benchmarks(args)
-        print()
+    if args.all and not any([args.goals_sweep, args.security]):
+        print("=== Running ALL LLM phases ===\n")
         run_security(args)
         print()
         run_goals_sweep(args)
         return
 
-    # Run selected phase(s)
-    if args.validate:
-        run_validate(args)
-    if args.subsystem:
-        run_subsystem(args)
     if args.security:
         run_security(args)
-    if args.benchmarks:
-        run_benchmarks(args)
     if args.goals_sweep:
         if not args.all and not args.domain and not args.goals:
             print("--goals-sweep requires --all, --domain, or --goals")
