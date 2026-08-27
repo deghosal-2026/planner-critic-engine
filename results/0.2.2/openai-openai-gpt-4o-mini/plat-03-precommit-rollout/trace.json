@@ -1,0 +1,204 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-03-precommit-rollout",
+  "duration_seconds": 18.17,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-plat-03-precommit-rollout-r2",
+    "goal_id": "plat-03-precommit-rollout",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plat-03-precommit-rollout-v1",
+    "created_at": "2026-08-27T04:11:59.207745Z",
+    "tasks": [
+      {
+        "id": "define-config",
+        "description": "Define shared .pre-commit-config.yaml with hooks for linting, secrets scanning, and formatting",
+        "action": "create",
+        "target": ".pre-commit-config.yaml",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "access to central repo",
+            "fact": "repo_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "install-plugins",
+        "description": "Install pre-commit plugins in the CI",
+        "action": "install",
+        "target": "pre-commit-plugins",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "pre-commit tool is installed",
+            "fact": "pre_commit_installed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "set-branch-protection",
+        "description": "Set branch protection rules in CI to enforce hook passing",
+        "action": "configure",
+        "target": "branch-protection",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "branch protection status",
+          "how": "check CI settings",
+          "expected": "rules are enforced"
+        },
+        "rollback": {
+          "trigger": "failed enforcement",
+          "action": "remove protection rules",
+          "safety_guard": "verify branch status",
+          "restores_state": [
+            "no protection rules"
+          ],
+          "restoration_evidence": "confirmed no rules in CI settings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "generate-report",
+        "description": "Generate adoption report showing compliance per team",
+        "action": "generate",
+        "target": "adoption-report",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CI configuration is complete",
+            "fact": "ci_configured",
+            "established_by": "set-branch-protection",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "adoption report availability",
+          "how": "check report generation",
+          "expected": "report is generated successfully"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define-config",
+        "to_task": "install-plugins",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "install-plugins",
+        "to_task": "set-branch-protection",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set-branch-protection",
+        "to_task": "generate-report",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:install-plugins",
+      "task_id": "install-plugins",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'install-plugins' is sequenced before fulfilling the precondition that 'pre-commit tool is installed'.",
+      "suggested_fix": "Ensure 'pre-commit tool is installed' is completed before 'install-plugins'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:set-branch-protection",
+      "task_id": "set-branch-protection",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'set-branch-protection' has a rollback action that may not fully restore the previous state if enforcement fails.",
+      "suggested_fix": "Implement enhanced rollback procedures to account for all states prior to rule enforcement.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:generate-report",
+      "task_id": "generate-report",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'generate-report' depends on 'set-branch-protection' without a verified outcome to confirm CI configuration is complete.",
+      "suggested_fix": "Add a verification step to ensure 'set-branch-protection' has successfully configured CI before proceeding to 'generate-report'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

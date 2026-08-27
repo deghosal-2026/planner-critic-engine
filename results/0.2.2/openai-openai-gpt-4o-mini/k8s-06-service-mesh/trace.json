@@ -1,0 +1,423 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-06-service-mesh",
+  "duration_seconds": 96.25,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-k8s-06-service-mesh-r3",
+    "goal_id": "k8s-06-service-mesh",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-k8s-06-service-mesh-r2",
+    "created_at": "2026-08-27T04:24:11.051899Z",
+    "tasks": [
+      {
+        "id": "label-namespace",
+        "description": "Label the namespace for automatic sidecar injection",
+        "action": "kubectl label namespace",
+        "target": "namespace",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "kubectl has access to the production namespace",
+            "fact": "kubectl_access_production",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "namespace label presence",
+          "how": "kubectl get namespace -o jsonpath='{.metadata.labels.auto-injection}'",
+          "expected": "enabled"
+        },
+        "rollback": {
+          "trigger": "label fails",
+          "action": "remove namespace label",
+          "safety_guard": "verify namespace label is removed",
+          "restores_state": [
+            "namespace without label"
+          ],
+          "restoration_evidence": "check namespace label absence"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "route-traffic-1pct",
+        "description": "Route 1% of traffic through the mesh using VirtualService",
+        "action": "istioctl apply virtualservice",
+        "target": "virtualservice",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "namespace label is successfully added",
+            "fact": "namespace_label_success",
+            "established_by": "label-namespace",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic distribution",
+          "how": "monitoring via Kiali",
+          "expected": "1% traffic through mesh"
+        },
+        "rollback": {
+          "trigger": "traffic routing fails",
+          "action": "revert virtualservice to previous state",
+          "safety_guard": "verify virtualservice is reverted",
+          "restores_state": [
+            "previous virtualservice state"
+          ],
+          "restoration_evidence": "verify previous virtualservice configuration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "observe-1pct",
+        "description": "Observe system metrics for latency and error rate at 1% traffic",
+        "action": "monitoring",
+        "target": "metrics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "1% traffic is routed",
+            "fact": "traffic_routed_1pct",
+            "established_by": "route-traffic-1pct",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "latency and error rate metrics",
+          "how": "monitoring system logs and metrics",
+          "expected": "metrics collected for analysis"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "route-traffic-50pct",
+        "description": "Ramp up to 50% traffic through the mesh",
+        "action": "istioctl apply virtualservice",
+        "target": "virtualservice",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "metrics for 1% traffic are successfully collected",
+            "fact": "metrics_collected_1pct",
+            "established_by": "observe-1pct",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic distribution",
+          "how": "monitoring via Kiali",
+          "expected": "50% traffic through mesh"
+        },
+        "rollback": {
+          "trigger": "50% traffic routing fails",
+          "action": "revert virtualservice to 1%",
+          "safety_guard": "verify virtualservice is reverted to 1%",
+          "restores_state": [
+            "1% traffic routing state"
+          ],
+          "restoration_evidence": "verify that traffic routing reverted to 1%"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "observe-50pct",
+        "description": "Observe metrics for latency and error rate at 50% traffic",
+        "action": "monitoring",
+        "target": "metrics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "50% traffic is routed",
+            "fact": "traffic_routed_50pct",
+            "established_by": "route-traffic-50pct",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "latency and error rate metrics",
+          "how": "monitoring system logs and metrics",
+          "expected": "metrics collected for analysis"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "rollback-if-issues",
+        "description": "Rollback if latency or error rate exceeds thresholds",
+        "action": "check metrics",
+        "target": "metrics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "metrics for 50% traffic are confirmed valid",
+            "fact": "metrics_valid_50pct",
+            "established_by": "observe-50pct",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "latency and error rate",
+          "how": "comparison against baseline metrics",
+          "expected": "latency < baseline + 200ms and error rate < baseline"
+        },
+        "rollback": {
+          "trigger": "latency increases by 200ms or error rate exceeds baseline",
+          "action": "remove namespace label and patch Deployments",
+          "safety_guard": "verify deployments patched",
+          "restores_state": [
+            "deployments in previous state"
+          ],
+          "restoration_evidence": "check deployment configuration"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "route-100pct",
+        "description": "Route 100% of traffic through the mesh",
+        "action": "istioctl apply virtualservice",
+        "target": "virtualservice",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "no issues observed at 50% traffic",
+            "fact": "no_issues_at_50pct",
+            "established_by": "rollback-if-issues",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic distribution",
+          "how": "monitoring via Kiali",
+          "expected": "100% traffic through mesh"
+        },
+        "rollback": {
+          "trigger": "100% traffic routing fails",
+          "action": "revert virtualservice to 50%",
+          "safety_guard": "verify virtualservice is reverted to 50%",
+          "restores_state": [
+            "50% traffic routing state"
+          ],
+          "restoration_evidence": "verify that traffic routing reverted to 50%"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "decommission-legacy",
+        "description": "Decommission legacy sidecar-free Deployments",
+        "action": "kubectl delete deployments",
+        "target": "legacy-deployments",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "100% traffic is routed through the mesh",
+            "fact": "traffic_routed_100pct",
+            "established_by": "route-100pct",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "legacy deployments removed",
+          "how": "confirm deletion through kubectl",
+          "expected": "no legacy deployments present"
+        },
+        "rollback": {
+          "trigger": "decommission fails",
+          "action": "restore legacy deployments",
+          "safety_guard": "verify legacy deployments are restored",
+          "restores_state": [
+            "legacy deployments present"
+          ],
+          "restoration_evidence": "check deployment configuration"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "label-namespace",
+        "to_task": "route-traffic-1pct",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "route-traffic-1pct",
+        "to_task": "observe-1pct",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "observe-1pct",
+        "to_task": "route-traffic-50pct",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "route-traffic-50pct",
+        "to_task": "observe-50pct",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "observe-50pct",
+        "to_task": "rollback-if-issues",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rollback-if-issues",
+        "to_task": "route-100pct",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "route-100pct",
+        "to_task": "decommission-legacy",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:route-traffic-1pct",
+      "task_id": "route-traffic-1pct",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'route-traffic-1pct' depends on 'label-namespace', but its rollback does not verify the dependency is met.",
+      "suggested_fix": "Ensure that the rollback for 'route-traffic-1pct' verifies that the namespace label was added before proceeding.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:rollback-if-issues",
+      "task_id": "rollback-if-issues",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'rollback-if-issues' relies on metrics being valid from 'observe-50pct', but there's no guarantee of valid state after potential issues.",
+      "suggested_fix": "Add checks to ensure that the metrics assessed for rollback are indeed reliable and accurate.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:decommission-legacy",
+      "task_id": "decommission-legacy",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'decommission-legacy' depends on 'route-100pct' but does not verify if traffic 100% routing was successful before proceeding.",
+      "suggested_fix": "Add verification step to confirm that traffic is actually routed 100% through the mesh before decommissioning legacy deployments.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:weak_rollback:decommission-legacy",
+      "task_id": "decommission-legacy",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'decommission-legacy' has weak rollback that only aims to restore previous deployments without validating state post-decommission.",
+      "suggested_fix": "Enhance rollback plan to ensure that legacy deployments' roles and functionality are fully restored after decommission issues.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:risk:route-traffic-50pct",
+      "task_id": "route-traffic-50pct",
+      "version": 3,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Transitioning to 50% traffic routing carries high-risk as it does not adequately assess potential system performance impacts.",
+      "suggested_fix": "Implement further monitoring of system performance during this transition to mitigate unforeseen issues.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-06-service-mesh:3:3",
+    "plan_id": "plan-k8s-06-service-mesh-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:route-traffic-1pct",
+    "question": "Plan for goal 'k8s-06-service-mesh' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,265 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-05-ci-runner-scaling",
+  "duration_seconds": 28.58,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-ci-05-ci-runner-scaling-r2",
+    "goal_id": "ci-05-ci-runner-scaling",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "ci-05-ci-runner-scaling-plan",
+    "created_at": "2026-08-27T03:14:02.005316Z",
+    "tasks": [
+      {
+        "id": "setup_ec2",
+        "description": "Setup EC2 instance for auto-scaling group",
+        "action": "create",
+        "target": "ec2-instance",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AWS credentials are configured",
+            "fact": "aws_credentials_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_asg",
+        "description": "Configure Auto-Scaling Group on EC2",
+        "action": "configure",
+        "target": "asg",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "ASG status",
+          "how": "describe auto-scaling groups",
+          "expected": "active"
+        },
+        "rollback": {
+          "trigger": "ASG configuration fails",
+          "action": "delete ASG",
+          "safety_guard": "verify no active instances",
+          "restores_state": [
+            "no ASG"
+          ],
+          "restoration_evidence": "check the absence of ASG in the list"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "runner_registration",
+        "description": "Configure GitHub Actions runner registration",
+        "action": "register",
+        "target": "github-runner",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "runner registration status",
+          "how": "check GitHub Actions settings",
+          "expected": "runner online"
+        },
+        "rollback": {
+          "trigger": "runner registration fails",
+          "action": "clean up runner resources",
+          "safety_guard": "verify successful run",
+          "restores_state": [
+            "no runner registered"
+          ],
+          "restoration_evidence": "check GitHub Actions settings for runner absence"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "scale_up",
+        "description": "Handle scale-up on demand",
+        "action": "scale",
+        "target": "asg-scale-up",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "number of EC2 instances",
+          "how": "describe auto-scaling groups",
+          "expected": "increased by 1"
+        },
+        "rollback": {
+          "trigger": "scale-up fails",
+          "action": "restore previous instance count",
+          "safety_guard": "check job backlog",
+          "restores_state": [
+            "previous instance count restored"
+          ],
+          "restoration_evidence": "check the number of instances matches previous state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "scale_down",
+        "description": "Handle scale-down on idle",
+        "action": "scale",
+        "target": "asg-scale-down",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "No active jobs in queue",
+            "fact": "job_queue_empty",
+            "established_by": "runner_registration",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "check instance scaling",
+          "how": "describe auto-scaling groups",
+          "expected": "number of instances decreased"
+        },
+        "rollback": {
+          "trigger": "scale-down fails",
+          "action": "restore previous instance count",
+          "safety_guard": "check job backlog",
+          "restores_state": [
+            "previous instance count restored"
+          ],
+          "restoration_evidence": "check the number of instances matches previous state"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup_ec2",
+        "to_task": "configure_asg",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_asg",
+        "to_task": "runner_registration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "runner_registration",
+        "to_task": "scale_up",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "runner_registration",
+        "to_task": "scale_down",
+        "kind": "soft",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:configure_asg",
+      "task_id": "configure_asg",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'configure_asg' is ordered before its hard prerequisite 'setup_ec2'.",
+      "suggested_fix": "Reorder 'configure_asg' to follow 'setup_ec2'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:scale_down",
+      "task_id": "scale_down",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'scale_down' depends on 'job_queue_empty' which is established by 'runner_registration', but 'runner_registration' is not completed before this task. This creates a dependency gap.",
+      "suggested_fix": "Ensure 'runner_registration' is completed before 'scale_down' to satisfy the dependency.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:scale_up",
+      "task_id": "scale_up",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Task 'scale_up' should validate that the scale operation has completed successfully before proceeding to backup or further steps.",
+      "suggested_fix": "Add a verification step to confirm successful scaling before proceeding.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:scale_down",
+      "task_id": "scale_down",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Task 'scale_down' should provide a check to ensure there are no pending jobs before scaling down.",
+      "suggested_fix": "Introduce a preliminary verification step that checks for active jobs in the queue before executing a scale-down.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

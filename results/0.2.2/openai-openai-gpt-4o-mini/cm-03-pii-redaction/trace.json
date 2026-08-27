@@ -1,0 +1,277 @@
+{
+  "dimension": "core-api",
+  "goal_id": "cm-03-pii-redaction",
+  "duration_seconds": 20.0,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-cm-03-pii-redaction-r2",
+    "goal_id": "cm-03-pii-redaction",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "cm-03-pii-redaction-plan",
+    "created_at": "2026-08-27T03:04:33.658182Z",
+    "tasks": [
+      {
+        "id": "identify-pii",
+        "description": "Identify all PII fields in application logs",
+        "action": "identify",
+        "target": "logs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "identified PII fields",
+          "how": "run validation tests",
+          "expected": "complete list of PII fields"
+        },
+        "rollback": {
+          "trigger": "PII identification fails",
+          "action": "revert PII list",
+          "safety_guard": "review previous PII definitions",
+          "restores_state": [
+            "previous PII definitions"
+          ],
+          "restoration_evidence": "documented definitions of PII"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy-sidecar",
+        "description": "Deploy a log redaction sidecar using FluentBit",
+        "action": "deploy",
+        "target": "sidecar",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "sidecar deployment status",
+          "how": "kubectl get pods",
+          "expected": "sidecar pod running"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "remove sidecar",
+          "safety_guard": "check log functionality after removal",
+          "restores_state": [
+            "application log functionality"
+          ],
+          "restoration_evidence": "logs show normal operations after sidecar removal"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure-elasticsearch",
+        "description": "Configure Elasticsearch ingest pipelines for redaction",
+        "action": "configure",
+        "target": "elasticsearch",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "sidecar is deployed successfully",
+            "fact": "sidecar_running",
+            "established_by": "deploy-sidecar",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "configured pipelines",
+          "how": "check Elasticsearch settings",
+          "expected": "correct pipeline configuration"
+        },
+        "rollback": {
+          "trigger": "pipeline configuration fails",
+          "action": "revert pipeline settings",
+          "safety_guard": "monitor Elasticsearch logs",
+          "restores_state": [
+            "previous pipeline settings"
+          ],
+          "restoration_evidence": "logs show successful ingestion with previous settings"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-redaction",
+        "description": "Verify redaction is working on sampled logs",
+        "action": "verify",
+        "target": "logs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "sampled logs",
+          "how": "analyze logs for PII",
+          "expected": "no PII in sampled logs"
+        },
+        "rollback": {
+          "trigger": "redaction fails",
+          "action": "disable redaction",
+          "safety_guard": "restore pre-redaction state",
+          "restores_state": [
+            "logs with PII intact"
+          ],
+          "restoration_evidence": "logs show PII presence after disabling redaction"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "tune-performance",
+        "description": "Tune false-positive rate of redaction",
+        "action": "tune",
+        "target": "redaction",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "redaction verified",
+            "fact": "redaction_verified",
+            "established_by": "verify-redaction",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "false-positive rate",
+          "how": "analyze redacted logs",
+          "expected": "acceptable false-positive rate"
+        },
+        "rollback": {
+          "trigger": "tuning fails",
+          "action": "reset redaction settings",
+          "safety_guard": "analyze performance metrics",
+          "restores_state": [
+            "previous redaction settings"
+          ],
+          "restoration_evidence": "metrics show performance before tuning"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "identify-pii",
+        "to_task": "deploy-sidecar",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-sidecar",
+        "to_task": "configure-elasticsearch",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-elasticsearch",
+        "to_task": "verify-redaction",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-redaction",
+        "to_task": "tune-performance",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:deploy-sidecar",
+      "task_id": "deploy-sidecar",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Deployment of the sidecar lacks verification on the completion of PII identification.",
+      "suggested_fix": "Add a precondition to ensure 'identify-pii' task is completed successfully before proceeding.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:configure-elasticsearch",
+      "task_id": "configure-elasticsearch",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Configuration of Elasticsearch ingest pipelines depends on the sidecar being deployed, but this dependency is not verified.",
+      "suggested_fix": "Add a verification step to confirm successful deployment of the sidecar before configuring Elasticsearch.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:verify-redaction",
+      "task_id": "verify-redaction",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Verification of redaction relies on the successful configuration of Elasticsearch, but there is no verification step for this dependency.",
+      "suggested_fix": "Include a check to verify that Elasticsearch ingest pipelines are configured correctly before proceeding to verify redaction.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:tune-performance",
+      "task_id": "tune-performance",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Tuning performance hinges on the verification of redaction, but there is no confirmation that redaction has been verified successfully before this step.",
+      "suggested_fix": "Ensure that 'verify-redaction' completion is verified before allowing the tuning of performance.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,324 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-09-oncall-escalation",
+  "duration_seconds": 36.02,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-obs-09-oncall-escalation-r2",
+    "goal_id": "obs-09-oncall-escalation",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "obs-09-oncall-escalation-plan",
+    "created_at": "2026-08-27T04:21:06.925555Z",
+    "tasks": [
+      {
+        "id": "define_rotation",
+        "description": "Define on-call rotation (primary + secondary)",
+        "action": "define_on_call_rotation",
+        "target": "on_call_schedule",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "SRE team availability confirmed",
+            "fact": "sre_team_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_escalation",
+        "description": "Configure escalation rules",
+        "action": "configure_escalation_rules",
+        "target": "pagerduty_escalation",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "on-call rotation defined",
+            "fact": "rotation_defined",
+            "established_by": "define_rotation",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "escalation configuration",
+          "how": "check PagerDuty API settings",
+          "expected": "escalation rules match defined policy"
+        },
+        "rollback": {
+          "trigger": "escalation misconfigured",
+          "action": "revert to previous escalation settings",
+          "safety_guard": "verify old escalation settings",
+          "restores_state": [
+            "previous escalation settings"
+          ],
+          "restoration_evidence": "confirmation of restored settings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "routing_rules",
+        "description": "Set up service-to-team routing rules",
+        "action": "configure_routing_rules",
+        "target": "pagerduty_routing",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "escalation rules configured",
+            "fact": "escalation_configured",
+            "established_by": "configure_escalation",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "routing structure",
+          "how": "test routing with simulated incidents",
+          "expected": "incidents routed to correct teams"
+        },
+        "rollback": {
+          "trigger": "routing misconfigured",
+          "action": "restore previous routing rules",
+          "safety_guard": "verify old routing rules",
+          "restores_state": [
+            "previous routing rules"
+          ],
+          "restoration_evidence": "confirmation of restored routing rules"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "policies_setup",
+        "description": "Configure business-hours vs after-hours policies",
+        "action": "configure_time_policies",
+        "target": "time_policies",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "routing rules established",
+            "fact": "routing_rules_established",
+            "established_by": "routing_rules",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "time policies correctness",
+          "how": "review policy settings",
+          "expected": "policies match business requirements"
+        },
+        "rollback": {
+          "trigger": "policy settings incorrect",
+          "action": "revert to previous time policies",
+          "safety_guard": "verify old time policies",
+          "restores_state": [
+            "previous time policies"
+          ],
+          "restoration_evidence": "confirmation of restored time policies"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "run_drill",
+        "description": "Run a drill to verify paging works",
+        "action": "execute_drill",
+        "target": "drill_test",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "policies configured",
+            "fact": "policies_set",
+            "established_by": "policies_setup",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "paging functionality",
+          "how": "monitor responses during drill",
+          "expected": "timely response from on-call team"
+        },
+        "rollback": {
+          "trigger": "drill fails",
+          "action": "analyze failures and adjust configurations",
+          "safety_guard": "conduct additional tests after adjustments",
+          "restores_state": [
+            "drill settings"
+          ],
+          "restoration_evidence": "confirmation of drill adjustments"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "document_runbook",
+        "description": "Document the runbook",
+        "action": "create_runbook",
+        "target": "runbook",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "drill completed successfully",
+            "fact": "drill_successful",
+            "established_by": "run_drill",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "runbook completeness",
+          "how": "review documentation",
+          "expected": "runbook contains all necessary information"
+        },
+        "rollback": {
+          "trigger": "runbook documentation insufficient",
+          "action": "update runbook with missing details",
+          "safety_guard": "review updated documentation",
+          "restores_state": [
+            "previous runbook version"
+          ],
+          "restoration_evidence": "confirmation of runbook updates"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define_rotation",
+        "to_task": "configure_escalation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_escalation",
+        "to_task": "routing_rules",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "routing_rules",
+        "to_task": "policies_setup",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "policies_setup",
+        "to_task": "run_drill",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_drill",
+        "to_task": "document_runbook",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:define_rotation",
+      "task_id": "define_rotation",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The precondition 'sre_team_available' is established by 'env', but there is no verification step to ensure that it is true before executing this task.",
+      "suggested_fix": "Add a verification step to confirm that the SRE team is available.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:run_drill",
+      "task_id": "run_drill",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The prerequisite 'policies_set' lacks a step that verifies that the policies are indeed configured correctly before this task executes.",
+      "suggested_fix": "Incorporate a verification step after 'policies_setup' to ensure that business hours and after-hours policies are configured as intended.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:run_drill",
+      "task_id": "run_drill",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'run_drill' focuses on adjusting configurations without a clear plan for restoring the setup to its prior state if necessary.",
+      "suggested_fix": "Consider adding a backup step prior to the drill to ensure the state can be fully restored to what it was before any modifications.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:document_runbook",
+      "task_id": "document_runbook",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The documentation process does not explicitly cover creating a version history or change log for the runbook.",
+      "suggested_fix": "Include steps to establish a version history or change log in the runbook documentation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

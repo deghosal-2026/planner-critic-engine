@@ -1,0 +1,339 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-04-artifactory-proxy",
+  "duration_seconds": 30.65,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-plat-04-artifactory-proxy-r2",
+    "goal_id": "plat-04-artifactory-proxy",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plat-04-artifactory-proxy",
+    "created_at": "2026-08-27T04:12:26.479183Z",
+    "tasks": [
+      {
+        "id": "configure_remote_repos",
+        "description": "Configure remote repositories in Artifactory for Docker Hub, PyPI, and npm",
+        "action": "configure",
+        "target": "Artifactory",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "repository configuration",
+          "how": "query Artifactory API",
+          "expected": "all repositories configured correctly"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "revert to previous config",
+          "safety_guard": "verify previous config integrity",
+          "restores_state": [
+            "previous repository config"
+          ],
+          "restoration_evidence": "verify repository configuration with API"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "set_cache_ttl",
+        "description": "Set pull-through caching and TTL policies for each remote repository",
+        "action": "set",
+        "target": "Artifactory",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "TTL settings",
+          "how": "query Artifactory API",
+          "expected": "TTL values match expected settings"
+        },
+        "rollback": {
+          "trigger": "setting fails",
+          "action": "reset TTL to default",
+          "safety_guard": "confirm default values",
+          "restores_state": [
+            "default TTL settings"
+          ],
+          "restoration_evidence": "check original TTL settings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "test_cache_population",
+        "description": "Pull a known image/package from each upstream to test cache population",
+        "action": "pull",
+        "target": "upstream registries",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Artifactory is configured correctly",
+            "fact": "repo_configured",
+            "established_by": "configure_remote_repos",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "cache population success",
+          "how": "check Artifactory for cached items",
+          "expected": "known image/package is available in the cache"
+        },
+        "rollback": {
+          "trigger": "cache population fails",
+          "action": "clear cache and retry",
+          "safety_guard": "confirm cache is clear",
+          "restores_state": [
+            "previous cache status"
+          ],
+          "restoration_evidence": "check cache contents"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update_docker_config",
+        "description": "Enforce Artifactory as the default registry in Docker daemon configs",
+        "action": "update",
+        "target": "docker daemon",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Docker daemon is reachable",
+            "fact": "docker_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Docker config updated",
+          "how": "check Docker daemon configs",
+          "expected": "Artifactory is set as default registry"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "restore previous Docker config",
+          "safety_guard": "verify previous Docker config",
+          "restores_state": [
+            "previous Docker daemon configs"
+          ],
+          "restoration_evidence": "check Docker daemon configs"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update_pip_config",
+        "description": "Enforce Artifactory as the default registry in pip.conf",
+        "action": "update",
+        "target": "pip.conf",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "pip is accessible",
+            "fact": "pip_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "pip config updated",
+          "how": "check pip.conf",
+          "expected": "Artifactory is set as default registry"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "restore previous pip config",
+          "safety_guard": "verify previous pip config",
+          "restores_state": [
+            "previous pip.conf settings"
+          ],
+          "restoration_evidence": "check pip.conf"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update_npm_config",
+        "description": "Enforce Artifactory as the default registry in .npmrc",
+        "action": "update",
+        "target": ".npmrc",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": ".npmrc file is writable",
+            "fact": "npmrc_writable",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "npm config updated",
+          "how": "check .npmrc",
+          "expected": "Artifactory is set as default registry"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "restore previous .npmrc",
+          "safety_guard": "verify previous .npmrc",
+          "restores_state": [
+            "previous .npmrc settings"
+          ],
+          "restoration_evidence": "check .npmrc"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "configure_remote_repos",
+        "to_task": "set_cache_ttl",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set_cache_ttl",
+        "to_task": "test_cache_population",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test_cache_population",
+        "to_task": "update_docker_config",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test_cache_population",
+        "to_task": "update_pip_config",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test_cache_population",
+        "to_task": "update_npm_config",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:set_cache_ttl",
+      "task_id": "set_cache_ttl",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'set_cache_ttl' depends on 'configure_remote_repos' being completed successfully, but this dependency is not verified before execution.",
+      "suggested_fix": "Add a verification step to ensure 'configure_remote_repos' completes successfully before proceeding to 'set_cache_ttl'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:test_cache_population",
+      "task_id": "test_cache_population",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'test_cache_population' depends on 'set_cache_ttl' being completed successfully, but this dependency is not verified before execution.",
+      "suggested_fix": "Add a verification step to ensure 'set_cache_ttl' completes successfully before proceeding to 'test_cache_population'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:update_docker_config",
+      "task_id": "update_docker_config",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'update_docker_config' is sequenced to run before ensuring 'test_cache_population' is successful.",
+      "suggested_fix": "Reorder tasks to run 'update_docker_config' only after 'test_cache_population' is confirmed to succeed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:update_pip_config",
+      "task_id": "update_pip_config",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'update_pip_config' is sequenced to run before ensuring 'test_cache_population' is successful.",
+      "suggested_fix": "Reorder tasks to run 'update_pip_config' only after 'test_cache_population' is confirmed to succeed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:update_npm_config",
+      "task_id": "update_npm_config",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'update_npm_config' is sequenced to run before ensuring 'test_cache_population' is successful.",
+      "suggested_fix": "Reorder tasks to run 'update_npm_config' only after 'test_cache_population' is confirmed to succeed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

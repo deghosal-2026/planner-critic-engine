@@ -1,0 +1,363 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-10-csi-storageclass-migration",
+  "duration_seconds": 79.02,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-k8s-10-csi-storageclass-migration-r4",
+    "goal_id": "k8s-10-csi-storageclass-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-k8s-10-csi-storageclass-migration-r3",
+    "created_at": "2026-08-27T04:20:05.375803Z",
+    "tasks": [
+      {
+        "id": "install-ebs-csi-driver",
+        "description": "Install the EBS CSI driver via Helm",
+        "action": "install",
+        "target": "ebs-csi-driver",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Helm is installed and configured",
+            "fact": "helm_installed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Helm installation status",
+          "how": "check Helm version",
+          "expected": "Helm v3.5.0 or later installed"
+        },
+        "rollback": {
+          "trigger": "installation fails",
+          "action": "reinstall Helm",
+          "safety_guard": "verify Helm installation status",
+          "restores_state": [
+            "EBS CSI driver installation is restored"
+          ],
+          "restoration_evidence": "logs confirm Helm reinstallation"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "create-storageclass",
+        "description": "Create new StorageClass pointing to the new EBS CSI driver",
+        "action": "create",
+        "target": "StorageClass",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EBS CSI driver is installed",
+            "fact": "ebs_csi_driver_installed",
+            "established_by": "install-ebs-csi-driver",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "EBS CSI driver installation",
+          "how": "check driver installation logs",
+          "expected": "EBS CSI driver is installed and ready"
+        },
+        "rollback": {
+          "trigger": "creation fails",
+          "action": "delete StorageClass",
+          "safety_guard": "ensure StorageClass configuration is intact",
+          "restores_state": [
+            "StorageClass is deleted"
+          ],
+          "restoration_evidence": "logs confirm StorageClass deletion"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "migrate-pvs",
+        "description": "Migrate existing PVs by creating new volumes from snapshots",
+        "action": "migrate",
+        "target": "PVs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "StorageClass created",
+            "fact": "storageclass_created",
+            "established_by": "create-storageclass",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data integrity of migrated PVs",
+          "how": "run data checks",
+          "expected": "data matches between old and new volumes"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore from original volumes",
+          "safety_guard": "verify original volume integrity",
+          "restores_state": [
+            "PVs are restored to their original state"
+          ],
+          "restoration_evidence": "logs showing original PVs restoration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update-pvcs",
+        "description": "Update PVCs to reference new StorageClass",
+        "action": "update",
+        "target": "PVCs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PV migration completed",
+            "fact": "pvs_migrated",
+            "established_by": "migrate-pvs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "PVC references new StorageClass",
+          "how": "check PVC definitions",
+          "expected": "PVCs point to new StorageClass"
+        },
+        "rollback": {
+          "trigger": "PVC update fails",
+          "action": "revert PVC to old StorageClass",
+          "safety_guard": "ensure old PVCs are intact",
+          "restores_state": [
+            "PVCs are reverted to reference old StorageClass"
+          ],
+          "restoration_evidence": "validation of PVC configuration shows old StorageClass reference"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-data-integrity",
+        "description": "Verify data integrity of the new volumes",
+        "action": "verify",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PVCs updated to new StorageClass",
+            "fact": "pvcs_updated",
+            "established_by": "update-pvcs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data consistency and integrity",
+          "how": "run validation scripts",
+          "expected": "data is consistent and correct"
+        },
+        "rollback": {
+          "trigger": "data integrity check fails",
+          "action": "restore from snapshots",
+          "safety_guard": "check snapshot versions",
+          "restores_state": [
+            "data is reverted to previous state using snapshots"
+          ],
+          "restoration_evidence": "logs confirm successful restoration from snapshots"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "decommission-old-driver",
+        "description": "Decommission the old in-tree driver",
+        "action": "remove",
+        "target": "old-driver",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data integrity verified",
+            "fact": "data_verified",
+            "established_by": "verify-data-integrity",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "old driver is removed",
+          "how": "check driver presence in the system",
+          "expected": "old in-tree driver is not present"
+        },
+        "rollback": {
+          "trigger": "decommissioning fails",
+          "action": "restore old driver",
+          "safety_guard": "ensure old driver installation is intact",
+          "restores_state": [
+            "old driver is restored"
+          ],
+          "restoration_evidence": "verification of old driver presence post rollback"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "install-ebs-csi-driver",
+        "to_task": "create-storageclass",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create-storageclass",
+        "to_task": "migrate-pvs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate-pvs",
+        "to_task": "update-pvcs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-pvcs",
+        "to_task": "verify-data-integrity",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-data-integrity",
+        "to_task": "decommission-old-driver",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:create-storageclass",
+      "task_id": "create-storageclass",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'create-storageclass' is sequenced before the completion of the prerequisite task 'install-ebs-csi-driver'.",
+      "suggested_fix": "Reorder tasks to ensure 'install-ebs-csi-driver' completes before 'create-storageclass'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:migrate-pvs",
+      "task_id": "migrate-pvs",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'migrate-pvs' depends on 'create-storageclass', which may not be successfully completed or verified.",
+      "suggested_fix": "Ensure that 'create-storageclass' is verified to be successful before proceeding with 'migrate-pvs'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:update-pvcs",
+      "task_id": "update-pvcs",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'update-pvcs' depends on 'migrate-pvs', but the migration may fail, leaving PVCs in an unknown state.",
+      "suggested_fix": "Add a verification step to ensure 'migrate-pvs' completed successfully before updating PVCs.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:verify-data-integrity",
+      "task_id": "verify-data-integrity",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'verify-data-integrity' relies on 'update-pvcs', which must be successfully completed and verified first.",
+      "suggested_fix": "Ensure 'update-pvcs' is validated to be successful before verifying data integrity.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:decommission-old-driver",
+      "task_id": "decommission-old-driver",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'decommission-old-driver' depends on 'verify-data-integrity', which must succeed before decommissioning the old driver.",
+      "suggested_fix": "Validate 'verify-data-integrity' and check data integrity before attempting to decommission the old driver.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-10-csi-storageclass-migration:4:4",
+    "plan_id": "plan-k8s-10-csi-storageclass-migration-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:create-storageclass",
+    "question": "Plan for goal 'k8s-10-csi-storageclass-migration' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

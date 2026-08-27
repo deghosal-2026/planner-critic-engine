@@ -1,0 +1,634 @@
+{
+  "dimension": "core-api",
+  "goal_id": "sf-02-cdn-origin-migration",
+  "duration_seconds": 56.93,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-sf-02-cdn-origin-migration-r2",
+    "goal_id": "sf-02-cdn-origin-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "sf-02-cdn-origin-migration-plan",
+    "created_at": "2026-08-27T04:13:21.849442Z",
+    "tasks": [
+      {
+        "id": "configure-origin",
+        "description": "Configure new custom origin behind the CDN",
+        "action": "configure",
+        "target": "nginx",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "CDN configuration",
+          "how": "check CDN settings",
+          "expected": "points to new Nginx origin"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "revert to previous settings",
+          "safety_guard": "ensure CDN endpoints are intact",
+          "restores_state": [
+            "previous settings for CDN"
+          ],
+          "restoration_evidence": "documented settings state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "set-weighted-routing",
+        "description": "Set up dual-origin with weighted routing",
+        "action": "configure",
+        "target": "CloudFront",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "routing weights",
+          "how": "check routing policy",
+          "expected": "5% S3, 95% Nginx initial weighting"
+        },
+        "rollback": {
+          "trigger": "routing misconfiguration",
+          "action": "restore previous routing settings",
+          "safety_guard": "confirm all origins accessible",
+          "restores_state": [
+            "previous routing settings"
+          ],
+          "restoration_evidence": "documented routing state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cut-traffic-5",
+        "description": "Cut traffic to 5% Nginx origin",
+        "action": "cut_traffic",
+        "target": "CloudFront",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "weighted routing is configured",
+            "fact": "routing_configured",
+            "established_by": "set-weighted-routing",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic cut confirmation",
+          "how": "check CloudFront metrics",
+          "expected": "5% Nginx traffic confirmed"
+        },
+        "rollback": {
+          "trigger": "traffic cut unsuccessful",
+          "action": "revert traffic cut",
+          "safety_guard": "confirm traffic fully operational",
+          "restores_state": [
+            "100% traffic to S3"
+          ],
+          "restoration_evidence": "monitor response times"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-cache-hit-5",
+        "description": "Verify cache hit rates after cutting to 5%",
+        "action": "verify",
+        "target": "cache",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "cache hit rate",
+          "how": "monitor cache statistics",
+          "expected": "above threshold"
+        },
+        "rollback": {
+          "trigger": "cache hit rate low",
+          "action": "restore full traffic to S3",
+          "safety_guard": "confirm no impact on users",
+          "restores_state": [
+            "full traffic to S3"
+          ],
+          "restoration_evidence": "monitor user reports"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cut-traffic-25",
+        "description": "Cut traffic to 25% Nginx origin",
+        "action": "cut_traffic",
+        "target": "CloudFront",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "5% traffic cut verified",
+            "fact": "cache_hit_verified",
+            "established_by": "verify-cache-hit-5",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic cut confirmation",
+          "how": "check CloudFront metrics",
+          "expected": "25% Nginx traffic confirmed"
+        },
+        "rollback": {
+          "trigger": "traffic cut unsuccessful",
+          "action": "revert traffic cut",
+          "safety_guard": "confirm traffic fully operational",
+          "restores_state": [
+            "100% traffic to S3"
+          ],
+          "restoration_evidence": "monitor response times"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-cache-hit-25",
+        "description": "Verify cache hit rates after cutting to 25%",
+        "action": "verify",
+        "target": "cache",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "cache hit rate",
+          "how": "monitor cache statistics",
+          "expected": "above threshold"
+        },
+        "rollback": {
+          "trigger": "cache hit rate low",
+          "action": "restore full traffic to S3",
+          "safety_guard": "confirm no impact on users",
+          "restores_state": [
+            "full traffic to S3"
+          ],
+          "restoration_evidence": "monitor user reports"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cut-traffic-50",
+        "description": "Cut traffic to 50% Nginx origin",
+        "action": "cut_traffic",
+        "target": "CloudFront",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "25% traffic cut verified",
+            "fact": "cache_hit_verified",
+            "established_by": "verify-cache-hit-25",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic cut confirmation",
+          "how": "check CloudFront metrics",
+          "expected": "50% Nginx traffic confirmed"
+        },
+        "rollback": {
+          "trigger": "traffic cut unsuccessful",
+          "action": "revert traffic cut",
+          "safety_guard": "confirm traffic fully operational",
+          "restores_state": [
+            "100% traffic to S3"
+          ],
+          "restoration_evidence": "monitor response times"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-cache-hit-50",
+        "description": "Verify cache hit rates after cutting to 50%",
+        "action": "verify",
+        "target": "cache",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "cache hit rate",
+          "how": "monitor cache statistics",
+          "expected": "above threshold"
+        },
+        "rollback": {
+          "trigger": "cache hit rate low",
+          "action": "restore full traffic to S3",
+          "safety_guard": "confirm no impact on users",
+          "restores_state": [
+            "full traffic to S3"
+          ],
+          "restoration_evidence": "monitor user reports"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cut-traffic-100",
+        "description": "Cut traffic to 100% Nginx origin",
+        "action": "cut_traffic",
+        "target": "CloudFront",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "50% traffic cut verified",
+            "fact": "cache_hit_verified",
+            "established_by": "verify-cache-hit-50",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic cut confirmation",
+          "how": "check CloudFront metrics",
+          "expected": "100% Nginx traffic confirmed"
+        },
+        "rollback": {
+          "trigger": "traffic cut unsuccessful",
+          "action": "revert traffic cut",
+          "safety_guard": "confirm traffic fully operational",
+          "restores_state": [
+            "100% traffic to S3"
+          ],
+          "restoration_evidence": "monitor response times"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-cache-hit-100",
+        "description": "Verify cache hit rates after cutting to 100%",
+        "action": "verify",
+        "target": "cache",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "cache hit rate",
+          "how": "monitor cache statistics",
+          "expected": "above threshold"
+        },
+        "rollback": {
+          "trigger": "cache hit rate low",
+          "action": "restore full traffic to S3",
+          "safety_guard": "confirm no impact on users",
+          "restores_state": [
+            "full traffic to S3"
+          ],
+          "restoration_evidence": "monitor user reports"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "warm-caches",
+        "description": "Warm caches before full cutover",
+        "action": "warm_cache",
+        "target": "Nginx",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "100% traffic cut verified",
+            "fact": "cache_hit_verified",
+            "established_by": "verify-cache-hit-100",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "cache warming",
+          "how": "check cache loading status",
+          "expected": "caches warmed successfully"
+        },
+        "rollback": {
+          "trigger": "cache warming failed",
+          "action": "clear cache",
+          "safety_guard": "monitor cache hits",
+          "restores_state": [
+            "previous cache state"
+          ],
+          "restoration_evidence": "cache health records"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-correct-content",
+        "description": "Verify edge locations serve correct content",
+        "action": "verify",
+        "target": "edge",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "served content",
+          "how": "check sample responses",
+          "expected": "content matches expectation"
+        },
+        "rollback": {
+          "trigger": "incorrect content served",
+          "action": "clear cache",
+          "safety_guard": "monitor edge responses",
+          "restores_state": [
+            "edge content to previous state"
+          ],
+          "restoration_evidence": "documented content state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "configure-origin",
+        "to_task": "set-weighted-routing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set-weighted-routing",
+        "to_task": "cut-traffic-5",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cut-traffic-5",
+        "to_task": "verify-cache-hit-5",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-cache-hit-5",
+        "to_task": "cut-traffic-25",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cut-traffic-25",
+        "to_task": "verify-cache-hit-25",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-cache-hit-25",
+        "to_task": "cut-traffic-50",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cut-traffic-50",
+        "to_task": "verify-cache-hit-50",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-cache-hit-50",
+        "to_task": "cut-traffic-100",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cut-traffic-100",
+        "to_task": "verify-cache-hit-100",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-cache-hit-100",
+        "to_task": "warm-caches",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "warm-caches",
+        "to_task": "verify-correct-content",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:set-weighted-routing",
+      "task_id": "set-weighted-routing",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'set-weighted-routing' is ordered before the prerequisite task 'configure-origin' is complete.",
+      "suggested_fix": "Reorder the tasks to ensure 'configure-origin' is completed before 'set-weighted-routing'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:cut-traffic-5",
+      "task_id": "cut-traffic-5",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'cut-traffic-5' depends on 'set-weighted-routing' which is scheduled before its prerequisite 'configure-origin'. This makes the sequence unsafe.",
+      "suggested_fix": "Ensure 'configure-origin' is completed before proceeding to 'set-weighted-routing' and then to 'cut-traffic-5'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:verify-cache-hit-5",
+      "task_id": "verify-cache-hit-5",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'verify-cache-hit-5' follows 'cut-traffic-5' which depends on the problematic 'set-weighted-routing'. This creates an unsafe sequence.",
+      "suggested_fix": "Correct the task order so that all prerequisites of 'cut-traffic-5' are met without issues.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:cut-traffic-25",
+      "task_id": "cut-traffic-25",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'cut-traffic-25' is dependent on 'verify-cache-hit-5' that may not be reliably executed due to prior dependencies being unsatisfied.",
+      "suggested_fix": "Re-evaluate dependencies to ensure all prerequisites are validated correctly before proceeding with 'cut-traffic-25'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:verify-cache-hit-25",
+      "task_id": "verify-cache-hit-25",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'verify-cache-hit-25' relies on 'cut-traffic-25', which may not execute safely due to issues with earlier tasks.",
+      "suggested_fix": "Ensure that 'cut-traffic-25' can be reliably executed by resolving earlier issues.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:cut-traffic-50",
+      "task_id": "cut-traffic-50",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'cut-traffic-50' is dependent on 'verify-cache-hit-25', which may not be valid if 'cut-traffic-25' faced issues earlier in the plan.",
+      "suggested_fix": "Verify sequential task structure to ensure integrity of the 'cut-traffic-50' execution.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:verify-cache-hit-50",
+      "task_id": "verify-cache-hit-50",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'verify-cache-hit-50' is dependent on 'cut-traffic-50', which may not reliably complete due to unresolved prerequisites.",
+      "suggested_fix": "Adjust plan to guarantee that all prerequisite tasks validated successfully before 'cut-traffic-50'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:cut-traffic-100",
+      "task_id": "cut-traffic-100",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'cut-traffic-100' follows 'cut-traffic-50', which could be non-functional if previous checks were skipped or failed.",
+      "suggested_fix": "Revise task order to ensure the necessary validation before executing 'cut-traffic-100'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:verify-cache-hit-100",
+      "task_id": "verify-cache-hit-100",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'verify-cache-hit-100' depends on 'cut-traffic-100', which may not be executed properly due to preceding task dependencies being unsatisfied.",
+      "suggested_fix": "Ensure all preceding tasks are completed successfully before 'cut-traffic-100' to enable verification.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:warm-caches",
+      "task_id": "warm-caches",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'warm-caches' requires the successful completion of 'verify-cache-hit-100', which is at risk due to earlier unsafe sequences.",
+      "suggested_fix": "Reassess workflow dependencies to ensure that 'warm-caches' can execute safely.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:verify-correct-content",
+      "task_id": "verify-correct-content",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'verify-correct-content' depends on 'warm-caches', which may not run correctly if previous tasks are not validated properly.",
+      "suggested_fix": "Reorganize to ensure the robustness of 'warm-caches' before conducting 'verify-correct-content'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=12"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

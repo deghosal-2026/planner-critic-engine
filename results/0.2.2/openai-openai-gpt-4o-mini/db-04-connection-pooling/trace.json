@@ -1,0 +1,264 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-04-connection-pooling",
+  "duration_seconds": 21.53,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-db-04-connection-pooling-r2",
+    "goal_id": "db-04-connection-pooling",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "db-04-connection-pooling-plan",
+    "created_at": "2026-08-27T03:47:10.274182Z",
+    "tasks": [
+      {
+        "id": "setup-instances",
+        "description": "Provision dedicated instances for PgBouncer in 2-node HA setup",
+        "action": "provision",
+        "target": "PgBouncer instances",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cloud resources available",
+            "fact": "resources_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "instances are running",
+          "how": "check instance status in cloud provider",
+          "expected": "instances are healthy"
+        },
+        "rollback": {
+          "trigger": "instance provisioning fails",
+          "action": "terminate instances and notify team",
+          "safety_guard": "verify instance status",
+          "restores_state": [
+            "no instances provisioned"
+          ],
+          "restoration_evidence": "instances not present in cloud provider"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure-pgbouncer",
+        "description": "Configure PgBouncer settings for transaction pooling",
+        "action": "configure",
+        "target": "PgBouncer",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PgBouncer instances are provisioned",
+            "fact": "instances_running",
+            "established_by": "setup-instances",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "PgBouncer configuration",
+          "how": "check config file",
+          "expected": "config matches expected values"
+        },
+        "rollback": {
+          "trigger": "configuration validation fails",
+          "action": "revert configuration to last known good state",
+          "safety_guard": "verify previous configuration",
+          "restores_state": [
+            "PgBouncer in last known good state"
+          ],
+          "restoration_evidence": "previous configuration file matched"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "setup-dns",
+        "description": "Set up Consul DNS for cutover to PgBouncer",
+        "action": "setup",
+        "target": "Consul DNS",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PgBouncer configured",
+            "fact": "pgbouncer_configured",
+            "established_by": "configure-pgbouncer",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "DNS setup status",
+          "how": "check DNS records in Consul",
+          "expected": "DNS records exist and are correct"
+        },
+        "rollback": {
+          "trigger": "DNS setup fails",
+          "action": "revert DNS to last known good state",
+          "safety_guard": "verify DNS integrity",
+          "restores_state": [
+            "DNS back to previous setup"
+          ],
+          "restoration_evidence": "last known good DNS records restored"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover-dns",
+        "description": "Perform DNS cutover to PgBouncer with zero downtime",
+        "action": "cutover",
+        "target": "application servers",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DNS setup completed",
+            "fact": "dns_set_up",
+            "established_by": "setup-dns",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "connection counts and query latency",
+          "how": "check PgBouncer stats and application logs",
+          "expected": "connection counts drop; query latency within 5% of baseline"
+        },
+        "rollback": {
+          "trigger": "cutover fails or latency increase detected",
+          "action": "roll back DNS to direct connections",
+          "safety_guard": "monitor query latency",
+          "restores_state": [
+            "DNS set to direct connections"
+          ],
+          "restoration_evidence": "original DNS configuration match"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitoring",
+        "description": "Monitor PgBouncer performance and application behavior post-cutover",
+        "action": "monitor",
+        "target": "PgBouncer stats and app logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DNS cutover completed",
+            "fact": "dns_cutover_successful",
+            "established_by": "cutover-dns",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "monitoring results",
+          "how": "analyze PgBouncer and application logs",
+          "expected": "PgBouncer operates within defined performance parameters"
+        },
+        "rollback": {
+          "trigger": "anomalies detected post-cutover",
+          "action": "revert to pre-cutover monitoring",
+          "safety_guard": "ensure pre-cutover metrics are intact",
+          "restores_state": [
+            "monitoring reverted to pre-cutover settings"
+          ],
+          "restoration_evidence": "logs reflect pre-cutover states"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup-instances",
+        "to_task": "configure-pgbouncer",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-pgbouncer",
+        "to_task": "setup-dns",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup-dns",
+        "to_task": "cutover-dns",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover-dns",
+        "to_task": "monitoring",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:cutover-dns",
+      "task_id": "cutover-dns",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The cutover-dns task is sequenced to run before verifying the performance of PgBouncer, which introduces risk if issues arise post-cutover.",
+      "suggested_fix": "Ensure that monitoring is established prior to executing the cutover-dns task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:cutover-dns",
+      "task_id": "cutover-dns",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The cutover-dns task has a dependency on the dns_setup fact that is not verified by any preceding task in its rollout, which can lead to operational failures.",
+      "suggested_fix": "Verify that DNS setup is confirmed and operational before proceeding with the cutover-dns task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

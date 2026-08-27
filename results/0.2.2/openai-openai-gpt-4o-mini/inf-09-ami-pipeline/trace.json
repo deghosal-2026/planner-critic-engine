@@ -1,0 +1,313 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-09-ami-pipeline",
+  "duration_seconds": 24.79,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-inf-09-ami-pipeline-r2",
+    "goal_id": "inf-09-ami-pipeline",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "inf-09-ami-pipeline",
+    "created_at": "2026-08-27T04:15:21.549635Z",
+    "tasks": [
+      {
+        "id": "build_ami",
+        "description": "Build base AMI from Amazon Linux 2",
+        "action": "build",
+        "target": "AMI",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Packer is installed",
+            "fact": "packer_installed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "bake_dependencies",
+        "description": "Bake application dependencies into the AMI",
+        "action": "bake",
+        "target": "AMI",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application dependencies",
+          "how": "run tests",
+          "expected": "all dependencies present"
+        },
+        "rollback": {
+          "trigger": "baking fails",
+          "action": "revert to previous AMI",
+          "safety_guard": "verify previous AMI integrity",
+          "restores_state": [
+            "previous AMI"
+          ],
+          "restoration_evidence": "verification of previous AMI integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "apply_hardening",
+        "description": "Apply CIS hardening baseline",
+        "action": "harden",
+        "target": "AMI",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "system security compliance",
+          "how": "run CIS-CAT",
+          "expected": "CIS compliance score is >= 90"
+        },
+        "rollback": {
+          "trigger": "hardening breaks application",
+          "action": "restore previous state",
+          "safety_guard": "verify system functionality",
+          "restores_state": [
+            "previous system state"
+          ],
+          "restoration_evidence": "functional testing of restored state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "run_security_scans",
+        "description": "Run security scans (Trivy, CIS-CAT)",
+        "action": "scan",
+        "target": "AMI",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "scan results",
+          "how": "review scan output",
+          "expected": "no critical vulnerabilities"
+        },
+        "rollback": {
+          "trigger": "scan fails",
+          "action": "rollback AMI to clean state",
+          "safety_guard": "verify rollback success",
+          "restores_state": [
+            "clean AMI state"
+          ],
+          "restoration_evidence": "verification of clean state post-rollback"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "promote_ami",
+        "description": "Promote AMI through environments (dev \u2192 staging \u2192 prod)",
+        "action": "promote",
+        "target": "AMI",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "deployment integrity",
+          "how": "run integration tests",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "promotion skips verification",
+          "action": "rollback to previous AMI in environment",
+          "safety_guard": "verify rollback integrity",
+          "restores_state": [
+            "previous AMI in environment"
+          ],
+          "restoration_evidence": "verification of previous AMI integrity in environment"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update_asg",
+        "description": "Update auto-scaling groups to use the new AMI",
+        "action": "update",
+        "target": "ASG",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "new AMI is verified",
+            "fact": "new_ami_verified",
+            "established_by": "promote_ami",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "ASG is using the new AMI",
+          "how": "check ASG configuration",
+          "expected": "ASG updated with new AMI"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "revert to previous AMI",
+          "safety_guard": "verify ASG configuration",
+          "restores_state": [
+            "previous AMI usage"
+          ],
+          "restoration_evidence": "confirmation of ASG restoring to previous AMI"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "build_ami",
+        "to_task": "bake_dependencies",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "bake_dependencies",
+        "to_task": "apply_hardening",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "apply_hardening",
+        "to_task": "run_security_scans",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_security_scans",
+        "to_task": "promote_ami",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote_ami",
+        "to_task": "update_asg",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:bake_dependencies",
+      "task_id": "bake_dependencies",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'bake_dependencies' is sequenced before verification of the base AMI completion.",
+      "suggested_fix": "Ensure that 'bake_dependencies' waits for 'build_ami' to fully complete.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:apply_hardening",
+      "task_id": "apply_hardening",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'apply_hardening' does not verify that 'bake_dependencies' has successfully completed.",
+      "suggested_fix": "Add a hard dependency to ensure 'bake_dependencies' has completed before applying hardening.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:run_security_scans",
+      "task_id": "run_security_scans",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'run_security_scans' does not verify that 'apply_hardening' has successfully completed.",
+      "suggested_fix": "Add a hard dependency to ensure 'apply_hardening' has completed before running security scans.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:promote_ami",
+      "task_id": "promote_ami",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'promote_ami' does not verify that 'run_security_scans' has successfully completed.",
+      "suggested_fix": "Add a hard dependency to ensure 'run_security_scans' has completed before promoting the AMI.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:update_asg",
+      "task_id": "update_asg",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'update_asg' depends on 'promote_ami' but 'promote_ami' lacks verification of its success.",
+      "suggested_fix": "Ensure 'promote_ami' successfully completes verification before proceeding to 'update_asg'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,283 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-02-hotfix-rollback",
+  "duration_seconds": 55.94,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-ci-02-hotfix-rollback-r4",
+    "goal_id": "ci-02-hotfix-rollback",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-ci-02-hotfix-rollback-r3",
+    "created_at": "2026-08-27T03:13:01.326701Z",
+    "tasks": [
+      {
+        "id": "revert_commit",
+        "description": "Revert the offending commit",
+        "action": "git revert",
+        "target": "repository",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "repository is accessible and clean",
+            "fact": "repo_clean",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "commit hash is correct",
+          "how": "compare hashes",
+          "expected": "expected hash matches"
+        },
+        "rollback": {
+          "trigger": "revert fails",
+          "action": "apply backup commit",
+          "safety_guard": "verify commit integrity",
+          "restores_state": [
+            "repository state before revert"
+          ],
+          "restoration_evidence": "restored commit hash matches expected hash"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_dockerfile",
+        "description": "Verify that the Dockerfile is properly configured",
+        "action": "dockerfile validate",
+        "target": "dockerfile",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dockerfile exists",
+            "fact": "dockerfile_present",
+            "established_by": "revert_commit",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Dockerfile configuration",
+          "how": "run validation checks",
+          "expected": "Dockerfile is valid"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "small",
+        "satisfies": null
+      },
+      {
+        "id": "build_application",
+        "description": "Build the application docker image",
+        "action": "docker build",
+        "target": "docker_image",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dockerfile exists",
+            "fact": "dockerfile_present",
+            "established_by": "verify_dockerfile",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "docker image is built",
+          "how": "check image tag",
+          "expected": "image tag matches expected"
+        },
+        "rollback": {
+          "trigger": "build fails",
+          "action": "clean up intermediate images",
+          "safety_guard": "ensure no stale images remain",
+          "restores_state": [
+            "previous build state"
+          ],
+          "restoration_evidence": "no intermediate images present"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy_application",
+        "description": "Deploy the application to production",
+        "action": "kubectl apply",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "build was successful and verified",
+            "fact": "build_successful_and_verified",
+            "established_by": "build_application",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application is up",
+          "how": "check health endpoint",
+          "expected": "200 OK"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "roll back to previous version",
+          "safety_guard": "ensure previous pods are running",
+          "restores_state": [
+            "production state before deployment"
+          ],
+          "restoration_evidence": "previous version is running"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_downstream",
+        "description": "Verify downstream dependents are functional",
+        "action": "run tests",
+        "target": "downstream_services",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "deployment was successful",
+            "fact": "deploy_successful",
+            "established_by": "deploy_application",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "downstream services health",
+          "how": "run health checks",
+          "expected": "all services operational"
+        },
+        "rollback": {
+          "trigger": "downstream verification fails",
+          "action": "notify team and halt deployment",
+          "safety_guard": "ensure all tests are rerun",
+          "restores_state": [
+            "previous downstream state"
+          ],
+          "restoration_evidence": "downstream services operational"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "revert_commit",
+        "to_task": "verify_dockerfile",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_dockerfile",
+        "to_task": "build_application",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "build_application",
+        "to_task": "deploy_application",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_application",
+        "to_task": "verify_downstream",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unverified_dependencies:build_application",
+      "task_id": "build_application",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'build_application' task depends on 'verify_dockerfile', but 'verify_dockerfile' has not been verified as successful before its execution.",
+      "suggested_fix": "Ensure that 'verify_dockerfile' is successfully completed before proceeding to 'build_application'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:deploy_application",
+      "task_id": "deploy_application",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'deploy_application' task depends on 'build_application', but 'build_application' has not been verified as successful before its execution.",
+      "suggested_fix": "Verify that 'build_application' is successful before executing 'deploy_application'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:verify_downstream",
+      "task_id": "verify_downstream",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'verify_downstream' task depends on 'deploy_application', but 'deploy_application' has not been verified as successful before its execution.",
+      "suggested_fix": "Ensure that 'deploy_application' is successfully completed before proceeding to 'verify_downstream'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ci-02-hotfix-rollback:4:4",
+    "plan_id": "plan-ci-02-hotfix-rollback-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unverified_dependencies:build_application",
+    "question": "Plan for goal 'ci-02-hotfix-rollback' cannot be approved: blockers remain (llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

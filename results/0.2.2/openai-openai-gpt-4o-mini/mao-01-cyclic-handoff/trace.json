@@ -1,0 +1,191 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mao-01-cyclic-handoff",
+  "duration_seconds": 27.67,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-mao-01-cyclic-handoff-r3",
+    "goal_id": "mao-01-cyclic-handoff",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-mao-01-cyclic-handoff-r2",
+    "created_at": "2026-08-27T04:21:27.685724Z",
+    "tasks": [
+      {
+        "id": "schema_migration",
+        "description": "Migrate the database schema",
+        "action": "migrate",
+        "target": "db_schema",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "schema version",
+          "how": "run migration checks",
+          "expected": "v2"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore previous schema",
+          "safety_guard": "verify schema integrity",
+          "restores_state": [
+            "previous schema"
+          ],
+          "restoration_evidence": "migration logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "api_update",
+        "description": "Update API contracts",
+        "action": "update",
+        "target": "api_contracts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "schema migration is complete",
+            "fact": "schema_migration_completed",
+            "established_by": "schema_migration",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "API contracts updated",
+          "how": "run contract validation tests",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "revert API contracts",
+          "safety_guard": "confirm old contracts are intact",
+          "restores_state": [
+            "previous API contracts"
+          ],
+          "restoration_evidence": "contract backup"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "traffic_routing",
+        "description": "Route traffic to updated API",
+        "action": "route",
+        "target": "api",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "API contracts have been updated",
+            "fact": "api_update_completed",
+            "established_by": "api_update",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic flow",
+          "how": "analyze logs",
+          "expected": "95% traffic to updated API and API contracts confirmed updated"
+        },
+        "rollback": {
+          "trigger": "routing fails",
+          "action": "route back to previous API",
+          "safety_guard": "validate traffic metrics",
+          "restores_state": [
+            "previous traffic routing"
+          ],
+          "restoration_evidence": "routing logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "schema_migration",
+        "to_task": "api_update",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "api_update",
+        "to_task": "traffic_routing",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:traffic_routing",
+      "task_id": "traffic_routing",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The traffic_routing task is sequenced before the prerequisite API contracts update is confirmed complete.",
+      "suggested_fix": "Ensure that traffic_routing is executed only after successful completion of api_update.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:traffic_routing",
+      "task_id": "traffic_routing",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Traffic routing depends on API contracts being updated, but the completion of this step is not verified before the routing task.",
+      "suggested_fix": "Add verification for api_update to ensure it is completed before executing traffic_routing.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mao-01-cyclic-handoff:3:3",
+    "plan_id": "plan-mao-01-cyclic-handoff-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:traffic_routing",
+    "question": "Plan for goal 'mao-01-cyclic-handoff' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,370 @@
+{
+  "dimension": "core-api",
+  "goal_id": "data-05-warehouse-model",
+  "duration_seconds": 41.82,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-data-05-warehouse-model-r3",
+    "goal_id": "data-05-warehouse-model",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-data-05-warehouse-model-r2",
+    "created_at": "2026-08-27T03:07:00.411855Z",
+    "tasks": [
+      {
+        "id": "backup_data",
+        "description": "Back up existing warehouse data",
+        "action": "backup",
+        "target": "warehouse",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "warehouse is accessible",
+            "fact": "warehouse_healthy",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "necessary permissions are in place to access warehouse",
+            "fact": "permissions_verified",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "backup completeness",
+          "how": "check file sizes and counts",
+          "expected": "backup matches source data sizes"
+        },
+        "rollback": {
+          "trigger": "backup fails",
+          "action": "alert and retry backup",
+          "safety_guard": "verify backup completeness",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "migrate_schema",
+        "description": "Migrate to star schema with SCD implementation",
+        "action": "migrate",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "backup is verified",
+            "fact": "backup_verified",
+            "established_by": "backup_data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "schema version",
+          "how": "run schema validation scripts",
+          "expected": "schema is compliant with design"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore from backup",
+          "safety_guard": "verify restored data integrity",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "backfill_data",
+        "description": "Backfill historical data into new schema",
+        "action": "backfill",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "schema migration is complete",
+            "fact": "migration_completed",
+            "established_by": "migrate_schema",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "backfill completion",
+          "how": "check backfill process logs",
+          "expected": "all historical data is present in new schema"
+        },
+        "rollback": {
+          "trigger": "backfill fails",
+          "action": "reprocess historical data",
+          "safety_guard": "ensure data quality",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_data",
+        "description": "Verify data integrity and accuracy after backfill",
+        "action": "verify",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "historical data is backfilled",
+            "fact": "backfill_completed",
+            "established_by": "backfill_data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data consistency and accuracy",
+          "how": "run tests to compare old and new data",
+          "expected": "data metrics match expectations"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "refine data and re-validate",
+          "safety_guard": "ensure no data loss during adjustment",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "backup_data",
+        "to_task": "migrate_schema",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate_schema",
+        "to_task": "backfill_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "backfill_data",
+        "to_task": "verify_data",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plan-data-05-warehouse-model-r3:3:backup_data:rollback_state_undeclared",
+      "task_id": "backup_data",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'backup_data' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-data-05-warehouse-model-r3:3:migrate_schema:rollback_state_undeclared",
+      "task_id": "migrate_schema",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'migrate_schema' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-data-05-warehouse-model-r3:3:verify_data:rollback_state_undeclared",
+      "task_id": "verify_data",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_data' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-data-05-warehouse-model-r3:3:backup_data:rollback_state_undeclared",
+      "task_id": "backup_data",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'backup_data' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-data-05-warehouse-model-r3:3:migrate_schema:rollback_state_undeclared",
+      "task_id": "migrate_schema",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'migrate_schema' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-data-05-warehouse-model-r3:3:verify_data:rollback_state_undeclared",
+      "task_id": "verify_data",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_data' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:migrate_schema",
+      "task_id": "migrate_schema",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Migration step is scheduled before verifying that the backup is complete and verified.",
+      "suggested_fix": "Ensure 'backup_data' task is fully completed and verified before starting 'migrate_schema'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:weak_rollback:migrate_schema",
+      "task_id": "migrate_schema",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Migration rollback lacks clear evidence or method to restore original state safely.",
+      "suggested_fix": "Define specific restoration evidence or state for the rollback action for 'migrate_schema'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:weak_rollback:backfill_data",
+      "task_id": "backfill_data",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Backfill rollback lacks clear evidence or method to restore original state safely.",
+      "suggested_fix": "Define specific restoration evidence or state for the rollback action for 'backfill_data'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:weak_rollback:verify_data",
+      "task_id": "verify_data",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Verification rollback lacks a clear method to ensure no data loss is effectively monitored during adjustments.",
+      "suggested_fix": "Implement a concrete method for tracking data before and after refinements to ensure integrity during rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:data-05-warehouse-model:3:3",
+    "plan_id": "plan-data-05-warehouse-model-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:migrate_schema",
+    "question": "Plan for goal 'data-05-warehouse-model' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

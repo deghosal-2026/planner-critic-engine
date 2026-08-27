@@ -1,0 +1,356 @@
+{
+  "dimension": "core-api",
+  "goal_id": "bch-01-validator-setup",
+  "duration_seconds": 44.84,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-bch-01-validator-setup-r3",
+    "goal_id": "bch-01-validator-setup",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-bch-01-validator-setup-r2",
+    "created_at": "2026-08-27T03:10:33.784214Z",
+    "tasks": [
+      {
+        "id": "key_generation",
+        "description": "Generate validator signing keys using EIP-2333",
+        "action": "generate_keys",
+        "target": "validator_keys",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "validator key validity",
+          "how": "check key signature",
+          "expected": "valid signatures"
+        },
+        "rollback": {
+          "trigger": "key generation fails",
+          "action": "revert to previous key state",
+          "safety_guard": "ensure key state consistency",
+          "restores_state": [
+            "previous key state"
+          ],
+          "restoration_evidence": "log of previous keys"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "key_custody",
+        "description": "Store keys in a hardware security module",
+        "action": "store",
+        "target": "HSM",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "validator keys are generated",
+            "fact": "keys_generated",
+            "established_by": "key_generation",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "key storage integrity",
+          "how": "audit HSM logs",
+          "expected": "no unauthorized access"
+        },
+        "rollback": {
+          "trigger": "key storage fails",
+          "action": "attempt alternative secure storage",
+          "safety_guard": "verify alternative storage security",
+          "restores_state": [
+            "original key storage state"
+          ],
+          "restoration_evidence": "audit log of original storage"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "signing_client_setup",
+        "description": "Configure the signing client using Prysm/Lighthouse/TEKU",
+        "action": "setup",
+        "target": "signing_client",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "keys are securely stored",
+            "fact": "keys_stored",
+            "established_by": "key_custody",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "signing client configuration success",
+          "how": "check client logs for configuration details",
+          "expected": "configuration completed"
+        },
+        "rollback": {
+          "trigger": "signing client setup fails",
+          "action": "revert configuration changes",
+          "safety_guard": "validate previous configuration",
+          "restores_state": [
+            "previous signing client settings"
+          ],
+          "restoration_evidence": "backup of previous configuration"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "validator_registration",
+        "description": "Submit the deposit transaction of 32 ETH to the deposit contract",
+        "action": "register",
+        "target": "validator",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "signing client is configured",
+            "fact": "client_configured",
+            "established_by": "signing_client_setup",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deposit contract confirmation",
+          "how": "check transaction on Ethereum blockchain",
+          "expected": "transaction confirmed"
+        },
+        "rollback": {
+          "trigger": "registration fails",
+          "action": "cancel registration attempt",
+          "safety_guard": "verify transaction submission status",
+          "restores_state": [
+            "previous registration state"
+          ],
+          "restoration_evidence": "transaction log"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitoring_setup",
+        "description": "Set up monitoring for missed attestations and slashing warnings",
+        "action": "configure",
+        "target": "monitoring_system",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "validator registration is completed",
+            "fact": "registration_successful",
+            "established_by": "validator_registration",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "monitoring system operational confirmation",
+          "how": "check monitoring alerts",
+          "expected": "alerts received for missed attestations"
+        },
+        "rollback": {
+          "trigger": "monitoring setup fails",
+          "action": "revert monitoring settings",
+          "safety_guard": "ensure previous settings are intact",
+          "restores_state": [
+            "previous monitoring configuration"
+          ],
+          "restoration_evidence": "backup of monitoring settings"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "exit_plan_establishment",
+        "description": "Establish an exit/stop plan for validator",
+        "action": "plan_exit",
+        "target": "exit_plan",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "monitoring setup is operational",
+            "fact": "monitoring_operational",
+            "established_by": "monitoring_setup",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "exit plan readiness",
+          "how": "run exit scenario",
+          "expected": "successful exit simulation"
+        },
+        "rollback": {
+          "trigger": "exit plan fails",
+          "action": "review and update exit procedures",
+          "safety_guard": "ensure updated plan is tested",
+          "restores_state": [
+            "previous exit plan state"
+          ],
+          "restoration_evidence": "logs of prior exit scenarios"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "key_generation",
+        "to_task": "key_custody",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "key_custody",
+        "to_task": "signing_client_setup",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "signing_client_setup",
+        "to_task": "validator_registration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "validator_registration",
+        "to_task": "monitoring_setup",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitoring_setup",
+        "to_task": "exit_plan_establishment",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unverified_dependencies:key_custody",
+      "task_id": "key_custody",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The key_custody task depends on keys being generated but does not verify if the key generation was successful.",
+      "suggested_fix": "Ensure the key_generation task is successfully verified before proceeding to key_custody.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:signing_client_setup",
+      "task_id": "signing_client_setup",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The signing_client_setup task depends on keys being securely stored but does not verify if the keys were stored successfully.",
+      "suggested_fix": "Add a verification step after key_custody to ensure keys are stored before executing signing_client_setup.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:validator_registration",
+      "task_id": "validator_registration",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The validator_registration task depends on the signing client being configured, but it does not verify if the client was configured successfully.",
+      "suggested_fix": "Include a verification for signing_client_setup to confirm the client was successfully configured before moving to validator_registration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:monitoring_setup",
+      "task_id": "monitoring_setup",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The monitoring_setup task depends on validator registration being completed but does not verify if the registration was successful.",
+      "suggested_fix": "Add a verification for validator_registration to ensure the registration was successful prior to monitoring_setup.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:exit_plan_establishment",
+      "task_id": "exit_plan_establishment",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The exit_plan_establishment task depends on monitoring setup being operational but does not verify if the monitoring setup was completed successfully.",
+      "suggested_fix": "Incorporate a verification step for monitoring_setup to ensure it is operational before proceeding to exit_plan_establishment.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:bch-01-validator-setup:3:3",
+    "plan_id": "plan-bch-01-validator-setup-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unverified_dependencies:key_custody",
+    "question": "Plan for goal 'bch-01-validator-setup' cannot be approved: blockers remain (llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

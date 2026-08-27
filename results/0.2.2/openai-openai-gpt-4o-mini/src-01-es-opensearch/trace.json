@@ -1,0 +1,568 @@
+{
+  "dimension": "core-api",
+  "goal_id": "src-01-es-opensearch",
+  "duration_seconds": 76.03,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-src-01-es-opensearch-r4",
+    "goal_id": "src-01-es-opensearch",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-src-01-es-opensearch-r3",
+    "created_at": "2026-08-27T04:12:01.900979Z",
+    "tasks": [
+      {
+        "id": "snapshot",
+        "description": "Take snapshots of the Elasticsearch cluster and save to S3",
+        "action": "snapshot",
+        "target": "Elasticsearch",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "snapshot completion",
+          "how": "check S3 for new snapshots",
+          "expected": "snapshot exists"
+        },
+        "rollback": {
+          "trigger": "snapshot fails",
+          "action": "retry snapshot",
+          "safety_guard": "check S3 access",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "provision",
+        "description": "Provision an OpenSearch cluster",
+        "action": "provision",
+        "target": "OpenSearch",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "S3 snapshot available",
+            "fact": "snapshot_exists",
+            "established_by": "snapshot",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "provisioning status",
+          "how": "check OpenSearch cluster health",
+          "expected": "cluster is active"
+        },
+        "rollback": {
+          "trigger": "provision fails",
+          "action": "destroy OpenSearch cluster",
+          "safety_guard": "confirm cluster is not provisioned",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "restore",
+        "description": "Restore snapshots into the OpenSearch cluster",
+        "action": "restore",
+        "target": "OpenSearch",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "restored indices",
+          "how": "query OpenSearch for list of indices",
+          "expected": "index list matches ES snapshot"
+        },
+        "rollback": {
+          "trigger": "restore fails",
+          "action": "delete partial restore and retry",
+          "safety_guard": "validate OpenSearch state",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "reindex",
+        "description": "Reindex any incompatible index mappings",
+        "action": "reindex",
+        "target": "OpenSearch",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "index mappings",
+          "how": "check index mapping compatibility",
+          "expected": "mappings compatible"
+        },
+        "rollback": {
+          "trigger": "reindex fails",
+          "action": "rollback to snapshot",
+          "safety_guard": "verify snapshot integrity",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "dual-query",
+        "description": "Run a dual-query period comparing results from both clusters",
+        "action": "query",
+        "target": "Elasticsearch and OpenSearch",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "query result comparison",
+          "how": "compare outputs from both clusters",
+          "expected": "results match"
+        },
+        "rollback": {
+          "trigger": "query discrepancies",
+          "action": "disable OpenSearch and revert to ES",
+          "safety_guard": "ensure application routes to ES",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover",
+        "description": "Execute cutover to switch application to OpenSearch only",
+        "action": "cutover",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application behavior on OpenSearch",
+          "how": "monitor application log for errors",
+          "expected": "no errors post cutover"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "re-route queries back to ES",
+          "safety_guard": "check application logs",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover-verification",
+        "description": "Verify cutover completion",
+        "action": "verify",
+        "target": "cutover",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "cutover success status",
+          "how": "check application logs and response",
+          "expected": "cutover was successful"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "revert to previous state",
+          "safety_guard": "ensure OpenSearch can still serve requests",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "retire",
+        "description": "Retire the old Elasticsearch cluster",
+        "action": "retire",
+        "target": "Elasticsearch",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "successful cutover to OpenSearch",
+            "fact": "cutover_successful",
+            "established_by": "cutover-verification",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "retirement status",
+          "how": "check Elasticsearch cluster availability",
+          "expected": "Elasticsearch cluster is not available"
+        },
+        "rollback": {
+          "trigger": "retire fails",
+          "action": "recreate Elasticsearch cluster",
+          "safety_guard": "confirm OpenSearch is still functional",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "snapshot",
+        "to_task": "provision",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provision",
+        "to_task": "restore",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "restore",
+        "to_task": "reindex",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "reindex",
+        "to_task": "dual-query",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dual-query",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover-verification",
+        "to_task": "retire",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover",
+        "to_task": "cutover-verification",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plan-src-01-es-opensearch-r4:4:snapshot:rollback_state_undeclared",
+      "task_id": "snapshot",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'snapshot' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-src-01-es-opensearch-r4:4:restore:rollback_state_undeclared",
+      "task_id": "restore",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'restore' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-src-01-es-opensearch-r4:4:reindex:rollback_state_undeclared",
+      "task_id": "reindex",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'reindex' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-src-01-es-opensearch-r4:4:dual-query:rollback_state_undeclared",
+      "task_id": "dual-query",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'dual-query' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-src-01-es-opensearch-r4:4:cutover:rollback_state_undeclared",
+      "task_id": "cutover",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'cutover' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-src-01-es-opensearch-r4:4:snapshot:rollback_state_undeclared",
+      "task_id": "snapshot",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'snapshot' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-src-01-es-opensearch-r4:4:restore:rollback_state_undeclared",
+      "task_id": "restore",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'restore' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-src-01-es-opensearch-r4:4:reindex:rollback_state_undeclared",
+      "task_id": "reindex",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'reindex' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-src-01-es-opensearch-r4:4:dual-query:rollback_state_undeclared",
+      "task_id": "dual-query",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'dual-query' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-src-01-es-opensearch-r4:4:cutover:rollback_state_undeclared",
+      "task_id": "cutover",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'cutover' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:provision",
+      "task_id": "provision",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'provision' is executed before confirming if the snapshot exists, which is a prerequisite for successful provisioning of the OpenSearch cluster.",
+      "suggested_fix": "Insert a dependency on the 'snapshot' task to ensure it completes successfully before proceeding to 'provision'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:restore",
+      "task_id": "restore",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'restore' does not have prerequisite verification for successful snapshot availability before attempting to restore snapshots into OpenSearch.",
+      "suggested_fix": "Add a verification step to ensure that the snapshot exists before executing the 'restore' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:cutover",
+      "task_id": "cutover",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for 'cutover' involves re-routing queries back to ES but lacks verification of the application's state before the cutover.",
+      "suggested_fix": "Include a step to ensure the application is in a state that can safely revert to ES before executing the cutover rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:missing_steps:dual-query",
+      "task_id": "dual-query",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The plan may not cover handling scenarios where results from ES and OpenSearch are persistently divergent, which could affect reliability.",
+      "suggested_fix": "Consider adding a further check post-dual-query that encompasses handling cases of discrepancies beyond the initial comparison.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:missing_steps:cutover-verification",
+      "task_id": "cutover-verification",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The verification process for 'cutover-verification' may need to explicitly check if all application features can operate smoothly on OpenSearch post-cutover.",
+      "suggested_fix": "Add a check to ensure that all critical application features are functioning as expected after the cutover.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:missing_steps:retire",
+      "task_id": "retire",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The retirement plan for the old Elasticsearch cluster should include a more detailed rollback strategy in case the retirement fails but OpenSearch is still functional.",
+      "suggested_fix": "Include specifics on verifying OpenSearch's operational status before attempting to retire the old ES cluster.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:src-01-es-opensearch:4:4",
+    "plan_id": "plan-src-01-es-opensearch-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:provision",
+    "question": "Plan for goal 'src-01-es-opensearch' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

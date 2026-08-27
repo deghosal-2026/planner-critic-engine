@@ -51,7 +51,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 GOALS_ROOT = Path(__file__).resolve().parent.parent / "goals"
 RESULTS_ROOT = REPO_ROOT / "results" / "0.2.2"
 FIELD_TEST_DIR = Path(__file__).resolve().parent.parent  # docs/field-test
-BENCH_DIR_V021 = FIELD_TEST_DIR / "v0.2.1" / "scripts"
+BENCH_DIR = FIELD_TEST_DIR / "scripts"
 
 PROVIDERS = {
     "openai": ProviderSpec(
@@ -173,13 +173,27 @@ def run_goal(domain: str, gid: str, registry: ProviderRegistry, config: LoopConf
     }
 
 
+def _resolve_provider_output_dir(args, model_slug: str) -> Path:
+    provider_dir = f"{args.provider}-{model_slug}"
+    if not args.output:
+        return RESULTS_ROOT / provider_dir
+
+    output_path = Path(args.output)
+    # If the caller points at the release root (for example results/0.2.2),
+    # keep traces under the provider-specific directory so skip-existing can
+    # discover prior runs reliably.
+    if output_path.name == provider_dir:
+        return output_path
+    return output_path / provider_dir
+
+
 def run_goals_sweep(args) -> None:
     """Live goal sweep through the configured LLM provider."""
     domains = args.domain.split(",") if args.domain else None
     goal_ids = args.goals.split(",") if args.goals else None
     spec = PROVIDERS[args.provider]
     model_slug = spec.model.replace("/", "-").replace(".", "-")
-    output_dir = Path(args.output) if args.output else RESULTS_ROOT / f"{args.provider}-{model_slug}"
+    output_dir = _resolve_provider_output_dir(args, model_slug)
 
     scenarios = discover_goals(domains, goal_ids)
     if not scenarios:
@@ -223,7 +237,7 @@ def run_boundary_live(args) -> None:
     ~60 audits). Provider is overridden to match the --provider flag so the
     boundary run uses the same model as the goals sweep.
     """
-    script = BENCH_DIR_V021 / "bench_live_boundary.py"
+    script = BENCH_DIR / "bench_live_boundary.py"
     if not script.exists():
         print(f"[boundary] missing {script}")
         return
@@ -281,9 +295,9 @@ def run_benchmarks(args) -> None:
     """P4: hermetic bench scripts — cycling, operational, boundary self-test ($0)."""
     print("=== P4: benchmarks (hermetic, $0) ===\n")
     benches = [
-        ("cycling (#217 self-test)", BENCH_DIR_V021 / "bench_cycling.py", ["--self-test"]),
-        ("operational (#221)", BENCH_DIR_V021 / "bench_operational.py", []),
-        ("boundary (#218 self-test)", BENCH_DIR_V021 / "bench_live_boundary.py", ["--self-test"]),
+        ("cycling (#217 self-test)", BENCH_DIR / "bench_cycling.py", ["--self-test"]),
+        ("operational (#221)", BENCH_DIR / "bench_operational.py", []),
+        ("boundary (#218 self-test)", BENCH_DIR / "bench_live_boundary.py", ["--self-test"]),
     ]
     failed = []
     for label, script, extra in benches:

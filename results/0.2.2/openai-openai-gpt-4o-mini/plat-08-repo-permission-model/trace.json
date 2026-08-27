@@ -1,0 +1,459 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-08-repo-permission-model",
+  "duration_seconds": 38.41,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-plat-08-repo-permission-model-r2",
+    "goal_id": "plat-08-repo-permission-model",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plan-plat-08-v1",
+    "created_at": "2026-08-27T04:12:52.013864Z",
+    "tasks": [
+      {
+        "id": "inventory_permissions",
+        "description": "Inventory current per-repo permissions",
+        "action": "fetch",
+        "target": "repo_permissions",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "GitHub API is reachable",
+            "fact": "api_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "permissions inventory exists",
+          "how": "check inventory file",
+          "expected": "file is not empty"
+        },
+        "rollback": {
+          "trigger": "inventory fails",
+          "action": "revert to previous permissions list",
+          "safety_guard": "verify integrity of permissions list",
+          "restores_state": [
+            "previous permissions are restored"
+          ],
+          "restoration_evidence": "verify the active permissions list matches the previous"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "define_team_structure",
+        "description": "Define team structure and roles",
+        "action": "create",
+        "target": "team_structure",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Existing org hierarchy is available",
+            "fact": "org_hierarchy_available",
+            "established_by": "inventory_permissions",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "team structure is defined",
+          "how": "check team structure documentation",
+          "expected": "team structure matches expectations"
+        },
+        "rollback": {
+          "trigger": "team structure definition fails",
+          "action": "delete defined team structure",
+          "safety_guard": "confirm team structure deletion",
+          "restores_state": [
+            "previous team structure is reinstated"
+          ],
+          "restoration_evidence": "document old team structure for reference"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "create_teams",
+        "description": "Create teams and assign members",
+        "action": "create",
+        "target": "teams",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Team structure has been defined",
+            "fact": "team_structure_defined",
+            "established_by": "define_team_structure",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "teams exist in org",
+          "how": "fetch teams list from GitHub",
+          "expected": "teams match defined structure"
+        },
+        "rollback": {
+          "trigger": "team creation fails",
+          "action": "delete created teams",
+          "safety_guard": "verify team deletion is complete",
+          "restores_state": [
+            "previous teams are intact"
+          ],
+          "restoration_evidence": "check teams list for retained teams"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "apply_team_permissions",
+        "description": "Apply team-based permissions to repos",
+        "action": "apply",
+        "target": "repo_permissions",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Teams have been created",
+            "fact": "teams_created",
+            "established_by": "create_teams",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "team permissions applied correctly",
+          "how": "check repository access levels",
+          "expected": "access levels match team roles"
+        },
+        "rollback": {
+          "trigger": "permission application fails",
+          "action": "revert to per-repo permissions",
+          "safety_guard": "confirm permissions restored",
+          "restores_state": [
+            "previous permissions are active"
+          ],
+          "restoration_evidence": "verify active permissions match previous state"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "enable_branch_protection",
+        "description": "Enable branch protection rules",
+        "action": "set",
+        "target": "branch_protection",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Team-based permissions are applied",
+            "fact": "permissions_applied",
+            "established_by": "apply_team_permissions",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "branch protection rules are active",
+          "how": "check branch protection settings",
+          "expected": "branch protection is configured"
+        },
+        "rollback": {
+          "trigger": "branch protection application fails",
+          "action": "disable branch protection rules",
+          "safety_guard": "confirm branch protection is removed",
+          "restores_state": [
+            "previous branch protection settings are restored"
+          ],
+          "restoration_evidence": "verify that branch protection rules are reverted"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_access",
+        "description": "Verify access is correct per team",
+        "action": "check",
+        "target": "access_levels",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Branch protection rules are enabled",
+            "fact": "branch_protection_enabled",
+            "established_by": "enable_branch_protection",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "access matches requirements",
+          "how": "conduct access audit",
+          "expected": "all teams have correct access"
+        },
+        "rollback": {
+          "trigger": "access verification fails",
+          "action": "inspect access levels manually",
+          "safety_guard": "document access levels",
+          "restores_state": [
+            "previous access levels are preserved"
+          ],
+          "restoration_evidence": "check documentation for prior access settings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "remove_legacy_permissions",
+        "description": "Remove legacy per-repo permissions",
+        "action": "delete",
+        "target": "legacy_permissions",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Access has been verified correctly",
+            "fact": "access_verified",
+            "established_by": "verify_access",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "legacy permissions removed",
+          "how": "check permissions list",
+          "expected": "legacy permissions are absent"
+        },
+        "rollback": {
+          "trigger": "removal fails",
+          "action": "restore legacy permissions",
+          "safety_guard": "confirm restoration success",
+          "restores_state": [
+            "legacy permissions are active again"
+          ],
+          "restoration_evidence": "verify presence of restored legacy permissions"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "inventory_permissions",
+        "to_task": "define_team_structure",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "define_team_structure",
+        "to_task": "create_teams",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_teams",
+        "to_task": "apply_team_permissions",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "apply_team_permissions",
+        "to_task": "enable_branch_protection",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "enable_branch_protection",
+        "to_task": "verify_access",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_access",
+        "to_task": "remove_legacy_permissions",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:inventory_permissions",
+      "task_id": "inventory_permissions",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The task requires access to the GitHub API, which must be confirmed as reachable before proceeding.",
+      "suggested_fix": "Ensure access to the GitHub API is established before starting the task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:remove_legacy_permissions",
+      "task_id": "remove_legacy_permissions",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "This task is ordered before ensuring the safety of access verification, potentially leading to data loss.",
+      "suggested_fix": "Reorder the tasks to ensure that access is verified before removing legacy permissions.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:apply_team_permissions",
+      "task_id": "apply_team_permissions",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "This task's dependency on teams being created is not verified prior to execution.",
+      "suggested_fix": "Ensure that the creation of teams is successfully verified before executing this task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:apply_team_permissions",
+      "task_id": "apply_team_permissions",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "In case of permission application failure, there is a risk that reverting to per-repo permissions does not fully restore the previous state.",
+      "suggested_fix": "Implement a more robust rollback procedure to guarantee that all aspects of permissions are restored correctly.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:remove_legacy_permissions",
+      "task_id": "remove_legacy_permissions",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Restoration of legacy permissions is not guaranteed, which poses a risk if removal fails.",
+      "suggested_fix": "Define a clearer and more reliable rollback procedure that guarantees restoration of legacy permissions.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:risk:apply_team_permissions",
+      "task_id": "apply_team_permissions",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "The critical risk level of applying team permissions may lead to significant access issues without robust safeguards.",
+      "suggested_fix": null,
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:risk:enable_branch_protection",
+      "task_id": "enable_branch_protection",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Enabling branch protection rules has potential impacts on existing workflows that should be assessed before execution.",
+      "suggested_fix": null,
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:define_team_structure",
+      "task_id": "define_team_structure",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Could also cover how team roles align with existing project needs to prevent future access issues.",
+      "suggested_fix": null,
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:verify_access",
+      "task_id": "verify_access",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Could also include a contingency plan for immediate corrections following access verification.",
+      "suggested_fix": null,
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

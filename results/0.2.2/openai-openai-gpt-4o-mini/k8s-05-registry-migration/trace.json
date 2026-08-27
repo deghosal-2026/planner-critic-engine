@@ -1,0 +1,288 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-05-registry-migration",
+  "duration_seconds": 44.0,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-k8s-05-registry-migration-r3",
+    "goal_id": "k8s-05-registry-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-k8s-05-registry-migration-r2",
+    "created_at": "2026-08-27T04:22:38.876930Z",
+    "tasks": [
+      {
+        "id": "pull_images",
+        "description": "Pull current images from Docker Hub",
+        "action": "pull",
+        "target": "Docker Hub",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "image availability",
+          "how": "list images",
+          "expected": "all images exist"
+        },
+        "rollback": {
+          "trigger": "pull fails",
+          "action": "notify and retry",
+          "safety_guard": "check network stability",
+          "restores_state": [
+            "images pulled from Docker Hub"
+          ],
+          "restoration_evidence": "image list matches before pull"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "retag_images",
+        "description": "Retag images with ECR repository URI",
+        "action": "retag",
+        "target": "ECR",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "tag correctness",
+          "how": "check tags",
+          "expected": "all images tagged correctly"
+        },
+        "rollback": {
+          "trigger": "retag fails",
+          "action": "alert and revert to original tags",
+          "safety_guard": "verify original tags exist",
+          "restores_state": [
+            "original image tags"
+          ],
+          "restoration_evidence": "tag list matches before retag"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "push_images",
+        "description": "Push retagged images to ECR",
+        "action": "push",
+        "target": "ECR",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "image availability in ECR",
+          "how": "list images in ECR",
+          "expected": "all retagged images are present"
+        },
+        "rollback": {
+          "trigger": "push fails",
+          "action": "remove failed images from ECR",
+          "safety_guard": "ensure rollback is clean",
+          "restores_state": [
+            "images pushed to ECR"
+          ],
+          "restoration_evidence": "image availability check after rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update_manifests",
+        "description": "Update Deployment and StatefulSet manifests for new registry",
+        "action": "update",
+        "target": "Kubernetes manifests",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "images are available in ECR",
+            "fact": "images_in_ecr",
+            "established_by": "push_images",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "manifest correctness",
+          "how": "check manifests",
+          "expected": "all manifests point to ECR images"
+        },
+        "rollback": {
+          "trigger": "rollback required",
+          "action": "restore original manifests",
+          "safety_guard": "verify that original manifests are intact",
+          "restores_state": [
+            "original manifests"
+          ],
+          "restoration_evidence": "manifest state matches original before update"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "trigger_rolling_restart",
+        "description": "Trigger rolling restart for all services",
+        "action": "restart",
+        "target": "Kubernetes services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service status",
+          "how": "check pods",
+          "expected": "all pods running with no errors"
+        },
+        "rollback": {
+          "trigger": "restart fails",
+          "action": "revert to old Docker Hub references",
+          "safety_guard": "verify old image references",
+          "restores_state": [
+            "old Docker Hub references restored"
+          ],
+          "restoration_evidence": "image references restored to previous state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_service",
+        "description": "Verify every service pod pulls from ECR and serves traffic",
+        "action": "verify",
+        "target": "service pods",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "pod functionality",
+          "how": "monitor service traffic",
+          "expected": "all pods serve traffic normally"
+        },
+        "rollback": {
+          "trigger": "service verification fails",
+          "action": "re-establish Docker Hub references",
+          "safety_guard": "ensure traffic is directed correctly",
+          "restores_state": [
+            "old Docker Hub references restored"
+          ],
+          "restoration_evidence": "image references restored to previous state"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "pull_images",
+        "to_task": "retag_images",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "retag_images",
+        "to_task": "push_images",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "push_images",
+        "to_task": "update_manifests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_manifests",
+        "to_task": "trigger_rolling_restart",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "trigger_rolling_restart",
+        "to_task": "verify_service",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": [
+      {
+        "id": "rollback_branch",
+        "kind": "fan_out",
+        "tasks": [
+          "trigger_rolling_restart",
+          "update_manifests",
+          "push_images"
+        ],
+        "join": "any"
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "crit:3:feasibility:push_images",
+      "task_id": "push_images",
+      "version": 3,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Pushing to ECR might fail if credentials are not configured properly in the production environment.",
+      "suggested_fix": "Ensure AWS credentials are set up and have necessary permissions to push images to ECR.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:trigger_rolling_restart",
+      "task_id": "trigger_rolling_restart",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Triggering a rolling restart before confirming all images are successfully pulled and serve traffic may lead to service downtime.",
+      "suggested_fix": "Move 'trigger_rolling_restart' task after verifying that all service pods are running successfully.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-05-registry-migration:3:3",
+    "plan_id": "plan-k8s-05-registry-migration-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:feasibility:push_images",
+    "question": "Plan for goal 'k8s-05-registry-migration' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

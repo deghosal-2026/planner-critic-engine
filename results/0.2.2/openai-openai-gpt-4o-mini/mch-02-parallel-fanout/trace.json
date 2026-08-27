@@ -1,0 +1,346 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mch-02-parallel-fanout",
+  "duration_seconds": 51.06,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-mch-02-parallel-fanout-r2",
+    "goal_id": "mch-02-parallel-fanout",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "mch-02-parallel-fanout",
+    "created_at": "2026-08-27T04:18:20.577333Z",
+    "tasks": [
+      {
+        "id": "update-db",
+        "description": "Update the database schema",
+        "action": "apply",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "schema version",
+          "how": "run query to check version",
+          "expected": "v2"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "rollback to previous schema",
+          "safety_guard": "ensure backup integrity",
+          "restores_state": [
+            "previous schema"
+          ],
+          "restoration_evidence": "verify restored schema version"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update-cache",
+        "description": "Refresh the cache configuration",
+        "action": "apply",
+        "target": "cache",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cache service is running",
+            "fact": "cache_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "cache status",
+          "how": "check cache health",
+          "expected": "healthy"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "restore previous cache configuration",
+          "safety_guard": "validate previous cache",
+          "restores_state": [
+            "previous cache settings"
+          ],
+          "restoration_evidence": "verify restored cache configuration"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update-queue",
+        "description": "Deploy new queue settings",
+        "action": "apply",
+        "target": "queue",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "queue service is ready",
+            "fact": "queue_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "queue status",
+          "how": "check queue health",
+          "expected": "operational"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "restore previous queue settings",
+          "safety_guard": "validate previous queue configuration",
+          "restores_state": [
+            "previous queue settings"
+          ],
+          "restoration_evidence": "verify restored queue configuration"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update-search",
+        "description": "Update search index",
+        "action": "reindex",
+        "target": "search",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "index status",
+          "how": "check index health",
+          "expected": "healthy"
+        },
+        "rollback": {
+          "trigger": "reindexing fails",
+          "action": "restore previous index",
+          "safety_guard": "validate index integrity",
+          "restores_state": [
+            "previous index"
+          ],
+          "restoration_evidence": "verify restored index health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update-ml",
+        "description": "Deploy new ML model",
+        "action": "deploy",
+        "target": "ml_model",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "model accuracy",
+          "how": "run evaluation tests",
+          "expected": "accuracy >= 0.95"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to last stable model",
+          "safety_guard": "compare model performance",
+          "restores_state": [
+            "previous ML model"
+          ],
+          "restoration_evidence": "verify restored model accuracy"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update-cdn",
+        "description": "Update CDN configuration",
+        "action": "deploy",
+        "target": "cdn",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CDN service is reachable",
+            "fact": "cdn_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "CDN status",
+          "how": "check CDN health",
+          "expected": "operational"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "restore previous CDN configuration",
+          "safety_guard": "validate previous CDN",
+          "restores_state": [
+            "previous CDN settings"
+          ],
+          "restoration_evidence": "verify restored CDN configuration"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "update-db",
+        "to_task": "update-cache",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-db",
+        "to_task": "update-queue",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-db",
+        "to_task": "update-search",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-db",
+        "to_task": "update-ml",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-db",
+        "to_task": "update-cdn",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": [
+      {
+        "id": "subsystem-updates",
+        "kind": "fan_out",
+        "tasks": [
+          "update-db",
+          "update-cache",
+          "update-queue",
+          "update-search",
+          "update-ml",
+          "update-cdn"
+        ],
+        "join": "all"
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:update-cache",
+      "task_id": "update-cache",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'update-cache' depends on 'update-db' being completed, but it's not sequenced accordingly.",
+      "suggested_fix": "Reorder 'update-cache' to occur after 'update-db' to satisfy its hard dependency.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:update-queue",
+      "task_id": "update-queue",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'update-queue' depends on 'update-db' being completed, but it's not sequenced accordingly.",
+      "suggested_fix": "Reorder 'update-queue' to occur after 'update-db' to satisfy its hard dependency.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:update-search",
+      "task_id": "update-search",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'update-search' depends on 'update-db' being completed, but it's not sequenced accordingly.",
+      "suggested_fix": "Reorder 'update-search' to occur after 'update-db' to satisfy its hard dependency.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:update-ml",
+      "task_id": "update-ml",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'update-ml' depends on 'update-db' being completed, but it's not sequenced accordingly.",
+      "suggested_fix": "Reorder 'update-ml' to occur after 'update-db' to satisfy its hard dependency.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:update-cdn",
+      "task_id": "update-cdn",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'update-cdn' depends on 'update-db' being completed, but it's not sequenced accordingly.",
+      "suggested_fix": "Reorder 'update-cdn' to occur after 'update-db' to satisfy its hard dependency.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

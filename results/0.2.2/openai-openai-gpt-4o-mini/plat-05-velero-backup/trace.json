@@ -1,0 +1,475 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-05-velero-backup",
+  "duration_seconds": 54.06,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-plat-05-velero-backup-r3",
+    "goal_id": "plat-05-velero-backup",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-plat-05-velero-backup-r2",
+    "created_at": "2026-08-27T04:11:19.655729Z",
+    "tasks": [
+      {
+        "id": "install_velero",
+        "description": "Install Velero with AWS S3 plugin",
+        "action": "install",
+        "target": "velero",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kubernetes cluster is reachable",
+            "fact": "k8s_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "velero installation status",
+          "how": "check installation logs",
+          "expected": "installed successfully"
+        },
+        "rollback": {
+          "trigger": "installation fails",
+          "action": "remove velero",
+          "safety_guard": "ensure no remaining resources",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_backup_schedule",
+        "description": "Configure daily backup schedules with 30-day retention",
+        "action": "configure",
+        "target": "velero",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Velero is installed",
+            "fact": "velero_installed",
+            "established_by": "install_velero",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "backup schedule configuration",
+          "how": "check configuration files",
+          "expected": "scheduled backups configured"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "manual_backup",
+        "description": "Execute a manual backup",
+        "action": "backup",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Backup schedule is configured",
+            "fact": "backup_schedule_configured",
+            "established_by": "configure_backup_schedule",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "backup completion status",
+          "how": "query backup status",
+          "expected": "backup completed successfully"
+        },
+        "rollback": {
+          "trigger": "backup fails",
+          "action": "alert team",
+          "safety_guard": "check backup logs",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "full_restore",
+        "description": "Perform full restore to validation namespace",
+        "action": "restore",
+        "target": "validation_namespace",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Manual backup is completed",
+            "fact": "manual_backup_completed",
+            "established_by": "manual_backup",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "restore success",
+          "how": "validate resources in namespace",
+          "expected": "resources restored correctly"
+        },
+        "rollback": {
+          "trigger": "restore fails",
+          "action": "revert changes",
+          "safety_guard": "ensure previous state",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_functionality_post_restore",
+        "description": "Verify application functionality post-restore",
+        "action": "verify",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Full restore is completed",
+            "fact": "full_restore_completed",
+            "established_by": "full_restore",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application functionality",
+          "how": "run end-to-end tests",
+          "expected": "application works as expected"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "notify operations team",
+          "safety_guard": "document failure",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "validate_alerts_on_failure",
+        "description": "Validate automated alerts on backup failures",
+        "action": "validate",
+        "target": "alert_system",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Application functionality is verified",
+            "fact": "functionality_verified",
+            "established_by": "verify_functionality_post_restore",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "alert configuration",
+          "how": "test alert scenarios",
+          "expected": "alerts trigger on backup failure"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "install_velero",
+        "to_task": "configure_backup_schedule",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_backup_schedule",
+        "to_task": "manual_backup",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "manual_backup",
+        "to_task": "full_restore",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "full_restore",
+        "to_task": "verify_functionality_post_restore",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_functionality_post_restore",
+        "to_task": "validate_alerts_on_failure",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plan-plat-05-velero-backup-r3:3:install_velero:rollback_state_undeclared",
+      "task_id": "install_velero",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'install_velero' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-plat-05-velero-backup-r3:3:manual_backup:rollback_state_undeclared",
+      "task_id": "manual_backup",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'manual_backup' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-plat-05-velero-backup-r3:3:full_restore:rollback_state_undeclared",
+      "task_id": "full_restore",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'full_restore' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-plat-05-velero-backup-r3:3:verify_functionality_post_restore:rollback_state_undeclared",
+      "task_id": "verify_functionality_post_restore",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_functionality_post_restore' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-plat-05-velero-backup-r3:3:install_velero:rollback_state_undeclared",
+      "task_id": "install_velero",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'install_velero' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-plat-05-velero-backup-r3:3:manual_backup:rollback_state_undeclared",
+      "task_id": "manual_backup",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'manual_backup' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-plat-05-velero-backup-r3:3:full_restore:rollback_state_undeclared",
+      "task_id": "full_restore",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'full_restore' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-plat-05-velero-backup-r3:3:verify_functionality_post_restore:rollback_state_undeclared",
+      "task_id": "verify_functionality_post_restore",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_functionality_post_restore' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:configure_backup_schedule",
+      "task_id": "configure_backup_schedule",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'configure_backup_schedule' is ordered before confirming 'velero_installed'.",
+      "suggested_fix": "Change the sequence to ensure 'configure_backup_schedule' follows a successful verification of 'install_velero'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:weak_rollback:configure_backup_schedule",
+      "task_id": "configure_backup_schedule",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'configure_backup_schedule' lacks rollback measures which could lead to issues if configuration fails.",
+      "suggested_fix": "Implement a rollback action for 'configure_backup_schedule' to revert to a previous valid state if configuration fails.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:weak_rollback:manual_backup",
+      "task_id": "manual_backup",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'manual_backup' has inadequate rollback measures in case the backup fails.",
+      "suggested_fix": "Add a rollback action for 'manual_backup' to restore any state if the backup process is unsuccessful.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:weak_rollback:full_restore",
+      "task_id": "full_restore",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'full_restore' lacks a detailed rollback strategy to handle failures during the restoration process.",
+      "suggested_fix": "Improve the rollback mechanism for 'full_restore' to ensure that a reliable previous state can be restored after a failure.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:weak_rollback:verify_functionality_post_restore",
+      "task_id": "verify_functionality_post_restore",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'verify_functionality_post_restore' should include rollback plans to handle potential verification failures.",
+      "suggested_fix": "Introduce a rollback mechanism for 'verify_functionality_post_restore' to recover from verification failures.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:plat-05-velero-backup:3:3",
+    "plan_id": "plan-plat-05-velero-backup-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:configure_backup_schedule",
+    "question": "Plan for goal 'plat-05-velero-backup' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

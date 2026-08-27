@@ -1,0 +1,239 @@
+{
+  "dimension": "core-api",
+  "goal_id": "adv-01-billing-schema-migration",
+  "duration_seconds": 16.83,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-adv-01-billing-schema-migration-r2",
+    "goal_id": "adv-01-billing-schema-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "adv-01-billing-schema-migration-plan",
+    "created_at": "2026-08-27T03:52:48.501784Z",
+    "tasks": [
+      {
+        "id": "backup",
+        "description": "Back up the production billing database",
+        "action": "backup",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "backup integrity",
+          "how": "checksum comparison",
+          "expected": "match with original db"
+        },
+        "rollback": {
+          "trigger": "backup fails",
+          "action": "notify admin and halt operation",
+          "safety_guard": "confirm backup run time",
+          "restores_state": [
+            "db restored to previous state"
+          ],
+          "restoration_evidence": "backup checksum matched"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "peer_review",
+        "description": "Conduct peer review of migration script",
+        "action": "review",
+        "target": "migration_script",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "migration script is prepared",
+            "fact": "script_prepared",
+            "established_by": "backup",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "peer review completion",
+          "how": "review logs",
+          "expected": "review documented and approved"
+        },
+        "rollback": {
+          "trigger": "peer review fails",
+          "action": "notify team and require resubmission",
+          "safety_guard": "review report issued",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "run_migration",
+        "description": "Run ALTER TABLE, DROP COLUMN, and RENAME operations",
+        "action": "migrate",
+        "target": "billing_schema",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "schema version",
+          "how": "run checks",
+          "expected": "new_schema_version"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore from backup",
+          "safety_guard": "verify backup integrity",
+          "restores_state": [
+            "billing schema restored"
+          ],
+          "restoration_evidence": "schema version matches backup"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "feature_flag",
+        "description": "Toggle feature flag for new billing schema",
+        "action": "toggle",
+        "target": "feature_flag",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "migration is successful",
+            "fact": "migration_successful",
+            "established_by": "run_migration",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "feature flag status",
+          "how": "check feature flag settings",
+          "expected": "feature flag is enabled"
+        },
+        "rollback": {
+          "trigger": "feature flag toggle fails",
+          "action": "revert feature flag",
+          "safety_guard": "check previous state",
+          "restores_state": [
+            "feature flag reverted to previous state"
+          ],
+          "restoration_evidence": "previous setting confirmed"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "backup",
+        "to_task": "peer_review",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "peer_review",
+        "to_task": "run_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_migration",
+        "to_task": "feature_flag",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:run_migration",
+      "task_id": "run_migration",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'run_migration' depends on 'migration_successful', but there is no prior verification that establishes this fact.",
+      "suggested_fix": "Add a verification step to confirm that 'run_migration' was successful before the execution of 'feature_flag'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:run_migration",
+      "task_id": "run_migration",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for 'run_migration' relies on restoring from backup, but it lacks a clear indication of how to confirm the successful restoration.",
+      "suggested_fix": "Include a verification step in the rollback plan to ensure that the schema restoration is verified against the backup.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:peer_review",
+      "task_id": "peer_review",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The 'peer_review' task should include a precondition to ensure that the migration script has passed initial testing before it can be reviewed.",
+      "suggested_fix": "Add a step to validate that the script has passed necessary tests prior to peer review.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:risk:run_migration",
+      "task_id": "run_migration",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Running migration directly on production without a simulated environment increase the risk of potential issues.",
+      "suggested_fix": "Consider executing the migration in a staging environment first to mitigate risks.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,351 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-10-multi-tenant-split",
+  "duration_seconds": 91.97,
+  "result": {
+    "status": "escalated",
+    "reason_code": "plan_oscillation_detected",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-db-10-multi-tenant-split-r4",
+    "goal_id": "db-10-multi-tenant-split",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-db-10-multi-tenant-split-r3",
+    "created_at": "2026-08-27T03:15:48.217818Z",
+    "tasks": [
+      {
+        "id": "enumerate-tenants",
+        "description": "Enumerate all tenants in the shared database",
+        "action": "query",
+        "target": "shared_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "shared database is accessible",
+            "fact": "shared_db_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "provision-db",
+        "description": "Provision dedicated databases for each tenant",
+        "action": "create_db",
+        "target": "tenant_dbs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "tenant enumeration completed",
+            "fact": "tenants_enumerated",
+            "established_by": "enumerate-tenants",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "dedicated database existence",
+          "how": "check database list",
+          "expected": "all tenant databases exist"
+        },
+        "rollback": {
+          "trigger": "db provision fails",
+          "action": "delete created databases",
+          "safety_guard": "verify no connections are made",
+          "restores_state": [
+            "previous state of the database system"
+          ],
+          "restoration_evidence": "confirmed lack of tenant connection"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "migrate-data",
+        "description": "Migrate tenant data with row-level filtering",
+        "action": "migrate",
+        "target": "tenant_dbs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dedicated databases provisioned",
+            "fact": "dedicated_dbs_provisioned",
+            "established_by": "provision-db",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "row counts for each tenant",
+          "how": "run count queries",
+          "expected": "row counts match original data"
+        },
+        "rollback": {
+          "trigger": "data migration fails",
+          "action": "restore data from backup",
+          "safety_guard": "verify data integrity",
+          "restores_state": [
+            "previous state of tenant data"
+          ],
+          "restoration_evidence": "data integrity checks passed"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "setup-routing-layer",
+        "description": "Set up connection routing layer for tenants",
+        "action": "configure",
+        "target": "HAProxy",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "data migration completed",
+            "fact": "data_migrated",
+            "established_by": "migrate-data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "routing configuration is applied",
+          "how": "check HAProxy configuration",
+          "expected": "routing rules are in place"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "dual-write",
+        "description": "Implement dual-write to both shared and per-tenant databases",
+        "action": "configure",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "routing layer set up",
+            "fact": "routing_layer_ready",
+            "established_by": "setup-routing-layer",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "write success rate",
+          "how": "monitor logs",
+          "expected": "success rate > 95%"
+        },
+        "rollback": {
+          "trigger": "dual-write fails",
+          "action": "disable dual-write",
+          "safety_guard": "ensure write consistency",
+          "restores_state": [
+            "previous write configuration"
+          ],
+          "restoration_evidence": "log of successful writes before failure"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-row-counts",
+        "description": "Verify row counts for migrated tenants",
+        "action": "check",
+        "target": "tenant_dbs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "data migration completed",
+            "fact": "data_migrated",
+            "established_by": "migrate-data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "row counts validated",
+          "how": "compare counts",
+          "expected": "counts match expected row counts"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover-connections",
+        "description": "Cutover application connections tenant-by-tenant",
+        "action": "update",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "verified row counts for tenants",
+            "fact": "row_counts_verified",
+            "established_by": "verify-row-counts",
+            "probe": null
+          },
+          {
+            "description": "dual-write set up",
+            "fact": "dual_write_enabled",
+            "established_by": "dual-write",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application performance and connection status",
+          "how": "monitor application metrics",
+          "expected": "performance within acceptable limits"
+        },
+        "rollback": {
+          "trigger": "cutover issue",
+          "action": "revert application connections to shared DB",
+          "safety_guard": "check application health",
+          "restores_state": [
+            "previous configuration of application connections"
+          ],
+          "restoration_evidence": "performance metrics logged prior to cutover"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "enumerate-tenants",
+        "to_task": "provision-db",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provision-db",
+        "to_task": "migrate-data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate-data",
+        "to_task": "setup-routing-layer",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup-routing-layer",
+        "to_task": "dual-write",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate-data",
+        "to_task": "verify-row-counts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-row-counts",
+        "to_task": "cutover-connections",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dual-write",
+        "to_task": "cutover-connections",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:cutover-connections",
+      "task_id": "cutover-connections",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Cutover application connections should not occur before both row counts have been verified and dual-write is confirmed to be successful.",
+      "suggested_fix": "Reorder the task to ensure 'verify-row-counts' and 'dual-write' complete before 'cutover-connections'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:setup-routing-layer",
+      "task_id": "setup-routing-layer",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The task lacks a rollback plan in case of failure, risking application stability during routing configuration.",
+      "suggested_fix": "Implement a rollback action to revert HAProxy configuration to its previous state if the setup fails.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:dual-write",
+      "task_id": "dual-write",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task depends on 'setup-routing-layer', but 'setup-routing-layer' does not have a verification mechanism to confirm successful routing setup.",
+      "suggested_fix": "Add a verification step to 'setup-routing-layer' to ensure that the routing configuration is correctly applied prior to proceeding with 'dual-write'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-10-multi-tenant-split:4:4",
+    "plan_id": "plan-db-10-multi-tenant-split-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:cutover-connections",
+    "question": "Plan for goal 'db-10-multi-tenant-split' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

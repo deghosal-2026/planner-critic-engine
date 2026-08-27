@@ -1,0 +1,239 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-05-chaos-experiment",
+  "duration_seconds": 36.32,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-obs-05-chaos-experiment-r3",
+    "goal_id": "obs-05-chaos-experiment",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-obs-05-chaos-experiment-r2",
+    "created_at": "2026-08-27T04:19:05.885891Z",
+    "tasks": [
+      {
+        "id": "inject-chaos",
+        "description": "Inject a pod-kill chaos into the inventory service",
+        "action": "inject",
+        "target": "chaos-mesh",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "chaos status",
+          "how": "check chaos-mesh dashboard",
+          "expected": "chaos is active"
+        },
+        "rollback": {
+          "trigger": "chaos injection fails",
+          "action": "remove chaos injection",
+          "safety_guard": "verify chaos is not active",
+          "restores_state": [
+            "chaos is inactive"
+          ],
+          "restoration_evidence": "verify chaos status is inactive"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "observe-recovery",
+        "description": "Observe recovery time via Prometheus liveness probe metrics",
+        "action": "observe",
+        "target": "prometheus",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "chaos injection is active",
+            "fact": "chaos_active",
+            "established_by": "inject-chaos",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "recovery time",
+          "how": "query Prometheus metrics",
+          "expected": "recovery time < 30s"
+        },
+        "rollback": {
+          "trigger": "observation fails",
+          "action": "retry observation",
+          "safety_guard": "ensure metrics are accessible",
+          "restores_state": [
+            "recovery observation metrics"
+          ],
+          "restoration_evidence": "check metrics after retry"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-rollback",
+        "description": "Verify rollback to original replica count",
+        "action": "verify",
+        "target": "kubectl",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replica count",
+          "how": "kubectl get deployments",
+          "expected": "replica count matches original"
+        },
+        "rollback": {
+          "trigger": "rollback verification fails",
+          "action": "restore original replica count",
+          "safety_guard": "check desired replica count",
+          "restores_state": [
+            "original replica count restored"
+          ],
+          "restoration_evidence": "verify replica count matches original"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "generate-report",
+        "description": "Generate a chaos report with time-to-recover measurement",
+        "action": "generate",
+        "target": "grafana",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "recovery time is measured",
+            "fact": "recovery_time_measured",
+            "established_by": "observe-recovery",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "chaos report generated",
+          "how": "check generated report in grafana",
+          "expected": "report includes time-to-recover metrics"
+        },
+        "rollback": {
+          "trigger": "report generation fails",
+          "action": "retry report generation",
+          "safety_guard": "ensure reporting tool is functional",
+          "restores_state": [
+            "chaos report state"
+          ],
+          "restoration_evidence": "verify report generated"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "inject-chaos",
+        "to_task": "observe-recovery",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "observe-recovery",
+        "to_task": "verify-rollback",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-rollback",
+        "to_task": "generate-report",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:observe-recovery",
+      "task_id": "observe-recovery",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'observe-recovery' is sequenced before 'inject-chaos' has confirmed the chaos injection status as active.",
+      "suggested_fix": "Reorder tasks to ensure 'inject-chaos' completes successfully and verifies chaos is active before 'observe-recovery' executes.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:verify-rollback",
+      "task_id": "verify-rollback",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'verify-rollback' depends on 'observe-recovery' verifying the recovery time, yet it has no precondition linking it back to 'inject-chaos'.",
+      "suggested_fix": "Establish a direct dependency on the result of the 'observe-recovery' task, ensuring its precondition verifies that chaos is active.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:generate-report",
+      "task_id": "generate-report",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'generate-report' depends on 'observe-recovery' without proper verification of the recovery time being measured before execution.",
+      "suggested_fix": "Ensure the 'observe-recovery' task confirms recovery time measurement before proceeding with 'generate-report'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:obs-05-chaos-experiment:3:3",
+    "plan_id": "plan-obs-05-chaos-experiment-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:observe-recovery",
+    "question": "Plan for goal 'obs-05-chaos-experiment' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

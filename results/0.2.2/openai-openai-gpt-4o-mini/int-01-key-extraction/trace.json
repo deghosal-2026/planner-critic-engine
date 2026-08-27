@@ -1,0 +1,372 @@
+{
+  "dimension": "core-api",
+  "goal_id": "int-01-key-extraction",
+  "duration_seconds": 50.0,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-int-01-key-extraction-r3",
+    "goal_id": "int-01-key-extraction",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-int-01-key-extraction-r2",
+    "created_at": "2026-08-27T03:13:22.766482Z",
+    "tasks": [
+      {
+        "id": "scan_strings",
+        "description": "Automated scan for hardcoded strings in components",
+        "action": "scan",
+        "target": "components",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "application code is accessible",
+            "fact": "code_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "found hardcoded strings",
+          "how": "review scan output",
+          "expected": "list of hardcoded strings"
+        },
+        "rollback": {
+          "trigger": "scan fails",
+          "action": "revert to previous state",
+          "safety_guard": "ensure no partial results",
+          "restores_state": [
+            "components state before scan"
+          ],
+          "restoration_evidence": "confirm scan results are not applied"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "review_strings",
+        "description": "Manual review of hardcoded strings found by scan",
+        "action": "review",
+        "target": "scan results",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "scan has completed successfully",
+            "fact": "scan_successful",
+            "established_by": "scan_strings",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "review results",
+          "how": "document findings and necessary changes",
+          "expected": "clear documentation of hardcoded strings and proposed changes"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "extract_keys",
+        "description": "Extract strings to key files (messages.en.json)",
+        "action": "extract",
+        "target": "key files",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "review of strings completed",
+            "fact": "review_completed",
+            "established_by": "review_strings",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "key files content",
+          "how": "compare with expected output",
+          "expected": "all keys extracted correctly"
+        },
+        "rollback": {
+          "trigger": "extraction fails",
+          "action": "restore original files",
+          "safety_guard": "backup key files",
+          "restores_state": [
+            "original key files state"
+          ],
+          "restoration_evidence": "verify original files are intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "refactor_code",
+        "description": "Modify code to use i18n keys instead of hardcoded strings",
+        "action": "refactor",
+        "target": "application code",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "keys have been successfully extracted",
+            "fact": "keys_extracted",
+            "established_by": "extract_keys",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "code compiles and runs",
+          "how": "run the application",
+          "expected": "no errors related to key lookups"
+        },
+        "rollback": {
+          "trigger": "refactoring fails",
+          "action": "revert code to use hardcoded strings",
+          "safety_guard": "ensure all changes are backed up",
+          "restores_state": [
+            "application code state before refactor"
+          ],
+          "restoration_evidence": "confirm code is reverted successfully"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_rendering",
+        "description": "Verify each component renders correctly with i18n keys",
+        "action": "test",
+        "target": "components",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "code refactor has completed",
+            "fact": "refactor_completed",
+            "established_by": "refactor_code",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "component rendering",
+          "how": "run rendering tests",
+          "expected": "all components render without errors"
+        },
+        "rollback": {
+          "trigger": "rendering issues found",
+          "action": "revert to hardcoded strings",
+          "safety_guard": "ensure rollback completeness",
+          "restores_state": [
+            "component state before rendering test"
+          ],
+          "restoration_evidence": "confirm components render with original strings"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "ship",
+        "description": "Deploy the changes to production",
+        "action": "deploy",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "all tests passed",
+            "fact": "tests_passed",
+            "established_by": "verify_rendering",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployed version",
+          "how": "check deployment logs",
+          "expected": "version shows new i18n integrations"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to previous production version",
+          "safety_guard": "ensure rollback script is ready",
+          "restores_state": [
+            "production state before deployment"
+          ],
+          "restoration_evidence": "verify production version matches previous state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "scan_strings",
+        "to_task": "review_strings",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "review_strings",
+        "to_task": "extract_keys",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "extract_keys",
+        "to_task": "refactor_code",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "refactor_code",
+        "to_task": "verify_rendering",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_rendering",
+        "to_task": "ship",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:feasibility:refactor_code",
+      "task_id": "refactor_code",
+      "version": 3,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Refactoring code to use i18n keys could lead to application failure if the key extraction fails, as hardcoded strings will be removed without proper fallback.",
+      "suggested_fix": "Ensure a backup of the original code persists until rendering verification is completed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:weak_rollback:ship",
+      "task_id": "ship",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Shipping the deployment lacks a robust rollback plan; reverting to prior versions may not account for data integrity or state consistency.",
+      "suggested_fix": "Implement a more comprehensive rollback strategy that ensures complete restoration of both code and state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:ship",
+      "task_id": "ship",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'ship' task depends on verification of rendering, but there's a risk of unverified changes leading to deployment failures.",
+      "suggested_fix": "Add a verification step post-deployment to confirm that functionality aligns with expectations.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:missing_steps:refactor_code",
+      "task_id": "refactor_code",
+      "version": 3,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider including a step to test the refactored code in a development environment before merging into production.",
+      "suggested_fix": "Introduce a staging step for testing refactored code to mitigate risks indicating that the application may not function as expected.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:risk:extract_keys",
+      "task_id": "extract_keys",
+      "version": 3,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Extracting keys does not provide insight into dynamic string handling, which carries a high risk of UI errors if improperly managed.",
+      "suggested_fix": "Include specific tests for dynamic string scenarios to preemptively mitigate these risks.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:missing_steps:verify_rendering",
+      "task_id": "verify_rendering",
+      "version": 3,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No specific plan for handling edge cases where components may not render due to dynamic keys or unexpected inputs.",
+      "suggested_fix": "Outline additional testing procedures covering edge cases and exceptional flows during rendering verification.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:int-01-key-extraction:3:3",
+    "plan_id": "plan-int-01-key-extraction-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:feasibility:refactor_code",
+    "question": "Plan for goal 'int-01-key-extraction' cannot be approved: blockers remain (llm_feasibility; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

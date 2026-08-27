@@ -1,0 +1,323 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-07-distributed-tracing",
+  "duration_seconds": 35.25,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-obs-07-distributed-tracing-r2",
+    "goal_id": "obs-07-distributed-tracing",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plan-obs-07-distributed-tracing",
+    "created_at": "2026-08-27T04:20:07.205135Z",
+    "tasks": [
+      {
+        "id": "instrument_services",
+        "description": "Instrument all microservices with OpenTelemetry SDK",
+        "action": "instrument",
+        "target": "microservices",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Microservices are operational",
+            "fact": "services_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "instrumentation correctness",
+          "how": "check for tracing spans",
+          "expected": "all services report traces"
+        },
+        "rollback": {
+          "trigger": "instrumentation fails",
+          "action": "remove instrumentation and revert changes",
+          "safety_guard": "verify service functionality",
+          "restores_state": [
+            "services are uninstrumented"
+          ],
+          "restoration_evidence": "service functionality is intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy_jaeger",
+        "description": "Deploy Jaeger collector",
+        "action": "deploy",
+        "target": "Jaeger",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kubernetes cluster is ready",
+            "fact": "k8s_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_exporters",
+        "description": "Configure trace exporters for each service",
+        "action": "configure",
+        "target": "exporters",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Jaeger is deployed",
+            "fact": "jaeger_deployed",
+            "established_by": "deploy_jaeger",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "add_trace_correlation_ids",
+        "description": "Add trace correlation IDs to logs",
+        "action": "modify",
+        "target": "microservices-logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "All services are instrumented",
+            "fact": "services_instrumented",
+            "established_by": "instrument_services",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "log entries with correlation IDs",
+          "how": "check log outputs",
+          "expected": "logs contain correlation IDs"
+        },
+        "rollback": {
+          "trigger": "log modification fails",
+          "action": "remove correlation IDs from logs",
+          "safety_guard": "ensure logs are intact",
+          "restores_state": [
+            "logs without correlation IDs"
+          ],
+          "restoration_evidence": "logs are verified for integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "set_up_alerting",
+        "description": "Set up alerting on p99 latency anomalies",
+        "action": "configure",
+        "target": "Prometheus",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Traces are propagated successfully",
+            "fact": "traces_propagated",
+            "established_by": "add_trace_correlation_ids",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "alert configuration",
+          "how": "check alert rules in Prometheus",
+          "expected": "alerts are correctly configured"
+        },
+        "rollback": {
+          "trigger": "alert configuration fails",
+          "action": "remove alert rules",
+          "safety_guard": "ensure monitoring continues",
+          "restores_state": [
+            "previous alert configuration"
+          ],
+          "restoration_evidence": "monitoring is verified"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_trace_propagation",
+        "description": "Verify trace propagation across service boundaries",
+        "action": "validate",
+        "target": "cross-service-tracing",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Logging has correlation IDs",
+            "fact": "correlation_ids_in_logs",
+            "established_by": "add_trace_correlation_ids",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "trace spans across services",
+          "how": "analyze tracing data in Jaeger",
+          "expected": "traces span across all services correctly"
+        },
+        "rollback": {
+          "trigger": "trace propagation fails",
+          "action": "revert to previous trace implementation",
+          "safety_guard": "confirm service integrity",
+          "restores_state": [
+            "previous trace implementation"
+          ],
+          "restoration_evidence": "traces must span previously"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "instrument_services",
+        "to_task": "add_trace_correlation_ids",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_jaeger",
+        "to_task": "configure_exporters",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "add_trace_correlation_ids",
+        "to_task": "set_up_alerting",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set_up_alerting",
+        "to_task": "verify_trace_propagation",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:add_trace_correlation_ids",
+      "task_id": "add_trace_correlation_ids",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'Add trace correlation IDs to logs' is ordered before verifying that trace propagation succeeds, which is a prerequisite for adding correlation IDs. This creates a risk of adding correlation IDs to logs without confirmed trace propagation.",
+      "suggested_fix": "Reorder the tasks to ensure 'verify_trace_propagation' is completed before 'add_trace_correlation_ids'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:set_up_alerting",
+      "task_id": "set_up_alerting",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'Set up alerting on p99 latency anomalies' depends on the fact 'traces_propagated', which has not been definitively established by an earlier task.",
+      "suggested_fix": "Ensure that 'verify_trace_propagation' is a prerequisite for 'set_up_alerting' to verify the successful propagation of traces before setting up alerts.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:set_up_alerting",
+      "task_id": "set_up_alerting",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'Set up alerting' does not verify that the monitoring system continues to function properly after removal of alert rules, which could leave the system unmonitored during rollback.",
+      "suggested_fix": "Enhance the rollback by adding checks to ensure that monitoring functionality is still intact after removing alert rules.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:deploy_jaeger",
+      "task_id": "deploy_jaeger",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The step 'Deploy Jaeger collector' does not include verification steps to ensure Jaeger has been deployed correctly and is operational before proceeding with further tasks.",
+      "suggested_fix": "Add a verification step after 'deploy_jaeger' to confirm Jaeger is running properly.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:instrument_services",
+      "task_id": "instrument_services",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The instrumentation task does not account for the potential overhead and performance impacts. Including a performance verification step post-instrumentation could be beneficial.",
+      "suggested_fix": "Include a step to monitor performance impact after instrumentation to ensure service performance thresholds are met.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

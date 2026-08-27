@@ -1,0 +1,368 @@
+{
+  "dimension": "core-api",
+  "goal_id": "msg-02-dlq-restructure",
+  "duration_seconds": 12.53,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "msg-02-dlq-restructure",
+    "goal_id": "msg-02-dlq-restructure",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-27T04:21:16.403467Z",
+    "tasks": [
+      {
+        "id": "define_dlq_policy",
+        "description": "Define DLQ policy with max retries and exponential backoff",
+        "action": "define",
+        "target": "dlq_policy",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kafka cluster is operational",
+            "fact": "kafka_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_retry_topics",
+        "description": "Configure retry topics with delay settings",
+        "action": "configure",
+        "target": "retry_topics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DLQ policy is defined",
+            "fact": "dlq_policy_defined",
+            "established_by": "define_dlq_policy",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "route_failed_messages",
+        "description": "Route failed messages to new DLQ",
+        "action": "route",
+        "target": "new_dlq",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "message routing",
+          "how": "check route configurations",
+          "expected": "messages routed correctly to DLQ"
+        },
+        "rollback": {
+          "trigger": "routing fails",
+          "action": "revert routing changes",
+          "safety_guard": "ensure no messages are lost",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "backfill_messages",
+        "description": "Backfill messages from old DLQ to new retry topology",
+        "action": "backfill",
+        "target": "new_retry_topology",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "message integrity",
+          "how": "compare old and new DLQ messages",
+          "expected": "no duplicates in new retry topology"
+        },
+        "rollback": {
+          "trigger": "backfill fails",
+          "action": "clear new topic",
+          "safety_guard": "verify no duplicates exist",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_redelivery",
+        "description": "Verify that redelivery of messages works as intended",
+        "action": "verify",
+        "target": "retry_mechanism",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "message delivery",
+          "how": "monitor delivery logs",
+          "expected": "all messages delivered successfully"
+        },
+        "rollback": {
+          "trigger": "redelivery fails",
+          "action": "restore previous retry settings",
+          "safety_guard": "ensure messages can still be delivered",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor_dlq_depth",
+        "description": "Monitor DLQ depth for anomalies",
+        "action": "monitor",
+        "target": "dlq_depth",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define_dlq_policy",
+        "to_task": "configure_retry_topics",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_retry_topics",
+        "to_task": "route_failed_messages",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "route_failed_messages",
+        "to_task": "backfill_messages",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "backfill_messages",
+        "to_task": "verify_redelivery",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_redelivery",
+        "to_task": "monitor_dlq_depth",
+        "kind": "soft",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:msg-02-dlq-restructure:1:route_failed_messages:rollback_state_undeclared",
+      "task_id": "route_failed_messages",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'route_failed_messages' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:msg-02-dlq-restructure:1:backfill_messages:rollback_state_undeclared",
+      "task_id": "backfill_messages",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'backfill_messages' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:msg-02-dlq-restructure:1:verify_redelivery:rollback_state_undeclared",
+      "task_id": "verify_redelivery",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_redelivery' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:msg-02-dlq-restructure:1:route_failed_messages:rollback_state_undeclared",
+      "task_id": "route_failed_messages",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'route_failed_messages' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:msg-02-dlq-restructure:1:backfill_messages:rollback_state_undeclared",
+      "task_id": "backfill_messages",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'backfill_messages' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:msg-02-dlq-restructure:1:verify_redelivery:rollback_state_undeclared",
+      "task_id": "verify_redelivery",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_redelivery' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:unverified_dependencies:configure_retry_topics",
+      "task_id": "configure_retry_topics",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task depends on 'dlq_policy_defined' which is not verified in the rollback or the verification section of 'define_dlq_policy'.",
+      "suggested_fix": "Add verification for the definition of DLQ policy in the 'define_dlq_policy' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:missing_steps:route_failed_messages",
+      "task_id": "route_failed_messages",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The task does not have preconditions ensuring the successful definition of the DLQ policy, which could lead to routing failures.",
+      "suggested_fix": "Add a precondition to verify that 'dlq_policy_defined' is true before routing failed messages.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:weak_rollback:backfill_messages",
+      "task_id": "backfill_messages",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for this task only clears the new topic but does not ensure that the operation can be safely retried without duplicates.",
+      "suggested_fix": "Implement a more robust rollback plan that verifies the integrity of messages before clearing the new topic.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:weak_rollback:verify_redelivery",
+      "task_id": "verify_redelivery",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback does not account for ensuring system stability or message integrity in case of rollback activation.",
+      "suggested_fix": "Include additional steps in rollback to confirm the system's readiness for retry after restoring previous settings.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

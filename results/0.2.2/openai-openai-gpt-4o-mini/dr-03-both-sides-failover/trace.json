@@ -1,0 +1,270 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dr-03-both-sides-failover",
+  "duration_seconds": 22.86,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-dr-03-both-sides-failover-r2",
+    "goal_id": "dr-03-both-sides-failover",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "dr-03-both-sides-failover-plan",
+    "created_at": "2026-08-27T04:02:33.623196Z",
+    "tasks": [
+      {
+        "id": "failover_dns",
+        "description": "Failover DNS from primary to secondary region",
+        "action": "failover",
+        "target": "Route53",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "DNS resolution",
+          "how": "check DNS records",
+          "expected": "resolve to secondary region"
+        },
+        "rollback": {
+          "trigger": "DNS failover fails",
+          "action": "revert DNS to primary region",
+          "safety_guard": "verify DNS resolves to primary region",
+          "restores_state": [
+            "DNS reverted to primary"
+          ],
+          "restoration_evidence": "DNS records match primary region"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "scale_up_secondary_app",
+        "description": "Scale up application deployment in secondary region",
+        "action": "scale_up",
+        "target": "app_secondary",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "app health in secondary region",
+          "how": "run health checks",
+          "expected": "app is healthy"
+        },
+        "rollback": {
+          "trigger": "scale up fails",
+          "action": "scale down secondary application",
+          "safety_guard": "verify secondary is not serving traffic",
+          "restores_state": [
+            "secondary app scaled down"
+          ],
+          "restoration_evidence": "secondary app health matches pre-scale up state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "scale_down_primary_app",
+        "description": "Scale down application deployment in primary region",
+        "action": "scale_down",
+        "target": "app_primary",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Secondary application is healthy",
+            "fact": "app_secondary_healthy",
+            "established_by": "scale_up_secondary_app",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "primary app health",
+          "how": "run health checks",
+          "expected": "app is healthy"
+        },
+        "rollback": {
+          "trigger": "scale down fails",
+          "action": "scale up primary application",
+          "safety_guard": "verify primary app is not serving traffic",
+          "restores_state": [
+            "primary app scaled up"
+          ],
+          "restoration_evidence": "primary app health matches pre-scale down state"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_data_consistency",
+        "description": "Verify data consistency between primary and secondary regions",
+        "action": "verify",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data consistency",
+          "how": "compare data snapshots",
+          "expected": "data matches between regions"
+        },
+        "rollback": {
+          "trigger": "data inconsistency found",
+          "action": "revert to previous state",
+          "safety_guard": "backup data prior to verification",
+          "restores_state": [
+            "data consistency restored"
+          ],
+          "restoration_evidence": "data matches previous state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutback_traffic_primary",
+        "description": "Cut back traffic to primary application",
+        "action": "cutback",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "traffic patterns",
+          "how": "analyze traffic logs",
+          "expected": "traffic is stable without split-brain"
+        },
+        "rollback": {
+          "trigger": "cutback leads to split-brain",
+          "action": "restore traffic priorities",
+          "safety_guard": "monitor traffic patterns after cutback",
+          "restores_state": [
+            "traffic priorities restored to previous state"
+          ],
+          "restoration_evidence": "traffic patterns match pre-cutback state"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "failover_dns",
+        "to_task": "scale_up_secondary_app",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "scale_up_secondary_app",
+        "to_task": "scale_down_primary_app",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "scale_down_primary_app",
+        "to_task": "verify_data_consistency",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_data_consistency",
+        "to_task": "cutback_traffic_primary",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:scale_down_primary_app",
+      "task_id": "scale_down_primary_app",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'scale_down_primary_app' is sequenced before 'verify_data_consistency', which is a hard prerequisite.",
+      "suggested_fix": "Reorder the tasks to execute 'verify_data_consistency' before 'scale_down_primary_app'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:cutback_traffic_primary",
+      "task_id": "cutback_traffic_primary",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'cutback_traffic_primary' depends on a fact 'app_secondary_healthy' that is never established by an earlier task.",
+      "suggested_fix": "Ensure that 'app_secondary_healthy' is verified before cutting back traffic.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:cutback_traffic_primary",
+      "task_id": "cutback_traffic_primary",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'cutback_traffic_primary' does not guarantee that traffic prior to cutback will be restored completely.",
+      "suggested_fix": "Implement a rollback that ensures all traffic is restored to the previous state, not just traffic priorities.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:risk:verify_data_consistency",
+      "task_id": "verify_data_consistency",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Verifying data consistency without ensuring network stability might lead to issues if changes are not synchronized properly.",
+      "suggested_fix": "Consider adding a check for network stability before verifying data consistency.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

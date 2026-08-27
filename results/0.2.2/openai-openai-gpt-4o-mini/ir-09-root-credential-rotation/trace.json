@@ -1,0 +1,267 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-09-root-credential-rotation",
+  "duration_seconds": 43.51,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-ir-09-root-credential-rotation-r3",
+    "goal_id": "ir-09-root-credential-rotation",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-ir-09-root-credential-rotation-r2",
+    "created_at": "2026-08-27T04:09:32.640961Z",
+    "tasks": [
+      {
+        "id": "revoke-credentials",
+        "description": "Revoke compromised AWS root account and GitHub admin token",
+        "action": "revoke",
+        "target": "credentials",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "credential status",
+          "how": "check revocation logs",
+          "expected": "revoked"
+        },
+        "rollback": {
+          "trigger": "revocation fails",
+          "action": "retry revocation",
+          "safety_guard": "verify access is still revoked",
+          "restores_state": [
+            "credentials revoked"
+          ],
+          "restoration_evidence": "revocation logs show revocation success"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "rotate-credentials",
+        "description": "Rotate all dependent credentials (IAM keys, OAuth tokens, service accounts)",
+        "action": "rotate",
+        "target": "dependent-credentials",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "credential functionality",
+          "how": "test API access",
+          "expected": "successful access"
+        },
+        "rollback": {
+          "trigger": "rotation fails",
+          "action": "restore previous credentials and dependent services",
+          "safety_guard": "verify functionality of restored credentials and service dependencies",
+          "restores_state": [
+            "previous credentials restored",
+            "dependent services restored to functional state"
+          ],
+          "restoration_evidence": "functionality tests confirm restoration success"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "audit-logs",
+        "description": "Audit CloudTrail and GitHub logs for unauthorized actions",
+        "action": "audit",
+        "target": "logs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "audit findings",
+          "how": "report generation",
+          "expected": "no unauthorized actions found"
+        },
+        "rollback": {
+          "trigger": "audit fails",
+          "action": "re-run audit",
+          "safety_guard": "preserve original log files",
+          "restores_state": [
+            "original audit state restored"
+          ],
+          "restoration_evidence": "original logs verified against new audit"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "revert-changes",
+        "description": "Identify and revert any unauthorized changes",
+        "action": "revert",
+        "target": "services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service state",
+          "how": "check service health",
+          "expected": "operational"
+        },
+        "rollback": {
+          "trigger": "reversion fails",
+          "action": "roll back to last stable state",
+          "safety_guard": "verify system stability",
+          "restores_state": [
+            "last stable state restored"
+          ],
+          "restoration_evidence": "service health checks confirm stability"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-services",
+        "description": "Verify all dependent services still function with new credentials",
+        "action": "verify",
+        "target": "dependent-services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service functionality",
+          "how": "conduct smoke tests",
+          "expected": "all services operational"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "restore to previous credentials",
+          "safety_guard": "check service integrity",
+          "restores_state": [
+            "previous credentials restored"
+          ],
+          "restoration_evidence": "service tests confirm functionality with previous credentials"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "implement-controls",
+        "description": "Implement preventive controls (MFA enforcement, credential scanning)",
+        "action": "implement",
+        "target": "controls",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "new credentials are in place",
+            "fact": "new_credentials_active",
+            "established_by": "rotate-credentials",
+            "probe": null
+          },
+          {
+            "description": "all services are functional",
+            "fact": "services_functional",
+            "established_by": "verify-services",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "control status",
+          "how": "check control implementation logs",
+          "expected": "controls in place"
+        },
+        "rollback": {
+          "trigger": "implementation fails",
+          "action": "remove implemented controls",
+          "safety_guard": "verify original controls were not modified",
+          "restores_state": [
+            "original state of controls restored"
+          ],
+          "restoration_evidence": "logs confirm removal of new controls"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "revoke-credentials",
+        "to_task": "rotate-credentials",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rotate-credentials",
+        "to_task": "audit-logs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "audit-logs",
+        "to_task": "revert-changes",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "revert-changes",
+        "to_task": "verify-services",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-services",
+        "to_task": "implement-controls",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unverified_dependencies:implement-controls",
+      "task_id": "implement-controls",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Implement preventive controls depends on a fact that is established later, specifically the successful verification of services with new credentials.",
+      "suggested_fix": "Reorder tasks or modify dependencies to ensure 'implement-controls' does not proceed until 'verify-services' is complete.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-09-root-credential-rotation:3:3",
+    "plan_id": "plan-ir-09-root-credential-rotation-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unverified_dependencies:implement-controls",
+    "question": "Plan for goal 'ir-09-root-credential-rotation' cannot be approved: blockers remain (llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

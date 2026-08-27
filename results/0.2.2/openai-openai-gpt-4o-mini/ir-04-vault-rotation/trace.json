@@ -1,0 +1,245 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-04-vault-rotation",
+  "duration_seconds": 35.4,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-ir-04-vault-rotation-r3",
+    "goal_id": "ir-04-vault-rotation",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-ir-04-vault-rotation-r2",
+    "created_at": "2026-08-27T03:48:12.509935Z",
+    "tasks": [
+      {
+        "id": "generate_password",
+        "description": "Generate a new password via Vault's dynamic secrets engine",
+        "action": "vault write",
+        "target": "dynamic_secret_engine",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "new password retrieval",
+          "how": "vault read dynamic_secret_engine",
+          "expected": "valid password"
+        },
+        "rollback": {
+          "trigger": "failed password generation",
+          "action": "alert and revert to previous password",
+          "safety_guard": "check last successful password generation",
+          "restores_state": [
+            "dynamic_secret_engine state"
+          ],
+          "restoration_evidence": "check previous password validity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update_services",
+        "description": "Update all consuming services to use the new lease",
+        "action": "reload services",
+        "target": "services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service health check",
+          "how": "curl health endpoints",
+          "expected": "all services responding 200 OK"
+        },
+        "rollback": {
+          "trigger": "service reload failure",
+          "action": "revert services to old password",
+          "safety_guard": "ensure old password is still valid",
+          "restores_state": [
+            "services state"
+          ],
+          "restoration_evidence": "confirm services health post-reload and verify new password validity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_database_access",
+        "description": "Verify the application can execute a simple SELECT against the database with the new credential",
+        "action": "execute SELECT",
+        "target": "database",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Services updated with new password",
+            "fact": "services_updated",
+            "established_by": "update_services",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "SELECT result validation",
+          "how": "check result rows",
+          "expected": "more than 0 rows returned"
+        },
+        "rollback": {
+          "trigger": "SELECT fails",
+          "action": "revert to previous password",
+          "safety_guard": "ensure previous password is valid",
+          "restores_state": [
+            "database credential state"
+          ],
+          "restoration_evidence": "confirm previous database access"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "revoke_old_lease",
+        "description": "Revoke the old Vault lease",
+        "action": "vault lease revoke",
+        "target": "old_lease",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "New lease is in use",
+            "fact": "new_lease_active",
+            "established_by": "update_services",
+            "probe": null
+          },
+          {
+            "description": "Database access verified",
+            "fact": "database_access_verified",
+            "established_by": "verify_database_access",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "verify old lease is revoked",
+          "how": "check Vault lease status",
+          "expected": "old lease is not active"
+        },
+        "rollback": {
+          "trigger": "revoke fails",
+          "action": "restore old lease",
+          "safety_guard": "check previous lease validity",
+          "restores_state": [
+            "old_lease state"
+          ],
+          "restoration_evidence": "confirm old lease is active"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "generate_password",
+        "to_task": "update_services",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_services",
+        "to_task": "verify_database_access",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_database_access",
+        "to_task": "revoke_old_lease",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:update_services",
+      "task_id": "update_services",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'update_services' is executed without verifying that a new password has been successfully generated by 'generate_password'.",
+      "suggested_fix": "Ensure 'generate_password' successfully completes before proceeding to 'update_services'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:verify_database_access",
+      "task_id": "verify_database_access",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'verify_database_access' depends on 'update_services' having updated services to a new password, but this dependency is not confirmed prior to execution.",
+      "suggested_fix": "Add a verification step or check to confirm that 'update_services' completed successfully before executing 'verify_database_access'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:revoke_old_lease",
+      "task_id": "revoke_old_lease",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'revoke_old_lease' relies on a successful completion of 'verify_database_access', but this prerequisite verification is not established before execution.",
+      "suggested_fix": "Ensure 'verify_database_access' is confirmed successful before executing 'revoke_old_lease'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-04-vault-rotation:3:3",
+    "plan_id": "plan-ir-04-vault-rotation-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:update_services",
+    "question": "Plan for goal 'ir-04-vault-rotation' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

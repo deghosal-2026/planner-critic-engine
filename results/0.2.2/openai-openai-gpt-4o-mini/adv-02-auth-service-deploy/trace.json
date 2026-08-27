@@ -1,0 +1,276 @@
+{
+  "dimension": "core-api",
+  "goal_id": "adv-02-auth-service-deploy",
+  "duration_seconds": 22.42,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-adv-02-auth-service-deploy-r2",
+    "goal_id": "adv-02-auth-service-deploy",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "adv-02-auth-service-deploy-v1",
+    "created_at": "2026-08-27T03:53:11.439252Z",
+    "tasks": [
+      {
+        "id": "run_tests",
+        "description": "Run unit and integration tests",
+        "action": "test",
+        "target": "codebase",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "code is checked out",
+            "fact": "code_checked_out",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy_canary",
+        "description": "Deploy the authentication service to canary environment",
+        "action": "deploy",
+        "target": "canary",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "tests must pass",
+            "fact": "tests_passed",
+            "established_by": "run_tests",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "canary service health",
+          "how": "check logs and metrics",
+          "expected": "no errors"
+        },
+        "rollback": {
+          "trigger": "canary deployment fails",
+          "action": "rollback to previous version",
+          "safety_guard": "verify canary health",
+          "restores_state": [
+            "previous canary version"
+          ],
+          "restoration_evidence": "successfully restored canary deployment"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "feature_flag",
+        "description": "Activate feature flag for new service",
+        "action": "activate",
+        "target": "feature_flag_service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary deployment successful",
+            "fact": "canary_deployment_success",
+            "established_by": "deploy_canary",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "feature flag status",
+          "how": "check feature flag configuration",
+          "expected": "feature flag is active"
+        },
+        "rollback": {
+          "trigger": "feature flag activation fails",
+          "action": "deactivate feature flag",
+          "safety_guard": "verify feature flag is inactive",
+          "restores_state": [
+            "feature flag inactive"
+          ],
+          "restoration_evidence": "feature flag is inactive"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor_canary",
+        "description": "Monitor canary deployment for anomalies",
+        "action": "monitor",
+        "target": "canary",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary deployment active",
+            "fact": "canary_deployment_active",
+            "established_by": "deploy_canary",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "monitoring status",
+          "how": "check monitoring dashboard",
+          "expected": "monitoring is active and logging"
+        },
+        "rollback": {
+          "trigger": "monitor canary fails",
+          "action": "reset monitoring configuration",
+          "safety_guard": "restore monitoring setup",
+          "restores_state": [
+            "initial monitoring state"
+          ],
+          "restoration_evidence": "monitoring setup verified"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "full_deploy",
+        "description": "Deploy to production if canary is successful",
+        "action": "deploy",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "monitor phase successful",
+            "fact": "monitor_success",
+            "established_by": "monitor_canary",
+            "probe": null
+          },
+          {
+            "description": "feature flag activated",
+            "fact": "feature_flag_active",
+            "established_by": "feature_flag",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "production service health",
+          "how": "check logs and metrics",
+          "expected": "no critical errors"
+        },
+        "rollback": {
+          "trigger": "production deployment fails",
+          "action": "rollback to stable version",
+          "safety_guard": "verify production service health",
+          "restores_state": [
+            "previous production version"
+          ],
+          "restoration_evidence": "service health verified after rollback"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "run_tests",
+        "to_task": "deploy_canary",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_canary",
+        "to_task": "feature_flag",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_canary",
+        "to_task": "monitor_canary",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_canary",
+        "to_task": "full_deploy",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "feature_flag",
+        "to_task": "full_deploy",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:run_tests",
+      "task_id": "run_tests",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The running of tests requires that code be checked out, but there is no guarantee this is accomplished in the environment as stipulated.",
+      "suggested_fix": "Ensure a step for checking out the code is included prior to the 'run_tests' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:full_deploy",
+      "task_id": "full_deploy",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The 'full_deploy' task can execute before ensuring that the 'run_tests' task has been completed successfully.",
+      "suggested_fix": "Add a hard dependency from 'run_tests' to 'full_deploy' to ensure tests are passed before proceeding.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:full_deploy",
+      "task_id": "full_deploy",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'full_deploy' task depends on the verification of 'monitor_canary' being successful but does not provide confirmation of this.",
+      "suggested_fix": "Ensure the 'full_deploy' task has a precondition that verifies the success of the 'monitor_canary' step.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,457 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dbm-02-mysql-to-postgres",
+  "duration_seconds": 12.68,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "dbm-02-mysql-to-postgres-v1",
+    "goal_id": "dbm-02-mysql-to-postgres",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-27T03:58:05.536003Z",
+    "tasks": [
+      {
+        "id": "setup_replication",
+        "description": "Set up a replication bridge from MySQL to PostgreSQL",
+        "action": "setup",
+        "target": "replication bridge",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replication status",
+          "how": "check replication logs",
+          "expected": "no error messages"
+        },
+        "rollback": {
+          "trigger": "replication setup fails",
+          "action": "delete replication configurations",
+          "safety_guard": "ensure no partial configs exist",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "schema_conversion",
+        "description": "Perform schema diff and conversion",
+        "action": "convert",
+        "target": "database schema",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "schema structure",
+          "how": "run schema validation scripts",
+          "expected": "schemas are equivalent"
+        },
+        "rollback": {
+          "trigger": "schema conversion fails",
+          "action": "restore original schema",
+          "safety_guard": "ensure backup of original schema exists",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "dual_write",
+        "description": "Start dual-write period to both databases",
+        "action": "write",
+        "target": "both databases",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "write consistency",
+          "how": "compare write logs between databases",
+          "expected": "all writes logged in both databases"
+        },
+        "rollback": {
+          "trigger": "dual-write fails",
+          "action": "stop dual writes and revert application configuration",
+          "safety_guard": "ensure feature flags are toggled back",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "run_reconciliation",
+        "description": "Run reconciliation between both databases",
+        "action": "reconcile",
+        "target": "data integrity",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "row counts and checksums",
+          "how": "run consistency checks",
+          "expected": "row counts match and checksums are identical"
+        },
+        "rollback": {
+          "trigger": "reconciliation fails",
+          "action": "restore latest known good state",
+          "safety_guard": "hold backups of data prior to reconciliation",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "execute_cutover",
+        "description": "Execute cutover to PostgreSQL with CHECK constraint exposure",
+        "action": "cutover",
+        "target": "production database",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data integrity and constraints validation",
+          "how": "run Postgres CHECK validations",
+          "expected": "all checks pass"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "fail back to MySQL and replay writes",
+          "safety_guard": "ensure all writes are captured during cutover",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup_replication",
+        "to_task": "schema_conversion",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "schema_conversion",
+        "to_task": "dual_write",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dual_write",
+        "to_task": "run_reconciliation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_reconciliation",
+        "to_task": "execute_cutover",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:dbm-02-mysql-to-postgres-v1:1:setup_replication:rollback_state_undeclared",
+      "task_id": "setup_replication",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'setup_replication' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:dbm-02-mysql-to-postgres-v1:1:schema_conversion:rollback_state_undeclared",
+      "task_id": "schema_conversion",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'schema_conversion' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:dbm-02-mysql-to-postgres-v1:1:dual_write:rollback_state_undeclared",
+      "task_id": "dual_write",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'dual_write' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:dbm-02-mysql-to-postgres-v1:1:run_reconciliation:rollback_state_undeclared",
+      "task_id": "run_reconciliation",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'run_reconciliation' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:dbm-02-mysql-to-postgres-v1:1:execute_cutover:rollback_state_undeclared",
+      "task_id": "execute_cutover",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'execute_cutover' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:dbm-02-mysql-to-postgres-v1:1:setup_replication:rollback_state_undeclared",
+      "task_id": "setup_replication",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'setup_replication' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:dbm-02-mysql-to-postgres-v1:1:schema_conversion:rollback_state_undeclared",
+      "task_id": "schema_conversion",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'schema_conversion' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:dbm-02-mysql-to-postgres-v1:1:dual_write:rollback_state_undeclared",
+      "task_id": "dual_write",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'dual_write' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:dbm-02-mysql-to-postgres-v1:1:run_reconciliation:rollback_state_undeclared",
+      "task_id": "run_reconciliation",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'run_reconciliation' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:dbm-02-mysql-to-postgres-v1:1:execute_cutover:rollback_state_undeclared",
+      "task_id": "execute_cutover",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'execute_cutover' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:weak_rollback:setup_replication",
+      "task_id": "setup_replication",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action does not ensure complete restoration of the previous state.",
+      "suggested_fix": "Include steps to verify the complete removal of all configurations.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:weak_rollback:schema_conversion",
+      "task_id": "schema_conversion",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action lacks verification of the success of the restoration.",
+      "suggested_fix": "Add evidence of successful restoration and validation of the original schema.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:weak_rollback:dual_write",
+      "task_id": "dual_write",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action only stops dual writes but does not detail the validation of application state.",
+      "suggested_fix": "Ensure that application behavior after reverting the configuration is validated.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:weak_rollback:run_reconciliation",
+      "task_id": "run_reconciliation",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback plan does not guarantee validation of data integrity after restoring the known good state.",
+      "suggested_fix": "Implement a check to validate the data integrity after the rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:weak_rollback:execute_cutover",
+      "task_id": "execute_cutover",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback is risky as it involves a complex fail back to MySQL without clear validation steps.",
+      "suggested_fix": "Add detailed steps to ensure all writes are accurately captured and can be replayed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:unverified_dependencies:run_reconciliation",
+      "task_id": "run_reconciliation",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task depends on dual write completions but does not verify if they were all successful.",
+      "suggested_fix": "Add a verification step to ensure all writes during dual write were successful before reconciliation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

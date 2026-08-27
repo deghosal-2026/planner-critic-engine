@@ -1,0 +1,252 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-02-terraform-migration",
+  "duration_seconds": 58.31,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 4,
+    "llm_calls": 4
+  },
+  "plan": {
+    "id": "plan-inf-02-terraform-migration-r4",
+    "goal_id": "inf-02-terraform-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-inf-02-terraform-migration-r3",
+    "created_at": "2026-08-27T04:11:18.472846Z",
+    "tasks": [
+      {
+        "id": "verify_credentials",
+        "description": "Verify AWS credentials",
+        "action": "verify",
+        "target": "aws_credentials",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "credentials validity confirmation",
+          "how": "check aws_credentials_valid fact",
+          "expected": "true"
+        },
+        "rollback": {
+          "trigger": "credential verification fails",
+          "action": "alert and halt process",
+          "safety_guard": "notify team",
+          "restores_state": [
+            "no credentials configured"
+          ],
+          "restoration_evidence": "confirm no changes made to AWS credentials"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "terraform_init",
+        "description": "Initialize Terraform configuration and verify AWS credentials",
+        "action": "init",
+        "target": "terraform",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "credentials are valid",
+            "fact": "aws_credentials_valid",
+            "established_by": "verify_credentials",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "AWS credentials validity",
+          "how": "check aws_credentials_valid fact",
+          "expected": "true"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "terraform_plan",
+        "description": "Create an execution plan for migration",
+        "action": "plan",
+        "target": "terraform",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AWS credentials have been verified",
+            "fact": "aws_credentials_valid",
+            "established_by": "verify_credentials",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "execution plan validity",
+          "how": "review plan output",
+          "expected": "no errors in plan"
+        },
+        "rollback": {
+          "trigger": "plan review failed",
+          "action": "rollback to previous state",
+          "safety_guard": "ensure no changes have been applied",
+          "restores_state": [
+            "previous Terraform state"
+          ],
+          "restoration_evidence": "check that Terraform state matches previous state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "apply_migration",
+        "description": "Apply migration to S3 with DynamoDB locking",
+        "action": "apply",
+        "target": "terraform",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Terraform plan has been executed successfully",
+            "fact": "execution plan validity",
+            "established_by": "terraform_plan",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "state migration success",
+          "how": "check S3 bucket and DynamoDB locking",
+          "expected": "state in S3 and DynamoDB configured"
+        },
+        "rollback": {
+          "trigger": "apply fails",
+          "action": "revert to local backend",
+          "safety_guard": "confirm local state integrity",
+          "restores_state": [
+            "local Terraform state"
+          ],
+          "restoration_evidence": "validate local state against backup"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_migration",
+        "description": "Verify that the migration has been successful",
+        "action": "verify",
+        "target": "terraform",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "successful migration confirmation",
+          "how": "query S3 and DynamoDB",
+          "expected": "correct keys and locks present"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "restart migration",
+          "safety_guard": "ensure backup exists",
+          "restores_state": [
+            "previous state before verification"
+          ],
+          "restoration_evidence": "confirm migration logs and states before the restart"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "verify_credentials",
+        "to_task": "terraform_init",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "terraform_init",
+        "to_task": "terraform_plan",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "terraform_plan",
+        "to_task": "apply_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "apply_migration",
+        "to_task": "verify_migration",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:terraform_init",
+      "task_id": "terraform_init",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'terraform_init' is ordered before verifying the AWS credentials, which is a hard prerequisite.",
+      "suggested_fix": "Reorder 'terraform_init' to follow 'verify_credentials'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:terraform_plan",
+      "task_id": "terraform_plan",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'terraform_plan' depends on 'aws_credentials_valid' without verifying it after 'terraform_init', which could lead to using invalid credentials.",
+      "suggested_fix": "Add a verification step for AWS credentials validity after 'terraform_init' before proceeding to 'terraform_plan'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:inf-02-terraform-migration:4:4",
+    "plan_id": "plan-inf-02-terraform-migration-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:terraform_init",
+    "question": "Plan for goal 'inf-02-terraform-migration' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

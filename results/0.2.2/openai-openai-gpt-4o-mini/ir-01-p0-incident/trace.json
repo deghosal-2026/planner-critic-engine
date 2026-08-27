@@ -1,0 +1,314 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-01-p0-incident",
+  "duration_seconds": 62.59,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-ir-01-p0-incident-r4",
+    "goal_id": "ir-01-p0-incident",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-ir-01-p0-incident-r3",
+    "created_at": "2026-08-27T03:46:38.617202Z",
+    "tasks": [
+      {
+        "id": "page_on_call",
+        "description": "Page on-call via PagerDuty",
+        "action": "page",
+        "target": "on-call",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PagerDuty is accessible",
+            "fact": "pagerduty_operational",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "diagnose_cause",
+        "description": "Diagnose the cause of degradation",
+        "action": "diagnose",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DB primary replica is reachable",
+            "fact": "db_primary_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_disk_full",
+        "description": "Verify that the disk is full",
+        "action": "check",
+        "target": "disk_space",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "disk space status",
+          "how": "check disk usage metrics",
+          "expected": "disk is full"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "stop process",
+          "safety_guard": "confirm process can safely stop",
+          "restores_state": [],
+          "restoration_evidence": "confirm no action taken"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "mitigate_disk_issue",
+        "description": "Mitigate by enlarging volume",
+        "action": "enlarge",
+        "target": "volume",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Disk space verified to be full",
+            "fact": "disk_full",
+            "established_by": "verify_disk_full",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "volume size and state",
+          "how": "check volume properties",
+          "expected": "volume enlarged and online"
+        },
+        "rollback": {
+          "trigger": "enlargement fails",
+          "action": "revert to previous volume size",
+          "safety_guard": "ensure data integrity before rollback",
+          "restores_state": [
+            "volume size to previous"
+          ],
+          "restoration_evidence": "check volume properties after rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "restart_replica",
+        "description": "Restart the database replica",
+        "action": "restart",
+        "target": "db_replica",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Volume state is confirmed post enlargement",
+            "fact": "volume_enlarged",
+            "established_by": "mitigate_disk_issue",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replica state",
+          "how": "check replica status",
+          "expected": "replica restarted and healthy"
+        },
+        "rollback": {
+          "trigger": "restart fails",
+          "action": "restore to previous replica state",
+          "safety_guard": "verify previous state is intact",
+          "restores_state": [
+            "previous replica state"
+          ],
+          "restoration_evidence": "confirm new state is consistent with previous"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_replication_lag",
+        "description": "Verify replication lag returns to zero",
+        "action": "check",
+        "target": "replication_lag",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DB replica is operational after restart",
+            "fact": "db_replica_healthy",
+            "established_by": "restart_replica",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replication lag",
+          "how": "check replication lag metrics",
+          "expected": "replication lag is zero"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "write_postmortem",
+        "description": "Write postmortem analysis",
+        "action": "document",
+        "target": "postmortem",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Replication lag is verified",
+            "fact": "replication_lag_zero",
+            "established_by": "verify_replication_lag",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "low",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "page_on_call",
+        "to_task": "diagnose_cause",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "diagnose_cause",
+        "to_task": "verify_disk_full",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_disk_full",
+        "to_task": "mitigate_disk_issue",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "mitigate_disk_issue",
+        "to_task": "restart_replica",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "restart_replica",
+        "to_task": "verify_replication_lag",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_replication_lag",
+        "to_task": "write_postmortem",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unverified_dependencies:restart_replica",
+      "task_id": "restart_replica",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'restart_replica' depends on the fact 'db_replica_healthy' which is not explicitly verified before the task.",
+      "suggested_fix": "Add a verification step that ensures the DB replica is healthy before the restart operation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:verify_replication_lag",
+      "task_id": "verify_replication_lag",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'verify_replication_lag' depends on the fact 'db_replica_healthy' but it does not have an explicit check to ensure the database replica is healthy before verification.",
+      "suggested_fix": "Add a verification step to confirm the health of the DB replica before checking replication lag.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:write_postmortem",
+      "task_id": "write_postmortem",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'write_postmortem' relies on the fact 'replication_lag_zero' but does not verify if the replication lag is actually zero before writing the postmortem.",
+      "suggested_fix": "Include a verification check to ensure that replication lag is confirmed to be zero before proceeding with the postmortem documentation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-01-p0-incident:4:4",
+    "plan_id": "plan-ir-01-p0-incident-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unverified_dependencies:restart_replica",
+    "question": "Plan for goal 'ir-01-p0-incident' cannot be approved: blockers remain (llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

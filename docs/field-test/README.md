@@ -99,7 +99,7 @@ python3 docs/field-test/scripts/run.py --all --provider mlx
 ### Phase 0 — Pre-run Validation (5 min, $0)
 
 ```bash
-python3 docs/field-test/v0.2.0/scripts/pre_run_validation.py
+python3 docs/field-test/scripts/pre_run_validation.py
 ```
 
 Validates all 170 assertion YAMLs have correct `invariants:` format before spending
@@ -132,9 +132,9 @@ Tests that require a live LLM (CLI dispatch, HTTP/MCP, decorators, drift).
 ### Phase 4 — Benchmarks (30 min, $0)
 
 ```bash
-python3 docs/field-test/v0.2.0/scripts/bench_auto_repair.py > docs/field-test/v0.2.0/results/bench_auto_repair.json
-python3 docs/field-test/v0.2.0/scripts/bench_rollback.py > docs/field-test/v0.2.0/results/bench_rollback.json
-python3 docs/field-test/v0.2.0/scripts/bench_stasis.py > docs/field-test/v0.2.0/results/bench_stasis.json
+python3 docs/field-test/scripts/bench_auto_repair.py > docs/field-test/v0.2.0/results/bench_auto_repair.json
+python3 docs/field-test/scripts/bench_rollback.py > docs/field-test/v0.2.0/results/bench_rollback.json
+python3 docs/field-test/scripts/bench_stasis.py > docs/field-test/v0.2.0/results/bench_stasis.json
 ```
 
 Retrospective analysis over existing traces. No new LLM calls.
@@ -199,11 +199,11 @@ Results are version-separated (`0.2.0`) and model-separated (`openai-gpt-4o-mini
 
 | Phase | Command | LLM? | Cost | Time |
 |-------|---------|------|------|------|
-| P0 assertion validation | `python3 docs/field-test/v0.2.0/scripts/pre_run_validation.py` | No | $0 | 5 min |
+| P0 assertion validation | `python3 docs/field-test/scripts/pre_run_validation.py` | No | $0 | 5 min |
 | P1 new domain goals | `python3 docs/field-test/scripts/run.py --domain idp,mao,sre,scp,fng,adversarial-policy` | Yes | ~$0.05 | 2-4 hr |
 | P2 deterministic tests | `pytest tests/field_test_v0_2_0/ -v --no-cov` | No | $0 | 45 min |
 | P3 LLM tests | `pytest tests/field_test_v0_2_0/ -v --run-llm --no-cov` | Yes | ~$0.10 | 1-2 hr |
-| P4 benchmarks | `python3 docs/field-test/v0.2.0/scripts/bench_*.py > results/` | No | $0 | 30 min |
+| P4 benchmarks | `python3 docs/field-test/scripts/bench_*.py > results/` | No | $0 | 30 min |
 | P5 full sweep | `python3 docs/field-test/scripts/run.py --all` | Yes | ~$0.35 | 8-12 hr |
 | **Total** | | | **~$0.45** | **~10-15 hr** |
 

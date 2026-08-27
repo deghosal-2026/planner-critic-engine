@@ -1,0 +1,335 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mob-01-staged-store-release",
+  "duration_seconds": 30.94,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-mob-01-staged-store-release-r2",
+    "goal_id": "mob-01-staged-store-release",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "mob-01-staged-store-release",
+    "created_at": "2026-08-27T04:19:56.674997Z",
+    "tasks": [
+      {
+        "id": "prepare_env",
+        "description": "Prepare the deployment environment",
+        "action": "set up",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "production environment is stable",
+            "fact": "env_stable",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy_api",
+        "description": "Deploy the new server API version",
+        "action": "deploy",
+        "target": "server",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "API version",
+          "how": "check server response",
+          "expected": "v1.5"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to previous API version",
+          "safety_guard": "verify API functionality",
+          "restores_state": [
+            "previous API version"
+          ],
+          "restoration_evidence": "check previous API deployment logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "release_beta",
+        "description": "Release app version v3.0 to the beta ring on TestFlight",
+        "action": "release",
+        "target": "TestFlight",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "API is deployed and verified",
+            "fact": "api_deployed",
+            "established_by": "deploy_api",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "release success",
+          "how": "check TestFlight for version availability",
+          "expected": "v3.0 listed on TestFlight"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "start_staged_rollout",
+        "description": "Start staged rollout on Google Play",
+        "action": "begin rollout",
+        "target": "Google Play",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "initial rollout status",
+          "how": "check Google Play Console",
+          "expected": "rollout started"
+        },
+        "rollback": {
+          "trigger": "issues reported",
+          "action": "halt rollout and revert to previous version",
+          "safety_guard": "monitor crash reports",
+          "restores_state": [
+            "previous app version"
+          ],
+          "restoration_evidence": "confirm previous version is live"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor_crash_rate",
+        "description": "Monitor crash rate during the rollout phase",
+        "action": "monitor",
+        "target": "Firebase Crashlytics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "rollout has started",
+            "fact": "rollout_started",
+            "established_by": "start_staged_rollout",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "crash rate",
+          "how": "check Firebase Crashlytics data",
+          "expected": "within acceptable limits"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "expand_rollout",
+        "description": "Expand rollout to 10% on Google Play",
+        "action": "increase percentage",
+        "target": "Google Play",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "rollout status",
+          "how": "check Google Play Console",
+          "expected": "10% rollout completed"
+        },
+        "rollback": {
+          "trigger": "critical bugs identified",
+          "action": "revert to previous version",
+          "safety_guard": "ensure user experience is unaffected",
+          "restores_state": [
+            "previous rollout state"
+          ],
+          "restoration_evidence": "verify user feedback and performance metrics"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "finalize_release",
+        "description": "Finalize rollout to 100% on all platforms",
+        "action": "complete rollout",
+        "target": "Google Play + App Store",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "production stability",
+          "how": "collect user feedback and monitor metrics",
+          "expected": "no critical errors reported"
+        },
+        "rollback": {
+          "trigger": "major issues arise",
+          "action": "remove app from store and restore previous version",
+          "safety_guard": "user feedback confirmations",
+          "restores_state": [
+            "previous app versions across platforms"
+          ],
+          "restoration_evidence": "confirm rollback through version checks"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "prepare_env",
+        "to_task": "deploy_api",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_api",
+        "to_task": "release_beta",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "release_beta",
+        "to_task": "start_staged_rollout",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "start_staged_rollout",
+        "to_task": "monitor_crash_rate",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "start_staged_rollout",
+        "to_task": "expand_rollout",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "expand_rollout",
+        "to_task": "finalize_release",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:prepare_env",
+      "task_id": "prepare_env",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The task 'Prepare the deployment environment' is not feasible without a concrete verification for the stability of the production environment.",
+      "suggested_fix": "Add a verification step to ensure the production environment is stable before proceeding with any deployments.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:release_beta",
+      "task_id": "release_beta",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider verifying compatibility with the current API version before releasing to the beta ring.",
+      "suggested_fix": "Add a step to verify that the app v3.0 is compatible with the current server API before beta release.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:start_staged_rollout",
+      "task_id": "start_staged_rollout",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Could include a step to verify that the app version is functioning correctly before starting the rollout.",
+      "suggested_fix": "Add a verification step to ensure the beta version is functioning correctly and is compatible with the current API.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:finalize_release",
+      "task_id": "finalize_release",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Finalizing the rollout should only occur after ensuring that the previous rollback state can be restored successfully.",
+      "suggested_fix": "Reorder the task to ensure that rollback verification is completed before finalizing the release.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:expand_rollout",
+      "task_id": "expand_rollout",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'Expand rollout to 10%' has dependencies that haven't been unambiguously verified, which could lead to issues if critical bugs arise.",
+      "suggested_fix": "Ensure rollbacks or user feedback evaluations are completed in the dependence link before expanding the rollout.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

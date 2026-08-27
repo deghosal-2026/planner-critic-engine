@@ -1,0 +1,455 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-08-redis-migration",
+  "duration_seconds": 45.2,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-db-08-redis-migration-r3",
+    "goal_id": "db-08-redis-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-db-08-redis-migration-r2",
+    "created_at": "2026-08-27T03:13:00.557652Z",
+    "tasks": [
+      {
+        "id": "setup_dual_write",
+        "description": "Implement dual-write pattern in application code",
+        "action": "update_code",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "application is ready for dual-write",
+            "fact": "app_ready_for_dual_write",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application writes to both caches",
+          "how": "check logs for cache writes",
+          "expected": "writes logged in both Memcached and Redis"
+        },
+        "rollback": {
+          "trigger": "code fails to run",
+          "action": "revert code changes",
+          "safety_guard": "confirm app is running previous version",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "migrate_data",
+        "description": "Migrate data from Memcached to Redis using Redis-Shake",
+        "action": "migrate",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data consistency between caches",
+          "how": "run data integrity checks",
+          "expected": "data matches in both caches"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore data from Memcached",
+          "safety_guard": "verify data integrity in Memcached",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor_performance",
+        "description": "Set up performance monitoring for cache hit rates",
+        "action": "setup_monitoring",
+        "target": "Grafana",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dual write setup complete",
+            "fact": "setup_dual_write_complete",
+            "established_by": "setup_dual_write",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "monitoring functionality",
+          "how": "check Grafana monitoring setup",
+          "expected": "performance metrics are available in Grafana"
+        },
+        "rollback": {
+          "trigger": "monitoring setup fails",
+          "action": "revert monitoring configuration",
+          "safety_guard": "confirm previous monitoring state",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "validate_cache_hit_rates",
+        "description": "Verify cache hit rates remain above 95% post-migration",
+        "action": "validate",
+        "target": "cache_hit_rates",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "cache hit rate",
+          "how": "monitor Grafana dashboard",
+          "expected": "cache hit rate > 95%"
+        },
+        "rollback": {
+          "trigger": "cache hit rate drops below 95%",
+          "action": "enable Memcached read back",
+          "safety_guard": "ensure Memcached is operational",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover_reads",
+        "description": "Cutover read traffic from Memcached to Redis",
+        "action": "cutover",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "read traffic analysis",
+          "how": "observe traffic in Grafana",
+          "expected": "100% read from Redis"
+        },
+        "rollback": {
+          "trigger": "issues arise after cutover",
+          "action": "rollback to reading from Memcached",
+          "safety_guard": "ensure Memcached is fully functional",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "decommission_memcached",
+        "description": "Decommission Memcached after successful migration",
+        "action": "remove",
+        "target": "old_cache",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cutover reads is successful",
+            "fact": "cutover_success",
+            "established_by": "cutover_reads",
+            "probe": null
+          },
+          {
+            "description": "Redis handles read traffic correctly",
+            "fact": "redis_read_traffic_stable",
+            "established_by": "validate_cache_hit_rates",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Memcached decommission confirmation",
+          "how": "check system for active Memcached",
+          "expected": "Memcached is no longer running"
+        },
+        "rollback": {
+          "trigger": "decommission fails",
+          "action": "re-enable Memcached service",
+          "safety_guard": "ensure Memcached is operational",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup_dual_write",
+        "to_task": "migrate_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate_data",
+        "to_task": "monitor_performance",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate_data",
+        "to_task": "validate_cache_hit_rates",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "validate_cache_hit_rates",
+        "to_task": "cutover_reads",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover_reads",
+        "to_task": "decommission_memcached",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plan-db-08-redis-migration-r3:3:setup_dual_write:rollback_state_undeclared",
+      "task_id": "setup_dual_write",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'setup_dual_write' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-db-08-redis-migration-r3:3:migrate_data:rollback_state_undeclared",
+      "task_id": "migrate_data",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'migrate_data' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-db-08-redis-migration-r3:3:validate_cache_hit_rates:rollback_state_undeclared",
+      "task_id": "validate_cache_hit_rates",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'validate_cache_hit_rates' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-db-08-redis-migration-r3:3:cutover_reads:rollback_state_undeclared",
+      "task_id": "cutover_reads",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'cutover_reads' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-db-08-redis-migration-r3:3:setup_dual_write:rollback_state_undeclared",
+      "task_id": "setup_dual_write",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'setup_dual_write' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-db-08-redis-migration-r3:3:migrate_data:rollback_state_undeclared",
+      "task_id": "migrate_data",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'migrate_data' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-db-08-redis-migration-r3:3:validate_cache_hit_rates:rollback_state_undeclared",
+      "task_id": "validate_cache_hit_rates",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'validate_cache_hit_rates' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-db-08-redis-migration-r3:3:cutover_reads:rollback_state_undeclared",
+      "task_id": "cutover_reads",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'cutover_reads' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:migrate_data",
+      "task_id": "migrate_data",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'migrate_data' is sequenced before necessary verification that 'setup_dual_write' has been completed.",
+      "suggested_fix": "Ensure 'setup_dual_write' has completed before starting 'migrate_data'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:decommission_memcached",
+      "task_id": "decommission_memcached",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'decommission_memcached' relies on a fact 'redis_read_traffic_stable' that is established by 'validate_cache_hit_rates', which is not guaranteed to have been completed successfully before 'cutover_reads'.",
+      "suggested_fix": "Reevaluate the order and ensure that 'validate_cache_hit_rates' is verified to succeed before proceeding to 'cutover_reads'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:weak_rollback:validate_cache_hit_rates",
+      "task_id": "validate_cache_hit_rates",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action in 'validate_cache_hit_rates' does not ensure a safe state for the application in case of cache hit rate drops.",
+      "suggested_fix": "Consider adding a rollback process that ensures reads can fallback to Memcached if the hit rates drop below the threshold.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:missing_steps:cutover_reads",
+      "task_id": "cutover_reads",
+      "version": 3,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The task 'cutover_reads' does not account for monitoring Redis performance immediately after cutover to prevent cache miss storms.",
+      "suggested_fix": "Include a step to monitor Redis cache performance immediately after the cutover to address potential cache miss storms.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-08-redis-migration:3:3",
+    "plan_id": "plan-db-08-redis-migration-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:migrate_data",
+    "question": "Plan for goal 'db-08-redis-migration' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

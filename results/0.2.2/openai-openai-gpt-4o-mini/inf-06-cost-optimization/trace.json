@@ -1,0 +1,234 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-06-cost-optimization",
+  "duration_seconds": 20.22,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-inf-06-cost-optimization-r2",
+    "goal_id": "inf-06-cost-optimization",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plan-inf-06-cost-optimization",
+    "created_at": "2026-08-27T04:13:17.584223Z",
+    "tasks": [
+      {
+        "id": "identify_resources",
+        "description": "Identify idle and oversized resources",
+        "action": "query",
+        "target": "cloud_resources",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cost data is available",
+            "fact": "cost_data_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "resize_terminate",
+        "description": "Resize or terminate identified resources",
+        "action": "resize_or_terminate",
+        "target": "cloud_resources",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "resource state",
+          "how": "query resource status",
+          "expected": "correct size or termination status"
+        },
+        "rollback": {
+          "trigger": "resize/terminate fails",
+          "action": "revert to previous state",
+          "safety_guard": "verify resource state",
+          "restores_state": [
+            "previous resource configuration"
+          ],
+          "restoration_evidence": "compare current and previous configuration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_no_impact",
+        "description": "Verify no impact on services",
+        "action": "check",
+        "target": "service_health",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service availability",
+          "how": "run health checks",
+          "expected": "services are operational"
+        },
+        "rollback": {
+          "trigger": "impact detected",
+          "action": "restore previous configurations",
+          "safety_guard": "check service health before restoration",
+          "restores_state": [
+            "previous service configurations"
+          ],
+          "restoration_evidence": "service health check results before and after restoration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "repeat_process",
+        "description": "Repeat the process for continuous savings",
+        "action": "loop",
+        "target": "cost_optimization",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "previous tasks are complete",
+            "fact": "resources_verified",
+            "established_by": "verify_no_impact",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "cost savings",
+          "how": "review cost data",
+          "expected": "increased cost efficiency"
+        },
+        "rollback": {
+          "trigger": "loop causes issues",
+          "action": "stop the optimization process",
+          "safety_guard": "ensure all resources return to a stable state",
+          "restores_state": [
+            "resource configurations and cost state"
+          ],
+          "restoration_evidence": "cost data analysis post-rollback"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "identify_resources",
+        "to_task": "resize_terminate",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "resize_terminate",
+        "to_task": "verify_no_impact",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_no_impact",
+        "to_task": "repeat_process",
+        "kind": "soft",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:resize_terminate",
+      "task_id": "resize_terminate",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'resize_terminate' depends on 'cost_data_available' but 'cost_data_available' was never established earlier in the plan.",
+      "suggested_fix": "Add a task to ensure 'cost_data_available' is verified or adjust dependencies accordingly.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:resize_terminate",
+      "task_id": "resize_terminate",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'resize_terminate' is ordered before its prerequisite 'identify_resources' is completed and verified.",
+      "suggested_fix": "Ensure that 'resize_terminate' runs only after successful completion of 'identify_resources'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:resize_terminate",
+      "task_id": "resize_terminate",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for 'resize_terminate' lacks a clear statement on impact if resource restoration fails.",
+      "suggested_fix": "Include specific actions on how to address failed resource restoration in the rollback plan.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:verify_no_impact",
+      "task_id": "verify_no_impact",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for 'verify_no_impact' lacks a sound strategy for minimum service disruption during restoration.",
+      "suggested_fix": "Enhance rollback plan to address how to manage service availability effectively during restoration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

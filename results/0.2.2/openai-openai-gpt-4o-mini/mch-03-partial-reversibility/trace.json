@@ -1,0 +1,202 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mch-03-partial-reversibility",
+  "duration_seconds": 18.06,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-mch-03-partial-reversibility-r3",
+    "goal_id": "mch-03-partial-reversibility",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-mch-03-partial-reversibility-r2",
+    "created_at": "2026-08-27T04:18:40.755701Z",
+    "tasks": [
+      {
+        "id": "schema_migration",
+        "description": "Apply schema migration by adding a new column",
+        "action": "migrate",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "schema version",
+          "how": "run checks",
+          "expected": "column exists"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "DROP COLUMN",
+          "safety_guard": "verify schema integrity",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "data_backfill",
+        "description": "Backfill data into the new column",
+        "action": "update",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Schema migration has been successfully completed",
+            "fact": "schema_migrated",
+            "established_by": "schema_migration",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data completeness",
+          "how": "validate records",
+          "expected": "all rows updated"
+        },
+        "rollback": {
+          "trigger": "backfill fails",
+          "action": "REVERT DATA",
+          "safety_guard": "verify data integrity",
+          "restores_state": [
+            "previous data state"
+          ],
+          "restoration_evidence": "run data validation checks"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "schema_migration",
+        "to_task": "data_backfill",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plan-mch-03-partial-reversibility-r3:3:schema_migration:rollback_state_undeclared",
+      "task_id": "schema_migration",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'schema_migration' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-mch-03-partial-reversibility-r3:3:schema_migration:rollback_state_undeclared",
+      "task_id": "schema_migration",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'schema_migration' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:weak_rollback:schema_migration",
+      "task_id": "schema_migration",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for schema migration does not adequately restore the previous state if the migration fails, as it lacks restoration evidence.",
+      "suggested_fix": "Include clear restoration evidence or a way to verify that the previous state is fully restored.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:data_backfill",
+      "task_id": "data_backfill",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The data backfill step relies on the successful completion of the schema migration, but there's no verification step that confirms this dependency before execution.",
+      "suggested_fix": "Add a verification step that confirms schema migration has completed successfully before proceeding with data backfill.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:feasibility:data_backfill",
+      "task_id": "data_backfill",
+      "version": 3,
+      "heuristic_family": "feasibility",
+      "severity": "warning",
+      "reason_code": "llm_feasibility",
+      "message": "Data backfill is irreversible if the column is repurposed mid-migration, which could lead to potential data loss without proper checks.",
+      "suggested_fix": "Implement checks to ensure the column has not been repurposed before executing data backfill.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mch-03-partial-reversibility:3:3",
+    "plan_id": "plan-mch-03-partial-reversibility-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:weak_rollback:schema_migration",
+    "question": "Plan for goal 'mch-03-partial-reversibility' cannot be approved: blockers remain (llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=2"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

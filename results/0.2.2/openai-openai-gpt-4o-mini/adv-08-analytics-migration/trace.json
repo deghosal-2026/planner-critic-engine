@@ -1,0 +1,244 @@
+{
+  "dimension": "core-api",
+  "goal_id": "adv-08-analytics-migration",
+  "duration_seconds": 15.56,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-adv-08-analytics-migration-r2",
+    "goal_id": "adv-08-analytics-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "adv-08-analytics-migration-plan",
+    "created_at": "2026-08-27T03:54:16.323981Z",
+    "tasks": [
+      {
+        "id": "check_db_connection",
+        "description": "Verify connection to the production PostgreSQL database",
+        "action": "check_connection",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "database server is operational",
+            "fact": "db_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "low",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "retrieve_data",
+        "description": "Retrieve anonymized customer analytics data from PostgreSQL",
+        "action": "retrieve",
+        "target": "analytics_data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DB connection is successful",
+            "fact": "db_connected",
+            "established_by": "check_db_connection",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "check_s3_bucket",
+        "description": "Verify the S3 bucket configurations and permissions",
+        "action": "check_configuration",
+        "target": "s3_bucket",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "bucket exists with proper encryption and access controls",
+            "fact": "s3_bucket_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "low",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "upload_data",
+        "description": "Upload the analytics data to the S3 bucket with encryption",
+        "action": "upload",
+        "target": "s3_bucket",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data integrity",
+          "how": "check data size and checksum",
+          "expected": "data matches original size and checksum"
+        },
+        "rollback": {
+          "trigger": "upload fails",
+          "action": "alert and retry upload later",
+          "safety_guard": "ensure bucket permissions are intact",
+          "restores_state": [
+            "data not uploaded"
+          ],
+          "restoration_evidence": "check if data exists in the bucket"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "optimize_pipeline",
+        "description": "Optimize the analytics pipeline for the new data source",
+        "action": "optimize",
+        "target": "analytics_pipeline",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "data has been successfully uploaded",
+            "fact": "data_uploaded",
+            "established_by": "upload_data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "pipeline performance metrics",
+          "how": "run performance tests",
+          "expected": "metrics meet predefined thresholds"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "set_data_uploaded",
+        "description": "Mark data as uploaded after successful upload",
+        "action": "set_flag",
+        "target": "data_uploaded",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_db_connection",
+        "to_task": "retrieve_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "retrieve_data",
+        "to_task": "upload_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check_s3_bucket",
+        "to_task": "upload_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "upload_data",
+        "to_task": "optimize_pipeline",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "upload_data",
+        "to_task": "set_data_uploaded",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:upload_data",
+      "task_id": "upload_data",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'upload_data' is ordered before its prerequisites 'check_s3_bucket' and 'retrieve_data' have been verified.",
+      "suggested_fix": "Reorder 'upload_data' to be after 'retrieve_data' and 'check_s3_bucket'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:upload_data",
+      "task_id": "upload_data",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for 'upload_data' is insufficient for handling all types of failures, potentially leading to inconsistent states.",
+      "suggested_fix": "Implement a more comprehensive rollback strategy that ensures previous states are restored if the upload fails.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:optimize_pipeline",
+      "task_id": "optimize_pipeline",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'optimize_pipeline' depends on unverified status of 'data_uploaded'.",
+      "suggested_fix": "Ensure that there is a clear task that verifies the 'data_uploaded' status before 'optimize_pipeline' is executed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

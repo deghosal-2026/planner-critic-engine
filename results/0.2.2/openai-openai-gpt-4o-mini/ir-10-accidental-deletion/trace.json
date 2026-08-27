@@ -1,0 +1,312 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-10-accidental-deletion",
+  "duration_seconds": 26.61,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-ir-10-accidental-deletion-r2",
+    "goal_id": "ir-10-accidental-deletion",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plan-ir-10-accidental-deletion",
+    "created_at": "2026-08-27T04:09:56.720262Z",
+    "tasks": [
+      {
+        "id": "stop_writes",
+        "description": "Stop all writes to the database",
+        "action": "stop",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "db is reachable",
+            "fact": "db_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "write operations",
+          "how": "check database logs",
+          "expected": "no write operations performed"
+        },
+        "rollback": {
+          "trigger": "unable to stop writes",
+          "action": "revert to previous state",
+          "safety_guard": "verify that writes are stopped",
+          "restores_state": [
+            "write operations are stopped"
+          ],
+          "restoration_evidence": "check database logs for write operations"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "identify_timestamp",
+        "description": "Identify the exact deletion timestamp from logs",
+        "action": "fetch",
+        "target": "logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "logs are accessible",
+            "fact": "logs_available",
+            "established_by": "stop_writes",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deletion timestamp",
+          "how": "check logs for deletion events",
+          "expected": "exact deletion timestamp identified"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "restore_db",
+        "description": "Restore the database to a point-in-time just before deletion",
+        "action": "restore",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "deletion timestamp is identified",
+            "fact": "deletion_timestamp_identified",
+            "established_by": "identify_timestamp",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "database state",
+          "how": "run consistency checks",
+          "expected": "db state matches expected PITR point"
+        },
+        "rollback": {
+          "trigger": "restore fails",
+          "action": "revert to last known good backup",
+          "safety_guard": "verify backup integrity",
+          "restores_state": [
+            "database before deletion"
+          ],
+          "restoration_evidence": "check if the database state matches the expected PITR point"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "reconcile_data",
+        "description": "Reconcile any data created after the restore point",
+        "action": "reapply",
+        "target": "application logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "db is restored",
+            "fact": "db_restored",
+            "established_by": "restore_db",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "reconciled data",
+          "how": "check application logs for discrepancies",
+          "expected": "data reconciled with application logs"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_integrity",
+        "description": "Verify data integrity after restoration and reconciliation",
+        "action": "verify",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "data is reconciled",
+            "fact": "data_reconciled",
+            "established_by": "reconcile_data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data integrity",
+          "how": "run integrity checks",
+          "expected": "data integrity verified"
+        },
+        "rollback": {
+          "trigger": "data integrity check fails",
+          "action": "revert changes and restore backup",
+          "safety_guard": "verify backup integrity",
+          "restores_state": [
+            "database integrity verified"
+          ],
+          "restoration_evidence": "run integrity checks to confirm database state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "implement_controls",
+        "description": "Implement preventive controls for future protection",
+        "action": "apply",
+        "target": "database controls",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "data integrity is verified",
+            "fact": "data_integrity_verified",
+            "established_by": "verify_integrity",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "implemented controls",
+          "how": "check controls documentation",
+          "expected": "preventive controls effectively documented"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "stop_writes",
+        "to_task": "identify_timestamp",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "identify_timestamp",
+        "to_task": "restore_db",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "restore_db",
+        "to_task": "reconcile_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "reconcile_data",
+        "to_task": "verify_integrity",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_integrity",
+        "to_task": "implement_controls",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:stop_writes",
+      "task_id": "stop_writes",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'stop_writes' should be successfully completed before proceeding with tasks dependent on its completion to ensure no writes occur during the recovery process.",
+      "suggested_fix": "Ensure 'stop_writes' is completed and confirmed before any subsequent tasks are initiated.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:restore_db",
+      "task_id": "restore_db",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'restore_db' depends on the completion of 'identify_timestamp', but 'identify_timestamp' does not have a rollback specified, which makes it unverified and risky to rely on.",
+      "suggested_fix": "Implement a rollback strategy for 'identify_timestamp' to ensure it can revert changes if the step fails.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:restore_db",
+      "task_id": "restore_db",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for 'restore_db' only reverts to the last known backup, which may not cover concurrent changes made after the deletion timestamp.",
+      "suggested_fix": "Enhance the rollback strategy to ensure that if the restore fails, the state is not only reverted but also validated against any concurrent changes.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:verify_integrity",
+      "task_id": "verify_integrity",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for 'verify_integrity' does not account for potential failures in data integrity check, risking undetected issues post-recovery.",
+      "suggested_fix": "Add a more robust rollback strategy that includes specific steps to correct any discrepancies found during integrity verification.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

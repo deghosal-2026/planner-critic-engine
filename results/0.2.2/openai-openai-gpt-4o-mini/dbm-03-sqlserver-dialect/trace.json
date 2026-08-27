@@ -1,0 +1,368 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dbm-03-sqlserver-dialect",
+  "duration_seconds": 24.64,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-dbm-03-sqlserver-dialect-r2",
+    "goal_id": "dbm-03-sqlserver-dialect",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "dbm-03-sqlserver-dialect-plan",
+    "created_at": "2026-08-27T03:58:29.054465Z",
+    "tasks": [
+      {
+        "id": "t_sql_rewrite",
+        "description": "Rewrite T-SQL stored procedures to PL/pgSQL",
+        "action": "rewrite",
+        "target": "stored procedures",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "procedure functionality",
+          "how": "run tests",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "rewrite fails",
+          "action": "revert to original T-SQL",
+          "safety_guard": "validate rewritten procedures against T-SQL behavior",
+          "restores_state": [
+            "source T-SQL procedures"
+          ],
+          "restoration_evidence": "backup of original T-SQL procedures"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "permission_migration",
+        "description": "Migrate SQL Server logins and roles to PostgreSQL roles and grants",
+        "action": "migrate",
+        "target": "permissions",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "postgreSQL roles defined",
+            "fact": "pg_roles_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "job_conversion",
+        "description": "Convert SQL Server Agent jobs to pg_cron or Airflow",
+        "action": "convert",
+        "target": "jobs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "pg_cron or Airflow environment set up",
+            "fact": "scheduler_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "data_migration",
+        "description": "Migrate data using DMS or pgloader",
+        "action": "migrate",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data consistency",
+          "how": "row count checks",
+          "expected": "row counts match"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore from backup",
+          "safety_guard": "verify data integrity",
+          "restores_state": [
+            "post-migration data state"
+          ],
+          "restoration_evidence": "row count matches backup post restoration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "dual_run_validation",
+        "description": "Perform dual-run validation between SQL Server and PostgreSQL",
+        "action": "validate",
+        "target": "migration",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "query results consistency",
+          "how": "run comparative queries",
+          "expected": "results are identical"
+        },
+        "rollback": {
+          "trigger": "discrepancies found",
+          "action": "refactor migration process",
+          "safety_guard": "document discrepancies",
+          "restores_state": [
+            "last known good migration state"
+          ],
+          "restoration_evidence": "log of previous migration validations"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover",
+        "description": "Cutover to PostgreSQL",
+        "action": "cutover",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application connectivity",
+          "how": "test application",
+          "expected": "successful connections"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "rollback to SQL Server",
+          "safety_guard": "confirm postgreSQL environment is stable",
+          "restores_state": [
+            "pre-cutover environment"
+          ],
+          "restoration_evidence": "successful connectivity reports from SQL Server"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_postgres",
+        "description": "Verify PostgreSQL setup post-cutover",
+        "action": "verify",
+        "target": "postgres",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "PostgreSQL functionality",
+          "how": "execute benchmark tests",
+          "expected": "performance metrics meet criteria"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "revert to previous config",
+          "safety_guard": "ensure prior state is documented",
+          "restores_state": [
+            "last verified configuration"
+          ],
+          "restoration_evidence": "logs or snapshots of previous configurations"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "retire_sql_server",
+        "description": "Retire the SQL Server environment",
+        "action": "retire",
+        "target": "sql_server",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "t_sql_rewrite",
+        "to_task": "data_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "permission_migration",
+        "to_task": "data_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "job_conversion",
+        "to_task": "data_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "data_migration",
+        "to_task": "dual_run_validation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dual_run_validation",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover",
+        "to_task": "verify_postgres",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_postgres",
+        "to_task": "retire_sql_server",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:missing_steps:permission_migration",
+      "task_id": "permission_migration",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Add a verification step for the migration of SQL Server logins and roles to PostgreSQL roles and grants.",
+      "suggested_fix": "Implement a verification process that ensures all SQL Server roles and permissions have been successfully migrated to PostgreSQL.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:job_conversion",
+      "task_id": "job_conversion",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Add a verification step for the status of converted jobs in pg_cron or Airflow.",
+      "suggested_fix": "Incorporate a check to validate that all jobs have been correctly converted and are functioning as expected in the new environment.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:data_migration",
+      "task_id": "data_migration",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Ensure the prerequisite tasks 't_sql_rewrite', 'permission_migration', and 'job_conversion' are verified before proceeding to data migration.",
+      "suggested_fix": "Implement checks to verify that the necessary permission setups and job conversions are complete and validated before data migration occurs.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:data_migration",
+      "task_id": "data_migration",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Data migration task is scheduled to run before verifying that all prerequisite tasks are complete.",
+      "suggested_fix": "Reorder the tasks or add suitable checks to ensure that all dependencies are satisfied before data migration proceeds.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:cutover",
+      "task_id": "cutover",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Add a precondition check that ensures PostgreSQL has been thoroughly validated before cutover.",
+      "suggested_fix": "Incorporate a step to ensure verification of PostgreSQL functionality is successfully completed before the cutover process begins.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:cutover",
+      "task_id": "cutover",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action for cutover does not specify how to revert the application connections properly.",
+      "suggested_fix": "Define a more comprehensive rollback plan for cutover that includes re-establishing existing SQL Server connections and state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

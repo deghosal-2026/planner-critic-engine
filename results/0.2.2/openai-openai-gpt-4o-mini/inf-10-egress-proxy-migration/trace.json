@@ -1,0 +1,454 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-10-egress-proxy-migration",
+  "duration_seconds": 83.73,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-inf-10-egress-proxy-migration-r4",
+    "goal_id": "inf-10-egress-proxy-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-inf-10-egress-proxy-migration-r3",
+    "created_at": "2026-08-27T04:16:45.334379Z",
+    "tasks": [
+      {
+        "id": "deploy-proxy",
+        "description": "Deploy egress proxy in a dedicated VPC",
+        "action": "deploy",
+        "target": "egress-proxy",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "VPC is configured correctly",
+            "fact": "vpc_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "egress proxy availability",
+          "how": "send test traffic and check logs",
+          "expected": "traffic routed through proxy"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "remove proxy and restore previous configuration",
+          "safety_guard": "verify service availability",
+          "restores_state": [
+            "previous configuration of the service"
+          ],
+          "restoration_evidence": "service operational status after rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "confirm-proxy-deployed",
+        "description": "Confirm proxy has been deployed successfully",
+        "action": "verify",
+        "target": "proxy",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Proxy deployment in progress",
+            "fact": "proxy_deploy_in_progress",
+            "established_by": "deploy-proxy",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "proxy deployment validation",
+          "how": "check deployment status",
+          "expected": "proxy is operational"
+        },
+        "rollback": {
+          "trigger": "confirmation fails",
+          "action": "alert deployment team",
+          "safety_guard": "document deployment issues",
+          "restores_state": [
+            "previous state of deployment"
+          ],
+          "restoration_evidence": "deployment logs indicate previous state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure-routing",
+        "description": "Configure NAT Gateway routing through the proxy",
+        "action": "configure",
+        "target": "NAT Gateway",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Proxy is confirmed deployed",
+            "fact": "proxy_deployed",
+            "established_by": "confirm-proxy-deployed",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "NAT Gateway routing",
+          "how": "check routing tables",
+          "expected": "traffic routed through proxy"
+        },
+        "rollback": {
+          "trigger": "routing misconfiguration",
+          "action": "revert NAT Gateway settings",
+          "safety_guard": "ensure backup routing is functional",
+          "restores_state": [
+            "previous NAT Gateway routing configuration"
+          ],
+          "restoration_evidence": "verification of NAT Gateway logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "set-dual-egress",
+        "description": "Set up dual-egress (old direct + new proxy) during migration",
+        "action": "configure",
+        "target": "dual-egress",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Routing is successfully configured",
+            "fact": "routing_successful",
+            "established_by": "configure-routing",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "dual egress setup validation",
+          "how": "check egress routing",
+          "expected": "both paths are operational"
+        },
+        "rollback": {
+          "trigger": "dual egress setup fails",
+          "action": "revert to single egress",
+          "safety_guard": "monitor egress paths for stability",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-dual-egress",
+        "description": "Verify dual egress is stable",
+        "action": "verify",
+        "target": "dual-egress",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dual egress configuration is applied",
+            "fact": "dual_egress_configured",
+            "established_by": "set-dual-egress",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "dual egress stability",
+          "how": "check egress paths",
+          "expected": "both egress paths operational"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "alert team",
+          "safety_guard": "document egress instability",
+          "restores_state": [
+            "previous dual egress state"
+          ],
+          "restoration_evidence": "logs indicating egress path stability"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-traffic",
+        "description": "Verify all traffic flows through proxy",
+        "action": "verify",
+        "target": "traffic flow",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dual egress is verified as stable",
+            "fact": "dual_egress_stable",
+            "established_by": "verify-dual-egress",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic inspection",
+          "how": "analyze proxy logs",
+          "expected": "100% traffic through proxy"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "check proxy configuration and revert as needed",
+          "safety_guard": "document all flows",
+          "restores_state": [
+            "previous traffic routing state"
+          ],
+          "restoration_evidence": "traffic logs show previous routing state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover-traffic",
+        "description": "Cutover application traffic to proxy in batches",
+        "action": "cutover",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Traffic is verified flowing through proxy",
+            "fact": "traffic_verified",
+            "established_by": "verify-traffic",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application traffic flow",
+          "how": "monitor application logs",
+          "expected": "all traffic flows through proxy"
+        },
+        "rollback": {
+          "trigger": "cutover issues",
+          "action": "revert traffic to direct access",
+          "safety_guard": "monitor application health",
+          "restores_state": [
+            "previous traffic routing state"
+          ],
+          "restoration_evidence": "logs confirming traffic routing state"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "enforce-allowlist",
+        "description": "Enforce egress allowlist rules",
+        "action": "configure",
+        "target": "allowlist",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Cutover has been completed",
+            "fact": "cutover_completed",
+            "established_by": "cutover-traffic",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service functionality",
+          "how": "test critical services",
+          "expected": "services operational without issues"
+        },
+        "rollback": {
+          "trigger": "allowlist breaks services",
+          "action": "relax allowlist rules",
+          "safety_guard": "monitor for service impact",
+          "restores_state": [
+            "previous allowlist rules"
+          ],
+          "restoration_evidence": "service health reports"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy-proxy",
+        "to_task": "confirm-proxy-deployed",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "confirm-proxy-deployed",
+        "to_task": "configure-routing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-routing",
+        "to_task": "set-dual-egress",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set-dual-egress",
+        "to_task": "verify-dual-egress",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-dual-egress",
+        "to_task": "verify-traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-traffic",
+        "to_task": "cutover-traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover-traffic",
+        "to_task": "enforce-allowlist",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:configure-routing",
+      "task_id": "configure-routing",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'configure-routing' is listed before verification of proxy deployment.",
+      "suggested_fix": "Reorder tasks to ensure 'confirm-proxy-deployed' is completed before 'configure-routing'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:set-dual-egress",
+      "task_id": "set-dual-egress",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'set-dual-egress' is listed before routing configuration verification.",
+      "suggested_fix": "Reorder tasks to ensure 'configure-routing' is verified before 'set-dual-egress'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:verify-dual-egress",
+      "task_id": "verify-dual-egress",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'verify-dual-egress' is listed before dual egress configuration completion.",
+      "suggested_fix": "Reorder tasks to ensure 'set-dual-egress' is completed before 'verify-dual-egress'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:verify-traffic",
+      "task_id": "verify-traffic",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'verify-traffic' is listed before dual egress stability verification.",
+      "suggested_fix": "Reorder tasks so 'verify-dual-egress' is completed before 'verify-traffic'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:cutover-traffic",
+      "task_id": "cutover-traffic",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'cutover-traffic' is listed before traffic verification is successful.",
+      "suggested_fix": "Ensure 'verify-traffic' is completed successfully before 'cutover-traffic'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:enforce-allowlist",
+      "task_id": "enforce-allowlist",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'enforce-allowlist' is listed before cutover completion verification.",
+      "suggested_fix": "Ensure 'cutover-traffic' is completed before 'enforce-allowlist'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:inf-10-egress-proxy-migration:4:4",
+    "plan_id": "plan-inf-10-egress-proxy-migration-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:configure-routing",
+    "question": "Plan for goal 'inf-10-egress-proxy-migration' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

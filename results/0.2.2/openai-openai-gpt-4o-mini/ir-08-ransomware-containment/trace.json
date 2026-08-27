@@ -1,0 +1,591 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-08-ransomware-containment",
+  "duration_seconds": 85.32,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-ir-08-ransomware-containment-r4",
+    "goal_id": "ir-08-ransomware-containment",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-ir-08-ransomware-containment-r3",
+    "created_at": "2026-08-27T04:08:43.987257Z",
+    "tasks": [
+      {
+        "id": "isolate_server",
+        "description": "Immediately isolate the affected server from the network using a dedicated isolation method that ensures service continuity",
+        "action": "isolate",
+        "target": "server",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "affected server is identified",
+            "fact": "server_identified",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "network isolation status",
+          "how": "run network checks",
+          "expected": "server is isolated"
+        },
+        "rollback": {
+          "trigger": "isolation fails",
+          "action": "re-establish network connectivity",
+          "safety_guard": "verify no data leak",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "snapshot_disk",
+        "description": "Snapshot disk of the affected server for forensics",
+        "action": "snapshot",
+        "target": "disk",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "isolation confirmed",
+            "fact": "server_isolated",
+            "established_by": "isolate_server",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "snapshot integrity",
+          "how": "check snapshot validity",
+          "expected": "valid snapshot created"
+        },
+        "rollback": {
+          "trigger": "snapshot fails",
+          "action": "attempt retry for snapshot",
+          "safety_guard": "ensure partial snapshots are discarded",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "halt_propagation",
+        "description": "Identify and halt lateral propagation paths",
+        "action": "halt",
+        "target": "propagation_paths",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "affected server is isolated",
+            "fact": "server_isolated",
+            "established_by": "isolate_server",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "propagation paths status",
+          "how": "run propagation checks",
+          "expected": "no propagation paths active"
+        },
+        "rollback": {
+          "trigger": "halt fails",
+          "action": "re-scan paths",
+          "safety_guard": "ensure all paths are checked",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_no_impact",
+        "description": "Verify no other systems are affected",
+        "action": "verify",
+        "target": "systems",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "halt propagation confirmed",
+            "fact": "propagation_halted",
+            "established_by": "halt_propagation",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "system status",
+          "how": "run health checks",
+          "expected": "no additional impact detected"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "reconfirm isolation and checks",
+          "safety_guard": "ensure thorough check of systems",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_backup_integrity",
+        "description": "Verify backup integrity prior to restoration",
+        "action": "verify",
+        "target": "backup",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "no impact confirmed",
+            "fact": "no_additional_impact",
+            "established_by": "verify_no_impact",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "backup integrity status",
+          "how": "check backup validity",
+          "expected": "valid backup confirmed"
+        },
+        "rollback": {
+          "trigger": "backup verification fails",
+          "action": "recheck backup",
+          "safety_guard": "ensure full integrity check",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "restore_services",
+        "description": "Restore affected services from clean backups",
+        "action": "restore",
+        "target": "services",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "backup integrity verified",
+            "fact": "backup_integrity_valid",
+            "established_by": "verify_backup_integrity",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service status",
+          "how": "run service health checks",
+          "expected": "all services operational"
+        },
+        "rollback": {
+          "trigger": "restore fails",
+          "action": "rollback to previous state, including configurations",
+          "safety_guard": "validate restore point",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_integrity",
+        "description": "Verify data integrity post-restore",
+        "action": "verify",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "services restored",
+            "fact": "services_operational",
+            "established_by": "restore_services",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data integrity status",
+          "how": "conduct data integrity checks",
+          "expected": "data integrity valid"
+        },
+        "rollback": {
+          "trigger": "integrity verification fails",
+          "action": "revalidate data integrity",
+          "safety_guard": "ensure data backup is intact",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "isolate_server",
+        "to_task": "snapshot_disk",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "snapshot_disk",
+        "to_task": "halt_propagation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "halt_propagation",
+        "to_task": "verify_no_impact",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_no_impact",
+        "to_task": "verify_backup_integrity",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_backup_integrity",
+        "to_task": "restore_services",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "restore_services",
+        "to_task": "verify_integrity",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plan-ir-08-ransomware-containment-r4:4:isolate_server:rollback_state_undeclared",
+      "task_id": "isolate_server",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'isolate_server' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-ir-08-ransomware-containment-r4:4:snapshot_disk:rollback_state_undeclared",
+      "task_id": "snapshot_disk",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'snapshot_disk' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-ir-08-ransomware-containment-r4:4:verify_no_impact:rollback_state_undeclared",
+      "task_id": "verify_no_impact",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_no_impact' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-ir-08-ransomware-containment-r4:4:verify_backup_integrity:rollback_state_undeclared",
+      "task_id": "verify_backup_integrity",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_backup_integrity' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-ir-08-ransomware-containment-r4:4:restore_services:rollback_state_undeclared",
+      "task_id": "restore_services",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'restore_services' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-ir-08-ransomware-containment-r4:4:verify_integrity:rollback_state_undeclared",
+      "task_id": "verify_integrity",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_integrity' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-ir-08-ransomware-containment-r4:4:isolate_server:rollback_state_undeclared",
+      "task_id": "isolate_server",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'isolate_server' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-ir-08-ransomware-containment-r4:4:snapshot_disk:rollback_state_undeclared",
+      "task_id": "snapshot_disk",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'snapshot_disk' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-ir-08-ransomware-containment-r4:4:verify_no_impact:rollback_state_undeclared",
+      "task_id": "verify_no_impact",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_no_impact' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-ir-08-ransomware-containment-r4:4:verify_backup_integrity:rollback_state_undeclared",
+      "task_id": "verify_backup_integrity",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_backup_integrity' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-ir-08-ransomware-containment-r4:4:restore_services:rollback_state_undeclared",
+      "task_id": "restore_services",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'restore_services' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-ir-08-ransomware-containment-r4:4:verify_integrity:rollback_state_undeclared",
+      "task_id": "verify_integrity",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_integrity' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:restore_services",
+      "task_id": "restore_services",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'restore_services' is ordered before verifying that the backup integrity is valid.",
+      "suggested_fix": "Move 'restore_services' after 'verify_backup_integrity'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:restore_services",
+      "task_id": "restore_services",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The 'restore_services' task lacks an effective rollback strategy that guarantees complete restoration of the system state without potential data loss.",
+      "suggested_fix": "Implement a detailed rollback plan to revert to a known good state with minimal service disruption.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:verify_integrity",
+      "task_id": "verify_integrity",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'verify_integrity' depends on 'services_operational' but this status is not guaranteed to be valid if the restore fails.",
+      "suggested_fix": "Ensure 'verify_integrity' only runs after confirming successful restoration with a validated state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:risk:snapshot_disk",
+      "task_id": "snapshot_disk",
+      "version": 4,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "There is a risk of creating a contaminated forensic snapshot if isolation is not absolute.",
+      "suggested_fix": "Enhance isolation methods before proceeding to ensure no possibility of leak during the snapshot.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:risk:verify_no_impact",
+      "task_id": "verify_no_impact",
+      "version": 4,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "If 'halt_propagation' task encounters issues, the verification of system status may yield false results.",
+      "suggested_fix": "Implement additional checks and controls to ensure comprehensive verification of no impact on other systems.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-08-ransomware-containment:4:4",
+    "plan_id": "plan-ir-08-ransomware-containment-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:restore_services",
+    "question": "Plan for goal 'ir-08-ransomware-containment' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

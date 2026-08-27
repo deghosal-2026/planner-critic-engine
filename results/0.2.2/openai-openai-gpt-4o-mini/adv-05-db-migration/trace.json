@@ -1,0 +1,409 @@
+{
+  "dimension": "core-api",
+  "goal_id": "adv-05-db-migration",
+  "duration_seconds": 16.18,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "adv-05-db-migration-plan",
+    "goal_id": "adv-05-db-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-27T03:53:46.290176Z",
+    "tasks": [
+      {
+        "id": "check_vpn",
+        "description": "Ensure the VPN connection is established and secure",
+        "action": "check_connection",
+        "target": "vpn",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "VPN configuration is correct",
+            "fact": "vpn_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "validate_schema",
+        "description": "Perform schema validation on the database",
+        "action": "validate",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Database is reachable",
+            "fact": "db_healthy",
+            "established_by": "check_vpn",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "schema validation results",
+          "how": "compare against expected schema",
+          "expected": "schema matches expected structure"
+        },
+        "rollback": {
+          "trigger": "schema validation fails",
+          "action": "revert to previous schema",
+          "safety_guard": "backup the schema version",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "backup_data",
+        "description": "Back up the current database",
+        "action": "backup",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Schema validation is successful",
+            "fact": "schema_validated",
+            "established_by": "validate_schema",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "backup file integrity",
+          "how": "run checksum on backup file",
+          "expected": "checksum matches original database"
+        },
+        "rollback": {
+          "trigger": "backup fails",
+          "action": "notify admin",
+          "safety_guard": "retry backup",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "migrate_data",
+        "description": "Migrate the database to the cloud using pg_dump and psql",
+        "action": "migrate",
+        "target": "cloud_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Backup completed successfully",
+            "fact": "backup_successful",
+            "established_by": "backup_data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "migrated database records",
+          "how": "run data integrity checks",
+          "expected": "data matches original database"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore from backup",
+          "safety_guard": "verify backup integrity",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "post_migration_validation",
+        "description": "Validate the schema and data after migration",
+        "action": "validate_post_migration",
+        "target": "cloud_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Migration completed successfully",
+            "fact": "migration_successful",
+            "established_by": "migrate_data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "post-migration validation results",
+          "how": "compare against expected results",
+          "expected": "data integrity validated"
+        },
+        "rollback": {
+          "trigger": "post-migration validation fails",
+          "action": "notify admin",
+          "safety_guard": "log the issue",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_vpn",
+        "to_task": "validate_schema",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "validate_schema",
+        "to_task": "backup_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "backup_data",
+        "to_task": "migrate_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate_data",
+        "to_task": "post_migration_validation",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:adv-05-db-migration-plan:1:validate_schema:rollback_state_undeclared",
+      "task_id": "validate_schema",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'validate_schema' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:adv-05-db-migration-plan:1:backup_data:rollback_state_undeclared",
+      "task_id": "backup_data",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'backup_data' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:adv-05-db-migration-plan:1:migrate_data:rollback_state_undeclared",
+      "task_id": "migrate_data",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'migrate_data' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:adv-05-db-migration-plan:1:post_migration_validation:rollback_state_undeclared",
+      "task_id": "post_migration_validation",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'post_migration_validation' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:adv-05-db-migration-plan:1:validate_schema:rollback_state_undeclared",
+      "task_id": "validate_schema",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'validate_schema' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:adv-05-db-migration-plan:1:backup_data:rollback_state_undeclared",
+      "task_id": "backup_data",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'backup_data' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:adv-05-db-migration-plan:1:migrate_data:rollback_state_undeclared",
+      "task_id": "migrate_data",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'migrate_data' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:adv-05-db-migration-plan:1:post_migration_validation:rollback_state_undeclared",
+      "task_id": "post_migration_validation",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'post_migration_validation' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:migrate_data",
+      "task_id": "migrate_data",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The migrate_data task is ordered before establishing that the database is in a healthy state, as it relies on the backup_data which depends on validate_schema.",
+      "suggested_fix": "Ensure that migrate_data is only executed after all prerequisite tasks, including validate_schema, have confirmed a successful state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:weak_rollback:migrate_data",
+      "task_id": "migrate_data",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for migrate_data does not include clear steps for restoration evidence or the conditions under which a restore will take place.",
+      "suggested_fix": "Enhance the rollback plan for migrate_data by detailing steps and conditions for validating the backup integrity and restoring data.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:unverified_dependencies:backup_data",
+      "task_id": "backup_data",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The backup_data task relies on a prerequisite that is not clearly established, as schema validation could fail without verification.",
+      "suggested_fix": "Introduce a verification step to confirm that schema validation has succeeded before proceeding with backup_data.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:missing_steps:post_migration_validation",
+      "task_id": "post_migration_validation",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Post-migration validation could benefit from additional checks on data completeness and consistency.",
+      "suggested_fix": "Include steps for data completeness checks in the post_migration_validation task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

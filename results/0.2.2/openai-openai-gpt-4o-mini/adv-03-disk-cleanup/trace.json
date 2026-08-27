@@ -1,0 +1,244 @@
+{
+  "dimension": "core-api",
+  "goal_id": "adv-03-disk-cleanup",
+  "duration_seconds": 13.63,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-adv-03-disk-cleanup-r2",
+    "goal_id": "adv-03-disk-cleanup",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "adv-03-disk-cleanup-plan",
+    "created_at": "2026-08-27T03:53:21.851539Z",
+    "tasks": [
+      {
+        "id": "snapshot",
+        "description": "Take a filesystem snapshot",
+        "action": "snapshot",
+        "target": "filesystem",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "SSH access verified",
+            "fact": "ssh_access",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "Filesystem is healthy",
+            "fact": "filesystem_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "backup_verification",
+        "description": "Verify backup integrity",
+        "action": "verify",
+        "target": "backup",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "backup integrity",
+          "how": "run checksum",
+          "expected": "checksums match"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "clean up previous backups",
+          "safety_guard": "ensure no operational backups exist",
+          "restores_state": [
+            "backup verified state"
+          ],
+          "restoration_evidence": "checksums match"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "dry_run",
+        "description": "Perform a dry-run of the cleanup process",
+        "action": "dry_run_cleanup",
+        "target": "temp_logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Backup verification complete",
+            "fact": "backup_verified",
+            "established_by": "backup_verification",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "dry run completion",
+          "how": "review dry run logs",
+          "expected": "no files are deleted and logs indicate success"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cleanup",
+        "description": "Delete old logs and temporary files",
+        "action": "cleanup",
+        "target": "temp_logs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "logs and files removal",
+          "how": "list directory contents",
+          "expected": "old logs and temp files are removed"
+        },
+        "rollback": {
+          "trigger": "cleanup fails",
+          "action": "restore files from backup",
+          "safety_guard": "ensure proper log restoration",
+          "restores_state": [
+            "previous state of temp_logs"
+          ],
+          "restoration_evidence": "files and logs are intact after restoration"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "snapshot",
+        "to_task": "backup_verification",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "backup_verification",
+        "to_task": "dry_run",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dry_run",
+        "to_task": "cleanup",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:cleanup",
+      "task_id": "cleanup",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The cleanup task is ordered before the dry_run task, which is a hard prerequisite.",
+      "suggested_fix": "Reorder the cleanup task to occur after the dry_run task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:cleanup",
+      "task_id": "cleanup",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The cleanup task depends on the 'backup_verified' fact, which is not established before it is executed.",
+      "suggested_fix": "Add a precondition to the cleanup task to verify that backup verification has been completed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:cleanup",
+      "task_id": "cleanup",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for the cleanup task lacks sufficient detail on how to ensure proper restoration of logs and files.",
+      "suggested_fix": "Define more robust rollback actions that ensure integrity and completeness of restoration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:snapshot",
+      "task_id": "snapshot",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider including a step to log the snapshot details for audit purposes.",
+      "suggested_fix": "Add logging of snapshot details after it is taken.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:dry_run",
+      "task_id": "dry_run",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Could also cover edge cases where no files are available for deletion.",
+      "suggested_fix": "Include a step for checking if there are no files before performing the dry-run.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

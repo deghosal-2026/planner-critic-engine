@@ -1,0 +1,355 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-07-blue-green",
+  "duration_seconds": 62.6,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-k8s-07-blue-green-r4",
+    "goal_id": "k8s-07-blue-green",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-k8s-07-blue-green-r3",
+    "created_at": "2026-08-27T04:16:14.969352Z",
+    "tasks": [
+      {
+        "id": "deploy_green",
+        "description": "Deploy the green stack for the payments API service",
+        "action": "deploy",
+        "target": "green_stack",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Verify environment and tools availability",
+            "fact": "env_tools_verified",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "Confirm green stack is deployed successfully",
+            "fact": "green_deployed",
+            "established_by": "deploy_green",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "green stack deployment status",
+          "how": "check deployment status via kubectl",
+          "expected": "all deployments available"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "roll back to blue stack",
+          "safety_guard": "verify blue stack is operational",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "run_smoke_tests",
+        "description": "Run smoke tests against the green service endpoint",
+        "action": "test",
+        "target": "green_endpoint",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "smoke test results",
+          "how": "monitor logs for errors",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "smoke tests fail",
+          "action": "revert to blue endpoint",
+          "safety_guard": "ensure blue endpoint is healthy",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "run_health_checks",
+        "description": "Run comprehensive health checks against the green service endpoint",
+        "action": "test",
+        "target": "green_endpoint",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "health check results",
+          "how": "monitor logs for errors",
+          "expected": "all health checks pass"
+        },
+        "rollback": {
+          "trigger": "health checks fail",
+          "action": "revert to blue endpoint",
+          "safety_guard": "ensure blue endpoint is healthy",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "switch_ingress",
+        "description": "Switch the production Ingress to point to the green service",
+        "action": "update",
+        "target": "ingress",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "ingress configuration",
+          "how": "kubectl get ingress",
+          "expected": "points to green service"
+        },
+        "rollback": {
+          "trigger": "switch fails",
+          "action": "revert Ingress to blue service",
+          "safety_guard": "validate blue service response",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor_green",
+        "description": "Monitor the green service for 30 minutes",
+        "action": "monitor",
+        "target": "green_service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "green service is deployed and switched",
+            "fact": "green_deployed",
+            "established_by": "switch_ingress",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "monitoring results",
+          "how": "check logs for performance",
+          "expected": "no critical errors"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "decommission_blue",
+        "description": "Drain and decommission the blue stack",
+        "action": "decommission",
+        "target": "blue_stack",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "monitoring completed and verified",
+            "fact": "green_healthy",
+            "established_by": "monitor_green",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "blue service response",
+          "how": "check blue service availability",
+          "expected": "blue service operational"
+        },
+        "rollback": {
+          "trigger": "decommission fails",
+          "action": "restore blue service if decommission fails",
+          "safety_guard": "validate blue service health post restoration",
+          "restores_state": [
+            "blue service operational"
+          ],
+          "restoration_evidence": "check blue service status"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_green",
+        "to_task": "run_smoke_tests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_green",
+        "to_task": "run_health_checks",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_smoke_tests",
+        "to_task": "switch_ingress",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_health_checks",
+        "to_task": "switch_ingress",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "switch_ingress",
+        "to_task": "monitor_green",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_green",
+        "to_task": "decommission_blue",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plan-k8s-07-blue-green-r4:4:deploy_green:rollback_self_dependent",
+      "task_id": "deploy_green",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "blocker",
+      "reason_code": "rollback_self_dependent",
+      "message": "precondition fact 'green_deployed' claims establishment by the task itself",
+      "suggested_fix": "Establish the fact from an earlier task or an env probe",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-k8s-07-blue-green-r4:4:deploy_green:rollback_state_undeclared",
+      "task_id": "deploy_green",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'deploy_green' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-k8s-07-blue-green-r4:4:run_smoke_tests:rollback_state_undeclared",
+      "task_id": "run_smoke_tests",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'run_smoke_tests' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-k8s-07-blue-green-r4:4:run_health_checks:rollback_state_undeclared",
+      "task_id": "run_health_checks",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'run_health_checks' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-k8s-07-blue-green-r4:4:switch_ingress:rollback_state_undeclared",
+      "task_id": "switch_ingress",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'switch_ingress' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "preconditions_referenced:plan-k8s-07-blue-green-r4:4:deploy_green:green_deployed",
+      "task_id": "deploy_green",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "blocker",
+      "reason_code": "unverified_precondition",
+      "message": "precondition 'green_deployed' on task 'deploy_green' references no established fact from an earlier task",
+      "suggested_fix": "Point the precondition at an earlier task that establishes 'green_deployed'",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-07-blue-green:4:4",
+    "plan_id": "plan-k8s-07-blue-green-r4",
+    "version": 4,
+    "blocker_finding_id": "rollback_credible:plan-k8s-07-blue-green-r4:4:deploy_green:rollback_self_dependent",
+    "question": "Plan for goal 'k8s-07-blue-green' cannot be approved: blockers remain (rollback_self_dependent; unverified_precondition). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

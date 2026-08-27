@@ -1,0 +1,262 @@
+{
+  "dimension": "core-api",
+  "goal_id": "data-04-streaming-pipeline",
+  "duration_seconds": 54.69,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-data-04-streaming-pipeline-r4",
+    "goal_id": "data-04-streaming-pipeline",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-data-04-streaming-pipeline-r3",
+    "created_at": "2026-08-27T03:06:20.793418Z",
+    "tasks": [
+      {
+        "id": "deploy-kafka",
+        "description": "Deploy Kafka cluster",
+        "action": "deploy",
+        "target": "kafka",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Kafka cluster status",
+          "how": "check Kafka logs",
+          "expected": "running"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "destroy Kafka resources",
+          "safety_guard": "ensure no data loss",
+          "restores_state": [
+            "Kafka cluster is not deployed"
+          ],
+          "restoration_evidence": "check for absence of Kafka resources"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-s3-accessibility",
+        "description": "Verify S3 bucket accessibility",
+        "action": "verify",
+        "target": "s3-accessibility",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "S3 bucket accessibility status",
+          "how": "check S3 access",
+          "expected": "accessible"
+        },
+        "rollback": {
+          "trigger": "accessibility check fails",
+          "action": "stop further S3 configurations",
+          "safety_guard": "notify about configuration failure",
+          "restores_state": [
+            "S3 accessibility check not performed"
+          ],
+          "restoration_evidence": "log of check failure"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure-s3",
+        "description": "Configure S3 bucket for output",
+        "action": "configure",
+        "target": "s3",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "S3 accessibility",
+          "how": "check S3 access permissions",
+          "expected": "accessible"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy-flink",
+        "description": "Deploy Flink application",
+        "action": "deploy",
+        "target": "flink",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Flink application status",
+          "how": "check Flink logs",
+          "expected": "running"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "destroy Flink resources",
+          "safety_guard": "ensure no data loss",
+          "restores_state": [
+            "Flink application is not deployed"
+          ],
+          "restoration_evidence": "check for absence of Flink resources"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-throughput",
+        "description": "Verify data throughput from Kafka to Flink",
+        "action": "verify",
+        "target": "throughput",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data throughput rate",
+          "how": "check Prometheus metrics",
+          "expected": "above threshold"
+        },
+        "rollback": {
+          "trigger": "throughput not met",
+          "action": "scale Flink resources",
+          "safety_guard": "monitor resource usage",
+          "restores_state": [
+            "throughput is below threshold"
+          ],
+          "restoration_evidence": "metrics show increased throughput"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-checkpointing",
+        "description": "Verify checkpointing in Flink",
+        "action": "verify",
+        "target": "checkpointing",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Flink checkpoint status",
+          "how": "check Flink dashboard",
+          "expected": "checkpoints are successful"
+        },
+        "rollback": {
+          "trigger": "checkpointing fails",
+          "action": "reset Flink state",
+          "safety_guard": "ensure no data loss",
+          "restores_state": [
+            "Flink application state is reset"
+          ],
+          "restoration_evidence": "check for successful checkpointing after reset"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "verify-s3-accessibility",
+        "to_task": "configure-s3",
+        "kind": "hard",
+        "reason": "S3 bucket accessibility must be verified before configuration"
+      },
+      {
+        "from_task": "deploy-kafka",
+        "to_task": "deploy-flink",
+        "kind": "hard",
+        "reason": "Deployment success of Kafka is required before Flink deployment"
+      },
+      {
+        "from_task": "deploy-flink",
+        "to_task": "verify-throughput",
+        "kind": "hard",
+        "reason": "Flink application must be running before verifying throughput"
+      },
+      {
+        "from_task": "deploy-flink",
+        "to_task": "verify-checkpointing",
+        "kind": "hard",
+        "reason": "Flink application must be running before verifying checkpointing"
+      },
+      {
+        "from_task": "configure-s3",
+        "to_task": "verify-s3-accessibility",
+        "kind": "soft",
+        "reason": "S3 bucket configuration may follow accessibility verification"
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:configure-s3",
+      "task_id": "configure-s3",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "S3 bucket configuration should not occur before verifying S3 accessibility.",
+      "suggested_fix": "Reorder tasks to ensure 'verify-s3-accessibility' completes before 'configure-s3'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:verify-checkpointing",
+      "task_id": "verify-checkpointing",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Checkpointing verification depends on the successful deployment of Flink, which is not verified.",
+      "suggested_fix": "Add a dependency to ensure 'deploy-flink' is completed and verified before 'verify-checkpointing'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:data-04-streaming-pipeline:4:4",
+    "plan_id": "plan-data-04-streaming-pipeline-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:configure-s3",
+    "question": "Plan for goal 'data-04-streaming-pipeline' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

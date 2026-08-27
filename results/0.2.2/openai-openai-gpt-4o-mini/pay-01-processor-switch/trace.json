@@ -1,0 +1,292 @@
+{
+  "dimension": "core-api",
+  "goal_id": "pay-01-processor-switch",
+  "duration_seconds": 49.73,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-pay-01-processor-switch-r4",
+    "goal_id": "pay-01-processor-switch",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-pay-01-processor-switch-r3",
+    "created_at": "2026-08-27T03:45:42.445794Z",
+    "tasks": [
+      {
+        "id": "setup_feature_flag",
+        "description": "Set up feature flag for routing transactions",
+        "action": "setup",
+        "target": "feature_flag",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Development environment is stable",
+            "fact": "env_stable",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "dual_acquire",
+        "description": "Implement dual acquisition of payments",
+        "action": "route",
+        "target": "transactions",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Feature flag is active",
+            "fact": "feature_flag_active",
+            "established_by": "setup_feature_flag",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "transaction success rate",
+          "how": "monitor success metrics",
+          "expected": "95% success"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "route all to Stripe",
+          "safety_guard": "verify feature flag status",
+          "restores_state": [
+            "transactions_routed_to_Stripe"
+          ],
+          "restoration_evidence": "transaction error logs reviewed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "reconciliation_check",
+        "description": "Perform reconciliation check between Stripe and Adyen",
+        "action": "compare",
+        "target": "transaction_records",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Both transaction records are available",
+            "fact": "records_ready",
+            "established_by": "dual_acquire",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "discrepancy count",
+          "how": "run reconciliation scripts",
+          "expected": "0 discrepancies"
+        },
+        "rollback": {
+          "trigger": "discrepancies found",
+          "action": "rollback transactions",
+          "safety_guard": "restore previous state",
+          "restores_state": [
+            "original_transaction_records"
+          ],
+          "restoration_evidence": "reconciliation audit logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "settlement_cutover",
+        "description": "Switch primary settlement to Adyen",
+        "action": "cutover",
+        "target": "settlement_process",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Reconciliation check is complete",
+            "fact": "reconciliation_done",
+            "established_by": "reconciliation_check",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "settlement summary",
+          "how": "check daily reports",
+          "expected": "Adyen settlements are complete"
+        },
+        "rollback": {
+          "trigger": "settlement issues occur",
+          "action": "switch back to Stripe",
+          "safety_guard": "ensure all settlements completed",
+          "restores_state": [
+            "primary_settlement_to_Stripe"
+          ],
+          "restoration_evidence": "settlement completion report reviewed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "fallback_plan",
+        "description": "Implement fallback plan for routing to Stripe",
+        "action": "monitor",
+        "target": "error_rate",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dual acquisition has commenced",
+            "fact": "dual_acquire_started",
+            "established_by": "dual_acquire",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "error rate",
+          "how": "review logs",
+          "expected": "error rate below 5%"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "retire_stripe",
+        "description": "Remove Stripe integration and close account",
+        "action": "remove",
+        "target": "Stripe_account",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "All transactions are settled with Adyen",
+            "fact": "settlement_complete",
+            "established_by": "settlement_cutover",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "confirmation of account closure",
+          "how": "check Stripe account status",
+          "expected": "Stripe account closed successfully"
+        },
+        "rollback": {
+          "trigger": "issues arise in earlier steps",
+          "action": "restore Stripe integration",
+          "safety_guard": "confirm settlements are intact",
+          "restores_state": [
+            "Stripe_account_restored"
+          ],
+          "restoration_evidence": "Stripe account status verified"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup_feature_flag",
+        "to_task": "dual_acquire",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dual_acquire",
+        "to_task": "reconciliation_check",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "reconciliation_check",
+        "to_task": "settlement_cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dual_acquire",
+        "to_task": "fallback_plan",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "settlement_cutover",
+        "to_task": "retire_stripe",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:retire_stripe",
+      "task_id": "retire_stripe",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The 'retire_stripe' task is sequenced before verifying that all transactions have settled with Adyen.",
+      "suggested_fix": "Reorder the tasks to ensure 'retire_stripe' follows the verification of settlements.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:retire_stripe",
+      "task_id": "retire_stripe",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'retire_stripe' lacks a sound rollback plan if earlier tasks fail.",
+      "suggested_fix": "Include a clear rollback plan that can handle failures in earlier steps clearly.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:pay-01-processor-switch:4:4",
+    "plan_id": "plan-pay-01-processor-switch-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:retire_stripe",
+    "question": "Plan for goal 'pay-01-processor-switch' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

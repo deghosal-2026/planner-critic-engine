@@ -1,0 +1,338 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-09-artifact-signing",
+  "duration_seconds": 28.15,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-plat-09-artifact-signing-r2",
+    "goal_id": "plat-09-artifact-signing",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plan-plat-09-artifact-signing",
+    "created_at": "2026-08-27T04:13:19.874518Z",
+    "tasks": [
+      {
+        "id": "integrate_cosign",
+        "description": "Integrate Cosign for container image signing",
+        "action": "integrate",
+        "target": "Cosign",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "integration status",
+          "how": "check logs",
+          "expected": "integration successful"
+        },
+        "rollback": {
+          "trigger": "integration fails",
+          "action": "remove Cosign integration",
+          "safety_guard": "verify that images are not signed",
+          "restores_state": [
+            "Cosign integration removed"
+          ],
+          "restoration_evidence": "check for absence of Cosign signatures"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "generate_sbom",
+        "description": "Generate SBOM with Syft for every build",
+        "action": "generate",
+        "target": "SBOM",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Syft is installed",
+            "fact": "syft_installed",
+            "established_by": "integrate_cosign",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "SBOM generation status",
+          "how": "check logs",
+          "expected": "SBOM generated successfully"
+        },
+        "rollback": {
+          "trigger": "SBOM generation fails",
+          "action": "retry generating SBOM",
+          "safety_guard": "confirm last successful SBOM exists",
+          "restores_state": [
+            "last known good SBOM retained"
+          ],
+          "restoration_evidence": "check for existence of last SBOM"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "store_signatures",
+        "description": "Store signatures in Rekor transparency log",
+        "action": "store",
+        "target": "signatures",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Rekor is reachable",
+            "fact": "rekor_healthy",
+            "established_by": "integrate_cosign",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "signature storage",
+          "how": "query Rekor",
+          "expected": "all signatures stored"
+        },
+        "rollback": {
+          "trigger": "storage fails",
+          "action": "retry storage",
+          "safety_guard": "check signature validity",
+          "restores_state": [
+            "last known good signatures"
+          ],
+          "restoration_evidence": "confirm signatures stored successfully"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_kyverno",
+        "description": "Configure Kyverno policy to reject unsigned images in production clusters",
+        "action": "configure",
+        "target": "Kyverno",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "policy enforcement",
+          "how": "check deployment logs",
+          "expected": "no unsigned images deployed"
+        },
+        "rollback": {
+          "trigger": "policy blocks deploys",
+          "action": "disable Kyverno policy",
+          "safety_guard": "ensure previous images can be deployed",
+          "restores_state": [
+            "Kyverno policy disabled"
+          ],
+          "restoration_evidence": "check deployment success after policy is disabled"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_images",
+        "description": "Verify all deployed images have valid signatures",
+        "action": "verify",
+        "target": "images",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "images are deployed",
+            "fact": "deployed_images_available",
+            "established_by": "store_signatures",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "image signatures",
+          "how": "scan images",
+          "expected": "all images signed"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "rollback to last known good deployment",
+          "safety_guard": "ensure no outage occurs",
+          "restores_state": [
+            "last known good deployment restored"
+          ],
+          "restoration_evidence": "confirmation of system state post-rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "key_rotation_procedure",
+        "description": "Set up key rotation procedure",
+        "action": "set up",
+        "target": "Key rotation",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "key rotation status",
+          "how": "check key validity",
+          "expected": "keys successfully rotated"
+        },
+        "rollback": {
+          "trigger": "rotation fails",
+          "action": "restore previous keys",
+          "safety_guard": "verify key integrity",
+          "restores_state": [
+            "previous keys restored"
+          ],
+          "restoration_evidence": "check key functionality with previous keys"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "integrate_cosign",
+        "to_task": "generate_sbom",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "integrate_cosign",
+        "to_task": "store_signatures",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "store_signatures",
+        "to_task": "verify_images",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "generate_sbom",
+        "to_task": "configure_kyverno",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_kyverno",
+        "to_task": "verify_images",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_images",
+        "to_task": "key_rotation_procedure",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:key_rotation_procedure",
+      "task_id": "key_rotation_procedure",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Key rotation procedure is executed after verifying images, but it should be part of the deployment process.",
+      "suggested_fix": "Reorder the key_rotation_procedure task to be executed immediately after all images are verified.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:configure_kyverno",
+      "task_id": "configure_kyverno",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The configure_kyverno task depends on generate_sbom, but the precondition does not verify if SBOM is generated successfully.",
+      "suggested_fix": "Add a precondition to configure_kyverno that verifies SBOM generation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:integrate_cosign",
+      "task_id": "integrate_cosign",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Weak rollback procedure for integration fails to adequately restore previous state.",
+      "suggested_fix": "Improve rollback safety guard to include verification steps ensuring system integrity after the rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:generate_sbom",
+      "task_id": "generate_sbom",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding steps to handle specific cases where SBOM generation may fail due to environmental issues.",
+      "suggested_fix": "Add additional handling for potential environmental failure scenarios during SBOM generation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:risk:configure_kyverno",
+      "task_id": "configure_kyverno",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Configuring a strict Kyverno policy may inadvertently block valid deployments.",
+      "suggested_fix": "Ensure thorough testing of the Kyverno policy to prevent unintended deployment issues.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

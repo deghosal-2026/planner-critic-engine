@@ -16,10 +16,10 @@ markdown artifacts under ``results/0.2.1/``. Mirrors ``bench_cycling.py`` /
 
 Usage::
 
-    python3 docs/field-test/v0.2.1/scripts/bench_live_boundary.py            # live, 5 trials
-    python3 docs/field-test/v0.2.1/scripts/bench_live_boundary.py --trials 3
-    python3 docs/field-test/v0.2.1/scripts/bench_live_boundary.py --self-test  # hermetic, $0
-    python3 docs/field-test/v0.2.1/scripts/bench_live_boundary.py --trials 5 --provider openai  # OpenRouter gpt-4o-mini
+    python3 docs/field-test/scripts/bench_live_boundary.py            # live, 5 trials
+    python3 docs/field-test/scripts/bench_live_boundary.py --trials 3
+    python3 docs/field-test/scripts/bench_live_boundary.py --self-test  # hermetic, $0
+    python3 docs/field-test/scripts/bench_live_boundary.py --trials 5 --provider openai  # OpenRouter gpt-4o-mini
 
 Provider resolution order: a ``plancritic.toml`` registry ``critic`` role if
 present; otherwise the ``LLM_BASE_URL`` / ``LLM_MODEL`` / ``LLM_API_KEY`` env
@@ -43,7 +43,7 @@ from planner_critic.schema.goal import Goal, RiskTolerance
 API_KEY = os.environ.get("OPENROUTER_API_KEY")
 MLX_API_KEY = os.environ.get("MLX_API_KEY", "omlx-test")
 
-SCRIPTS_DIR = Path(__file__).resolve().parent          # docs/field-test/v0.2.1/scripts
+SCRIPTS_DIR = Path(__file__).resolve().parent          # docs/field-test/scripts
 
 def _find_repo_root() -> Path:
     """Walk up from ``SCRIPTS_DIR`` until we find ``pyproject.toml``."""

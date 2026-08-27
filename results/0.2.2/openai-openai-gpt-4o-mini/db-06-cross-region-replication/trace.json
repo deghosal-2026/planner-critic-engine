@@ -1,0 +1,294 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-06-cross-region-replication",
+  "duration_seconds": 44.75,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-db-06-cross-region-replication-r3",
+    "goal_id": "db-06-cross-region-replication",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-db-06-cross-region-replication-r2",
+    "created_at": "2026-08-27T03:11:49.895987Z",
+    "tasks": [
+      {
+        "id": "setup_pglogical",
+        "description": "Set up pglogical on primary region",
+        "action": "configure",
+        "target": "pglogical",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "pglogical configuration",
+          "how": "check pglogical status",
+          "expected": "pglogical is active"
+        },
+        "rollback": {
+          "trigger": "pglogical setup fails",
+          "action": "restore previous pglogical config",
+          "safety_guard": "verify original state",
+          "restores_state": [
+            "pglogical configuration"
+          ],
+          "restoration_evidence": "previous configuration backup"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_replication_slot",
+        "description": "Configure replication slots for logical replication",
+        "action": "create",
+        "target": "replication slots",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replication slot status",
+          "how": "query replication slots",
+          "expected": "Active slots match targeted databases"
+        },
+        "rollback": {
+          "trigger": "replication slot error",
+          "action": "delete replication slot",
+          "safety_guard": "ensure no data loss",
+          "restores_state": [
+            "existing replication slots"
+          ],
+          "restoration_evidence": "state of slots prior to configuration"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "setup_aws_dms",
+        "description": "Set up AWS DMS for data replication",
+        "action": "configure",
+        "target": "AWS DMS",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "DMS task status",
+          "how": "check DMS console",
+          "expected": "DMS task runs without errors"
+        },
+        "rollback": {
+          "trigger": "DMS setup fails",
+          "action": "remove DMS replication task",
+          "safety_guard": "verify data integrity",
+          "restores_state": [
+            "previous DMS configuration"
+          ],
+          "restoration_evidence": "DMS task configuration backup"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "filter_databases",
+        "description": "Filter critical databases for replication",
+        "action": "filter",
+        "target": "database list",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "database list is established",
+            "fact": "db_list_established",
+            "established_by": "setup_pglogical",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "filtered database list",
+          "how": "compare list with expected critical databases",
+          "expected": "list matches expected critical databases for replication"
+        },
+        "rollback": {
+          "trigger": "filtering fails",
+          "action": "reset database filter",
+          "safety_guard": "ensure no data loss",
+          "restores_state": [
+            "previous database list"
+          ],
+          "restoration_evidence": "original list of databases"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor_replication",
+        "description": "Monitor replication lag",
+        "action": "monitor",
+        "target": "replication lag",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replication lag metrics",
+          "how": "check monitoring system",
+          "expected": "lag under 5 seconds during normal load, 30 seconds during peak"
+        },
+        "rollback": {
+          "trigger": "high replication lag",
+          "action": "alert operations team",
+          "safety_guard": "verify lag metrics",
+          "restores_state": [
+            "alert status"
+          ],
+          "restoration_evidence": "alert records"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "setup_failback_procedure",
+        "description": "Implement automated failback procedure",
+        "action": "configure",
+        "target": "failback system",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "failback process",
+          "how": "test failback scenario",
+          "expected": "successful failback within defined parameters"
+        },
+        "rollback": {
+          "trigger": "failback fails",
+          "action": "execute manual failback",
+          "safety_guard": "ensure no data loss",
+          "restores_state": [
+            "previous failback configuration"
+          ],
+          "restoration_evidence": "failback test results"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup_pglogical",
+        "to_task": "configure_replication_slot",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_replication_slot",
+        "to_task": "setup_aws_dms",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_aws_dms",
+        "to_task": "filter_databases",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "filter_databases",
+        "to_task": "monitor_replication",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_replication",
+        "to_task": "setup_failback_procedure",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:configure_replication_slot",
+      "task_id": "configure_replication_slot",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'configure_replication_slot' is ordered before task 'setup_pglogical', which is a hard prerequisite.",
+      "suggested_fix": "Reorder task 'configure_replication_slot' to occur after 'setup_pglogical'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:setup_aws_dms",
+      "task_id": "setup_aws_dms",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'setup_aws_dms' depends on 'configure_replication_slot' without verification to ensure its successful completion.",
+      "suggested_fix": "Add a verification step to confirm successful completion of 'configure_replication_slot' before proceeding with 'setup_aws_dms'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:weak_rollback:setup_failback_procedure",
+      "task_id": "setup_failback_procedure",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'setup_failback_procedure' lacks a sound rollback mechanism for data loss prevention.",
+      "suggested_fix": "Implement a rollback procedure that ensures no data loss during the manual failback execution.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-06-cross-region-replication:3:3",
+    "plan_id": "plan-db-06-cross-region-replication-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:configure_replication_slot",
+    "question": "Plan for goal 'db-06-cross-region-replication' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

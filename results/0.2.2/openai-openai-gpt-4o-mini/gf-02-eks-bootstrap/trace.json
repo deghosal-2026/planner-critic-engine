@@ -1,0 +1,453 @@
+{
+  "dimension": "core-api",
+  "goal_id": "gf-02-eks-bootstrap",
+  "duration_seconds": 95.41,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-gf-02-eks-bootstrap-r4",
+    "goal_id": "gf-02-eks-bootstrap",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-gf-02-eks-bootstrap-r3",
+    "created_at": "2026-08-27T03:11:45.100914Z",
+    "tasks": [
+      {
+        "id": "check-iam-vpc",
+        "description": "Verify IAM roles and VPC configurations required for EKS",
+        "action": "validate",
+        "target": "EKS",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "IAM roles and VPC configurations",
+          "how": "check IAM roles and VPC settings",
+          "expected": "valid IAM roles and VPC configurations"
+        },
+        "rollback": {
+          "trigger": "IAM roles or VPC configurations are invalid",
+          "action": "revert IAM roles and VPC configurations",
+          "safety_guard": "validate current settings before rollback",
+          "restores_state": [
+            "Valid IAM roles and VPC configurations"
+          ],
+          "restoration_evidence": "Valid IAM roles and VPC configurations exist"
+        },
+        "risk_class": "critical",
+        "blast_radius": "small",
+        "satisfies": null
+      },
+      {
+        "id": "create-eks-cluster",
+        "description": "Provision EKS cluster using Terraform",
+        "action": "apply",
+        "target": "EKS",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "EKS cluster state",
+          "how": "describe cluster via AWS CLI",
+          "expected": "ACTIVE"
+        },
+        "rollback": {
+          "trigger": "EKS cluster creation fails",
+          "action": "delete cluster",
+          "safety_guard": "validate cluster state before delete",
+          "restores_state": [
+            "No EKS cluster"
+          ],
+          "restoration_evidence": "EKS cluster does not exist"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "apply-pod-security-standards",
+        "description": "Apply Pod Security Standards for restricted baseline",
+        "action": "apply",
+        "target": "pod-security-standards",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "pod security settings",
+          "how": "kubectl get psp",
+          "expected": "restricted"
+        },
+        "rollback": {
+          "trigger": "pod security standard application fails",
+          "action": "remove security standards",
+          "safety_guard": "verify active workloads before removal",
+          "restores_state": [
+            "No Pod Security Standards applied"
+          ],
+          "restoration_evidence": "Pod Security Standards do not exist"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-eks-context",
+        "description": "Verify EKS context is set",
+        "action": "validate",
+        "target": "eks-context",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "EKS context",
+          "how": "kubectl config current-context",
+          "expected": "current context is the EKS cluster"
+        },
+        "rollback": {
+          "trigger": "EKS context verification fails",
+          "action": "reset context to default",
+          "safety_guard": "ensure previous context is valid",
+          "restores_state": [
+            "Previous EKS context"
+          ],
+          "restoration_evidence": "Previous EKS context is restored"
+        },
+        "risk_class": "high",
+        "blast_radius": "small",
+        "satisfies": null
+      },
+      {
+        "id": "install-cert-manager",
+        "description": "Install cert-manager via Helm",
+        "action": "install",
+        "target": "cert-manager",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EKS context is set",
+            "fact": "eks_context_set",
+            "established_by": "verify-eks-context",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "cert-manager installation status",
+          "how": "kubectl get pods -n cert-manager",
+          "expected": "cert-manager pods are running"
+        },
+        "rollback": {
+          "trigger": "cert-manager installation fails",
+          "action": "uninstall cert-manager",
+          "safety_guard": "verify no cert-manager resources are running",
+          "restores_state": [
+            "No cert-manager installed"
+          ],
+          "restoration_evidence": "cert-manager pods do not exist"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "install-cluster-autoscaler",
+        "description": "Install cluster-autoscaler via Helm",
+        "action": "install",
+        "target": "cluster-autoscaler",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EKS context is set",
+            "fact": "eks_context_set",
+            "established_by": "verify-eks-context",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "cluster-autoscaler installation status",
+          "how": "kubectl get deployment cluster-autoscaler -n kube-system",
+          "expected": "cluster-autoscaler deployment exists and is running"
+        },
+        "rollback": {
+          "trigger": "cluster-autoscaler installation fails",
+          "action": "uninstall cluster-autoscaler",
+          "safety_guard": "verify no cluster-autoscaler resources are running",
+          "restores_state": [
+            "No cluster-autoscaler installed"
+          ],
+          "restoration_evidence": "cluster-autoscaler pods do not exist"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy-prometheus-grafana",
+        "description": "Deploy Prometheus and Grafana",
+        "action": "deploy",
+        "target": "monitoring-tools",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EKS context is set",
+            "fact": "eks_context_set",
+            "established_by": "verify-eks-context",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Prometheus and Grafana deployment status",
+          "how": "kubectl get pods -n monitoring",
+          "expected": "Prometheus and Grafana pods are running"
+        },
+        "rollback": {
+          "trigger": "Prometheus and Grafana deployment fails",
+          "action": "remove Prometheus and Grafana",
+          "safety_guard": "verify monitoring workloads are disrupted",
+          "restores_state": [
+            "No Prometheus and Grafana deployed"
+          ],
+          "restoration_evidence": "Prometheus and Grafana pods do not exist"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "enable-velero-backup",
+        "description": "Enable Velero backup with schedule",
+        "action": "configure",
+        "target": "velero",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EKS cluster is active",
+            "fact": "eks_cluster_active",
+            "established_by": "create-eks-cluster",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Velero backup schedule",
+          "how": "velero get schedules",
+          "expected": "scheduled jobs exist"
+        },
+        "rollback": {
+          "trigger": "Velero backup configuration fails",
+          "action": "remove Velero",
+          "safety_guard": "verify no ongoing backup operations",
+          "restores_state": [
+            "Velero configuration removed"
+          ],
+          "restoration_evidence": "Velero does not exist"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure-network-policies",
+        "description": "Configure network policies (default deny + allow-list)",
+        "action": "apply",
+        "target": "network-policies",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "network policy settings",
+          "how": "kubectl get networkpolicies",
+          "expected": "default deny + allow-list"
+        },
+        "rollback": {
+          "trigger": "network policy application fails",
+          "action": "remove network policies",
+          "safety_guard": "validate security before removal",
+          "restores_state": [
+            "No network policies applied"
+          ],
+          "restoration_evidence": "Network policies do not exist"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check-iam-vpc",
+        "to_task": "create-eks-cluster",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create-eks-cluster",
+        "to_task": "apply-pod-security-standards",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-eks-context",
+        "to_task": "install-cert-manager",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-eks-context",
+        "to_task": "install-cluster-autoscaler",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-eks-context",
+        "to_task": "deploy-prometheus-grafana",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create-eks-cluster",
+        "to_task": "enable-velero-backup",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create-eks-cluster",
+        "to_task": "configure-network-policies",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:feasibility:create-eks-cluster",
+      "task_id": "create-eks-cluster",
+      "version": 4,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "EKS cluster creation is not achievable without valid IAM roles and VPC configurations verified in the previous task.",
+      "suggested_fix": "Ensure all required IAM roles and VPC configurations are valid before proceeding to create the EKS cluster.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:enable-velero-backup",
+      "task_id": "enable-velero-backup",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Enabling Velero backup is sequenced before the creation of the EKS cluster, which is a hard prerequisite.",
+      "suggested_fix": "Reorder tasks to ensure 'enable-velero-backup' occurs after 'create-eks-cluster'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:configure-network-policies",
+      "task_id": "configure-network-policies",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Configuring network policies depends on the successful execution of the 'create-eks-cluster', but it does not verify whether this was successful before proceeding.",
+      "suggested_fix": "Add a precondition to 'configure-network-policies' to ensure the EKS cluster is active before applying network policies.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:enable-velero-backup",
+      "task_id": "enable-velero-backup",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback step lacks a solid guarantee that Velero has been properly removed in case the backup configuration fails.",
+      "suggested_fix": "Enhance the rollback to ensure the Velero configuration state is restored correctly.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:missing_steps:apply-pod-security-standards",
+      "task_id": "apply-pod-security-standards",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Pod Security Standards may block certain workloads, consider validating impact on workloads before application.",
+      "suggested_fix": "Include a step to evaluate the workloads compatibility with the restricted baseline of Pod Security Standards before application.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:risk:install-cluster-autoscaler",
+      "task_id": "install-cluster-autoscaler",
+      "version": 4,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Installing the cluster-autoscaler without verifying resource availability may result in insufficient capacity for scaling.",
+      "suggested_fix": "Add a verification step for resource availability prior to installing the cluster-autoscaler.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:gf-02-eks-bootstrap:4:4",
+    "plan_id": "plan-gf-02-eks-bootstrap-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:feasibility:create-eks-cluster",
+    "question": "Plan for goal 'gf-02-eks-bootstrap' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=9"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

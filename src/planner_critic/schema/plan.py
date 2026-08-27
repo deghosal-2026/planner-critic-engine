@@ -24,7 +24,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 PLAN_SCHEMA_VERSION = "0.1.0"
 
@@ -103,6 +103,22 @@ class RollbackStep(BaseModel):
         "When present, rollback_credible treats it as satisfying the "
         "re-establishment exemption for inconsistent-state / post-consumed patterns.",
     )
+
+    @field_validator("restores_state", mode="before")
+    @classmethod
+    def _coerce_restores_state(cls, value: object) -> object:
+        """Leniently accept LLM-produced values for ``restores_state``.
+
+        LLM planners do not read the schema and frequently emit a bare string
+        (e.g. ``"restore components to pre-fix state"``) where a ``list[str]``
+        is expected, which strict Pydantic validation rejects — failing the
+        plan after the retry budget (see v0.2.2 field-test learning L-1).
+        Coerce ``str`` → ``[str]`` so LLM-produced plans validate while the
+        typed ``list[str] | None`` contract is preserved for code-produced plans.
+        """
+        if isinstance(value, str):
+            return [value]
+        return value
 
 
 class EnvProbe(BaseModel):

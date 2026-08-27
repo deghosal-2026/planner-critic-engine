@@ -1,0 +1,308 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-10-trunk-based-promo",
+  "duration_seconds": 34.64,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-ci-10-trunk-based-promo-r2",
+    "goal_id": "ci-10-trunk-based-promo",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "ci-10-trunk-based-promo-plan",
+    "created_at": "2026-08-27T03:02:14.506226Z",
+    "tasks": [
+      {
+        "id": "configure_branch_protection",
+        "description": "Configure branch protection on main.",
+        "action": "configure",
+        "target": "main_branch",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "user has admin access to repository",
+            "fact": "admin_access_granted",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "branch protection settings",
+          "how": "check GitHub settings",
+          "expected": "PR required, CI required, review required"
+        },
+        "rollback": {
+          "trigger": "misconfiguration detected",
+          "action": "revert branch protection settings",
+          "safety_guard": "verify previous settings",
+          "restores_state": [
+            "previous branch protection settings"
+          ],
+          "restoration_evidence": "validate restored settings against backup"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "setup_auto_deploy",
+        "description": "Set up auto-deploy to staging on merge.",
+        "action": "set up",
+        "target": "staging",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "branch protection configured",
+            "fact": "branch_protection_configured",
+            "established_by": "configure_branch_protection",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "auto-deploy workflow status",
+          "how": "check GitHub Actions logs",
+          "expected": "successful deployment to staging"
+        },
+        "rollback": {
+          "trigger": "deployment failed",
+          "action": "disable auto-deploy",
+          "safety_guard": "monitor for new merges",
+          "restores_state": [
+            "previous auto-deploy settings"
+          ],
+          "restoration_evidence": "confirm auto-deploy is disabled"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "run_integration_tests",
+        "description": "Run integration tests on staging.",
+        "action": "execute",
+        "target": "integration_tests",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "auto-deploy successful",
+            "fact": "staging_deployed",
+            "established_by": "setup_auto_deploy",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "test results",
+          "how": "review test report",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "integration tests fail",
+          "action": "run previous tests",
+          "safety_guard": "verify staging state",
+          "restores_state": [
+            "previous test results"
+          ],
+          "restoration_evidence": "confirm previous tests are intact"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_promotion_gate",
+        "description": "Configure promotion gate for prod deployment.",
+        "action": "configure",
+        "target": "promotion_gate",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "integration tests completed",
+            "fact": "integration_tests_passed",
+            "established_by": "run_integration_tests",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "promotion criteria",
+          "how": "check configuration",
+          "expected": "green tests and manual approval required"
+        },
+        "rollback": {
+          "trigger": "promotions too lenient",
+          "action": "tighten promotion criteria",
+          "safety_guard": "review promotion logs",
+          "restores_state": [
+            "previous promotion gate settings"
+          ],
+          "restoration_evidence": "confirm criteria matches previous state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "promote_to_prod",
+        "description": "Promote to production if all checks pass.",
+        "action": "promote",
+        "target": "production",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "promotion gate enforced",
+            "fact": "promotion_gate_configured",
+            "established_by": "configure_promotion_gate",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "production state",
+          "how": "check application status",
+          "expected": "application running as expected"
+        },
+        "rollback": {
+          "trigger": "production deployment fails",
+          "action": "rollback to previous stable version",
+          "safety_guard": "verify current production state",
+          "restores_state": [
+            "previous production version"
+          ],
+          "restoration_evidence": "confirm successful rollback"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "configure_branch_protection",
+        "to_task": "setup_auto_deploy",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_auto_deploy",
+        "to_task": "run_integration_tests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_integration_tests",
+        "to_task": "configure_promotion_gate",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_promotion_gate",
+        "to_task": "promote_to_prod",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:setup_auto_deploy",
+      "task_id": "setup_auto_deploy",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'setup_auto_deploy' is sequenced before 'configure_branch_protection' is verified as completed.",
+      "suggested_fix": "Reorder tasks to ensure 'configure_branch_protection' is completed before 'setup_auto_deploy'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:run_integration_tests",
+      "task_id": "run_integration_tests",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'run_integration_tests' is sequenced before 'setup_auto_deploy' is verified as completed.",
+      "suggested_fix": "Reorder tasks to ensure 'setup_auto_deploy' is completed before 'run_integration_tests'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:configure_promotion_gate",
+      "task_id": "configure_promotion_gate",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'configure_promotion_gate' is sequenced before 'run_integration_tests' is verified as completed.",
+      "suggested_fix": "Reorder tasks to ensure 'run_integration_tests' is completed before 'configure_promotion_gate'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:promote_to_prod",
+      "task_id": "promote_to_prod",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'promote_to_prod' is sequenced before 'configure_promotion_gate' is verified as completed.",
+      "suggested_fix": "Reorder tasks to ensure 'configure_promotion_gate' is completed before 'promote_to_prod'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ci-10-trunk-based-promo:2:2",
+    "plan_id": "plan-ci-10-trunk-based-promo-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:setup_auto_deploy",
+    "question": "Plan for goal 'ci-10-trunk-based-promo' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

@@ -1,0 +1,208 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-01-ecs-migration",
+  "duration_seconds": 22.35,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-inf-01-ecs-migration-r2",
+    "goal_id": "inf-01-ecs-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plan-inf-01-ecs-migration",
+    "created_at": "2026-08-27T04:10:20.564817Z",
+    "tasks": [
+      {
+        "id": "drain-traffic",
+        "description": "Drain traffic from EC2 instances",
+        "action": "drain",
+        "target": "ec2-instances",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "traffic status",
+          "how": "check load balancer metrics",
+          "expected": "no traffic to EC2 instances"
+        },
+        "rollback": {
+          "trigger": "traffic drain fails",
+          "action": "re-route traffic back to EC2",
+          "safety_guard": "verify traffic flow",
+          "restores_state": [
+            "traffic successfully routed to EC2"
+          ],
+          "restoration_evidence": "load balancer metrics showing traffic to EC2"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "migrate-containers",
+        "description": "Migrate container workloads to ECS Fargate",
+        "action": "migrate",
+        "target": "ecs-fargate",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "traffic drained",
+            "fact": "traffic_drained",
+            "established_by": "drain-traffic",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "container instances on ECS",
+          "how": "check ECS task status",
+          "expected": "all tasks running and healthy"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "rollback ECS task to previous state",
+          "safety_guard": "verify container health",
+          "restores_state": [
+            "previous ECS task state restored"
+          ],
+          "restoration_evidence": "ECS task metrics showing previous state health"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover",
+        "description": "Cutover traffic to ECS Fargate",
+        "action": "cutover",
+        "target": "ecs-fargate",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "containers migrated successfully",
+            "fact": "migration_success",
+            "established_by": "migrate-containers",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "user traffic",
+          "how": "analyze traffic logs",
+          "expected": "100% traffic to ECS Fargate"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "redirect traffic back to EC2",
+          "safety_guard": "monitor user experience",
+          "restores_state": [
+            "traffic redirected back to EC2"
+          ],
+          "restoration_evidence": "traffic logs showing redirection to EC2"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "drain-traffic",
+        "to_task": "migrate-containers",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate-containers",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:migrate-containers",
+      "task_id": "migrate-containers",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'migrate-containers' should not start before 'drain-traffic' has successfully completed and traffic is confirmed drained.",
+      "suggested_fix": "Ensure 'migrate-containers' has a verification of 'traffic_drained' established by 'drain-traffic'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:cutover",
+      "task_id": "cutover",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'cutover' relies on 'migration_success' without verification of its successful establishment by 'migrate-containers'.",
+      "suggested_fix": "Add a verification step in 'migrate-containers' to confirm and establish 'migration_success' before proceeding to 'cutover'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:cutover",
+      "task_id": "cutover",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'cutover' action lacks sufficient guarantees to ensure the state is restored, particularly in terms of verifying user experience post-redirect.",
+      "suggested_fix": "Implement additional verification checks in the rollback procedure to ensure user experience is restored before concluding the rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:inf-01-ecs-migration:2:2",
+    "plan_id": "plan-inf-01-ecs-migration-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:migrate-containers",
+    "question": "Plan for goal 'inf-01-ecs-migration' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

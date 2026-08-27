@@ -1,0 +1,226 @@
+{
+  "dimension": "core-api",
+  "goal_id": "data-01-dbt-pipeline",
+  "duration_seconds": 14.54,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-data-01-dbt-pipeline-r2",
+    "goal_id": "data-01-dbt-pipeline",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "data-01-dbt-pipeline",
+    "created_at": "2026-08-27T03:04:47.516799Z",
+    "tasks": [
+      {
+        "id": "extract",
+        "description": "Extract data from S3",
+        "action": "extract",
+        "target": "S3",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "S3 is accessible",
+            "fact": "s3_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "transform",
+        "description": "Transform extracted data",
+        "action": "transform",
+        "target": "staging",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "transformation success",
+          "how": "compare row counts",
+          "expected": "counts match"
+        },
+        "rollback": {
+          "trigger": "transformation fails",
+          "action": "revert to raw data",
+          "safety_guard": "ensure raw data integrity",
+          "restores_state": [
+            "raw data maintained during transformation"
+          ],
+          "restoration_evidence": "log of transformation operations"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "load",
+        "description": "Load transformed data to target",
+        "action": "load",
+        "target": "target_db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data matches",
+          "how": "run validation queries",
+          "expected": "no discrepancies"
+        },
+        "rollback": {
+          "trigger": "load fails",
+          "action": "clear target and reload",
+          "safety_guard": "check for transient errors",
+          "restores_state": [
+            "prior state of target_db is intact"
+          ],
+          "restoration_evidence": "query results before load"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify",
+        "description": "Verify data quality post-load",
+        "action": "verify",
+        "target": "quality_checks",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "data is loaded",
+            "fact": "data_loaded",
+            "established_by": "load",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data quality",
+          "how": "run quality checks",
+          "expected": "all quality checks pass"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "extract",
+        "to_task": "transform",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "transform",
+        "to_task": "load",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "load",
+        "to_task": "verify",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:transform",
+      "task_id": "transform",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'transform' task has no established prerequisites, making it unverified in relation to the 'extract' task dependency.",
+      "suggested_fix": "Add a precondition to the 'transform' task that verifies the extracted data is available.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:transform",
+      "task_id": "transform",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for 'transform' lacks detailed steps to ensure restoration in case of failure.",
+      "suggested_fix": "Include specific steps to handle the scenario if raw data integrity cannot be maintained.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:load",
+      "task_id": "load",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The 'load' task does not cover verification of data integrity post-load before verification checks.",
+      "suggested_fix": "Add a verification step to check the integrity of data loaded into the target database before proceeding to the 'verify' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:verify",
+      "task_id": "verify",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The 'verify' task would benefit from specifying additional data quality metrics checks.",
+      "suggested_fix": "Include more detailed quality checks in the verification process.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,165 @@
+{
+  "dimension": "core-api",
+  "goal_id": "idp-02-naming-tagging",
+  "duration_seconds": 19.07,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-idp-02-naming-tagging-r2",
+    "goal_id": "idp-02-naming-tagging",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plan-idp-02-naming-tagging",
+    "created_at": "2026-08-27T03:45:29.362401Z",
+    "tasks": [
+      {
+        "id": "check_tags",
+        "description": "Ensure all required tags are defined",
+        "action": "validate",
+        "target": "tags",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "tags have been proposed",
+            "fact": "tags_proposed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "create_rds",
+        "description": "Provision RDS PostgreSQL instance",
+        "action": "create",
+        "target": "rds_instance",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "All required tags are validated",
+            "fact": "tags_validated",
+            "established_by": "check_tags",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "RDS instance status",
+          "how": "check instance state via AWS CLI",
+          "expected": "available"
+        },
+        "rollback": {
+          "trigger": "RDS creation fails",
+          "action": "delete RDS instance",
+          "safety_guard": "confirm RDS instance does not exist",
+          "restores_state": [
+            "RDS instance deleted"
+          ],
+          "restoration_evidence": "confirm instance no longer listed in AWS"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_tags",
+        "to_task": "create_rds",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:create_rds",
+      "task_id": "create_rds",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'create_rds' is sequenced before confirming that all required tags are defined and validated.",
+      "suggested_fix": "Ensure 'create_rds' is executed only after the successful validation of tags by 'check_tags'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:create_rds",
+      "task_id": "create_rds",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'create_rds' lacks a verification step after deletion to confirm the instance has been successfully removed.",
+      "suggested_fix": "Add a verification step to confirm that the RDS instance is deleted after the rollback action.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:create_rds",
+      "task_id": "create_rds",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The precondition of 'create_rds' relies on a verification of the 'tags_validated' fact which is unverified by any earlier task.",
+      "suggested_fix": "Implement a verification step for 'tags_validated' before it's used as a precondition in 'create_rds'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:idp-02-naming-tagging:2:2",
+    "plan_id": "plan-idp-02-naming-tagging-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:create_rds",
+    "question": "Plan for goal 'idp-02-naming-tagging' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=2"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

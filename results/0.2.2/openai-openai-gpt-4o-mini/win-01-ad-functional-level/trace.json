@@ -1,0 +1,470 @@
+{
+  "dimension": "core-api",
+  "goal_id": "win-01-ad-functional-level",
+  "duration_seconds": 69.4,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-win-01-ad-functional-level-r3",
+    "goal_id": "win-01-ad-functional-level",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-win-01-ad-functional-level-r2",
+    "created_at": "2026-08-27T04:13:34.904040Z",
+    "tasks": [
+      {
+        "id": "adprep_forestprep",
+        "description": "Run adprep /forestprep to prepare the Active Directory forest for upgrade",
+        "action": "run_adprep_forestprep",
+        "target": "AD forest",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "adprep is accessible",
+            "fact": "adprep_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "forestprep completion status",
+          "how": "check logs for success",
+          "expected": "successful execution"
+        },
+        "rollback": {
+          "trigger": "forestprep fails",
+          "action": "revert changes",
+          "safety_guard": "verify Active Directory health",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "adprep_domainprep",
+        "description": "Run adprep /domainprep to prepare the Active Directory domain for upgrade",
+        "action": "run_adprep_domainprep",
+        "target": "AD domain",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "forestprep is successful",
+            "fact": "forestprep_successful",
+            "established_by": "adprep_forestprep",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "domainprep completion status",
+          "how": "check logs for success",
+          "expected": "successful execution"
+        },
+        "rollback": {
+          "trigger": "domainprep fails",
+          "action": "revert changes",
+          "safety_guard": "verify Active Directory health",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "raise_functional_level",
+        "description": "Raise the Active Directory domain functional level to Server 2019",
+        "action": "raise_functional_level",
+        "target": "AD domain functional level",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "schema replication completed",
+            "fact": "schema_replicated",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "domainprep is successful",
+            "fact": "domainprep_successful",
+            "established_by": "adprep_domainprep",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "functional level",
+          "how": "check Active Directory using PowerShell",
+          "expected": "Functional Level set to Server 2019"
+        },
+        "rollback": {
+          "trigger": "functional level raise fails",
+          "action": "restore previous level",
+          "safety_guard": "verify domain health",
+          "restores_state": [
+            "Previous functional level"
+          ],
+          "restoration_evidence": "check functional level via PowerShell"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "fsmos_gc_placement",
+        "description": "Sequence FSMO role holder transfer and Global Catalog placement",
+        "action": "transfer_fsmos_gc",
+        "target": "AD roles",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "replication of functional level is confirmed",
+            "fact": "functional_level_replication_confirmed",
+            "established_by": "raise_functional_level",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "FSMO roles and GCs placement status",
+          "how": "check role holder integrity",
+          "expected": "All roles placed correctly"
+        },
+        "rollback": {
+          "trigger": "FSMO transfer fails",
+          "action": "revert FSMO roles",
+          "safety_guard": "verify FSMO role health",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "upgrade_primary_site",
+        "description": "Upgrade AD at the primary site and verify",
+        "action": "upgrade_site",
+        "target": "primary_site",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "FSMOs and GCs placed correctly",
+            "fact": "fsmos_gc_placed",
+            "established_by": "fsmos_gc_placement",
+            "probe": null
+          },
+          {
+            "description": "functional level is raised",
+            "fact": "functional_level_raised",
+            "established_by": "raise_functional_level",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "primary site upgrade status",
+          "how": "run dcdiag and repadmin",
+          "expected": "no errors and replication success"
+        },
+        "rollback": {
+          "trigger": "primary site upgrade fails",
+          "action": "revert changes at primary site",
+          "safety_guard": "verify site health",
+          "restores_state": [
+            "Previous primary site state"
+          ],
+          "restoration_evidence": "check primary site connectivity and replication status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "upgrade_remote_site_1",
+        "description": "Upgrade AD at remote site 1 and verify",
+        "action": "upgrade_site",
+        "target": "remote_site_1",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "primary site upgrade is successful",
+            "fact": "primary_site_upgraded",
+            "established_by": "upgrade_primary_site",
+            "probe": null
+          },
+          {
+            "description": "replication is verified",
+            "fact": "primary_to_remote_1_replication_verified",
+            "established_by": "upgrade_primary_site",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "remote site 1 upgrade status",
+          "how": "run dcdiag and repadmin",
+          "expected": "no errors and replication success"
+        },
+        "rollback": {
+          "trigger": "remote site 1 upgrade fails",
+          "action": "revert changes at remote site 1",
+          "safety_guard": "verify site health",
+          "restores_state": [
+            "Previous remote site 1 state"
+          ],
+          "restoration_evidence": "check remote site 1 connectivity and replication status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "upgrade_remote_site_2",
+        "description": "Upgrade AD at remote site 2 and verify",
+        "action": "upgrade_site",
+        "target": "remote_site_2",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "remote site 1 upgrade is successful",
+            "fact": "remote_site_1_upgraded",
+            "established_by": "upgrade_remote_site_1",
+            "probe": null
+          },
+          {
+            "description": "replication is verified",
+            "fact": "remote_1_to_remote_2_replication_verified",
+            "established_by": "upgrade_remote_site_1",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "remote site 2 upgrade status",
+          "how": "run dcdiag and repadmin",
+          "expected": "no errors and replication success"
+        },
+        "rollback": {
+          "trigger": "remote site 2 upgrade fails",
+          "action": "revert changes at remote site 2",
+          "safety_guard": "verify site health",
+          "restores_state": [
+            "Previous remote site 2 state"
+          ],
+          "restoration_evidence": "check remote site 2 connectivity and replication status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "adprep_forestprep",
+        "to_task": "adprep_domainprep",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "adprep_domainprep",
+        "to_task": "raise_functional_level",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "raise_functional_level",
+        "to_task": "fsmos_gc_placement",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "fsmos_gc_placement",
+        "to_task": "upgrade_primary_site",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "upgrade_primary_site",
+        "to_task": "upgrade_remote_site_1",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "upgrade_remote_site_1",
+        "to_task": "upgrade_remote_site_2",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plan-win-01-ad-functional-level-r3:3:adprep_forestprep:rollback_state_undeclared",
+      "task_id": "adprep_forestprep",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'adprep_forestprep' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-win-01-ad-functional-level-r3:3:adprep_domainprep:rollback_state_undeclared",
+      "task_id": "adprep_domainprep",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'adprep_domainprep' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-win-01-ad-functional-level-r3:3:adprep_forestprep:rollback_state_undeclared",
+      "task_id": "adprep_forestprep",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'adprep_forestprep' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-win-01-ad-functional-level-r3:3:adprep_domainprep:rollback_state_undeclared",
+      "task_id": "adprep_domainprep",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'adprep_domainprep' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:raise_functional_level",
+      "task_id": "raise_functional_level",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The functional level raise is sequenced before confirmation of schema replication, which is a hard prerequisite.",
+      "suggested_fix": "Ensure 'schema replication completed' is verified before raising the functional level.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:upgrade_primary_site",
+      "task_id": "upgrade_primary_site",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task depends on 'FSMOs and GCs placed correctly' and 'functional level is raised', which are dependencies not explicitly verified before this task.",
+      "suggested_fix": "Add verification steps to confirm FSMOs and GCs placement and functional level raise before proceeding with the primary site upgrade.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:upgrade_remote_site_1",
+      "task_id": "upgrade_remote_site_1",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "This task depends on 'primary site upgrade is successful' which has not been clearly established or verified before this task.",
+      "suggested_fix": "Include a verification step to ensure the primary site upgrade is indeed successful before initiating the upgrade for remote site 1.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:upgrade_remote_site_2",
+      "task_id": "upgrade_remote_site_2",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "This task relies on 'remote site 1 upgrade is successful', which must be verified prior to proceeding with this upgrade.",
+      "suggested_fix": "Add a verification step to confirm the successful upgrade of remote site 1 before upgrading remote site 2.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:win-01-ad-functional-level:3:3",
+    "plan_id": "plan-win-01-ad-functional-level-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:raise_functional_level",
+    "question": "Plan for goal 'win-01-ad-functional-level' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

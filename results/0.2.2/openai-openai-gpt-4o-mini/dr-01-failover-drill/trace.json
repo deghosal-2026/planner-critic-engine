@@ -1,0 +1,551 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dr-01-failover-drill",
+  "duration_seconds": 111.39,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-dr-01-failover-drill-r4",
+    "goal_id": "dr-01-failover-drill",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-dr-01-failover-drill-r3",
+    "created_at": "2026-08-27T04:01:41.305798Z",
+    "tasks": [
+      {
+        "id": "lower_dns_ttl",
+        "description": "Lower DNS TTL to 60 seconds",
+        "action": "update",
+        "target": "Route53",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DNS service is reachable",
+            "fact": "dns_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_replica_sync",
+        "description": "Verify the read replica is in sync",
+        "action": "check",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Read replica is reachable",
+            "fact": "replica_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replica sync status",
+          "how": "check replication lag",
+          "expected": "replica is in sync"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "abort promotion",
+          "safety_guard": "ensure no further actions taken as replica isn't ready",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "promote_replica",
+        "description": "Promote the read replica to primary",
+        "action": "promote",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Replica is confirmed in sync",
+            "fact": "replica_sync",
+            "established_by": "verify_replica_sync",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "primary status",
+          "how": "check database state",
+          "expected": "replica is now primary"
+        },
+        "rollback": {
+          "trigger": "promotion fails or split-brain occurs",
+          "action": "revert to old primary with split-brain check",
+          "safety_guard": "ensure no writes are in conflict and verify data integrity",
+          "restores_state": [
+            "old primary state"
+          ],
+          "restoration_evidence": "old primary is functional and restored"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_primary_promoted",
+        "description": "Verify primary has been promoted",
+        "action": "check",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Promotion is confirmed",
+            "fact": "primary_promoted",
+            "established_by": "promote_replica",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "primary promotion status",
+          "how": "check database state",
+          "expected": "primary is promoted"
+        },
+        "rollback": {
+          "trigger": "primary not promoted",
+          "action": "abort update connection strings",
+          "safety_guard": "ensure no corrupted connections",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update_connection_strings",
+        "description": "Update application connection strings to new primary",
+        "action": "update",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Application is running",
+            "fact": "app_running",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "Primary has been promoted",
+            "fact": "primary_promoted",
+            "established_by": "verify_primary_promoted",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": {
+          "trigger": "update fails",
+          "action": "revert to old connection strings",
+          "safety_guard": "ensure application can connect to the old primary",
+          "restores_state": [
+            "previous connection strings"
+          ],
+          "restoration_evidence": "application can connect to old primary"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_data_consistency",
+        "description": "Verify data consistency on new primary",
+        "action": "check",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Connection strings updated",
+            "fact": "connection_strings_updated",
+            "established_by": "update_connection_strings",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data consistency",
+          "how": "run data checks",
+          "expected": "data matches reference"
+        },
+        "rollback": {
+          "trigger": "data inconsistency found",
+          "action": "revert to old primary",
+          "safety_guard": "ensure no writes are in conflict",
+          "restores_state": [
+            "data consistent state"
+          ],
+          "restoration_evidence": "data matches reference"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "run_integration_tests",
+        "description": "Run full application integration tests",
+        "action": "test",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data consistency verified",
+            "fact": "data_consistent",
+            "established_by": "verify_data_consistency",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor_write_conflicts",
+        "description": "Monitor for write conflicts during the failover",
+        "action": "monitor",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Integration tests completed",
+            "fact": "integration_tests_passed",
+            "established_by": "run_integration_tests",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "write conflict status",
+          "how": "check error logs",
+          "expected": "no write conflicts"
+        },
+        "rollback": {
+          "trigger": "write conflict detected",
+          "action": "pause writes and analyze",
+          "safety_guard": "notify admin",
+          "restores_state": [
+            "no write conflicts state"
+          ],
+          "restoration_evidence": "no pending write conflicts"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "failback",
+        "description": "Failback to us-east-1 primary",
+        "action": "failback",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "No active writes detected",
+            "fact": "no_active_writes",
+            "established_by": "monitor_write_conflicts",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "primary status after failback",
+          "how": "check database state",
+          "expected": "us-east-1 is primary"
+        },
+        "rollback": {
+          "trigger": "failback fails",
+          "action": "restore state from backup",
+          "safety_guard": "check for split-brain",
+          "restores_state": [
+            "previous primary state"
+          ],
+          "restoration_evidence": "us-east-1 is functional"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_split_brain_protection",
+        "description": "Verify split-brain protection after failback",
+        "action": "check",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Failback completed",
+            "fact": "failback_completed",
+            "established_by": "failback",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "split-brain status",
+          "how": "check cluster health",
+          "expected": "no split-brain"
+        },
+        "rollback": {
+          "trigger": "split-brain detected",
+          "action": "isolate nodes",
+          "safety_guard": "notify admin",
+          "restores_state": [
+            "healthy cluster state"
+          ],
+          "restoration_evidence": "no split-brain detected"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "lower_dns_ttl",
+        "to_task": "verify_replica_sync",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_replica_sync",
+        "to_task": "promote_replica",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote_replica",
+        "to_task": "update_connection_strings",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_connection_strings",
+        "to_task": "verify_data_consistency",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_data_consistency",
+        "to_task": "run_integration_tests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_integration_tests",
+        "to_task": "monitor_write_conflicts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_write_conflicts",
+        "to_task": "failback",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "failback",
+        "to_task": "verify_split_brain_protection",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plan-dr-01-failover-drill-r4:4:verify_replica_sync:rollback_state_undeclared",
+      "task_id": "verify_replica_sync",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_replica_sync' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-dr-01-failover-drill-r4:4:verify_primary_promoted:rollback_state_undeclared",
+      "task_id": "verify_primary_promoted",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_primary_promoted' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-dr-01-failover-drill-r4:4:verify_replica_sync:rollback_state_undeclared",
+      "task_id": "verify_replica_sync",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_replica_sync' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-dr-01-failover-drill-r4:4:verify_primary_promoted:rollback_state_undeclared",
+      "task_id": "verify_primary_promoted",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_primary_promoted' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:promote_replica",
+      "task_id": "promote_replica",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Promotion of the read replica should not occur before verifying that the read replica is in sync.",
+      "suggested_fix": "Ensure 'verify_replica_sync' is completed successfully before proceeding to 'promote_replica'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:update_connection_strings",
+      "task_id": "update_connection_strings",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task depends on the verification of the primary's promotion, but there is a lack of verification for the successful update of connection strings.",
+      "suggested_fix": "Add a verification step for 'update_connection_strings' to confirm that the application has successfully updated the connection strings.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:promote_replica",
+      "task_id": "promote_replica",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for promoting the read replica lacks clear restoration evidence to confirm that the old primary is functional.",
+      "suggested_fix": "Include specific checks that demonstrate the old primary is operational after a rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:missing_steps:run_integration_tests",
+      "task_id": "run_integration_tests",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Could benefit from specifying which integration tests will be run to ensure full coverage of application functionalities.",
+      "suggested_fix": "List the specific integration tests that will be executed during this task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:verify_data_consistency",
+      "task_id": "verify_data_consistency",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Data consistency verification depends on successful connection string updates, which lacks a verification step.",
+      "suggested_fix": "Add a verification step for 'update_connection_strings' to ensure that connection strings were updated correctly before checking data consistency.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:dr-01-failover-drill:4:4",
+    "plan_id": "plan-dr-01-failover-drill-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:promote_replica",
+    "question": "Plan for goal 'dr-01-failover-drill' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=10"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,214 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-07-dns-migration",
+  "duration_seconds": 25.09,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-inf-07-dns-migration-r3",
+    "goal_id": "inf-07-dns-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-inf-07-dns-migration-r2",
+    "created_at": "2026-08-27T04:13:44.280450Z",
+    "tasks": [
+      {
+        "id": "lower_ttl",
+        "description": "Lower the TTL of DNS records",
+        "action": "update",
+        "target": "dns",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "DNS TTL value",
+          "how": "query DNS records",
+          "expected": "lowered TTL value"
+        },
+        "rollback": {
+          "trigger": "TTL update fails",
+          "action": "revert TTL to previous value",
+          "safety_guard": "confirm previous value",
+          "restores_state": [
+            "TTL value reverted"
+          ],
+          "restoration_evidence": "previous TTL value confirmed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update_records",
+        "description": "Update DNS records to point to eu-west-1",
+        "action": "update",
+        "target": "dns",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "lower_ttl has completed successfully",
+            "fact": "ttl_lowered",
+            "established_by": "lower_ttl",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "DNS records",
+          "how": "query DNS records",
+          "expected": "records point to eu-west-1"
+        },
+        "rollback": {
+          "trigger": "record update fails",
+          "action": "revert DNS records to previous values",
+          "safety_guard": "check DNS history",
+          "restores_state": [
+            "DNS records reverted to previous values"
+          ],
+          "restoration_evidence": "DNS history verified"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor_traffic_shift",
+        "description": "Monitor traffic shift to new DNS records",
+        "action": "monitor",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DNS changes have propagated",
+            "fact": "dns_updated",
+            "established_by": "update_records",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic metrics",
+          "how": "analyze traffic logs",
+          "expected": "traffic shifting to new records"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_failover",
+        "description": "Verify failover functionality",
+        "action": "test",
+        "target": "failover",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "failover response",
+          "how": "run failover tests",
+          "expected": "successful failover"
+        },
+        "rollback": {
+          "trigger": "failover verification fails",
+          "action": "restore previous DNS settings",
+          "safety_guard": "document current settings",
+          "restores_state": [
+            "DNS settings reverted to previous"
+          ],
+          "restoration_evidence": "current settings documented"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "lower_ttl",
+        "to_task": "update_records",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_records",
+        "to_task": "monitor_traffic_shift",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_traffic_shift",
+        "to_task": "verify_failover",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unverified_dependencies:monitor_traffic_shift",
+      "task_id": "monitor_traffic_shift",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'monitor_traffic_shift' depends on 'dns_updated', which is not established by a previous task.",
+      "suggested_fix": "Establish the fact 'dns_updated' within the update_records task after confirming DNS propagation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:missing_steps:verify_failover",
+      "task_id": "verify_failover",
+      "version": 3,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding a step to confirm that 'monitor_traffic_shift' has completed successfully before proceeding to 'verify_failover'.",
+      "suggested_fix": null,
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:inf-07-dns-migration:3:3",
+    "plan_id": "plan-inf-07-dns-migration-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unverified_dependencies:monitor_traffic_shift",
+    "question": "Plan for goal 'inf-07-dns-migration' cannot be approved: blockers remain (llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

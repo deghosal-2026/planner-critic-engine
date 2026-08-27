@@ -1,0 +1,291 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dr-02-point-in-time-restore",
+  "duration_seconds": 27.69,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-dr-02-point-in-time-restore-r2",
+    "goal_id": "dr-02-point-in-time-restore",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "dr-02-point-in-time-restore-plan",
+    "created_at": "2026-08-27T04:02:09.144966Z",
+    "tasks": [
+      {
+        "id": "identify_restore_point",
+        "description": "Identify the appropriate restore point (T-2 hours)",
+        "action": "identify",
+        "target": "timestamp",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Current time is known",
+            "fact": "current_time_known",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "pitr_restore",
+        "description": "Run PITR restore to isolated environment",
+        "action": "restore",
+        "target": "isolated_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Restore point is identified",
+            "fact": "restore_point_identified",
+            "established_by": "identify_restore_point",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "check if restore completed successfully",
+          "how": "inspect logs",
+          "expected": "restore logs show no errors"
+        },
+        "rollback": {
+          "trigger": "restore fails",
+          "action": "rollback to last full backup",
+          "safety_guard": "ensure no data loss",
+          "restores_state": [
+            "isolated_db"
+          ],
+          "restoration_evidence": "log indicating last successful state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_row_counts",
+        "description": "Verify row counts and critical records",
+        "action": "verify",
+        "target": "restored_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Restore has been completed",
+            "fact": "restore_successful",
+            "established_by": "pitr_restore",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "validate row counts and critical records",
+          "how": "run SQL queries",
+          "expected": "row counts and records match expected values"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "log errors and notify team",
+          "safety_guard": "alert on critical record mismatch",
+          "restores_state": [
+            "verified_restored_db"
+          ],
+          "restoration_evidence": "row count and record validation logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "test_application_compatibility",
+        "description": "Run application tests against the restored DB",
+        "action": "test",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Row counts and critical records verified",
+            "fact": "verification_successful",
+            "established_by": "verify_row_counts",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application functionality",
+          "how": "run functional tests",
+          "expected": "application functions as expected"
+        },
+        "rollback": {
+          "trigger": "tests fail",
+          "action": "rollback to previous application version",
+          "safety_guard": "ensure minimal disruption",
+          "restores_state": [
+            "previous_application_state"
+          ],
+          "restoration_evidence": "logs of functional test outcomes"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cleanup_isolated_environment",
+        "description": "Securely delete the restored data and cleanup resources",
+        "action": "cleanup",
+        "target": "isolated_environment",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Application compatibility tests are complete",
+            "fact": "tests_completed",
+            "established_by": "test_application_compatibility",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "identify_restore_point",
+        "to_task": "pitr_restore",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "pitr_restore",
+        "to_task": "verify_row_counts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_row_counts",
+        "to_task": "test_application_compatibility",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test_application_compatibility",
+        "to_task": "cleanup_isolated_environment",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:pitr_restore",
+      "task_id": "pitr_restore",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'pitr_restore' depends on 'identify_restore_point' but the fact 'restore_point_identified' is not established by a hard prerequisite before execution.",
+      "suggested_fix": "Ensure that 'identify_restore_point' successfully establishes the fact 'restore_point_identified' before proceeding with 'pitr_restore'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:pitr_restore",
+      "task_id": "pitr_restore",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action for 'pitr_restore' lacks a solid safety mechanism to ensure no data loss during rollback to the last full backup.",
+      "suggested_fix": "Implement additional safeguards in the rollback process to prevent potential data loss.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:verify_row_counts",
+      "task_id": "verify_row_counts",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'verify_row_counts' is dependent on 'pitr_restore' but does not verify that 'restore_successful' has been established by the previous task.",
+      "suggested_fix": "Add verification in 'pitr_restore' to ensure 'restore_successful' is established before 'verify_row_counts' is executed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:test_application_compatibility",
+      "task_id": "test_application_compatibility",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'test_application_compatibility' relies on 'verify_row_counts' but does not confirm that 'verification_successful' is established beforehand.",
+      "suggested_fix": "Make sure that 'verify_row_counts' confirms the establishment of 'verification_successful' before 'test_application_compatibility' is executed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:cleanup_isolated_environment",
+      "task_id": "cleanup_isolated_environment",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'cleanup_isolated_environment' depends on 'test_application_compatibility' but does not verify that 'tests_completed' has been established, potentially leading to premature cleanup.",
+      "suggested_fix": "Ensure 'test_application_compatibility' establishes 'tests_completed' before 'cleanup_isolated_environment' is executed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,216 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-01-ci-migration",
+  "duration_seconds": 22.7,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-plat-01-ci-migration-r2",
+    "goal_id": "plat-01-ci-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plat-01-ci-migration-v1",
+    "created_at": "2026-08-27T04:11:09.285680Z",
+    "tasks": [
+      {
+        "id": "convert-configs",
+        "description": "Convert .travis.yml configs to GitHub Actions workflow files.",
+        "action": "convert",
+        "target": "workflows",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "travis.yml files exist for each repo",
+            "fact": "travis_files_exist",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "converted workflows",
+          "how": "run syntax check",
+          "expected": "no syntax errors"
+        },
+        "rollback": {
+          "trigger": "conversion fails",
+          "action": "restore previous .travis.yml files",
+          "safety_guard": "verify integrity of backups",
+          "restores_state": [
+            "previous .travis.yml files"
+          ],
+          "restoration_evidence": "backup logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "dry-run-tests",
+        "description": "Run dry-test on the converted workflows to validate functionality.",
+        "action": "test",
+        "target": "workflows",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "workflows are converted",
+            "fact": "workflows_converted",
+            "established_by": "convert-configs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "test results",
+          "how": "check logs for errors",
+          "expected": "all tests pass without errors"
+        },
+        "rollback": {
+          "trigger": "test fails",
+          "action": "revert to last working state",
+          "safety_guard": "ensure rollback doesn't break next tests",
+          "restores_state": [
+            "last working state of workflows"
+          ],
+          "restoration_evidence": "last successful test logs"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "enable-actions",
+        "description": "Enable GitHub Actions workflows and disable Travis CI integration.",
+        "action": "enable",
+        "target": "GitHub Actions",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dry-run tests are successful",
+            "fact": "tests_successful",
+            "established_by": "dry-run-tests",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "GitHub Actions status",
+          "how": "check GitHub repository settings",
+          "expected": "GitHub Actions enabled and Travis CI disabled"
+        },
+        "rollback": {
+          "trigger": "roll back action",
+          "action": "disable GitHub Actions and re-enable Travis CI integration",
+          "safety_guard": "verify previous CI system settings",
+          "restores_state": [
+            "Travis CI integration enabled"
+          ],
+          "restoration_evidence": "previous integration settings logs"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "convert-configs",
+        "to_task": "dry-run-tests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dry-run-tests",
+        "to_task": "enable-actions",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": [
+      {
+        "id": "batch-1",
+        "kind": "fan_out",
+        "tasks": [
+          "convert-configs",
+          "dry-run-tests",
+          "enable-actions"
+        ],
+        "join": "all"
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:enable-actions",
+      "task_id": "enable-actions",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'enable-actions' is sequenced to run before ensuring that 'dry-run-tests' have been verified as successful due to missing execution criteria.",
+      "suggested_fix": "Change the order of execution to ensure 'dry-run-tests' completes successfully before running 'enable-actions'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:enable-actions",
+      "task_id": "enable-actions",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'enable-actions' relies on the 'tests_successful' fact established by 'dry-run-tests' which is not verified until after 'enable-actions' is triggered.",
+      "suggested_fix": "Ensure that 'enable-actions' waits for the verification of 'dry-run-tests' before proceeding.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:enable-actions",
+      "task_id": "enable-actions",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'enable-actions' lacks sufficient detail on how to verify previous CI system settings accurately.",
+      "suggested_fix": "Enhance the rollback plan to specify exact steps for verifying previous CI system settings.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

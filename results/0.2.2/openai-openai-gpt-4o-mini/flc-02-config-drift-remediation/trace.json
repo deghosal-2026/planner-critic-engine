@@ -1,0 +1,246 @@
+{
+  "dimension": "core-api",
+  "goal_id": "flc-02-config-drift-remediation",
+  "duration_seconds": 18.97,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-flc-02-config-drift-remediation-r2",
+    "goal_id": "flc-02-config-drift-remediation",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "flc-02-config-drift-remediation-plan",
+    "created_at": "2026-08-27T03:09:20.653249Z",
+    "tasks": [
+      {
+        "id": "detect_drift",
+        "description": "Detect configuration drift across hosts",
+        "action": "run",
+        "target": "Puppet in noop mode or Ansible check mode",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "drifted hosts list",
+          "how": "compare with expected configuration",
+          "expected": "15% or less of hosts drifted"
+        },
+        "rollback": {
+          "trigger": "detection fails",
+          "action": "use previous stable configuration",
+          "safety_guard": "ensure hosts are reachable",
+          "restores_state": [
+            "previous stable configuration"
+          ],
+          "restoration_evidence": "verify configuration matches expected"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "classify_drift",
+        "description": "Classify drifted hosts by drift type",
+        "action": "categorize",
+        "target": "hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "drifted hosts detected",
+            "fact": "detect_drift_success",
+            "established_by": "detect_drift",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "drift classification accuracy",
+          "how": "cross-check against expected drift types",
+          "expected": "100% classification accuracy"
+        },
+        "rollback": {
+          "trigger": "classification fails",
+          "action": "reset drift classifications",
+          "safety_guard": "ensure classification sources are still valid",
+          "restores_state": [
+            "prior classification state"
+          ],
+          "restoration_evidence": "verify classification history"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "auto_remediate",
+        "description": "Auto-remediate drifted hosts in staged batches",
+        "action": "apply",
+        "target": "correct configuration",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "remediation status",
+          "how": "verify each batch applied",
+          "expected": "all hosts in desired state"
+        },
+        "rollback": {
+          "trigger": "remediation causes failures",
+          "action": "revert config on affected hosts",
+          "safety_guard": "check host health after rollback",
+          "restores_state": [
+            "last known good configuration"
+          ],
+          "restoration_evidence": "verify host states after rollback"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "generate_report",
+        "description": "Generate drift report",
+        "action": "compile",
+        "target": "drift report",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "auto-remediation completed",
+            "fact": "auto_remediate_success",
+            "established_by": "auto_remediate",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "report accuracy",
+          "how": "review contents against incidents",
+          "expected": "report reflects accurate drift history"
+        },
+        "rollback": {
+          "trigger": "report generation fails",
+          "action": "retrieve last successful report",
+          "safety_guard": "check report source validity",
+          "restores_state": [
+            "previous successful report"
+          ],
+          "restoration_evidence": "provide evidence of last report"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "detect_drift",
+        "to_task": "classify_drift",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "classify_drift",
+        "to_task": "auto_remediate",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "auto_remediate",
+        "to_task": "generate_report",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:detect_drift",
+      "task_id": "detect_drift",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Running Puppet in noop mode or Ansible check mode may not reliably detect drift in all configurations due to variations in environments.",
+      "suggested_fix": "Ensure that the environment can handle both tools effectively and test on a smaller sample before full-scale implementation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:classify_drift",
+      "task_id": "classify_drift",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The classification task is dependent on drift being detected, but if detection fails, this task may execute without valid data.",
+      "suggested_fix": "Add a precondition in classify_drift to ensure detect_drift must be successful.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:auto_remediate",
+      "task_id": "auto_remediate",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The auto-remediate task does not verify drift classification prior to execution, leading to potential reversion of intentional drift.",
+      "suggested_fix": "Implement a verification step to confirm classified drift types before proceeding with auto-remediation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:auto_remediate",
+      "task_id": "auto_remediate",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback plan for auto-remediate does not specify how to handle situations where multiple hosts have diverging configurations.",
+      "suggested_fix": "Enhance the rollback plan to account for individual host configuration states if rollback is triggered.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

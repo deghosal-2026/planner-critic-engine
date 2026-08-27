@@ -1,0 +1,296 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-05-tls-encryption",
+  "duration_seconds": 47.02,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-db-05-tls-encryption-r4",
+    "goal_id": "db-05-tls-encryption",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-db-05-tls-encryption-r3",
+    "created_at": "2026-08-27T03:47:55.571902Z",
+    "tasks": [
+      {
+        "id": "check-certificates",
+        "description": "Check if all services have updated certificates",
+        "action": "check",
+        "target": "services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "presence of valid certificates",
+          "how": "verify certificates stored in Kubernetes secrets",
+          "expected": "all services have valid certificates"
+        },
+        "rollback": {
+          "trigger": "certificate check fails",
+          "action": "revert to previous certificates",
+          "safety_guard": "ensure previous certificates are intact",
+          "restores_state": [
+            "previous_valid_certificates"
+          ],
+          "restoration_evidence": "confirm restored certificates in Kubernetes secrets"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-certificates",
+        "description": "Verify that no certificates are expired and all are valid",
+        "action": "verify",
+        "target": "certificates",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "previous check-certificates task is completed",
+            "fact": "valid_certificates_checked",
+            "established_by": "check-certificates",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "expiry status and validity",
+          "how": "check certificate expiration dates",
+          "expected": "no certificates are expired and all are valid"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "re-run the check-certificates task",
+          "safety_guard": "ensure no services are using expired certificates",
+          "restores_state": [
+            "current_valid_certificates"
+          ],
+          "restoration_evidence": "confirm valid certificates after re-check"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update-services",
+        "description": "Update each microservice to use TLS for PostgreSQL connections",
+        "action": "update",
+        "target": "microservices",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "certificate verification completed",
+            "fact": "certificates_verified",
+            "established_by": "verify-certificates",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "connection details",
+          "how": "review configuration files and connection logs",
+          "expected": "all connections use TLS with valid certificates"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "revert configuration to previous state",
+          "safety_guard": "restore configuration from backup",
+          "restores_state": [
+            "previous_tls_config",
+            "services_operational"
+          ],
+          "restoration_evidence": "confirm rollback to previous configuration in version control and check service functionality"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor-connections",
+        "description": "Monitor active connections for failed TLS handshakes",
+        "action": "monitor",
+        "target": "database",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "services must be updated to use TLS",
+            "fact": "tls_services_updated",
+            "established_by": "update-services",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "connection status",
+          "how": "check pg_stat_ssl for failures",
+          "expected": "no connection failures"
+        },
+        "rollback": {
+          "trigger": "connection failure detected",
+          "action": "alert support team",
+          "safety_guard": "rollback not applicable",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check-certificates",
+        "to_task": "verify-certificates",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-certificates",
+        "to_task": "update-services",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-services",
+        "to_task": "monitor-connections",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plan-db-05-tls-encryption-r4:4:monitor-connections:rollback_state_undeclared",
+      "task_id": "monitor-connections",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'monitor-connections' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-db-05-tls-encryption-r4:4:monitor-connections:rollback_state_undeclared",
+      "task_id": "monitor-connections",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'monitor-connections' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:update-services",
+      "task_id": "update-services",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The update-services task is sequenced before ensuring that all configuration files are compatible with TLS requirements, leading to potential service outages.",
+      "suggested_fix": "Add a task to check compatibility of services with TLS requirements before updating.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:update-services",
+      "task_id": "update-services",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The update-services task depends on certificates being verified, but there is no guarantee that this verification ensures compatibility with all microservices.",
+      "suggested_fix": "Include an additional verification step before update-services to confirm that all services can handle tls configurations.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:missing_steps:update-services",
+      "task_id": "update-services",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The update-services task might lack details about handling services with hardcoded connection strings that won't automatically pick up configuration changes.",
+      "suggested_fix": "Add a step to identify and refactor hardcoded connection strings in the microservices.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:missing_steps:monitor-connections",
+      "task_id": "monitor-connections",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The monitor-connections task does not account for monitoring other relevant metrics like CPU usage and connection counts that may indicate deeper issues beyond just TLS failures.",
+      "suggested_fix": "Expand the monitoring to include CPU usage and connection counts to proactively catch potential issues.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-05-tls-encryption:4:4",
+    "plan_id": "plan-db-05-tls-encryption-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:update-services",
+    "question": "Plan for goal 'db-05-tls-encryption' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

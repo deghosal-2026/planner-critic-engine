@@ -1,0 +1,503 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mch-01-env-promotion",
+  "duration_seconds": 129.3,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-mch-01-env-promotion-r4",
+    "goal_id": "mch-01-env-promotion",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-mch-01-env-promotion-r3",
+    "created_at": "2026-08-27T04:17:28.872685Z",
+    "tasks": [
+      {
+        "id": "establish_dev_ready",
+        "description": "Establish dev environment readiness",
+        "action": "establish",
+        "target": "dev_ready",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "dev readiness status",
+          "how": "check environment",
+          "expected": "dev environment is ready"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "promote_dev",
+        "description": "Promote to dev environment",
+        "action": "promote",
+        "target": "dev",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dev environment is ready",
+            "fact": "dev_ready",
+            "established_by": "establish_dev_ready",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "establish_dev_verified",
+        "description": "Establish dev verification status",
+        "action": "establish",
+        "target": "dev_verified",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dev promotion completed",
+            "fact": "dev_promoted",
+            "established_by": "promote_dev",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "dev verification status",
+          "how": "run unit tests",
+          "expected": "tests pass"
+        },
+        "rollback": null,
+        "risk_class": "low",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_dev",
+        "description": "Run unit tests for dev",
+        "action": "verify",
+        "target": "unit_tests",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dev verification established",
+            "fact": "dev_verified",
+            "established_by": "establish_dev_verified",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "low",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "promote_staging",
+        "description": "Promote to staging environment",
+        "action": "promote",
+        "target": "staging",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dev verification passed",
+            "fact": "dev_verified",
+            "established_by": "establish_dev_verified",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "integration and smoke tests",
+          "how": "run tests",
+          "expected": "tests pass"
+        },
+        "rollback": {
+          "trigger": "staging promotion fails",
+          "action": "rollback dev promotion",
+          "safety_guard": "verify dev is intact",
+          "restores_state": [
+            "dev environment restored to pre-promotion state"
+          ],
+          "restoration_evidence": "successful deployment logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "establish_staging_verified",
+        "description": "Establish staging verification status",
+        "action": "establish",
+        "target": "staging_verified",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "staging promotion completed",
+            "fact": "staging_promoted",
+            "established_by": "promote_staging",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "staging verification status",
+          "how": "run integration and smoke tests",
+          "expected": "tests pass"
+        },
+        "rollback": {
+          "trigger": "staging verification fails",
+          "action": "rollback staging promotion",
+          "safety_guard": "ensure dev is functioning",
+          "restores_state": [
+            "staging environment restored to pre-verification state"
+          ],
+          "restoration_evidence": "successful staging deployment logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_staging",
+        "description": "Run integration and smoke tests for staging",
+        "action": "verify",
+        "target": "integration_smoke_tests",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "staging verification established",
+            "fact": "staging_verified",
+            "established_by": "establish_staging_verified",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "test results",
+          "how": "check logs",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "test failures",
+          "action": "rollback staging promotion",
+          "safety_guard": "ensure dev is functioning",
+          "restores_state": [
+            "staging environment restored to pre-testing state"
+          ],
+          "restoration_evidence": "successful staging deployment logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "promote_prod_canary_5",
+        "description": "Promote to production (5% canary)",
+        "action": "promote",
+        "target": "prod",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "staging verification passed",
+            "fact": "staging_verified",
+            "established_by": "establish_staging_verified",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "health checks",
+          "how": "check service status",
+          "expected": "all checks pass"
+        },
+        "rollback": {
+          "trigger": "canary fails",
+          "action": "rollback production",
+          "safety_guard": "verify staging is intact",
+          "restores_state": [
+            "production restored to pre-canary state"
+          ],
+          "restoration_evidence": "successful previous production logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "establish_canary_5_success",
+        "description": "Establish 5% canary success status",
+        "action": "establish",
+        "target": "canary_5_success",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "5% canary succeeded",
+            "fact": "canary_5_success",
+            "established_by": "promote_prod_canary_5",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "canary success",
+          "how": "monitor health",
+          "expected": "canary is healthy"
+        },
+        "rollback": {
+          "trigger": "canary fails",
+          "action": "rollback production",
+          "safety_guard": "verify previous canary is intact",
+          "restores_state": [
+            "production restored to pre-canary state"
+          ],
+          "restoration_evidence": "successful previous production logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "promote_prod_canary_25",
+        "description": "Promote to production (25% canary)",
+        "action": "promote",
+        "target": "prod",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "5% canary succeeded",
+            "fact": "canary_5_success",
+            "established_by": "establish_canary_5_success",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "health checks",
+          "how": "check service status",
+          "expected": "all checks pass"
+        },
+        "rollback": {
+          "trigger": "canary fails",
+          "action": "rollback production",
+          "safety_guard": "verify previous canary is intact",
+          "restores_state": [
+            "production restored to pre-canary state"
+          ],
+          "restoration_evidence": "successful previous production logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "establish_canary_25_success",
+        "description": "Establish 25% canary success status",
+        "action": "establish",
+        "target": "canary_25_success",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "25% canary succeeded",
+            "fact": "canary_25_success",
+            "established_by": "promote_prod_canary_25",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "canary success",
+          "how": "monitor health",
+          "expected": "canary is healthy"
+        },
+        "rollback": {
+          "trigger": "canary fails",
+          "action": "rollback production",
+          "safety_guard": "verify previous canary is intact",
+          "restores_state": [
+            "production restored to pre-canary state"
+          ],
+          "restoration_evidence": "successful previous production logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "promote_prod_full",
+        "description": "Promote to production (100%)",
+        "action": "promote",
+        "target": "prod",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "25% canary succeeded",
+            "fact": "canary_25_success",
+            "established_by": "establish_canary_25_success",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "health checks",
+          "how": "check service status",
+          "expected": "all checks pass"
+        },
+        "rollback": {
+          "trigger": "full promotion fails",
+          "action": "rollback production",
+          "safety_guard": "verify canary is intact",
+          "restores_state": [
+            "production restored to pre-canary state"
+          ],
+          "restoration_evidence": "successful previous production logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "establish_dev_ready",
+        "to_task": "promote_dev",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote_dev",
+        "to_task": "verify_dev",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_dev",
+        "to_task": "promote_staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote_staging",
+        "to_task": "verify_staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_staging",
+        "to_task": "promote_prod_canary_5",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote_prod_canary_5",
+        "to_task": "promote_prod_canary_25",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote_prod_canary_25",
+        "to_task": "promote_prod_full",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:promote_staging",
+      "task_id": "promote_staging",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Promotion to staging occurs before verifying the dev environment was successful.",
+      "suggested_fix": "Ensure that 'verify_dev' completes successfully before 'promote_staging'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:promote_prod_canary_5",
+      "task_id": "promote_prod_canary_5",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Promotion to production (5% canary) occurs before staging verification has completed successfully.",
+      "suggested_fix": "Ensure that 'verify_staging' completes successfully before 'promote_prod_canary_5'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:promote_prod_canary_25",
+      "task_id": "promote_prod_canary_25",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Promotion to production (25% canary) occurs before confirmation of 5% canary success.",
+      "suggested_fix": "Ensure that 'establish_canary_5_success' completes successfully before 'promote_prod_canary_25'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:promote_prod_full",
+      "task_id": "promote_prod_full",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Promotion to production (100%) occurs before confirmation of 25% canary success.",
+      "suggested_fix": "Ensure that 'establish_canary_25_success' completes successfully before 'promote_prod_full'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mch-01-env-promotion:4:4",
+    "plan_id": "plan-mch-01-env-promotion-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:promote_staging",
+    "question": "Plan for goal 'mch-01-env-promotion' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=12"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

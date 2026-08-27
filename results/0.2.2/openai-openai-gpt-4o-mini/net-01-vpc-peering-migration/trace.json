@@ -1,0 +1,273 @@
+{
+  "dimension": "core-api",
+  "goal_id": "net-01-vpc-peering-migration",
+  "duration_seconds": 28.75,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-net-01-vpc-peering-migration-r2",
+    "goal_id": "net-01-vpc-peering-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "net-01-vpc-peering-migration",
+    "created_at": "2026-08-27T04:23:51.703923Z",
+    "tasks": [
+      {
+        "id": "deploy_tgw",
+        "description": "Deploy AWS Transit Gateway",
+        "action": "create",
+        "target": "Transit Gateway",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Transit Gateway ID",
+          "how": "check AWS Console or CLI",
+          "expected": "TGW exists"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "delete Transit Gateway",
+          "safety_guard": "verify no resources were created",
+          "restores_state": [
+            "no Transit Gateway exists"
+          ],
+          "restoration_evidence": "check if TGW ID is not present"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "attach_vpcs",
+        "description": "Attach all VPCs to Transit Gateway",
+        "action": "attach",
+        "target": "VPCs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "attached VPCs",
+          "how": "check AWS Console or CLI",
+          "expected": "all VPCs are attached"
+        },
+        "rollback": {
+          "trigger": "attachment fails",
+          "action": "detach VPCs",
+          "safety_guard": "verify VPCs are in a valid state",
+          "restores_state": [
+            "all VPCs are detached"
+          ],
+          "restoration_evidence": "check if VPCs are back to previous state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_route_tables",
+        "description": "Configure route tables to route traffic through Transit Gateway",
+        "action": "configure",
+        "target": "route tables",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "route tables configuration",
+          "how": "check route table settings",
+          "expected": "routes point to TGW"
+        },
+        "rollback": {
+          "trigger": "route configuration fails",
+          "action": "restore previous route tables",
+          "safety_guard": "verify previous routes",
+          "restores_state": [
+            "route tables are restored to previous configuration"
+          ],
+          "restoration_evidence": "check route table settings for previous state"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_connectivity",
+        "description": "Verify connectivity between all VPC pairs",
+        "action": "test",
+        "target": "VPC pairs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "connectivity status",
+          "how": "ping tests or AWS Reachability Analyzer",
+          "expected": "all pairs have connectivity"
+        },
+        "rollback": {
+          "trigger": "connectivity test fails",
+          "action": "rollback to peering connections",
+          "safety_guard": "verify traffic can flow again",
+          "restores_state": [
+            "VPC pairs return to previous connectivity"
+          ],
+          "restoration_evidence": "check connectivity status before and after rollback"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "remove_peering_connections",
+        "description": "Remove old VPC peering connections one-by-one",
+        "action": "delete",
+        "target": "VPC peering connections",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "peering connections status",
+          "how": "check AWS Console or CLI",
+          "expected": "all peering connections removed"
+        },
+        "rollback": {
+          "trigger": "removal causes issues",
+          "action": "restore peering connections",
+          "safety_guard": "ensure no blackholes exist",
+          "restores_state": [
+            "peering connections restored"
+          ],
+          "restoration_evidence": "check if all peering connections are back"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_tgw",
+        "to_task": "attach_vpcs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "attach_vpcs",
+        "to_task": "configure_route_tables",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_route_tables",
+        "to_task": "verify_connectivity",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_connectivity",
+        "to_task": "remove_peering_connections",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:attach_vpcs",
+      "task_id": "attach_vpcs",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Attaching VPCs should occur only after the Transit Gateway is verified as successfully deployed.",
+      "suggested_fix": "Change the order of tasks to ensure 'deploy_tgw' is fully successful before 'attach_vpcs' begins.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:configure_route_tables",
+      "task_id": "configure_route_tables",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Configuring route tables should happen only after all VPCs are successfully attached to the Transit Gateway.",
+      "suggested_fix": "Ensure 'attach_vpcs' is complete before starting 'configure_route_tables'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:verify_connectivity",
+      "task_id": "verify_connectivity",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Verifying connectivity must occur after route tables have been configured.",
+      "suggested_fix": "Reorder tasks to move 'verify_connectivity' after 'configure_route_tables'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:remove_peering_connections",
+      "task_id": "remove_peering_connections",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Removing peering connections should only happen once connectivity has been verified.",
+      "suggested_fix": "Change the order so 'remove_peering_connections' occurs after 'verify_connectivity'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:net-01-vpc-peering-migration:2:2",
+    "plan_id": "plan-net-01-vpc-peering-migration-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:attach_vpcs",
+    "question": "Plan for goal 'net-01-vpc-peering-migration' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

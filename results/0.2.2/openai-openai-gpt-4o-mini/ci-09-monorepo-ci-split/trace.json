@@ -1,0 +1,278 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-09-monorepo-ci-split",
+  "duration_seconds": 30.55,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-ci-09-monorepo-ci-split-r2",
+    "goal_id": "ci-09-monorepo-ci-split",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "ci-09-monorepo-ci-split-plan",
+    "created_at": "2026-08-27T03:01:39.355183Z",
+    "tasks": [
+      {
+        "id": "configure-path-triggers",
+        "description": "Configure path-based trigger rules for CI jobs",
+        "action": "set_trigger_rules",
+        "target": "CI configuration",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CI configuration is accessible",
+            "fact": "ci_config_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "set-dependency-caching",
+        "description": "Set up dependency caching for Go modules, npm, and pip",
+        "action": "configure_caching",
+        "target": "build system",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Build system supports caching",
+            "fact": "caching_supported",
+            "established_by": "configure-path-triggers",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "cache hit rates",
+          "how": "check build logs",
+          "expected": "80% cache hit rate"
+        },
+        "rollback": {
+          "trigger": "caching fails",
+          "action": "remove caching configuration",
+          "safety_guard": "verify build success without cache",
+          "restores_state": [
+            "build system state before caching"
+          ],
+          "restoration_evidence": "check if builds succeed without cache"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "parallelize-service-builds",
+        "description": "Parallelize builds for independent services",
+        "action": "setup_parallel_builds",
+        "target": "build pipeline",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Services are defined properly",
+            "fact": "service_definitions_valid",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "build duration",
+          "how": "measure time for builds",
+          "expected": "reduce build time by 50%"
+        },
+        "rollback": {
+          "trigger": "parallelization fails",
+          "action": "revert to sequential builds",
+          "safety_guard": "ensure all services built successfully in sequence",
+          "restores_state": [
+            "build pipeline state before parallelization"
+          ],
+          "restoration_evidence": "verify all services built sequentially"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "add-merge-gate",
+        "description": "Add a merge-gate to aggregate results from builds",
+        "action": "implement_merge_gate",
+        "target": "CI workflow",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CI workflow is stable",
+            "fact": "ci_workflow_stable",
+            "established_by": "parallelize-service-builds",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "merge-gate functionality",
+          "how": "run builds and check results aggregation",
+          "expected": "results are aggregated correctly and timely"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-pr-builds",
+        "description": "Verify that PR builds complete in under 5 minutes",
+        "action": "set_timing_check",
+        "target": "CI process",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PR builds are configured",
+            "fact": "pr_build_configured",
+            "established_by": "add-merge-gate",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "build completion time",
+          "how": "monitor build execution",
+          "expected": "< 5 minutes per PR"
+        },
+        "rollback": {
+          "trigger": "timing check fails",
+          "action": "alert team and disable merge gate",
+          "safety_guard": "revert configuration if time exceeds 8 minutes",
+          "restores_state": [
+            "CI process state before timing check"
+          ],
+          "restoration_evidence": "check PR builds timing before change"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "configure-path-triggers",
+        "to_task": "set-dependency-caching",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set-dependency-caching",
+        "to_task": "parallelize-service-builds",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "parallelize-service-builds",
+        "to_task": "add-merge-gate",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "add-merge-gate",
+        "to_task": "verify-pr-builds",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:set-dependency-caching",
+      "task_id": "set-dependency-caching",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'set-dependency-caching' is sequenced before task 'configure-path-triggers', which is a hard prerequisite.",
+      "suggested_fix": "Reorder tasks to ensure 'configure-path-triggers' is completed before 'set-dependency-caching'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:parallelize-service-builds",
+      "task_id": "parallelize-service-builds",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'parallelize-service-builds' depends on 'set-dependency-caching' which is unverified.",
+      "suggested_fix": "Ensure 'set-dependency-caching' has a verification step before 'parallelize-service-builds' is executed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:add-merge-gate",
+      "task_id": "add-merge-gate",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding steps to handle potential merge conflicts when aggregating build results.",
+      "suggested_fix": "Include a conflict resolution strategy in the implementation of the merge-gate.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:verify-pr-builds",
+      "task_id": "verify-pr-builds",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback strategy for 'verify-pr-builds' lacks specificity on how to restore state if timing check fails.",
+      "suggested_fix": "Specify detailed steps for restoring the CI process state to improve rollback robustness.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

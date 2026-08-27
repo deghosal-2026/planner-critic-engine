@@ -1,0 +1,289 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-08-log-retention-tiering",
+  "duration_seconds": 21.66,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-obs-08-log-retention-tiering-r2",
+    "goal_id": "obs-08-log-retention-tiering",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "obs-08-log-retention-tiering-plan",
+    "created_at": "2026-08-27T04:20:28.758290Z",
+    "tasks": [
+      {
+        "id": "classify_logs",
+        "description": "Classify log types by retention requirement",
+        "action": "classify",
+        "target": "logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "log types are available",
+            "fact": "log_types_initialized",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_ilm",
+        "description": "Configure ILM policies for log tiering",
+        "action": "configure",
+        "target": "ilm",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "ILM policies",
+          "how": "run ILM policy check",
+          "expected": "correctly configured"
+        },
+        "rollback": {
+          "trigger": "ILM misconfiguration",
+          "action": "restore previous ILM config",
+          "safety_guard": "check saved ILM config validity",
+          "restores_state": [
+            "previous ILM config"
+          ],
+          "restoration_evidence": "confirm ILM states match previous"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "set_deletion_schedules",
+        "description": "Set up deletion schedules for logs",
+        "action": "schedule",
+        "target": "deletion",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ILM policies configured",
+            "fact": "ilm_policies_configured",
+            "established_by": "configure_ilm",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deletion schedules",
+          "how": "run deletion schedule check",
+          "expected": "deletion schedules are correctly configured"
+        },
+        "rollback": {
+          "trigger": "schedule misconfiguration",
+          "action": "reset to initial deletion schedule",
+          "safety_guard": "confirm backup of initial schedule exists",
+          "restores_state": [
+            "initial deletion schedules"
+          ],
+          "restoration_evidence": "check schedules after reset"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_retention",
+        "description": "Verify retention policies are enforced",
+        "action": "verify",
+        "target": "logs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "log retention",
+          "how": "check log existence",
+          "expected": "logs are retained according to policy"
+        },
+        "rollback": {
+          "trigger": "retention policy enforcement fails",
+          "action": "reset logs to previous state",
+          "safety_guard": "assure old logs are still available",
+          "restores_state": [
+            "previous log state"
+          ],
+          "restoration_evidence": "confirm logs match previous state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor_storage",
+        "description": "Monitor storage usage of logs",
+        "action": "monitor",
+        "target": "storage",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "deletion schedules established",
+            "fact": "deletion_schedules_set",
+            "established_by": "set_deletion_schedules",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "storage usage",
+          "how": "check storage metrics",
+          "expected": "storage usage is within limits"
+        },
+        "rollback": {
+          "trigger": "storage issues detected",
+          "action": "revert to previous storage monitoring",
+          "safety_guard": "system state confirms previous configuration",
+          "restores_state": [
+            "previous storage monitoring state"
+          ],
+          "restoration_evidence": "verify storage metrics after rollback"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "classify_logs",
+        "to_task": "configure_ilm",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_ilm",
+        "to_task": "set_deletion_schedules",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set_deletion_schedules",
+        "to_task": "verify_retention",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_retention",
+        "to_task": "monitor_storage",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:classify_logs",
+      "task_id": "classify_logs",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'classify_logs' has a dependency on 'log_types_initialized' that is not verified by any previous task, making it unsafe to proceed without confirmation.",
+      "suggested_fix": "Ensure that log types are initialized and verified before proceeding with 'classify_logs'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:configure_ilm",
+      "task_id": "configure_ilm",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'configure_ilm' lacks comprehensive assurance steps to confirm successful restoration of the previous ILM config.",
+      "suggested_fix": "Enhance the rollback procedure to include verification that the restoration of the ILM config has been successfully applied.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:set_deletion_schedules",
+      "task_id": "set_deletion_schedules",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider additional verifications for edge cases of deletion schedule compliance, such as concurrent log generation.",
+      "suggested_fix": "Implement checks to validate that ongoing log generation does not exceed deletion schedules.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:verify_retention",
+      "task_id": "verify_retention",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'verify_retention' does not confirm the availability of logs before resetting, posing a risk of data loss.",
+      "suggested_fix": "Modify the rollback to ensure logs are validated as retrievable before resetting to the previous state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:monitor_storage",
+      "task_id": "monitor_storage",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'monitor_storage' depends on successful execution of 'set_deletion_schedules', which is unverified, leading to potential execution risks.",
+      "suggested_fix": "Implement a verification step to confirm 'set_deletion_schedules' has been completed successfully.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

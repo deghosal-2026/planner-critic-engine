@@ -24,7 +24,7 @@ Paired-baseline protocol (the "before" arm):
 Pure Python over stored traces — no LLM calls, no planner runs.
 
 Usage:
-    python3 docs/field-test/v0.2.1/scripts/bench_operational.py
+    python3 docs/field-test/scripts/bench_operational.py
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ import json
 import statistics
 from pathlib import Path
 
-SCRIPTS_DIR = Path(__file__).resolve().parent          # docs/field-test/v0.2.1/scripts
+SCRIPTS_DIR = Path(__file__).resolve().parent          # docs/field-test/scripts
 FIELD_TEST_DIR = SCRIPTS_DIR.parent.parent             # docs/field-test
 
 REPORTS_DIRS = [

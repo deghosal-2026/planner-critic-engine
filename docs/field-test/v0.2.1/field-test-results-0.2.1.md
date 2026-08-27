@@ -936,8 +936,8 @@ Total findings across all goals: 625
 - **LLM results:** `results/0.2.1/field-test-0.2.1-llm.md`
 - **Deterministic tests:** `tests/field_test_v0_2_0/` (90 tests) + `tests/field_test_v0_2_1/` (3 tests)
 - **Runner script:** `docs/field-test/scripts/run-field.py`
-- **Boundary script:** `docs/field-test/v0.2.1/scripts/bench_live_boundary.py`
-- **Operational script:** `docs/field-test/v0.2.1/scripts/bench_operational.py`
-- **Cycling script:** `docs/field-test/v0.2.1/scripts/bench_cycling.py`
+- **Boundary script:** `docs/field-test/scripts/bench_live_boundary.py`
+- **Operational script:** `docs/field-test/scripts/bench_operational.py`
+- **Cycling script:** `docs/field-test/scripts/bench_cycling.py`
 - **API key:** `OPENROUTER_API_KEY` env var (no config files tracked in git)
 - **Model:** `openai/gpt-4o-mini` via OpenRouter (both planner and critic roles)

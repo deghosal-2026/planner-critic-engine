@@ -1,0 +1,419 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ai-03-model-serving-migration",
+  "duration_seconds": 69.78,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-ai-03-model-serving-migration-r3",
+    "goal_id": "ai-03-model-serving-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-ai-03-model-serving-migration-r2",
+    "created_at": "2026-08-27T03:04:19.726810Z",
+    "tasks": [
+      {
+        "id": "deploy-vllm",
+        "description": "Deploy vLLM with model weights",
+        "action": "deploy",
+        "target": "vLLM",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "vLLM deployment status",
+          "how": "check deployment status via Kubernetes",
+          "expected": "vLLM running successfully"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "delete vLLM deployment",
+          "safety_guard": "verify vLLM not running",
+          "restores_state": [
+            "vLLM not deployed"
+          ],
+          "restoration_evidence": "vLLM replaced with SageMaker"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "run-shadow-inference",
+        "description": "Run shadow inference for model requests",
+        "action": "run",
+        "target": "shadow-inference",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "vLLM is deployed",
+            "fact": "vllm_deployed",
+            "established_by": "deploy-vllm",
+            "probe": null
+          },
+          {
+            "description": "SageMaker endpoint is active",
+            "fact": "sagemaker_active",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "shadow inference running correctly",
+          "how": "check logs and metrics",
+          "expected": "shadow inference provides responses within expected patterns"
+        },
+        "rollback": {
+          "trigger": "shadow inference fails",
+          "action": "stop shadow inference",
+          "safety_guard": "ensure no active requests",
+          "restores_state": [
+            "shadow inference stopped"
+          ],
+          "restoration_evidence": "verification confirms inference no longer running"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-parity",
+        "description": "Verify prediction parity between SageMaker and vLLM",
+        "action": "verify",
+        "target": "parity",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "cosine similarity score",
+          "how": "calculate cosine similarity",
+          "expected": "\u2265 0.99"
+        },
+        "rollback": {
+          "trigger": "parity check fails",
+          "action": "stop shadow inference",
+          "safety_guard": "ensure no active requests",
+          "restores_state": [
+            "shadow inference stopped"
+          ],
+          "restoration_evidence": "shadow inference no longer running"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover-traffic-10",
+        "description": "Cut over 10% of traffic to vLLM",
+        "action": "cutover",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "shadow inference is running correctly",
+            "fact": "shadow_inference_verified",
+            "established_by": "run-shadow-inference",
+            "probe": null
+          },
+          {
+            "description": "prediction parity verified",
+            "fact": "parity_verified",
+            "established_by": "verify-parity",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic distribution",
+          "how": "check traffic metrics",
+          "expected": "10% of traffic to vLLM"
+        },
+        "rollback": {
+          "trigger": "issues observed post cutover",
+          "action": "rollback traffic to SageMaker",
+          "safety_guard": "bring back 100% traffic to SageMaker",
+          "restores_state": [
+            "10% traffic restored"
+          ],
+          "restoration_evidence": "metrics confirm traffic revert"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover-traffic-50",
+        "description": "Cut over 50% of traffic to vLLM",
+        "action": "cutover",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "10% traffic cutover verified",
+            "fact": "traffic_cutover_10_verified",
+            "established_by": "cutover-traffic-10",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic distribution",
+          "how": "check traffic metrics",
+          "expected": "50% of traffic to vLLM"
+        },
+        "rollback": {
+          "trigger": "issues observed post cutover",
+          "action": "rollback traffic to SageMaker",
+          "safety_guard": "bring back 50% traffic to SageMaker",
+          "restores_state": [
+            "50% traffic restored"
+          ],
+          "restoration_evidence": "metrics confirm traffic revert"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover-traffic-100",
+        "description": "Cut over 100% of traffic to vLLM",
+        "action": "cutover",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "50% traffic cutover verified",
+            "fact": "traffic_cutover_50_verified",
+            "established_by": "cutover-traffic-50",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic distribution",
+          "how": "check traffic metrics",
+          "expected": "100% of traffic to vLLM"
+        },
+        "rollback": {
+          "trigger": "issues observed post cutover",
+          "action": "rollback traffic to SageMaker",
+          "safety_guard": "restore all traffic to SageMaker",
+          "restores_state": [
+            "traffic completely restored"
+          ],
+          "restoration_evidence": "metrics confirm full traffic to SageMaker"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-latency-slo",
+        "description": "Verify latency SLO for vLLM",
+        "action": "verify",
+        "target": "latency",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "p99 latency",
+          "how": "check Prometheus metrics",
+          "expected": "< 200ms"
+        },
+        "rollback": {
+          "trigger": "latency exceeds SLO",
+          "action": "stop vLLM traffic",
+          "safety_guard": "ensure reset to pre-cutover state",
+          "restores_state": [
+            "latency under control"
+          ],
+          "restoration_evidence": "metrics confirm latency compliance"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "decommission-sagemaker",
+        "description": "Decommission SageMaker endpoint after successful migration",
+        "action": "decommission",
+        "target": "sagemaker",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "100% traffic to vLLM",
+            "fact": "traffic_cutover_100",
+            "established_by": "cutover-traffic-100",
+            "probe": null
+          },
+          {
+            "description": "latency SLO verified",
+            "fact": "latency_slo_verified",
+            "established_by": "verify-latency-slo",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "SageMaker endpoint status",
+          "how": "check if endpoint is inactive",
+          "expected": "SageMaker endpoint decommissioned"
+        },
+        "rollback": {
+          "trigger": "decommission fails",
+          "action": "restore SageMaker endpoint",
+          "safety_guard": "ensure clients back to SageMaker",
+          "restores_state": [
+            "SageMaker operational"
+          ],
+          "restoration_evidence": "SageMaker endpoint checked and active"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy-vllm",
+        "to_task": "run-shadow-inference",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run-shadow-inference",
+        "to_task": "verify-parity",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-parity",
+        "to_task": "cutover-traffic-10",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover-traffic-10",
+        "to_task": "cutover-traffic-50",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover-traffic-50",
+        "to_task": "cutover-traffic-100",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover-traffic-100",
+        "to_task": "verify-latency-slo",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover-traffic-100",
+        "to_task": "decommission-sagemaker",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:cutover-traffic-10",
+      "task_id": "cutover-traffic-10",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Cutover 10% of traffic to vLLM cannot proceed until both shadow inference is confirmed as running correctly and prediction parity is verified.",
+      "suggested_fix": "Ensure 'run-shadow-inference' and 'verify-parity' are successfully completed before executing this task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:cutover-traffic-50",
+      "task_id": "cutover-traffic-50",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Cutover 50% of traffic to vLLM cannot proceed until 10% traffic cutover is verified.",
+      "suggested_fix": "Confirm completion and verification of 'cutover-traffic-10' before executing this task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:cutover-traffic-100",
+      "task_id": "cutover-traffic-100",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Cutover 100% of traffic to vLLM cannot proceed until 50% traffic cutover is verified.",
+      "suggested_fix": "Confirm completion and verification of 'cutover-traffic-50' before executing this task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:decommission-sagemaker",
+      "task_id": "decommission-sagemaker",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Decommission SageMaker endpoint cannot proceed until 100% traffic has been cut over to vLLM and latency SLO has been verified.",
+      "suggested_fix": "Ensure both 'cutover-traffic-100' and 'verify-latency-slo' are successfully completed before executing this task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ai-03-model-serving-migration:3:3",
+    "plan_id": "plan-ai-03-model-serving-migration-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:cutover-traffic-10",
+    "question": "Plan for goal 'ai-03-model-serving-migration' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

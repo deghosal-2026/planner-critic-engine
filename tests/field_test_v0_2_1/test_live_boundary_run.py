@@ -3,7 +3,7 @@
 Hermetic ($0): exercises the script's self-test path and report-artifact
 writing with a stub critic, proving the end-to-end wiring (cases → harness →
 JSON + markdown files) is correct before a paid live run. The live run itself
-is invoked separately via ``python3 docs/field-test/v0.2.1/scripts/bench_live_boundary.py``
+is invoked separately via ``python3 docs/field-test/scripts/bench_live_boundary.py``
 and is NOT part of CI (it spends money).
 """
 
@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "docs" / "field-test" / "v0.2.1" / "scripts"
+SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "docs" / "field-test" / "scripts"
 BENCH_PATH = SCRIPTS_DIR / "bench_live_boundary.py"
 
 

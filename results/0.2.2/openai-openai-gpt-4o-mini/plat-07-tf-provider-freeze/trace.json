@@ -1,0 +1,314 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-07-tf-provider-freeze",
+  "duration_seconds": 31.24,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-plat-07-tf-provider-freeze-r2",
+    "goal_id": "plat-07-tf-provider-freeze",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plat-07-tf-provider-freeze-v1",
+    "created_at": "2026-08-27T04:12:13.421898Z",
+    "tasks": [
+      {
+        "id": "inventory_providers",
+        "description": "Inventory all provider versions in use across stacks",
+        "action": "inventory",
+        "target": "terraform stacks",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Terraform CLI is installed",
+            "fact": "terraform_installed",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "Proper access permissions are set for all stacks",
+            "fact": "access_permissions_confirmed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "list of current provider versions",
+          "how": "run inventory command",
+          "expected": "versions match expected output"
+        },
+        "rollback": {
+          "trigger": "inventory fails",
+          "action": "review manually",
+          "safety_guard": "ensure all stacks are accounted",
+          "restores_state": [
+            "no action taken"
+          ],
+          "restoration_evidence": "manual review confirms stacks accounted"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "pin_versions",
+        "description": "Pin provider versions in lock files",
+        "action": "pin",
+        "target": "terraform lock files",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Provider versions are inventoried",
+            "fact": "providers_inventory_complete",
+            "established_by": "inventory_providers",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "locked provider versions",
+          "how": "check lock file contents",
+          "expected": "versions pinned correctly"
+        },
+        "rollback": {
+          "trigger": "pinning fails",
+          "action": "revert changes in lock files",
+          "safety_guard": "ensure no change is applied",
+          "restores_state": [
+            "previous lock file state"
+          ],
+          "restoration_evidence": "compare lock files before/after revert"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "validate_plans",
+        "description": "Validate that pinned versions produce identical plans",
+        "action": "validate",
+        "target": "terraform plan",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Provider versions are pinned",
+            "fact": "versions_pinned",
+            "established_by": "pin_versions",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "plan output comparison",
+          "how": "run terraform plan on each stack",
+          "expected": "plans are identical across stacks"
+        },
+        "rollback": {
+          "trigger": "plan validation fails",
+          "action": "revert to previous provider configurations",
+          "safety_guard": "ensure previous state is intact",
+          "restores_state": [
+            "previous provider configurations"
+          ],
+          "restoration_evidence": "compare configurations before/after revert"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "test_apply_staging",
+        "description": "Test apply in staging with pinned providers",
+        "action": "apply",
+        "target": "staging environment",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Plans validated successfully",
+            "fact": "plans_validated",
+            "established_by": "validate_plans",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "staging state consistency",
+          "how": "check state after apply",
+          "expected": "staging environment matches expected outcome"
+        },
+        "rollback": {
+          "trigger": "apply fails",
+          "action": "rollback to previous state in staging",
+          "safety_guard": "verify rollback success",
+          "restores_state": [
+            "previous staging state"
+          ],
+          "restoration_evidence": "compare states before/after rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "rollout_production",
+        "description": "Roll out version-pinned providers to production",
+        "action": "apply",
+        "target": "production environment",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Staging tests passed",
+            "fact": "staging_tests_successful",
+            "established_by": "test_apply_staging",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "production state post-apply",
+          "how": "validate final state",
+          "expected": "production mirrors desired state with pinned versions"
+        },
+        "rollback": {
+          "trigger": "production apply fails",
+          "action": "restore previous production state",
+          "safety_guard": "confirm rollback capabilities",
+          "restores_state": [
+            "previous production state"
+          ],
+          "restoration_evidence": "validate production state before/after rollback"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "inventory_providers",
+        "to_task": "pin_versions",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "pin_versions",
+        "to_task": "validate_plans",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "validate_plans",
+        "to_task": "test_apply_staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test_apply_staging",
+        "to_task": "rollout_production",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:pin_versions",
+      "task_id": "pin_versions",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'pin_versions' should not execute before 'inventory_providers' is successfully completed.",
+      "suggested_fix": "Ensure that 'pin_versions' has a proper dependency on 'inventory_providers' so it does not execute prematurely.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:validate_plans",
+      "task_id": "validate_plans",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'validate_plans' cannot run before 'pin_versions' has successfully finished.",
+      "suggested_fix": "Establish a hard dependency for 'validate_plans' on the completion of 'pin_versions'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:test_apply_staging",
+      "task_id": "test_apply_staging",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'test_apply_staging' must not proceed before 'validate_plans' has successfully completed.",
+      "suggested_fix": "Create a hard dependency between 'test_apply_staging' and 'validate_plans' to ensure proper order.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:rollout_production",
+      "task_id": "rollout_production",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'rollout_production' cannot execute unless 'test_apply_staging' has been completed successfully.",
+      "suggested_fix": "Implement a hard dependency for 'rollout_production' on 'test_apply_staging'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:plat-07-tf-provider-freeze:2:2",
+    "plan_id": "plan-plat-07-tf-provider-freeze-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:pin_versions",
+    "question": "Plan for goal 'plat-07-tf-provider-freeze' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

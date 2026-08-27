@@ -1,0 +1,479 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-01-schema-migration",
+  "duration_seconds": 66.79,
+  "result": {
+    "status": "escalated",
+    "reason_code": "plan_oscillation_detected",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-db-01-schema-migration-r4",
+    "goal_id": "db-01-schema-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-db-01-schema-migration-r3",
+    "created_at": "2026-08-27T03:45:40.498918Z",
+    "tasks": [
+      {
+        "id": "backup-db",
+        "description": "Back up the database",
+        "action": "backup",
+        "target": "database",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Database is reachable",
+            "fact": "db_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "check-disk-space",
+        "description": "Check available disk space for WAL",
+        "action": "check",
+        "target": "disk",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Backup completed successfully",
+            "fact": "backup_successful",
+            "established_by": "backup-db",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "available disk space",
+          "how": "run disk usage check",
+          "expected": "at least 100GB available"
+        },
+        "rollback": {
+          "trigger": "disk space insufficient",
+          "action": "notify team",
+          "safety_guard": "ensure backup exists",
+          "restores_state": [
+            "disk space sufficient"
+          ],
+          "restoration_evidence": "disk space confirmed sufficient"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "backfill-null-columns",
+        "description": "Backfill existing NULLs for last_login_ip column",
+        "action": "pt-online-schema-change",
+        "target": "users table",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Disk space sufficient",
+            "fact": "disk_space_sufficient",
+            "established_by": "check-disk-space",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "NULL counts",
+          "how": "query to count NULLs",
+          "expected": "0 NULLs in last_login_ip"
+        },
+        "rollback": {
+          "trigger": "backfill fails",
+          "action": "restore backup",
+          "safety_guard": "backup integrity verified",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "apply-not-null-constraint",
+        "description": "Apply NOT NULL constraint to last_login_ip column",
+        "action": "alter",
+        "target": "users table",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Backfill completed successfully",
+            "fact": "backfill_successful",
+            "established_by": "backfill-null-columns",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "column constraint",
+          "how": "check table schema",
+          "expected": "last_login_ip is NOT NULL"
+        },
+        "rollback": {
+          "trigger": "constraint application fails",
+          "action": "remove NOT NULL constraint",
+          "safety_guard": "check for remaining NULLs",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-constraint-application",
+        "description": "Verify NOT NULL constraint application",
+        "action": "check",
+        "target": "users table",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "NOT NULL constraint applied",
+            "fact": "constraint_applied",
+            "established_by": "apply-not-null-constraint",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "constraint application",
+          "how": "check table schema",
+          "expected": "constraint applied successfully"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "reapply NOT NULL constraint",
+          "safety_guard": "ensure constraint is valid",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy-application-code",
+        "description": "Deploy application code referencing the updated users table",
+        "action": "deploy",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Constraint application verified",
+            "fact": "constraint_application_verified",
+            "established_by": "verify-constraint-application",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application version",
+          "how": "check application status",
+          "expected": "new version deployed"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to previous version",
+          "safety_guard": "ensure database is unchanged",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "backup-db",
+        "to_task": "check-disk-space",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check-disk-space",
+        "to_task": "backfill-null-columns",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "backfill-null-columns",
+        "to_task": "apply-not-null-constraint",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "apply-not-null-constraint",
+        "to_task": "verify-constraint-application",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-constraint-application",
+        "to_task": "deploy-application-code",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plan-db-01-schema-migration-r4:4:backfill-null-columns:rollback_state_undeclared",
+      "task_id": "backfill-null-columns",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'backfill-null-columns' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-db-01-schema-migration-r4:4:apply-not-null-constraint:rollback_state_undeclared",
+      "task_id": "apply-not-null-constraint",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'apply-not-null-constraint' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-db-01-schema-migration-r4:4:verify-constraint-application:rollback_state_undeclared",
+      "task_id": "verify-constraint-application",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify-constraint-application' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-db-01-schema-migration-r4:4:deploy-application-code:rollback_state_undeclared",
+      "task_id": "deploy-application-code",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'deploy-application-code' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-db-01-schema-migration-r4:4:backfill-null-columns:rollback_state_undeclared",
+      "task_id": "backfill-null-columns",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'backfill-null-columns' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-db-01-schema-migration-r4:4:apply-not-null-constraint:rollback_state_undeclared",
+      "task_id": "apply-not-null-constraint",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'apply-not-null-constraint' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-db-01-schema-migration-r4:4:verify-constraint-application:rollback_state_undeclared",
+      "task_id": "verify-constraint-application",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify-constraint-application' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-db-01-schema-migration-r4:4:deploy-application-code:rollback_state_undeclared",
+      "task_id": "deploy-application-code",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'deploy-application-code' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:feasibility:check-disk-space",
+      "task_id": "check-disk-space",
+      "version": 4,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The task requires checking disk space, which may not be possible if the database server has no free memory or is unreachable after backup.",
+      "suggested_fix": "Ensure the task has a fallback or alternate verification method in case of unreachable database.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:apply-not-null-constraint",
+      "task_id": "apply-not-null-constraint",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Applying the NOT NULL constraint should not occur before verifying that there are 0 NULLs in the last_login_ip column.",
+      "suggested_fix": "Ensure that the 'apply-not-null-constraint' happens only after the 'backfill-null-columns' task has successfully completed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:deploy-application-code",
+      "task_id": "deploy-application-code",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Deployment of application code assumes the constraint application is verified without confirmation of successful deployment or integrity check of the application code.",
+      "suggested_fix": "Add a step to verify the successful deployment of the application and ensure it can handle the updated database table.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:apply-not-null-constraint",
+      "task_id": "apply-not-null-constraint",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback procedure for removing the NOT NULL constraint does not ensure all remaining NULLs will be handled appropriately.",
+      "suggested_fix": "Modify the rollback to ensure that any remaining NULLs are adequately addressed before re-applying the NOT NULL constraint.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:missing_steps:backfill-null-columns",
+      "task_id": "backfill-null-columns",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Considerations for handling partial failures during backfill are not covered, which could lead to incomplete data states.",
+      "suggested_fix": "Include steps to handle scenarios where backfill could partially complete but not fully.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-01-schema-migration:4:4",
+    "plan_id": "plan-db-01-schema-migration-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:feasibility:check-disk-space",
+    "question": "Plan for goal 'db-01-schema-migration' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

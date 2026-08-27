@@ -1,0 +1,293 @@
+{
+  "dimension": "core-api",
+  "goal_id": "erp-02-workflow-platform",
+  "duration_seconds": 27.25,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-erp-02-workflow-platform-r2",
+    "goal_id": "erp-02-workflow-platform",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "erp-02-workflow-platform",
+    "created_at": "2026-08-27T04:03:34.008574Z",
+    "tasks": [
+      {
+        "id": "process_remap",
+        "description": "Map ServiceNow workflows to the custom platform's workflow engine.",
+        "action": "remap",
+        "target": "workflow",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "workflow mappings",
+          "how": "compare with ServiceNow",
+          "expected": "all workflows mapped"
+        },
+        "rollback": {
+          "trigger": "remapping fails",
+          "action": "revert to previous mapping",
+          "safety_guard": "review mapping logs",
+          "restores_state": [
+            "previous workflow mapping"
+          ],
+          "restoration_evidence": "verified mapping logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "data_import",
+        "description": "Export ServiceNow records to CSV/JSON and import to the custom platform.",
+        "action": "import",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "record counts and field mappings",
+          "how": "count records pre and post import",
+          "expected": "record counts match"
+        },
+        "rollback": {
+          "trigger": "data import fails",
+          "action": "reimport from ServiceNow",
+          "safety_guard": "validate data integrity",
+          "restores_state": [
+            "previously imported records"
+          ],
+          "restoration_evidence": "matched record counts"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "testing",
+        "description": "Run both platforms in parallel for critical workflows.",
+        "action": "test",
+        "target": "workflows",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "SLA timers, assignments, notifications",
+          "how": "monitor both systems for discrepancies",
+          "expected": "synchronization maintained"
+        },
+        "rollback": {
+          "trigger": "testing fails",
+          "action": "switch back to ServiceNow",
+          "safety_guard": "confirm critical workflows operational",
+          "restores_state": [
+            "last known good configuration"
+          ],
+          "restoration_evidence": "system functionality check"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "canary_migration",
+        "description": "Migrate a single department's workflows to the custom platform and monitor for 1 week.",
+        "action": "migrate",
+        "target": "department workflows",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "canary performance metrics",
+          "how": "analyze logs and user feedback",
+          "expected": "no critical issues reported"
+        },
+        "rollback": {
+          "trigger": "canary department errors",
+          "action": "revert canary department to ServiceNow",
+          "safety_guard": "confirm department functionality",
+          "restores_state": [
+            "previous department workflows"
+          ],
+          "restoration_evidence": "user feedback and performance metrics"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover",
+        "description": "All departments switch to the custom platform.",
+        "action": "cutover",
+        "target": "all departments",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "system stability and performance",
+          "how": "monitor system behavior post cutover",
+          "expected": "all systems operational"
+        },
+        "rollback": {
+          "trigger": "cutover issues",
+          "action": "revert all departments to ServiceNow",
+          "safety_guard": "ensure recovery plan in place",
+          "restores_state": [
+            "previous operational status"
+          ],
+          "restoration_evidence": "service restoration confirmation"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "decommission_servicenow",
+        "description": "Export final data from ServiceNow and cancel license.",
+        "action": "decommission",
+        "target": "ServiceNow",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cutover completed successfully",
+            "fact": "cutover_success",
+            "established_by": "cutover",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data export completeness",
+          "how": "validate exported data against ServiceNow records",
+          "expected": "all necessary data exported"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "process_remap",
+        "to_task": "data_import",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "data_import",
+        "to_task": "testing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "testing",
+        "to_task": "canary_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "canary_migration",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover",
+        "to_task": "decommission_servicenow",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:data_import",
+      "task_id": "data_import",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Data import should not begin until the process remap is completed successfully.",
+      "suggested_fix": "Ensure 'data_import' task has a hard dependency on the successful completion of 'process_remap.'",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:decommission_servicenow",
+      "task_id": "decommission_servicenow",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Decommissioning should not proceed until cutover is verified successful.",
+      "suggested_fix": "Establish a verified fact from the 'cutover' task before allowing 'decommission_servicenow' to execute.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:cutover",
+      "task_id": "cutover",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for cutover lacks specific verification steps to ensure all services are restored correctly.",
+      "suggested_fix": "Include detailed steps in the rollback for system state verification after reverting to ServiceNow.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:canary_migration",
+      "task_id": "canary_migration",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider outlining specific metrics to monitor during the canary migration beyond just user feedback.",
+      "suggested_fix": "Expand on canary performance metrics to include specific KPIs for success measurement.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,437 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ai-02-embedding-index-migration",
+  "duration_seconds": 103.64,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-ai-02-embedding-index-migration-r4",
+    "goal_id": "ai-02-embedding-index-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-ai-02-embedding-index-migration-r3",
+    "created_at": "2026-08-27T03:03:08.686221Z",
+    "tasks": [
+      {
+        "id": "provision_qdrant",
+        "description": "Provision Qdrant cluster with 3 nodes and replication",
+        "action": "provision",
+        "target": "Qdrant cluster",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Sufficient cloud resources available",
+            "fact": "resource_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Qdrant cluster status",
+          "how": "check cluster health via admin API",
+          "expected": "cluster healthy with 3 nodes"
+        },
+        "rollback": {
+          "trigger": "provisioning fails",
+          "action": "deprovision Qdrant cluster",
+          "safety_guard": "ensure no data was lost during provisioning",
+          "restores_state": [
+            "no Qdrant cluster exists"
+          ],
+          "restoration_evidence": "cluster deprovisioned status check"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "check_openai_api",
+        "description": "Check operational status of OpenAI API",
+        "action": "check",
+        "target": "OpenAI API",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Prior to rebuilding the index",
+            "fact": "openai_api_operational",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "OpenAI API status",
+          "how": "ping API and check response",
+          "expected": "API is up and performing adequately"
+        },
+        "rollback": {
+          "trigger": "OpenAI API is down",
+          "action": "notify operations team",
+          "safety_guard": "monitor API status continuously",
+          "restores_state": [
+            "OpenAI API is operational"
+          ],
+          "restoration_evidence": "API response restored"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "rebuild_index",
+        "description": "Rebuild the embedding index from source data using OpenAI API",
+        "action": "rebuild",
+        "target": "embedding index",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Provision Qdrant cluster",
+            "fact": "qdrant_provisioned",
+            "established_by": "provision_qdrant",
+            "probe": null
+          },
+          {
+            "description": "OpenAI API is operational",
+            "fact": "openai_api_operational",
+            "established_by": "check_openai_api",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "number of indexed vectors",
+          "how": "query index for count",
+          "expected": "500 million vectors"
+        },
+        "rollback": {
+          "trigger": "rebuild takes too long",
+          "action": "abort and restore previous index",
+          "safety_guard": "keep an active backup of the previous index",
+          "restores_state": [
+            "previous index is restored"
+          ],
+          "restoration_evidence": "successful query of previous index"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "dual_query_setup",
+        "description": "Set up dual-query system for Pinecone and Qdrant",
+        "action": "setup",
+        "target": "dual-query layer",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Rebuild index completed",
+            "fact": "index_built",
+            "established_by": "rebuild_index",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "result parity",
+          "how": "compare outputs from Pinecone and Qdrant for same queries",
+          "expected": "results have minimal skew"
+        },
+        "rollback": {
+          "trigger": "dual-query fails",
+          "action": "revert to Pinecone only",
+          "safety_guard": "ensure dual-query is disabled before cutover",
+          "restores_state": [
+            "system reverts to Pinecone"
+          ],
+          "restoration_evidence": "Pinecone system operational check"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_dual_query_setup",
+        "description": "Verify dual-query system is operational",
+        "action": "verify",
+        "target": "dual-query system",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dual-query system setup is complete",
+            "fact": "dual_query_setup_verified",
+            "established_by": "dual_query_setup",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "dual-query system status",
+          "how": "check logs and responses of dual-query system",
+          "expected": "dual-query system operational"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "backfill_vectors",
+        "description": "Backfill new vectors added during migration",
+        "action": "backfill",
+        "target": "new vectors",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Prior to cutting over application queries",
+            "fact": "dual_query_setup_complete",
+            "established_by": "dual_query_setup",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "number of backfilled vectors",
+          "how": "query for count of new vectors",
+          "expected": "total count matches expected values"
+        },
+        "rollback": {
+          "trigger": "backfill fails",
+          "action": "abort backfill and restore previous state",
+          "safety_guard": "ensure no new vectors are lost",
+          "restores_state": [
+            "no change to existing vector state"
+          ],
+          "restoration_evidence": "successful query and count confirmation"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover_queries",
+        "description": "Cutover application queries from Pinecone to Qdrant",
+        "action": "cutover",
+        "target": "application queries",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Backfill of new vectors completed",
+            "fact": "backfill_complete",
+            "established_by": "backfill_vectors",
+            "probe": null
+          },
+          {
+            "description": "Dual-query system established",
+            "fact": "dual_query_setup_verified",
+            "established_by": "dual_query_setup",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "query logs for missing vectors",
+          "how": "analyze application logs post-cutover",
+          "expected": "no missing queries"
+        },
+        "rollback": {
+          "trigger": "cutover gaps found",
+          "action": "redirect queries back to Pinecone",
+          "safety_guard": "monitor query logs for missing data",
+          "restores_state": [
+            "queries revert to Pinecone"
+          ],
+          "restoration_evidence": "successful query check on Pinecone"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_search_quality",
+        "description": "Verify search quality with recall metric",
+        "action": "verify",
+        "target": "search quality",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Cutover successful",
+            "fact": "cutover_verified",
+            "established_by": "cutover_queries",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "recall@k metric",
+          "how": "evaluate search results",
+          "expected": "recall@k \u2265 0.98"
+        },
+        "rollback": {
+          "trigger": "search quality fails",
+          "action": "review recent changes",
+          "safety_guard": "keep logs of recent queries for analysis",
+          "restores_state": [
+            "search quality reverts to acceptable level"
+          ],
+          "restoration_evidence": "metrics returned to thresholds"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "provision_qdrant",
+        "to_task": "rebuild_index",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check_openai_api",
+        "to_task": "rebuild_index",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rebuild_index",
+        "to_task": "dual_query_setup",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dual_query_setup",
+        "to_task": "backfill_vectors",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "backfill_vectors",
+        "to_task": "cutover_queries",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover_queries",
+        "to_task": "verify_search_quality",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unverified_dependencies:rebuild_index",
+      "task_id": "rebuild_index",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The index rebuild depends on the OpenAI API being operational, which is not verified until after the provisioning step.",
+      "suggested_fix": "Perform a verification check of OpenAI API status prior to starting the index rebuild.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:cutover_queries",
+      "task_id": "cutover_queries",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Cutover application queries depend on a prior successful backfill and dual-query setup, both of which may not have completed successfully, making this step unsafe to execute.",
+      "suggested_fix": "Ensure all prerequisite tasks are successfully completed and verified before executing the cutover.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:verify_search_quality",
+      "task_id": "verify_search_quality",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for verifying search quality does not specify a clear method of returning to an acceptable search threshold if metrics fail.",
+      "suggested_fix": "Define a rollback strategy that includes reverting to a known good state or previous index version if quality metrics are not met.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:missing_steps:backfill_vectors",
+      "task_id": "backfill_vectors",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No step is included to ensure that backfills are accurately recorded and accounted for, which may lead to missing vectors during migration.",
+      "suggested_fix": "Include a verification step post-backfill to ensure total vector counts match expected values.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:risk:verify_dual_query_setup",
+      "task_id": "verify_dual_query_setup",
+      "version": 4,
+      "heuristic_family": "risk",
+      "severity": "info",
+      "reason_code": "llm_risk",
+      "message": "Verifying dual-query system before cutover leaves high potential for issues if not properly set up.",
+      "suggested_fix": "Consider adding a formal system check or dry run for the dual-query setup prior to cutover.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ai-02-embedding-index-migration:4:4",
+    "plan_id": "plan-ai-02-embedding-index-migration-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unverified_dependencies:rebuild_index",
+    "question": "Plan for goal 'ai-02-embedding-index-migration' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

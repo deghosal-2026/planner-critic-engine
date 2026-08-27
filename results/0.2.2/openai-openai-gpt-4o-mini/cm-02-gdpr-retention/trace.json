@@ -1,0 +1,429 @@
+{
+  "dimension": "core-api",
+  "goal_id": "cm-02-gdpr-retention",
+  "duration_seconds": 42.54,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-cm-02-gdpr-retention-r2",
+    "goal_id": "cm-02-gdpr-retention",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "cm-02-gdpr-retention-v1",
+    "created_at": "2026-08-27T03:04:11.966701Z",
+    "tasks": [
+      {
+        "id": "classify-data",
+        "description": "Classify data types by retention period",
+        "action": "classify",
+        "target": "data types",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data types identified",
+            "fact": "data_identified",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "build-pipelines",
+        "description": "Build deletion pipelines for PostgreSQL",
+        "action": "build",
+        "target": "postgresql_deletion_pipeline",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data classification completed",
+            "fact": "data_classified",
+            "established_by": "classify-data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "pipeline functionality",
+          "how": "run test deletions",
+          "expected": "deletion completion without errors"
+        },
+        "rollback": {
+          "trigger": "pipeline fails",
+          "action": "restore previous state",
+          "safety_guard": "verify pipeline integrity",
+          "restores_state": [
+            "previous_deletion_pipeline_state"
+          ],
+          "restoration_evidence": "confirm no pending deletions"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "build-analytics-pipeline",
+        "description": "Build deletion pipelines for analytics data",
+        "action": "build",
+        "target": "analytics_deletion_pipeline",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data classification completed",
+            "fact": "data_classified",
+            "established_by": "classify-data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "pipeline functionality",
+          "how": "run test deletions",
+          "expected": "deletion completion without errors"
+        },
+        "rollback": {
+          "trigger": "pipeline fails",
+          "action": "restore previous state",
+          "safety_guard": "verify pipeline integrity",
+          "restores_state": [
+            "previous_analytics_pipeline_state"
+          ],
+          "restoration_evidence": "confirm no pending analytics deletions"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "build-elasticsearch-pipeline",
+        "description": "Build deletion pipeline for Elasticsearch",
+        "action": "build",
+        "target": "elasticsearch_deletion_pipeline",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data classification completed",
+            "fact": "data_classified",
+            "established_by": "classify-data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "pipeline functionality",
+          "how": "run test deletions",
+          "expected": "deletion completion without errors"
+        },
+        "rollback": {
+          "trigger": "pipeline fails",
+          "action": "restore previous state",
+          "safety_guard": "verify pipeline integrity",
+          "restores_state": [
+            "previous_elasticsearch_pipeline_state"
+          ],
+          "restoration_evidence": "confirm no pending elasticsearch deletions"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure-audit-logging",
+        "description": "Configure audit logging for all deletions",
+        "action": "configure",
+        "target": "audit_logging",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Deletion pipelines built",
+            "fact": "pipelines_built",
+            "established_by": "build-pipelines",
+            "probe": null
+          },
+          {
+            "description": "Deletion pipelines built",
+            "fact": "pipelines_built",
+            "established_by": "build-analytics-pipeline",
+            "probe": null
+          },
+          {
+            "description": "Deletion pipelines built",
+            "fact": "pipelines_built",
+            "established_by": "build-elasticsearch-pipeline",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "audit log completeness",
+          "how": "run audit report",
+          "expected": "all deletions recorded"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "revert to previous audit settings",
+          "safety_guard": "verify configuration completeness",
+          "restores_state": [
+            "previous_audit_configuration"
+          ],
+          "restoration_evidence": "confirm audit settings match the previous configurations"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "setup-archive-lifecycle",
+        "description": "Set up archive lifecycle policies",
+        "action": "setup",
+        "target": "archive_lifecycle",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Audit logging configured",
+            "fact": "audit_logging_configured",
+            "established_by": "configure-audit-logging",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "archive lifecycle policies",
+          "how": "review setup configuration",
+          "expected": "policies are established correctly"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-retention-rules",
+        "description": "Verify retention rules are enforced",
+        "action": "verify",
+        "target": "retention_rules",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Archive lifecycle policies set up",
+            "fact": "archive_lifecycle_set",
+            "established_by": "setup-archive-lifecycle",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "enforcement of retention rules",
+          "how": "review deletion reports",
+          "expected": "compliance with retention policies"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "review and adjust rules",
+          "safety_guard": "check legal compliance",
+          "restores_state": [
+            "previous_retention_rules"
+          ],
+          "restoration_evidence": "confirm adjustments made and align with legal requirements"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "classify-data",
+        "to_task": "build-pipelines",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "classify-data",
+        "to_task": "build-analytics-pipeline",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "classify-data",
+        "to_task": "build-elasticsearch-pipeline",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "build-pipelines",
+        "to_task": "configure-audit-logging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "build-analytics-pipeline",
+        "to_task": "configure-audit-logging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "build-elasticsearch-pipeline",
+        "to_task": "configure-audit-logging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-audit-logging",
+        "to_task": "setup-archive-lifecycle",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup-archive-lifecycle",
+        "to_task": "verify-retention-rules",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:missing_steps:classify-data",
+      "task_id": "classify-data",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Could also cover edge cases related to data classification criteria for legal holds.",
+      "suggested_fix": "Include additional classification steps for data under legal holds.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:risk:build-pipelines",
+      "task_id": "build-pipelines",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "High risk of deletion pipeline failing silently without proper monitoring.",
+      "suggested_fix": "Implement monitoring alerts for pipeline failures.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:build-pipelines",
+      "task_id": "build-pipelines",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback lacks clear verification steps post-restore.",
+      "suggested_fix": "Add a verification step post-restore to ensure pipeline integrity.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:build-analytics-pipeline",
+      "task_id": "build-analytics-pipeline",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback lacks clear verification steps post-restore.",
+      "suggested_fix": "Add a verification step post-restore to ensure analytics pipeline integrity.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:build-elasticsearch-pipeline",
+      "task_id": "build-elasticsearch-pipeline",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback lacks clear verification steps post-restore.",
+      "suggested_fix": "Add a verification step post-restore to ensure Elasticsearch pipeline integrity.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:risk:configure-audit-logging",
+      "task_id": "configure-audit-logging",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Risk of audit log being incomplete for compliance due to failure in configuration.",
+      "suggested_fix": "Ensure robust testing and validation of audit log configuration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:verify-retention-rules",
+      "task_id": "verify-retention-rules",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback lacks a comprehensive plan for recovery after verification failure.",
+      "suggested_fix": "Develop a detailed rollback strategy including specific actions post-verification failure.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

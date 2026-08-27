@@ -14,7 +14,7 @@ Mirrors bench_stasis.py (#183) methodology. Success criteria (from the issue):
 * orthogonality: ≥ 80% of detected cyclers missed by F-06 / #152 / stasis.
 
 Usage:
-    python3 docs/field-test/v0.2.1/scripts/bench_cycling.py
+    python3 docs/field-test/scripts/bench_cycling.py
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ from planner_critic.loop.histogram import (
 )
 from planner_critic.types import Finding
 
-SCRIPTS_DIR = Path(__file__).resolve().parent          # docs/field-test/v0.2.1/scripts
+SCRIPTS_DIR = Path(__file__).resolve().parent          # docs/field-test/scripts
 FIELD_TEST_DIR = SCRIPTS_DIR.parent.parent             # docs/field-test
 REPORTS_DIR = FIELD_TEST_DIR / "v0.1.0" / "reports"
 

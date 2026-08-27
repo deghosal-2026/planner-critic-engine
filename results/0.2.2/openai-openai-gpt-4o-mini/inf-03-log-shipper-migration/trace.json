@@ -1,0 +1,321 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-03-log-shipper-migration",
+  "duration_seconds": 23.04,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-inf-03-log-shipper-migration-r2",
+    "goal_id": "inf-03-log-shipper-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "inf-03-log-shipper-migration-plan",
+    "created_at": "2026-08-27T04:11:40.818407Z",
+    "tasks": [
+      {
+        "id": "deploy-fluentbit",
+        "description": "Deploy FluentBit to the nodes",
+        "action": "deploy",
+        "target": "FluentBit",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Fluentd is installed on nodes",
+            "fact": "fluentd_installed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-fluentbit",
+        "description": "Verify FluentBit deployment",
+        "action": "verify",
+        "target": "FluentBit",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "FluentBit logs",
+          "how": "check logs for errors",
+          "expected": "no errors present"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "rollback deployment",
+          "safety_guard": "ensure Fluentd remains intact",
+          "restores_state": [
+            "FluentBit not deployed"
+          ],
+          "restoration_evidence": "successful logs indicate FluentBit operational"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "dual-ship",
+        "description": "Configure dual shipping to send logs to both Fluentd and FluentBit",
+        "action": "configure",
+        "target": "log shipping",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "FluentBit is deployed",
+            "fact": "fluentbit_deployed",
+            "established_by": "deploy-fluentbit",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "verify dual shipping setup",
+          "how": "check configuration settings",
+          "expected": "configuration correctly set for dual shipping"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "compare-logs",
+        "description": "Compare logs from Fluentd and FluentBit",
+        "action": "compare",
+        "target": "logs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "log consistency",
+          "how": "run comparison scripts",
+          "expected": "logs match"
+        },
+        "rollback": {
+          "trigger": "discrepancy found",
+          "action": "revert dual-ship settings",
+          "safety_guard": "ensure log retention policies are intact",
+          "restores_state": [
+            "dual shipping settings restored"
+          ],
+          "restoration_evidence": "system logs confirm reverted settings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover",
+        "description": "Cut over from Fluentd to FluentBit",
+        "action": "cutover",
+        "target": "log shipping",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "success of cutover",
+          "how": "monitor logs for failures",
+          "expected": "all logs are flowing through FluentBit"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "restore FluentD as primary",
+          "safety_guard": "backup FluentBit config",
+          "restores_state": [
+            "FluentD as primary"
+          ],
+          "restoration_evidence": "successful logs indicate FluentD operational"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cleanup-fluentd",
+        "description": "Remove FluentD from nodes",
+        "action": "cleanup",
+        "target": "FluentD",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Cutover was successful",
+            "fact": "cutover_successful",
+            "established_by": "cutover",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "confirm FluentD is removed",
+          "how": "check node service status",
+          "expected": "FluentD service no longer running"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy-fluentbit",
+        "to_task": "verify-fluentbit",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-fluentbit",
+        "to_task": "dual-ship",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dual-ship",
+        "to_task": "compare-logs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "compare-logs",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover",
+        "to_task": "cleanup-fluentd",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:verify-fluentbit",
+      "task_id": "verify-fluentbit",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'verify-fluentbit' must not execute before 'deploy-fluentbit' is successfully completed and verified.",
+      "suggested_fix": "Ensure that 'deploy-fluentbit' completes successfully before starting 'verify-fluentbit'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:cutover",
+      "task_id": "cutover",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'cutover' lacks a sound rollback mechanism as it does not ensure FluentBit configuration is safely backed up before execution.",
+      "suggested_fix": "Implement a backup strategy for FluentBit configuration prior to executing the 'cutover' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:cleanup-fluentd",
+      "task_id": "cleanup-fluentd",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'cleanup-fluentd' depends on 'cutover' but is not established that 'cutover' is successful as there is no verification linked to it.",
+      "suggested_fix": "Add a verification step following 'cutover' to confirm its success before executing 'cleanup-fluentd'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:deploy-fluentbit",
+      "task_id": "deploy-fluentbit",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding a step to confirm the readiness of infrastructure before deploying FluentBit to avoid deployment errors.",
+      "suggested_fix": "Add verification for infrastructure readiness prior to 'deploy-fluentbit'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:dual-ship",
+      "task_id": "dual-ship",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The plan could benefit from validating that logs are being received by both Fluentd and FluentBit during dual shipping.",
+      "suggested_fix": "Include a validation step for confirming that both Fluentd and FluentBit are receiving logs during 'dual-ship'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:risk:cutover",
+      "task_id": "cutover",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "The effects of failing to successfully cut over to FluentBit could cause loss of logging data, given that FluentD is the primary until cutover is confirmed.",
+      "suggested_fix": "Ensure logging data retention policies are reinforced before proceeding to 'cutover'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

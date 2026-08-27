@@ -1,0 +1,191 @@
+{
+  "dimension": "core-api",
+  "goal_id": "scp-03-canary-internal-dep",
+  "duration_seconds": 16.92,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-scp-03-canary-internal-dep-r2",
+    "goal_id": "scp-03-canary-internal-dep",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "scp-03-canary-internal-dep",
+    "created_at": "2026-08-27T04:11:52.639949Z",
+    "tasks": [
+      {
+        "id": "deploy-canary",
+        "description": "Deploy patched core library to canary services",
+        "action": "deploy",
+        "target": "canary-services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "check canary service metrics",
+          "how": "analyze Prometheus metrics",
+          "expected": "no critical errors"
+        },
+        "rollback": {
+          "trigger": "canary deployment fails",
+          "action": "rollback canary services",
+          "safety_guard": "ensure previous version is stable",
+          "restores_state": [
+            "canary services restored to previous version"
+          ],
+          "restoration_evidence": "confirm service metrics are stable"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-canary",
+        "description": "Verify canary services stability and performance",
+        "action": "verify",
+        "target": "canary-services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "canary service response time",
+          "how": "measure response times",
+          "expected": "response time under threshold"
+        },
+        "rollback": {
+          "trigger": "canary verification fails",
+          "action": "restart canary services",
+          "safety_guard": "ensure canary backup is intact",
+          "restores_state": [
+            "canary services restarted to previous state"
+          ],
+          "restoration_evidence": "confirm services are operational"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy-full",
+        "description": "Deploy patched core library to full fleet upon successful canary verification",
+        "action": "deploy",
+        "target": "all-services",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary services verified",
+            "fact": "canary_verification_passed",
+            "established_by": "verify-canary",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "check deployment success",
+          "how": "monitor service logs and metrics",
+          "expected": "all services up and running without issues"
+        },
+        "rollback": {
+          "trigger": "full deployment fails",
+          "action": "rollback full fleet to previous version",
+          "safety_guard": "ensure full backup is intact",
+          "restores_state": [
+            "all services restored to previous stable state"
+          ],
+          "restoration_evidence": "verify all services functioning correctly"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy-canary",
+        "to_task": "verify-canary",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-canary",
+        "to_task": "deploy-full",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:deploy-full",
+      "task_id": "deploy-full",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'deploy-full' is sequenced before confirming canary services verification.",
+      "suggested_fix": "Ensure 'verify-canary' task is completed and successful before proceeding to 'deploy-full'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:deploy-full",
+      "task_id": "deploy-full",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'deploy-full' lacks a sound rollback mechanism for all services in case of failure.",
+      "suggested_fix": "Implement a verification step post-rollback to ensure all services are restored to a stable state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:verify-canary",
+      "task_id": "verify-canary",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The dependency on 'canary_verification_passed' is not explicitly established in the plan structure after the verification step.",
+      "suggested_fix": "Clarify how 'canary_verification_passed' will be set as a verified fact post 'verify-canary' before proceeding.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

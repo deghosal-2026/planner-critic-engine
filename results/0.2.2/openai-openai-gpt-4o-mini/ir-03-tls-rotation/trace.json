@@ -1,0 +1,194 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-03-tls-rotation",
+  "duration_seconds": 27.65,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-ir-03-tls-rotation-r2",
+    "goal_id": "ir-03-tls-rotation",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "ir-03-tls-rotation-plan",
+    "created_at": "2026-08-27T03:47:34.946688Z",
+    "tasks": [
+      {
+        "id": "generate_cert",
+        "description": "Generate new TLS certificate via ACM",
+        "action": "generate",
+        "target": "tls_cert",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "certificate validity",
+          "how": "check ACM console",
+          "expected": "new cert is issued"
+        },
+        "rollback": {
+          "trigger": "cert generation fails",
+          "action": "notify system of failure and revert to last known cert",
+          "safety_guard": "verify previous certificate is still valid",
+          "restores_state": [
+            "last valid certificate restored"
+          ],
+          "restoration_evidence": "check previous cert validity in ACM"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update_alb_listeners",
+        "description": "Update each ALB listener to use the new TLS certificate",
+        "action": "update",
+        "target": "ALB",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "listener configuration",
+          "how": "describe listeners via AWS CLI",
+          "expected": "listeners use new cert"
+        },
+        "rollback": {
+          "trigger": "listener update fails",
+          "action": "reassociate old cert",
+          "safety_guard": "verify old cert is reinstated",
+          "restores_state": [
+            "old certificate configuration restored"
+          ],
+          "restoration_evidence": "describe listeners and check old cert assigned"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_https_connectivity",
+        "description": "Verify HTTPS connectivity on each ALB endpoint",
+        "action": "verify",
+        "target": "ALB endpoints",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "HTTPS response",
+          "how": "curl each endpoint",
+          "expected": "valid certificate chain and new serial"
+        },
+        "rollback": {
+          "trigger": "https verification fails",
+          "action": "revert ALB listeners to previous state",
+          "safety_guard": "ensure old config is intact",
+          "restores_state": [
+            "previous ALB listener configuration restored"
+          ],
+          "restoration_evidence": "describe listeners to verify old cert is in use"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "generate_cert",
+        "to_task": "update_alb_listeners",
+        "kind": "hard",
+        "reason": "successful cert generation needed"
+      },
+      {
+        "from_task": "update_alb_listeners",
+        "to_task": "verify_https_connectivity",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:update_alb_listeners",
+      "task_id": "update_alb_listeners",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'update_alb_listeners' depends on 'generate_cert', but no verification of successful certificate generation is established in a prior task before this step.",
+      "suggested_fix": "Ensure that 'update_alb_listeners' explicitly verifies the successful issuance of the new certificate before execution.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:verify_https_connectivity",
+      "task_id": "verify_https_connectivity",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'verify_https_connectivity' is sequenced after 'update_alb_listeners' but does not confirm that the ALB listener update was successful prior to executing this task.",
+      "suggested_fix": "Implement a verification step before 'verify_https_connectivity' to ensure listeners are properly updated with the new certificate.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:verify_https_connectivity",
+      "task_id": "verify_https_connectivity",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for 'verify_https_connectivity' does not ensure that the old configuration is restored in the event of failure, which can lead to service disruptions.",
+      "suggested_fix": "Add additional measures to verify that the previous ALB listener configuration is correctly reinstated in the rollback plan.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-03-tls-rotation:2:2",
+    "plan_id": "plan-ir-03-tls-rotation-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unverified_dependencies:update_alb_listeners",
+    "question": "Plan for goal 'ir-03-tls-rotation' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

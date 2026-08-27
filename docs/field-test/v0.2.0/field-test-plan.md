@@ -421,11 +421,11 @@ The field test executes in 6 phases on the `0.2.0-m10-field-test` branch:
 
 - `docs/field-test/scripts/batch-*.py` — batch runners for goal groups (update to include new domains: idp, mao, sre, scp, fng, adversarial-policy)
 - `docs/field-test/scripts/run_remaining.py` — catch-all for uncategorized goals
-- `docs/field-test/v0.2.0/scripts/bench_auto_repair.py` — auto-repair benchmark (#177)
-- `docs/field-test/v0.2.0/scripts/bench_rollback.py` — rollback credibility field test (#182)
-- `docs/field-test/v0.2.0/scripts/bench_stasis.py` — family-histogram stasis benchmark (#183)
-- `docs/field-test/v0.2.0/scripts/wbs_coverage.py` — WBS coverage test runner (35 scenarios from §4.8)
-- `docs/field-test/v0.2.0/scripts/pre_run_validation.py` — assertion YAML validation (P0)
+- `docs/field-test/scripts/bench_auto_repair.py` — auto-repair benchmark (#177)
+- `docs/field-test/scripts/bench_rollback.py` — rollback credibility field test (#182)
+- `docs/field-test/scripts/bench_stasis.py` — family-histogram stasis benchmark (#183)
+- `docs/field-test/scripts/wbs_coverage.py` — WBS coverage test runner (35 scenarios from §4.8)
+- `docs/field-test/scripts/pre_run_validation.py` — assertion YAML validation (P0)
 
 ### 5.3 Scoring
 
@@ -446,7 +446,7 @@ Results are reported in a `field-test-results-0.2.0.md` document with:
 1. **Field test results** — `docs/field-test/v0.2.0/field-test-results-0.2.0.md`
 2. **Benchmark reports** — JSON output files in `docs/field-test/v0.2.0/results/`
 3. **Traces** — per-goal traces in `docs/field-test/v0.2.0/reports/`
-4. **Scripts** — benchmark scripts in `docs/field-test/v0.2.0/scripts/`
+4. **Scripts** — benchmark scripts in `docs/field-test/scripts/`
 5. **WBS update** — M10 task checklist updated with results
 
 ---

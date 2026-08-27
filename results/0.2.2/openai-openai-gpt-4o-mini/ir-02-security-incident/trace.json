@@ -1,0 +1,364 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-02-security-incident",
+  "duration_seconds": 29.83,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-ir-02-security-incident-r3",
+    "goal_id": "ir-02-security-incident",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-ir-02-security-incident-r2",
+    "created_at": "2026-08-27T03:47:08.607751Z",
+    "tasks": [
+      {
+        "id": "revoke-ingress",
+        "description": "Revoke security group ingress for EC2 instance",
+        "action": "revoke",
+        "target": "sg",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EC2 instance ID is identified",
+            "fact": "ec2_instance_id",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "security group ingress rules",
+          "how": "describe security group",
+          "expected": "expected rules are present"
+        },
+        "rollback": {
+          "trigger": "ingress revoke fails",
+          "action": "restore previous ingress settings",
+          "safety_guard": "verify security group state",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "rotate-iam-keys",
+        "description": "Rotate IAM keys associated with the compromised user",
+        "action": "rotate",
+        "target": "iam",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Compromised IAM user is identified",
+            "fact": "compromised_user",
+            "established_by": "revoke-ingress",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "IAM key status",
+          "how": "list IAM keys",
+          "expected": "only new keys are active"
+        },
+        "rollback": {
+          "trigger": "key rotation fails",
+          "action": "restore previous IAM keys",
+          "safety_guard": "verify key functionality",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "snapshot-ebs",
+        "description": "Take a forensic EBS snapshot of every attached volume",
+        "action": "snapshot",
+        "target": "ebs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Volumes attached to EC2 identified",
+            "fact": "attached_volumes",
+            "established_by": "rotate-iam-keys",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "EBS snapshot status",
+          "how": "list EBS snapshots",
+          "expected": "snapshots are available and correctly correspond to volumes"
+        },
+        "rollback": {
+          "trigger": "snapshot creation fails",
+          "action": "attempt to recreate snapshots",
+          "safety_guard": "ensure volumes remain attached",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor-cloudtrail",
+        "description": "Verify no further anomalous API calls appear in CloudTrail",
+        "action": "monitor",
+        "target": "cloudtrail",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CloudTrail is enabled and logging",
+            "fact": "cloudtrail_enabled",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "CloudTrail logs",
+          "how": "fetch logs for the last 5 minutes",
+          "expected": "no anomalous calls"
+        },
+        "rollback": {
+          "trigger": "anomalous API calls detected",
+          "action": "alert security team for further actions",
+          "safety_guard": "confirm alerting system is operational",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "revoke-ingress",
+        "to_task": "rotate-iam-keys",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rotate-iam-keys",
+        "to_task": "snapshot-ebs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "snapshot-ebs",
+        "to_task": "monitor-cloudtrail",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plan-ir-02-security-incident-r3:3:revoke-ingress:rollback_state_undeclared",
+      "task_id": "revoke-ingress",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'revoke-ingress' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-ir-02-security-incident-r3:3:rotate-iam-keys:rollback_state_undeclared",
+      "task_id": "rotate-iam-keys",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'rotate-iam-keys' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-ir-02-security-incident-r3:3:monitor-cloudtrail:rollback_state_undeclared",
+      "task_id": "monitor-cloudtrail",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'monitor-cloudtrail' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-ir-02-security-incident-r3:3:revoke-ingress:rollback_state_undeclared",
+      "task_id": "revoke-ingress",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'revoke-ingress' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-ir-02-security-incident-r3:3:rotate-iam-keys:rollback_state_undeclared",
+      "task_id": "rotate-iam-keys",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'rotate-iam-keys' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-ir-02-security-incident-r3:3:monitor-cloudtrail:rollback_state_undeclared",
+      "task_id": "monitor-cloudtrail",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'monitor-cloudtrail' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:revoke-ingress",
+      "task_id": "revoke-ingress",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The 'revoke-ingress' task must be completed before 'rotate-iam-keys' can be performed.",
+      "suggested_fix": "Ensure all prerequisites for 'rotate-iam-keys' are fully executed before starting rotation of IAM keys.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:rotate-iam-keys",
+      "task_id": "rotate-iam-keys",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'rotate-iam-keys' task depends on the 'compromised_user' fact which is presumed established by an earlier task, but it seems to be unverified as 'revoke-ingress' does not confirm it.",
+      "suggested_fix": "Add verification for 'compromised_user' to ensure it is identified before proceeding.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:weak_rollback:snapshot-ebs",
+      "task_id": "snapshot-ebs",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for 'snapshot-ebs' does not ensure the integrity of volumes since the restoration mechanism is not specified clearly.",
+      "suggested_fix": "Clarify the rollback plan to include specific steps on restoring the state of volumes if snapshots fail.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:missing_steps:monitor-cloudtrail",
+      "task_id": "monitor-cloudtrail",
+      "version": 3,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The plan lacks steps to handle a scenario if anomalous API calls are detected after monitoring.",
+      "suggested_fix": "Include explicit actions to take when anomalous API calls are detected during the monitoring phase.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-02-security-incident:3:3",
+    "plan_id": "plan-ir-02-security-incident-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:revoke-ingress",
+    "question": "Plan for goal 'ir-02-security-incident' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

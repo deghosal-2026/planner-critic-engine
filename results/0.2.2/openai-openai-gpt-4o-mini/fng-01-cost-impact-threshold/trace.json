@@ -1,0 +1,163 @@
+{
+  "dimension": "core-api",
+  "goal_id": "fng-01-cost-impact-threshold",
+  "duration_seconds": 15.01,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-fng-01-cost-impact-threshold-r2",
+    "goal_id": "fng-01-cost-impact-threshold",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "fng-01-cost-impact-threshold",
+    "created_at": "2026-08-27T03:09:35.337482Z",
+    "tasks": [
+      {
+        "id": "check_budget",
+        "description": "Check if estimated monthly cost exceeds the budget threshold",
+        "action": "check",
+        "target": "budget",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "budget check result",
+          "how": "compare estimated cost with budget threshold",
+          "expected": "cost <= budget"
+        },
+        "rollback": {
+          "trigger": "budget checking fails",
+          "action": "revert to last known budget state",
+          "safety_guard": "ensure budget state is consistent",
+          "restores_state": [
+            "last known budget state"
+          ],
+          "restoration_evidence": "logs of budget state before change"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "scale_up_instances",
+        "description": "Scale up database instance classes if budget is not exceeded",
+        "action": "scale_up",
+        "target": "db_instances",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "instance sizes after scaling",
+          "how": "describe instances",
+          "expected": "instance sizes increased"
+        },
+        "rollback": {
+          "trigger": "scaling fails",
+          "action": "revert to previous instance sizes",
+          "safety_guard": "verify instance sizes restored",
+          "restores_state": [
+            "previous instance sizes"
+          ],
+          "restoration_evidence": "logs of previous instance sizes"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_budget",
+        "to_task": "scale_up_instances",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:scale_up_instances",
+      "task_id": "scale_up_instances",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'scale_up_instances' is ordered before the outcome of the 'check_budget' task, making it possible to scale up instances without verifying the budget first.",
+      "suggested_fix": "Reorder the tasks to ensure 'check_budget' is completed before 'scale_up_instances'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:scale_up_instances",
+      "task_id": "scale_up_instances",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'scale_up_instances' depends on the result of 'check_budget', but the dependency is not verified as there is no conditional execution based on the budget check result.",
+      "suggested_fix": "Implement a conditional check such that 'scale_up_instances' only executes if 'check_budget' indicates that the budget is not exceeded.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:scale_up_instances",
+      "task_id": "scale_up_instances",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback mechanism for 'scale_up_instances' does not ensure the budget perspective is re-evaluated post-rollback, which may lead to repeated violations of the budget check.",
+      "suggested_fix": "Enhance the rollback to include rechecking the budget after restoring instance sizes.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:fng-01-cost-impact-threshold:2:2",
+    "plan_id": "plan-fng-01-cost-impact-threshold-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:scale_up_instances",
+    "question": "Plan for goal 'fng-01-cost-impact-threshold' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=2"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

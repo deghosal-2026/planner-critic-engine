@@ -1,0 +1,265 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-03-pod-security",
+  "duration_seconds": 26.51,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-k8s-03-pod-security-r2",
+    "goal_id": "k8s-03-pod-security",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "k8s-03-pod-security",
+    "created_at": "2026-08-27T04:21:24.431622Z",
+    "tasks": [
+      {
+        "id": "enable-audit-mode",
+        "description": "Enable audit mode across all namespaces",
+        "action": "kubectl apply",
+        "target": "audit-namespace-config",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "kubectl is configured",
+            "fact": "kubectl_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor-violations",
+        "description": "Monitor violations for 72 hours",
+        "action": "jq parse",
+        "target": "audit-logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "audit mode is enabled",
+            "fact": "audit_enabled",
+            "established_by": "enable-audit-mode",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "switch-to-warn-mode",
+        "description": "Switch to warn mode across all namespaces",
+        "action": "kubectl apply",
+        "target": "warn-namespace-config",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "namespace config",
+          "how": "kubectl get",
+          "expected": "warn mode active"
+        },
+        "rollback": {
+          "trigger": "switch fails",
+          "action": "revert to audit mode",
+          "safety_guard": "verify audit mode is working",
+          "restores_state": [
+            "audit mode active"
+          ],
+          "restoration_evidence": "kubectl get namespace config"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor-warn-mode",
+        "description": "Monitor warnings for 48 hours",
+        "action": "jq parse",
+        "target": "warn-logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "warn mode is enabled",
+            "fact": "warn_enabled",
+            "established_by": "switch-to-warn-mode",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "warnings log",
+          "how": "parse logs for warnings",
+          "expected": "warnings recorded"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "enforce-baseline-profile",
+        "description": "Enforce the baseline profile on all namespaces",
+        "action": "kubectl apply",
+        "target": "baseline-profile-config",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "namespace compliance",
+          "how": "kubectl get",
+          "expected": "baseline profile enforced"
+        },
+        "rollback": {
+          "trigger": "enforcement fails",
+          "action": "revert to warn mode",
+          "safety_guard": "verify warn mode is active",
+          "restores_state": [
+            "warn mode active"
+          ],
+          "restoration_evidence": "kubectl get namespace config"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "generate-compliance-report",
+        "description": "Generate a compliance audit report",
+        "action": "generate report",
+        "target": "compliance-report",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "audit and warn modes completed",
+            "fact": "audit_warn_completed",
+            "established_by": "monitor-warn-mode",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "compliance report",
+          "how": "check report generation success",
+          "expected": "report created successfully"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "enable-audit-mode",
+        "to_task": "monitor-violations",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "switch-to-warn-mode",
+        "to_task": "monitor-warn-mode",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor-warn-mode",
+        "to_task": "enforce-baseline-profile",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor-violations",
+        "to_task": "switch-to-warn-mode",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "enforce-baseline-profile",
+        "to_task": "generate-compliance-report",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:switch-to-warn-mode",
+      "task_id": "switch-to-warn-mode",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task switch-to-warn-mode is not sequenced after its hard prerequisite, monitor-violations, which must complete first.",
+      "suggested_fix": "Reorder the tasks so that switch-to-warn-mode follows monitor-violations.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:enforce-baseline-profile",
+      "task_id": "enforce-baseline-profile",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task enforce-baseline-profile lacks a sound rollback mechanism that effectively reverts any changes made during enforcement.",
+      "suggested_fix": "Implement a rollback mechanism that safely reverts to the previous state in case enforcement fails.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:generate-compliance-report",
+      "task_id": "generate-compliance-report",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding verification of the compliance report's accuracy and completeness after generation.",
+      "suggested_fix": "Add steps to validate the compliance report post-generation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

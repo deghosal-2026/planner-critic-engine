@@ -1,0 +1,361 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-09-cluster-autoscaler",
+  "duration_seconds": 36.43,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-k8s-09-cluster-autoscaler-r2",
+    "goal_id": "k8s-09-cluster-autoscaler",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "k8s-09-cluster-autoscaler-plan",
+    "created_at": "2026-08-27T04:18:49.255509Z",
+    "tasks": [
+      {
+        "id": "install-cluster-autoscaler",
+        "description": "Install cluster-autoscaler via Helm",
+        "action": "install",
+        "target": "cluster-autoscaler",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Helm is installed",
+            "fact": "helm_installed",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "Kubernetes cluster is reachable",
+            "fact": "k8s_cluster_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "cluster-autoscaler status",
+          "how": "check Helm release status",
+          "expected": "installed"
+        },
+        "rollback": {
+          "trigger": "installation fails",
+          "action": "uninstall cluster-autoscaler",
+          "safety_guard": "verify previous state",
+          "restores_state": [
+            "cluster-autoscaler uninstalled"
+          ],
+          "restoration_evidence": "Helm release status check"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure-auto-discovery",
+        "description": "Configure node group auto-discovery",
+        "action": "configure",
+        "target": "auto-discovery",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cluster-autoscaler installed",
+            "fact": "cluster_autoscaler_installed",
+            "established_by": "install-cluster-autoscaler",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "auto-discovery configuration",
+          "how": "check node group settings",
+          "expected": "auto-discovery configured"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "reset auto-discovery settings",
+          "safety_guard": "validate previous configuration",
+          "restores_state": [
+            "auto-discovery settings restored"
+          ],
+          "restoration_evidence": "node group settings verification"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "set-min-max-node-counts",
+        "description": "Set min/max node counts per group",
+        "action": "set",
+        "target": "node-counts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "node group configuration completed",
+            "fact": "node_groups_configured",
+            "established_by": "configure-auto-discovery",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "tune-scale-down-delay",
+        "description": "Tune scale-down delay to 10 minutes",
+        "action": "tune",
+        "target": "scale-down-delay",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "min/max node counts set",
+            "fact": "min_max_counts_set",
+            "established_by": "set-min-max-node-counts",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-scale-up-triggers",
+        "description": "Verify scale-up triggers on pending pods",
+        "action": "verify",
+        "target": "scale-up",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "scale-down delay configured",
+            "fact": "scale_down_delay_set",
+            "established_by": "tune-scale-down-delay",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-scale-down-drain",
+        "description": "Verify scale-down drains nodes gracefully",
+        "action": "verify",
+        "target": "scale-down",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "scale-up triggers verified",
+            "fact": "scale_up_verified",
+            "established_by": "verify-scale-up-triggers",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "node drain status",
+          "how": "check pod disruption events",
+          "expected": "graceful drain"
+        },
+        "rollback": {
+          "trigger": "drain fails",
+          "action": "restore previous node state",
+          "safety_guard": "validate pod health",
+          "restores_state": [
+            "previous node state restored"
+          ],
+          "restoration_evidence": "node health check"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor-pod-disruption",
+        "description": "Monitor for pod disruption",
+        "action": "monitor",
+        "target": "pod-disruption",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "scale-down drain verified",
+            "fact": "drain_verified",
+            "established_by": "verify-scale-down-drain",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "pod disruption rate",
+          "how": "analyze Prometheus metrics",
+          "expected": "within acceptable limits"
+        },
+        "rollback": {
+          "trigger": "pod disruption exceeds limits",
+          "action": "alert with metrics",
+          "safety_guard": "ensure monitoring setup",
+          "restores_state": [
+            "monitoring metrics reset"
+          ],
+          "restoration_evidence": "alert confirmation"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "install-cluster-autoscaler",
+        "to_task": "configure-auto-discovery",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-auto-discovery",
+        "to_task": "set-min-max-node-counts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set-min-max-node-counts",
+        "to_task": "tune-scale-down-delay",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "tune-scale-down-delay",
+        "to_task": "verify-scale-up-triggers",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-scale-up-triggers",
+        "to_task": "verify-scale-down-drain",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-scale-down-drain",
+        "to_task": "monitor-pod-disruption",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:missing_steps:set-min-max-node-counts",
+      "task_id": "set-min-max-node-counts",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The task lacks a verification step to confirm that min/max node counts are set correctly.",
+      "suggested_fix": "Add a verification step that checks the applied min/max node counts.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:tune-scale-down-delay",
+      "task_id": "tune-scale-down-delay",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The task lacks a verification step to confirm that the scale-down delay is tuned to 10 minutes.",
+      "suggested_fix": "Add a verification step to confirm the scale-down delay is set correctly.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:verify-scale-up-triggers",
+      "task_id": "verify-scale-up-triggers",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The task lacks a verification step to ensure scale-up triggers are functioning as intended.",
+      "suggested_fix": "Add a verification step to confirm that scale-up triggers are properly detecting pending pods.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:verify-scale-down-drain",
+      "task_id": "verify-scale-down-drain",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "There is a potential risk of not verifying the state of the nodes post-drain if they are drained unexpectedly.",
+      "suggested_fix": "Consider adding a confirmation step to ensure node states are verified after the drain.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:monitor-pod-disruption",
+      "task_id": "monitor-pod-disruption",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The monitoring task could benefit from defined thresholds or expected ranges for acceptable pod disruption rates.",
+      "suggested_fix": "Clarify expected limits for pod disruption in the task description.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

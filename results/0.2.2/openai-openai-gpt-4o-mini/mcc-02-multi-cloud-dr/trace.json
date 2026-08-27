@@ -1,0 +1,293 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mcc-02-multi-cloud-dr",
+  "duration_seconds": 46.72,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-mcc-02-multi-cloud-dr-r3",
+    "goal_id": "mcc-02-multi-cloud-dr",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-mcc-02-multi-cloud-dr-r2",
+    "created_at": "2026-08-27T04:25:19.326849Z",
+    "tasks": [
+      {
+        "id": "cross_cloud_replication",
+        "description": "Establish cross-cloud replication for database and object storage, addressing replication lag and provider API differences.",
+        "action": "configure",
+        "target": "database and object storage",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "source database is reachable",
+            "fact": "db_a_healthy",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "target database is reachable",
+            "fact": "db_b_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replication status",
+          "how": "check replication logs",
+          "expected": "replication healthy"
+        },
+        "rollback": {
+          "trigger": "replication fails",
+          "action": "restore original configuration",
+          "safety_guard": "check for data consistency",
+          "restores_state": [
+            "original database and storage configuration"
+          ],
+          "restoration_evidence": "replication logs verify configuration integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_dns_failover",
+        "description": "Configure global DNS failover using Route 53",
+        "action": "setup",
+        "target": "Route 53",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Route 53 is accessible",
+            "fact": "route53_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "DNS records",
+          "how": "query DNS entries",
+          "expected": "DNS entries correctly configured"
+        },
+        "rollback": {
+          "trigger": "DNS configuration issues",
+          "action": "restore previous DNS settings",
+          "safety_guard": "validate previous settings",
+          "restores_state": [
+            "previous DNS configuration"
+          ],
+          "restoration_evidence": "DNS history logs verify restoration"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "dr_failover_drill",
+        "description": "Run a disaster recovery failover drill ensuring cross-cloud replication is healthy before executing the drill.",
+        "action": "execute",
+        "target": "GCP",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "GCP services are provisioned",
+            "fact": "gcp_services_ready",
+            "established_by": "cross_cloud_replication",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service accessibility on GCP",
+          "how": "perform endpoint checks",
+          "expected": "GCP services operational"
+        },
+        "rollback": {
+          "trigger": "drill identifies issues",
+          "action": "fail back to AWS immediately",
+          "safety_guard": "verify AWS service health and data consistency",
+          "restores_state": [
+            "original AWS service configuration"
+          ],
+          "restoration_evidence": "AWS service logs confirm operational status"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "failback_execution",
+        "description": "Execute failback to AWS as primary and include steps to address potential data conflicts during the process.",
+        "action": "resync",
+        "target": "databases",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AWS environment is ready for failback",
+            "fact": "aws_ready_for_failback",
+            "established_by": "dr_failover_drill",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "database integrity",
+          "how": "run integrity checks",
+          "expected": "no data conflicts"
+        },
+        "rollback": {
+          "trigger": "failback fails",
+          "action": "restore GCP as active",
+          "safety_guard": "confirm data integrity",
+          "restores_state": [
+            "active GCP service configuration"
+          ],
+          "restoration_evidence": "integrity checks confirm GCP status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "cross_cloud_replication",
+        "to_task": "configure_dns_failover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_dns_failover",
+        "to_task": "dr_failover_drill",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dr_failover_drill",
+        "to_task": "failback_execution",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:feasibility:failback_execution",
+      "task_id": "failback_execution",
+      "version": 3,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "AWS environment readiness must be verified before initiating failback execution.",
+      "suggested_fix": "Add a task to verify AWS environment readiness before failback execution.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:dr_failover_drill",
+      "task_id": "dr_failover_drill",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "DR failover drill is dependent on successful cross-cloud replication, but it lacks verification that cross-cloud replication is satisfactory before executing.",
+      "suggested_fix": "Include a verification step to check the health of cross-cloud replication before executing the drill.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:dr_failover_drill",
+      "task_id": "dr_failover_drill",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The precondition 'GCP services are provisioned' relies on facts established by the 'cross_cloud_replication' task which may not be verified as complete.",
+      "suggested_fix": "Ensure 'cross_cloud_replication' task has a verification or completion check before moving to the drill.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:missing_steps:cross_cloud_replication",
+      "task_id": "cross_cloud_replication",
+      "version": 3,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider addressing the potential risk of replication lag more comprehensively by adding monitoring steps.",
+      "suggested_fix": "Include monitoring for replication lag during the cross-cloud replication task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:missing_steps:failback_execution",
+      "task_id": "failback_execution",
+      "version": 3,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Missing a step to verify data consistency on GCP after failback.",
+      "suggested_fix": "Add a verification step for data consistency on GCP after the failback process.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mcc-02-multi-cloud-dr:3:3",
+    "plan_id": "plan-mcc-02-multi-cloud-dr-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:feasibility:failback_execution",
+    "question": "Plan for goal 'mcc-02-multi-cloud-dr' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

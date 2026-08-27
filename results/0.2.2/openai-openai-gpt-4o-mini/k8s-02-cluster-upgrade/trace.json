@@ -1,0 +1,393 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-02-cluster-upgrade",
+  "duration_seconds": 63.9,
+  "result": {
+    "status": "escalated",
+    "reason_code": "plan_oscillation_detected",
+    "revision_count": 4,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-k8s-02-cluster-upgrade-r4",
+    "goal_id": "k8s-02-cluster-upgrade",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-k8s-02-cluster-upgrade-r3",
+    "created_at": "2026-08-27T04:20:58.006932Z",
+    "tasks": [
+      {
+        "id": "backup-etcd",
+        "description": "Take a full etcd snapshot backup",
+        "action": "backup",
+        "target": "etcd",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "snapshot availability",
+          "how": "check snapshot status",
+          "expected": "snapshot exists"
+        },
+        "rollback": {
+          "trigger": "backup fails",
+          "action": "revert to previous snapshot",
+          "safety_guard": "verify snapshot integrity",
+          "restores_state": [
+            "previous snapshot"
+          ],
+          "restoration_evidence": "snapshot integrity confirmed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-backup",
+        "description": "Verify the backup of etcd is complete",
+        "action": "verify",
+        "target": "etcd",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "backup status",
+          "how": "check backup log",
+          "expected": "backup successful"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "abort upgrade process",
+          "safety_guard": "ensure backup integrity",
+          "restores_state": [
+            "no restoration possible"
+          ],
+          "restoration_evidence": "backup integrity maintained"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cordon-drain-node",
+        "description": "Cordon and drain a worker node",
+        "action": "cordon-drain",
+        "target": "worker-node",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "worker node is reachable",
+            "fact": "node_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "node status",
+          "how": "check if node is cordoned and drained",
+          "expected": "node is cordoned and drained"
+        },
+        "rollback": {
+          "trigger": "rollback requested",
+          "action": "uncordon the node",
+          "safety_guard": "verify node functionality",
+          "restores_state": [
+            "node in functional state"
+          ],
+          "restoration_evidence": "node operational"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-cordon-drain",
+        "description": "Verify that cordon-drain-node completed successfully",
+        "action": "verify",
+        "target": "worker-node",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "cordon status",
+          "how": "check node status",
+          "expected": "node is cordoned and drained"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "abort upgrade process",
+          "safety_guard": "ensure node is in valid state",
+          "restores_state": [
+            "node in previous state"
+          ],
+          "restoration_evidence": "node functional confirmation"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "upgrade-control-plane",
+        "description": "Upgrade control plane components via kubeadm",
+        "action": "upgrade",
+        "target": "control-plane",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "control plane components status",
+          "how": "check component health",
+          "expected": "all components healthy"
+        },
+        "rollback": {
+          "trigger": "upgrade fails",
+          "action": "restore from backup",
+          "safety_guard": "verify control plane functionality",
+          "restores_state": [
+            "previous control plane state"
+          ],
+          "restoration_evidence": "functionality validated"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-upgrade-control-plane",
+        "description": "Verify that upgrade-control-plane completed successfully",
+        "action": "verify",
+        "target": "control-plane",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "upgrade status",
+          "how": "check upgrade log",
+          "expected": "upgrade successful"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "abort upgrade process",
+          "safety_guard": "ensure control plane is operational",
+          "restores_state": [
+            "previous control plane state"
+          ],
+          "restoration_evidence": "functionality validated"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "upgrade-kubelet-kube-proxy",
+        "description": "Upgrade kubelet and kube-proxy on each node",
+        "action": "upgrade",
+        "target": "kubelet-kube-proxy",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "node readiness",
+          "how": "check node conditions",
+          "expected": "all nodes Ready"
+        },
+        "rollback": {
+          "trigger": "upgrade fails",
+          "action": "reinstall previous version",
+          "safety_guard": "verify node status",
+          "restores_state": [
+            "previous version state"
+          ],
+          "restoration_evidence": "nodes operational"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "backup-etcd",
+        "to_task": "verify-backup",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-backup",
+        "to_task": "cordon-drain-node",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cordon-drain-node",
+        "to_task": "verify-cordon-drain",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-cordon-drain",
+        "to_task": "upgrade-control-plane",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "upgrade-control-plane",
+        "to_task": "verify-upgrade-control-plane",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-upgrade-control-plane",
+        "to_task": "upgrade-kubelet-kube-proxy",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:feasibility:upgrade-control-plane",
+      "task_id": "upgrade-control-plane",
+      "version": 4,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The upgrade-control-plane task is not achievable without verification of the backup first, which is a prerequisite.",
+      "suggested_fix": "Ensure the backup is verified before attempting to upgrade control plane components.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:cordon-drain-node",
+      "task_id": "cordon-drain-node",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Cordon and drain operation depends on the verification of the backup, which has not been established by the previous task.",
+      "suggested_fix": "Establish a verification step for the backup before proceeding with cordon-drain-node.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:backup-etcd",
+      "task_id": "backup-etcd",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Restoration evidence for the backup is based on integrity confirmation but does not outline what to do if it fails.",
+      "suggested_fix": "Clarify and document a specific rollback strategy that can effectively deal with backup failures during the process.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:verify-backup",
+      "task_id": "verify-backup",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action lacks a detailed restoration plan in case the backup verification fails.",
+      "suggested_fix": "Detail the steps to take if backup verification fails to ensure a safe rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:risk:upgrade-kubelet-kube-proxy",
+      "task_id": "upgrade-kubelet-kube-proxy",
+      "version": 4,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "There is a risk if the upgrade process is not staggered properly, which could result in downtime for workloads.",
+      "suggested_fix": "Consider staggered or rolling upgrades for kubelet and kube-proxy to minimize impact on workloads.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:missing_steps:upgrade-control-plane",
+      "task_id": "upgrade-control-plane",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "info",
+      "reason_code": "llm_missing_steps",
+      "message": "The upgrade of control plane components could also cover additional post-upgrade checks for etcd and networking components.",
+      "suggested_fix": null,
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:missing_steps:upgrade-kubelet-kube-proxy",
+      "task_id": "upgrade-kubelet-kube-proxy",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "info",
+      "reason_code": "llm_missing_steps",
+      "message": "The plan does not specify how to handle node failures post-upgrade, which is crucial for a successful upgrade.",
+      "suggested_fix": null,
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-02-cluster-upgrade:4:4",
+    "plan_id": "plan-k8s-02-cluster-upgrade-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:feasibility:upgrade-control-plane",
+    "question": "Plan for goal 'k8s-02-cluster-upgrade' cannot be approved: blockers remain (llm_feasibility; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -182,3 +182,32 @@ class TestTaskSchema:
         task = make_task("t1", parallel_group="pg")
         assert task.parallel_group == "pg"
         assert make_task("t2").parallel_group is None
+
+
+class TestRollbackStepLenientCoercion:
+    """``restores_state`` leniently accepts LLM-produced strings (L-1)."""
+
+    def test_string_coerced_to_single_element_list(self) -> None:
+        """A bare string is wrapped into ``[str]`` so LLM plans validate."""
+        from planner_critic.schema.plan import RollbackStep
+
+        rb = RollbackStep.model_validate(
+            {"trigger": "fail", "action": "revert", "restores_state": "restore db"}
+        )
+        assert rb.restores_state == ["restore db"]
+
+    def test_list_passthrough(self) -> None:
+        """A proper list is unchanged."""
+        from planner_critic.schema.plan import RollbackStep
+
+        rb = RollbackStep(
+            trigger="fail", action="revert", restores_state=["a", "b"]
+        )
+        assert rb.restores_state == ["a", "b"]
+
+    def test_none_unchanged(self) -> None:
+        """``None`` (legacy prose rollback) stays ``None``."""
+        from planner_critic.schema.plan import RollbackStep
+
+        rb = RollbackStep(trigger="fail", action="revert")
+        assert rb.restores_state is None

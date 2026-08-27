@@ -1,0 +1,267 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-08-cross-account-peering",
+  "duration_seconds": 42.55,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-inf-08-cross-account-peering-r3",
+    "goal_id": "inf-08-cross-account-peering",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-inf-08-cross-account-peering-r2",
+    "created_at": "2026-08-27T04:14:28.410791Z",
+    "tasks": [
+      {
+        "id": "create_peering",
+        "description": "Create VPC peering connections between each account pair",
+        "action": "create",
+        "target": "peering_connections",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "peering connection status",
+          "how": "describe peering connections",
+          "expected": "active"
+        },
+        "rollback": {
+          "trigger": "peering creation fails",
+          "action": "delete failed peering connections",
+          "safety_guard": "check peering connection limits",
+          "restores_state": [
+            "no peering connections exist"
+          ],
+          "restoration_evidence": "confirm no peering connections exist after rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update_route_tables",
+        "description": "Update route tables in all VPCs to enable traffic flow",
+        "action": "update",
+        "target": "route_tables",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "route table entries",
+          "how": "describe route tables",
+          "expected": "correct entries for all VPCs"
+        },
+        "rollback": {
+          "trigger": "route table update fails",
+          "action": "revert to previous route configuration",
+          "safety_guard": "verify previous route configuration",
+          "restores_state": [
+            "previous route table state restored"
+          ],
+          "restoration_evidence": "confirm correct route table entries after rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_security_groups",
+        "description": "Configure security groups to allow only required ports",
+        "action": "configure",
+        "target": "security_groups",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "security group rules",
+          "how": "list security group rules",
+          "expected": "only required ports open"
+        },
+        "rollback": {
+          "trigger": "security group misconfiguration",
+          "action": "restore default security group settings",
+          "safety_guard": "verify security group rules",
+          "restores_state": [
+            "default security group settings restored"
+          ],
+          "restoration_evidence": "confirm default settings after rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_connectivity",
+        "description": "Verify connectivity between accounts",
+        "action": "test",
+        "target": "connectivity",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "connectivity status",
+          "how": "ping across accounts",
+          "expected": "successful ping from all accounts"
+        },
+        "rollback": {
+          "trigger": "connectivity test fails",
+          "action": "check configurations",
+          "safety_guard": "confirm route and security settings",
+          "restores_state": [
+            "correct configurations verified"
+          ],
+          "restoration_evidence": "confirm correct configurations after rollback"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "setup_nat",
+        "description": "Set up Network Address Translation (NAT) for egress",
+        "action": "setup",
+        "target": "NAT_gateway",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "NAT gateway is not already created",
+            "fact": "nat_gateway_not_exists",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "NAT gateway status",
+          "how": "describe NAT gateway",
+          "expected": "NAT gateway is active"
+        },
+        "rollback": {
+          "trigger": "NAT setup fails",
+          "action": "delete NAT gateway",
+          "safety_guard": "ensure there are no dependent resources",
+          "restores_state": [
+            "no NAT gateway exists"
+          ],
+          "restoration_evidence": "confirm no NAT gateway after rollback"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "document_topology",
+        "description": "Document the network topology",
+        "action": "document",
+        "target": "network_topology",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "All previous tasks must be completed successfully",
+            "fact": "tasks_completed",
+            "established_by": "setup_nat",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "network topology documentation",
+          "how": "review documentation",
+          "expected": "documentation is accurate and complete"
+        },
+        "rollback": {
+          "trigger": "documentation process fails",
+          "action": "discard incomplete documentation",
+          "safety_guard": "verify documentation is not published",
+          "restores_state": [
+            "no documentation registered"
+          ],
+          "restoration_evidence": "confirm no documentation entry after rollback"
+        },
+        "risk_class": "low",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "create_peering",
+        "to_task": "update_route_tables",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_route_tables",
+        "to_task": "configure_security_groups",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_security_groups",
+        "to_task": "verify_connectivity",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_connectivity",
+        "to_task": "setup_nat",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_nat",
+        "to_task": "document_topology",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:document_topology",
+      "task_id": "document_topology",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'document_topology' is dependent on the completion of all previous tasks, but there is no verification of the success of those tasks before proceeding to documentation.",
+      "suggested_fix": "Implement a verification step to ensure that all previous tasks have been successfully completed before executing 'document_topology'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:inf-08-cross-account-peering:3:3",
+    "plan_id": "plan-inf-08-cross-account-peering-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:document_topology",
+    "question": "Plan for goal 'inf-08-cross-account-peering' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}
