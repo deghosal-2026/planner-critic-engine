@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run field tests for v0.2.1 (four-phase: P0/P2/P3/P4).
+"""Run field tests for the current release (four-phase: P0/P2/P3/P4).
 
 Phases are cost-tiered so hermetic ($0) work runs first and LLM-spending work
 is gated behind an explicit ``--run-llm`` flag:
@@ -49,7 +49,7 @@ MLX_API_KEY = os.environ.get("MLX_API_KEY", "omlx-test")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 GOALS_ROOT = Path(__file__).resolve().parent.parent / "goals"
-RESULTS_ROOT = REPO_ROOT / "results" / "0.2.1"
+RESULTS_ROOT = REPO_ROOT / "results" / "0.2.2"
 FIELD_TEST_DIR = Path(__file__).resolve().parent.parent  # docs/field-test
 BENCH_DIR_V021 = FIELD_TEST_DIR / "v0.2.1" / "scripts"
 
@@ -219,7 +219,7 @@ def run_goals_sweep(args) -> None:
 def run_boundary_live(args) -> None:
     """P3 #218: live-critic boundary-case run via bench_live_boundary.py.
 
-    Writes JSON + markdown to results/0.2.1/. Spend ≤ $1 (mini-class model,
+    Writes JSON + markdown to results/0.2.2/. Spend ≤ $1 (mini-class model,
     ~60 audits). Provider is overridden to match the --provider flag so the
     boundary run uses the same model as the goals sweep.
     """
@@ -238,7 +238,7 @@ def run_boundary_live(args) -> None:
     if result.returncode != 0:
         print("[boundary] FAILED or incomplete")
     else:
-        print("[boundary] DONE — see results/0.2.1/live-boundary-report.{json,md}")
+        print("[boundary] DONE — see results/0.2.2/live-boundary-report.{json,md}")
 
 
 def run_subsystem_llm(args) -> None:
@@ -310,7 +310,7 @@ def run_benchmarks(args) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Run v0.2.1 field tests (four-phase: P0/P2/P3/P4)",
+        description="Run field tests (four-phase: P0/P2/P3/P4)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
 Phases (cost-tiered):
