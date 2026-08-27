@@ -32,7 +32,14 @@ class TestSchemaValidGate:
 
     def test_blank_task_id_flagged(self) -> None:
         """A blank task id is a structural flaw."""
-        findings = run_deterministic_gates(make_plan(tasks=[make_task("valid", satisfies="criterion"), make_task(" ", satisfies="criterion")]))
+        findings = run_deterministic_gates(
+            make_plan(
+                tasks=[
+                    make_task("valid", satisfies="criterion"),
+                    make_task(" ", satisfies="criterion"),
+                ]
+            )
+        )
         assert PLAN_SCHEMA_INVALID in {f.reason_code for f in findings}
 
 
@@ -54,7 +61,11 @@ class TestDepCyclesGate:
     def test_longer_cycle_flagged(self) -> None:
         """t1 -> t2 -> t3 -> t1 is flagged too."""
         plan = make_plan(
-            tasks=[make_task("t1", satisfies="criterion"), make_task("t2", satisfies="criterion"), make_task("t3", satisfies="criterion")],
+            tasks=[
+                make_task("t1", satisfies="criterion"),
+                make_task("t2", satisfies="criterion"),
+                make_task("t3", satisfies="criterion"),
+            ],
             dependencies=[
                 hard_dep("t1", "t2"),
                 hard_dep("t2", "t3"),
@@ -97,7 +108,9 @@ class TestOrderingGate:
 
     def test_no_dependencies_passes(self) -> None:
         """No edges → no ordering findings."""
-        plan = make_plan(tasks=[make_task("t1", satisfies="criterion"), make_task("t2", satisfies="criterion")])
+        plan = make_plan(
+            tasks=[make_task("t1", satisfies="criterion"), make_task("t2", satisfies="criterion")]
+        )
         assert UNSAFE_ORDERING not in {f.reason_code for f in run_deterministic_gates(plan)}
 
 
@@ -171,7 +184,13 @@ class TestPreconditionsGate:
     def test_unreferenced_precondition_flagged(self) -> None:
         """A precondition with no source is unverifiable."""
         plan = make_plan(
-            tasks=[make_task("t1", preconditions=[{"description": "p", "fact": "some fact"}], satisfies="criterion")]
+            tasks=[
+                make_task(
+                    "t1",
+                    preconditions=[{"description": "p", "fact": "some fact"}],
+                    satisfies="criterion",
+                )
+            ]
         )
         assert UNVERIFIED_PRECONDITION in {f.reason_code for f in run_deterministic_gates(plan)}
 
@@ -275,7 +294,9 @@ class TestOrchestrator:
 
     def test_clean_plan_has_no_findings(self) -> None:
         """A fully-validated low-risk plan passes every gate."""
-        plan = make_plan(tasks=[make_task("t1", satisfies="criterion"), make_task("t2", satisfies="criterion")])
+        plan = make_plan(
+            tasks=[make_task("t1", satisfies="criterion"), make_task("t2", satisfies="criterion")]
+        )
         assert run_deterministic_gates(plan) == []
 
     def test_deterministic_equal_plans_equal_findings(self) -> None:
@@ -284,7 +305,11 @@ class TestOrchestrator:
             tasks=[
                 make_task("t1", risk_class="high", parallel_group="g", satisfies="criterion"),
                 make_task("t2", risk_class="high", parallel_group="g", satisfies="criterion"),
-                make_task("t3", preconditions=[{"description": "unmet", "fact": "nope"}], satisfies="criterion"),
+                make_task(
+                    "t3",
+                    preconditions=[{"description": "unmet", "fact": "nope"}],
+                    satisfies="criterion",
+                ),
             ]
         )
         plan2 = plan.model_copy(deep=True)
@@ -298,7 +323,11 @@ class TestOrchestrator:
             tasks=[
                 make_task("t1", risk_class="high", parallel_group="g", satisfies="criterion"),
                 make_task("t2", risk_class="high", parallel_group="g", satisfies="criterion"),
-                make_task("t3", preconditions=[{"description": "unmet", "fact": "nope"}], satisfies="criterion"),
+                make_task(
+                    "t3",
+                    preconditions=[{"description": "unmet", "fact": "nope"}],
+                    satisfies="criterion",
+                ),
             ]
         )
         findings = run_deterministic_gates(plan)

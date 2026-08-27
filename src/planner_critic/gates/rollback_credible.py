@@ -139,7 +139,10 @@ class Gate(BaseGate):
                             f"what state it restores (restores_state) or how restoration is "
                             f"verified (restoration_evidence)"
                         ),
-                        suggested_fix="Add restores_state and restoration_evidence fields to the rollback step",
+                        suggested_fix=(
+                            "Add restores_state and restoration_evidence "
+                            "fields to the rollback step"
+                        ),
                     )
                 )
             else:

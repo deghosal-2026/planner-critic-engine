@@ -111,7 +111,11 @@ class Gate(BaseGate):
                 consumer = plan.tasks[consumer_index]
                 pre_state = _is_pre_state_check(consumer)
                 if consumer_index < producer_index and not pre_state:
-                    findings.append(self._finding(plan, consumer_id, producer_id=producer.id, id_to_index=id_to_index))
+                    findings.append(
+                        self._finding(
+                            plan, consumer_id, producer_id=producer.id, id_to_index=id_to_index
+                        )
+                    )
                 elif consumer_index > producer_index and pre_state:
                     findings.append(
                         self._finding(

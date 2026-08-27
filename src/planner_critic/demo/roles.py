@@ -194,7 +194,11 @@ def _migration() -> _Scenario:
         return _plan(
             goal_id,
             tasks=[
-                _task("snapshot", "Take a pre-cutover snapshot of the production database", satisfies="criterion"),
+                _task(
+                    "snapshot",
+                    "Take a pre-cutover snapshot of the production database",
+                    satisfies="criterion",
+                ),
                 _task("backfill", "Run the incremental schema backfill", satisfies="criterion"),
                 _task(
                     "cutover",
@@ -221,7 +225,11 @@ def _migration() -> _Scenario:
             goal_id,
             version=2,
             tasks=[
-                _task("snapshot", "Take a pre-cutover snapshot of the production database", satisfies="criterion"),
+                _task(
+                    "snapshot",
+                    "Take a pre-cutover snapshot of the production database",
+                    satisfies="criterion",
+                ),
                 _task("backfill", "Run the incremental schema backfill", satisfies="criterion"),
                 _task(
                     "verify",
@@ -375,7 +383,11 @@ def _refactor() -> _Scenario:
         return _plan(
             goal_id,
             tasks=[
-                _task("book", "Book the maintenance window with the platform team", satisfies="criterion"),
+                _task(
+                    "book",
+                    "Book the maintenance window with the platform team",
+                    satisfies="criterion",
+                ),
                 _task("backup", "Back up the current routing state", satisfies="criterion"),
                 _task(
                     "swap",
@@ -404,7 +416,11 @@ def _refactor() -> _Scenario:
             goal_id,
             version=2,
             tasks=[
-                _task("book", "Book the maintenance window with the platform team", satisfies="criterion"),
+                _task(
+                    "book",
+                    "Book the maintenance window with the platform team",
+                    satisfies="criterion",
+                ),
                 _task("backup", "Back up the current routing state", satisfies="criterion"),
                 _task(
                     "swap",

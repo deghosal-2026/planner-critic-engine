@@ -23,7 +23,6 @@ from .reason_codes import ReasonCode
 from .schema.goal import RiskTolerance
 from .schema.plan import PlanVersion
 
-
 FINDING_SCHEMA_VERSION = "0.2.0"
 
 
