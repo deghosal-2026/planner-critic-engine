@@ -29,7 +29,7 @@ v0.2.1 is a patch release that hardens the v0.2.0 engine with 10 code-review fix
 | Code-review bugs fixed | 31 (#184–214) | 10 (#232–241) | — |
 | Field-test-found bugs | 0 | 0 | same |
 | Coverage | 91.62% | 91.58% | -0.04% (accepted) |
-| `plan_oscillation_detected` | 0 | 3 | #152 now fires |
+| `plan_oscillation_detected` | 0 | 5 | #152 now fires |
 
 ---
 
@@ -43,7 +43,7 @@ v0.2.1 is a patch release — no new goals, no new domains, no schema changes. T
 
 3. **Operational benchmark (#221).** v0.2.0 had 3 benchmarks (auto-repair, rollback credibility, stasis). v0.2.1 adds latency, reviewer burden, and operator workload measurement from stored traces — the before/after numbers the community asked for.
 
-4. **Family-histogram cycling detection (#217) now reachable.** A code-review fix (#232) made the cycling detector fire under default config (`revision_cap=3`); v0.2.0's detector was dead under defaults. 3 goals now escalate with `plan_oscillation_detected` instead of `revision_cap_reached`.
+4. **Family-histogram cycling detection (#217) now reachable.** A code-review fix (#232) made the cycling detector fire under default config (`revision_cap=3`); v0.2.0's detector was dead under defaults. 5 goals now escalate with `plan_oscillation_detected` instead of `revision_cap_reached`.
 
 5. **Gate findings are now actionable.** Two fixes (#233, #237) replaced bare task-id messages and wrong variable interpolations with descriptive, actionable blocker messages and suggested fixes.
 
@@ -283,7 +283,7 @@ The field test costs ~$0.40, takes 90 minutes, and validates end-to-end behavior
 
 3. **The #218 live-critic boundary run shows 100% label-flip and evidence-drift.** gpt-4o-mini is fully non-deterministic on identical input — different verdicts and explanations every trial. Despite this, family_migration_rate=0 and underclaim_approvals=0: the critic never under-claims a seeded defect.
 
-4. **3 goals now escalate with `plan_oscillation_detected` (#152).** v0.2.0 had 0; v0.2.1 has 3. This is the #152 structural oscillation signal firing before `revision_cap_reached` — it saves revisions by detecting cycling earlier. The increase is due to LLM non-determinism producing different structural patterns, not an engine change.
+4. **5 goals now escalate with `plan_oscillation_detected` (#152).** v0.2.0 had 0; v0.2.1 has 5. This is the #152 structural oscillation signal firing before `revision_cap_reached` — it saves revisions by detecting cycling earlier. The increase is due to LLM non-determinism producing different structural patterns, not an engine change.
 
 5. **1 transient provider error (`mch-04-blast-radius`).** OpenRouter returned `planning_unavailable` — the planner could not produce a plan. This is a transient API error, not an engine defect. Re-running this goal should succeed.
 
@@ -342,9 +342,9 @@ Despite 100% label-flip and evidence-drift rates, family_migration_rate=0 and un
 
 ### 4. The #152 structural oscillation signal saves revisions
 
-3 goals now escalate with `plan_oscillation_detected` instead of `revision_cap_reached`. The signal detects cycling earlier and terminates the loop sooner, saving LLM calls.
+5 goals now escalate with `plan_oscillation_detected` instead of `revision_cap_reached`. The signal detects cycling earlier and terminates the loop sooner, saving LLM calls.
 
-**Lesson:** The #152 signal fires in practice (3/97 strict goals) and saves revisions.
+**Lesson:** The #152 signal fires in practice (5/97 strict goals) and saves revisions.
 
 ### 5. Transient provider errors are not engine defects
 
