@@ -132,17 +132,17 @@ M1 is the foundation layer of v0.2.2. Every issue here is a correction to someth
 Before M1 closes, the following must be true:
 
 ### Standard milestone exit gate
-- [ ] **Code review**: all M1 changes reviewed, no P1/P2 findings
-- [ ] **Lint clean**: `ruff check src/ tests/` + `ruff format --check` 0 errors
-- [ ] **Type check**: `mypy --strict src/ tests/` 0 errors
-- [ ] **Test coverage**: `pytest --cov=src/ --cov-report=term` reports >90%
-- [ ] **Documents updated**: all docs affected by M1 changes are current
-- [ ] **Clean checkin**: no debug code, no print statements, no TODOs, no .py,cover artifacts
+- [x] **Code review**: all M1 changes reviewed, no P1/P2 findings
+- [x] **Lint clean**: `ruff check src/ tests/` + `ruff format --check` 0 errors
+- [x] **Type check**: `mypy --strict src/ tests/` 0 errors
+- [x] **Test coverage**: `pytest --cov=src/ --cov-report=term` reports >90% (91.50%)
+- [x] **Documents updated**: all docs affected by M1 changes are current
+- [x] **Clean checkin**: no debug code, no print statements, no TODOs, no .py,cover artifacts
 
 ### M1-specific closure
-- [ ] All 5 issues closed with evidence
-- [ ] No v0.2.1 release docs remain contradictory
-- [ ] `.gitignore` prevents future coverage artifact commits
-- [ ] Test count discrepancy resolved and documented
-- [ ] Failure-origin taxonomy ready for use in M5 field test results
-- [ ] Full test suite passes on `rel-0.2.2` after M1 merge
+- [x] All 5 issues closed with evidence
+- [x] No v0.2.1 release docs remain contradictory
+- [x] `.gitignore` prevents future coverage artifact commits
+- [x] Test count discrepancy resolved and documented
+- [x] Failure-origin taxonomy ready for use in M5 field test results
+- [x] Full test suite passes on `rel-0.2.2` after M1 merge
