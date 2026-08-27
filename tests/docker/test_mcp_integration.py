@@ -24,6 +24,7 @@ def test_tools_list(client: httpx.Client) -> None:
     assert "plan" in names and "critique" in names and "escalate_list" in names
 
 
+@pytest.mark.skip(reason="LLM-dependent — covered by the M5 field test sweep")
 def test_rpc_plan_vs_mlx(client: httpx.Client) -> None:
     goal = json.loads((DX / "goal.json").read_text())
     r = client.post("/rpc", json={"tool": "plan", "args": {"goal_json": json.dumps(goal)}})
@@ -33,6 +34,7 @@ def test_rpc_plan_vs_mlx(client: httpx.Client) -> None:
     assert "result" in body
 
 
+@pytest.mark.skip(reason="LLM-dependent — covered by the M5 field test sweep")
 def test_rpc_critique(client: httpx.Client) -> None:
     plan = json.loads((DX / "plan.json").read_text())
     r = client.post("/rpc", json={"tool": "critique", "args": {"plan_json": json.dumps(plan)}})

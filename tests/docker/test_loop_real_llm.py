@@ -116,6 +116,7 @@ def _post_plan(goal: dict[str, Any], label: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skip(reason="LLM-dependent — covered by the M5 field test sweep")
 def test_adversarial_goal_never_approved() -> None:
     """A critical-risk goal under strict tolerance is NEVER approved.
 

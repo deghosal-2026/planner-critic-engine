@@ -28,6 +28,7 @@ def test_healthz(client: httpx.Client) -> None:
     assert r.json() == {"status": "ok"}
 
 
+@pytest.mark.skip(reason="LLM-dependent — covered by the M5 field test sweep")
 def test_plan_vs_mlx(client: httpx.Client) -> None:
     r = client.post("/plan", json=_load("goal.json"))
     assert r.status_code == 200
@@ -44,6 +45,7 @@ def test_plan_vs_mlx(client: httpx.Client) -> None:
         assert "error" in body
 
 
+@pytest.mark.skip(reason="LLM-dependent — covered by the M5 field test sweep")
 def test_critique_vs_mlx(client: httpx.Client) -> None:
     plan = _load("plan.json")
     r = client.post(
