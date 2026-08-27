@@ -24,7 +24,7 @@ v0.2.1 is a patch release that hardens the v0.2.0 engine with 10 code-review fix
 | Strict escalated | 97/97 (100%) | 96/97 (99%) | 1 provider error |
 | Adversarial aborted | 8/8 | 8/8 | same |
 | Verdict deltas vs v0.2.0 | — | 30 | all attributable |
-| Deterministic tests | 90 | 1295 | +1205 (M11 suite) |
+| Deterministic tests | 90 | 1294 | +1204 (M11 suite, 14 docker-gated + 1 flaky skip) |
 | Benchmarks | 3 | 3 | +operational, +boundary |
 | Code-review bugs fixed | 31 (#184–214) | 10 (#232–241) | — |
 | Field-test-found bugs | 0 | 0 | same |
@@ -96,7 +96,7 @@ The field test was run in four phases, cost-tiered so hermetic ($0) work runs fi
 - **8/8 adversarial goals escalated** (100%) — `replan_policy=abort` correctly prevents revision on dangerous plans
 - **170/170 plans passed all deterministic gates** on the first revision
 - **10 CodeReview bugs found and fixed** before the field test (#232–#241) — the code review was the v0.2.1 equivalent of v0.2.0's 31 bug sweep
-- **1295 deterministic subsystem tests pass** — covering all v0.2.0 + v0.2.1 features
+- **1294 deterministic subsystem tests pass** (15 skipped: 14 docker-gated + 1 flaky SQLite #93) — covering all v0.2.0 + v0.2.1 features
 - **3 benchmarks completed** — cycling, operational, live-critic boundary (#218)
 - **Live-critic boundary run (#218):** label_flip=1.0, evidence_drift=1.0, family_migration=0.0, underclaim_approvals=0
 
@@ -198,7 +198,7 @@ The field test plan specifies 170 goals across 40 domains (inherited from v0.2.0
 | Normal goals | ≥80% pass (Scorecard A) | 169/170 (99%) ✅ | BLOCKING — PASS |
 | Deterministic gates | 100% pass on all goals | 170/170 (100%) ✅ | BLOCKING — PASS |
 | Uncaught PlanningError | Zero engine errors | 1 (transient provider) ⚠ | BLOCKING — PASS (not engine) |
-| Deterministic subsystem tests | 1295 pass | ✅ | BLOCKING — PASS |
+| Deterministic subsystem tests | 1294 pass | ✅ | BLOCKING — PASS |
 | Benchmarks | 3/3 complete | ✅ | BLOCKING — PASS |
 | Live-critic boundary (#218) | Report committed | ✅ | BLOCKING — PASS |
 | Regression diff | All deltas attributable | 30/30 explained ✅ | BLOCKING — PASS |
@@ -231,7 +231,7 @@ Latency (approved p50=13.86s, escalated p50=27.82s), reviewer burden (2.58 block
 
 ### 6. The field test is the release gate
 
-The field test costs ~$0.40, takes 90 minutes, and validates end-to-end behavior across 40 domains. The 1295 deterministic tests provide faster feedback for code changes; the LLM field test validates the full pipeline. Both are needed.
+The field test costs ~$0.40, takes 90 minutes, and validates end-to-end behavior across 40 domains. The 1294 deterministic tests provide faster feedback for code changes; the LLM field test validates the full pipeline. Both are needed.
 
 ---
 
@@ -289,7 +289,7 @@ The field test costs ~$0.40, takes 90 minutes, and validates end-to-end behavior
 
 6. **The strict pass rate remains a clean 0% — zero overlap with balanced.** Same as v0.2.0 and v0.1.0. Every balanced goal approves; every strict goal escalates.
 
-7. **1295 deterministic tests run in 4.7 seconds.** The deterministic test suite provides faster feedback than the 170 LLM goals (~90 minutes). Both are needed.
+7. **1294 deterministic tests run in 4.7 seconds.** The deterministic test suite provides faster feedback than the 170 LLM goals (~90 minutes). Both are needed.
 
 8. **The operational benchmark shows median revisions to resolution = 1.0.** Most goals resolve in a single revision — the deterministic precondition closer and auto-repair are working.
 
@@ -316,7 +316,7 @@ The #222 code review of the M11 hardening diff (`f2a5025..42b5ada`) found 10 def
 
 ### 2. Field test found 0 new engine issues
 
-The field test validated the 10 bug fixes. No new issues were discovered during the 170-goal sweep, 1295 deterministic tests, 3 benchmarks, or live-critic boundary run. 1 transient LLM provider error is not an engine defect.
+The field test validated the 10 bug fixes. No new issues were discovered during the 170-goal sweep, 1294 deterministic tests, 3 benchmarks, or live-critic boundary run. 1 transient LLM provider error is not an engine defect.
 
 ---
 
@@ -850,7 +850,7 @@ Total findings across all goals: 625
 | Dimension | Status | Notes |
 |-----------|--------|-------|
 | **goals-sweep** | ✅ PASS | 170/170 goals, 169 correct, 1 transient provider error |
-| **deterministic-tests** | ✅ PASS | 1295 tests pass |
+| **deterministic-tests** | ✅ PASS | 1294 tests pass |
 | **benchmarks** | ✅ PASS | 3/3: cycling, operational, live-critic boundary |
 | **assertion-validation** | ✅ PASS | 170/170 YAMLs valid |
 | **live-critic-boundary (#218)** | ✅ PASS | 6 cases × 5 trials, report committed |
@@ -888,7 +888,7 @@ Total findings across all goals: 625
 
 1. ✅ Run all 170 goals — 170/170 complete
 
-2. ✅ Run 1295 deterministic subsystem tests — 1295 pass
+2. ✅ Run 1294 deterministic subsystem tests — 1294 pass
 
 3. ✅ Run 3 benchmarks — 3/3 complete
 

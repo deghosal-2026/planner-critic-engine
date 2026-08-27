@@ -24,7 +24,7 @@
 ### Field Test Results (M12 #223)
 - **170 goals across 40 domains** — 73 approved (balanced), 96 escalated (strict), 8 escalated (adversarial), 1 transient provider error, 0 true failures
 - **30 verdict deltas vs v0.2.0** — all attributable to LLM non-determinism or #152 oscillation signal; zero unexplained
-- **1295 deterministic subsystem tests** (14 docker-gated skips)
+- **1294 deterministic subsystem tests** (15 skipped: 14 docker-gated + 1 flaky SQLite #93)
 - **3 benchmarks** — cycling (#217), operational (#221), live-critic boundary (#218)
 - **Live-critic boundary run:** label_flip=1.0, evidence_drift=1.0, family_migration=0.0, underclaim_approvals=0
 - **Operational benchmark:** latency p50=13.86s (approved) / 27.82s (escalated), median revisions=1.0
@@ -49,7 +49,7 @@ No migration steps required. Update the wheel pin: `planner_critic-0.2.0-py3-non
 | Verdict deltas vs v0.2.0 | 30 — all attributable |
 | Scorecard A | PASS |
 | Scorecard B (pass\* semantics) | 100% |
-| Deterministic tests | 1295/1295 pass |
+| Deterministic tests | 1294/1294 pass (15 skipped: 14 docker-gated + 1 flaky) |
 | Benchmarks | 3/3 complete |
 | Live-critic boundary (#218) | Complete — report committed |
 | Total LLM cost | ~$0.49 |
