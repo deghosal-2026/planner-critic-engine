@@ -23,7 +23,7 @@
 
 ## Defect Classification (v0.1.0 — v0.2.1)
 
-All 41 bugs found across v0.1.0–v0.2.1, classified by first-detectable layer.
+All 51 bugs found across v0.1.0 — v0.2.2, classified by first-detectable layer.
 
 ### Code Review (31 bugs)
 

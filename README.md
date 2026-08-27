@@ -4,20 +4,20 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
-[![PyPI](https://img.shields.io/badge/pypi-v0.2.1-blue)](https://pypi.org/project/planner-critic/)
+[![PyPI](https://img.shields.io/badge/pypi-v0.2.2-blue)](https://pypi.org/project/planner-critic/)
 [![Ruff](https://img.shields.io/badge/code%20style-ruff-000000)](https://github.com/astral-sh/ruff)
 [![Type checked](https://img.shields.io/badge/mypy-strict-blue)](https://github.com/python/mypy)
 [![Coverage](https://img.shields.io/badge/coverage-91%25-brightgreen)](https://github.com/deghosal-2026/planner-critic-engine/actions)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14184/badge)](https://www.bestpractices.dev/projects/14184)
-[![Field Test](https://img.shields.io/badge/field%20test-170%20goals%2C%200%20failures-brightgreen)](docs/field-test/v0.2.1/field-test-results-0.2.1.md)
+[![Field Test](https://img.shields.io/badge/field%20test-170%20goals%2C%200%20failures-brightgreen)](docs/field-test/v0.2.2/field-test-results.md)
 
 **Hierarchical task planning with an independent LLM critic. A planner decomposes a goal into a structured plan; a critic audits every subtask; the plan is revised until approval — or escalated to a human.**
 
 </div>
 
 > [!NOTE]
-> **Status:** v0.2.1 released · [PyPI](https://pypi.org/project/planner-critic/) · `pip install planner-critic`
+> **Status:** v0.2.2 released · [PyPI](https://pypi.org/project/planner-critic/) · `pip install planner-critic`
 > **License:** MIT
 
 ---
@@ -81,6 +81,19 @@ The plan is a persisted, versioned artifact — you can diff revisions, see whic
 | **Histogram cycling detection** | Period-2 reshuffling stall signal — A→B→A→B pattern detection (#217) | v0.2.1 |
 | **Live-critic boundary evaluator** | Repeated-trial label-flip, evidence-drift, family-migration, underclaim metrics (#218) | v0.2.1 |
 | **Failure-mode register** | Intentional vs. needs-evidence assumptions register (14 rows) (#220) | v0.2.1 |
+| **Runtime precondition verification** | On by default; coverage honesty, fail-closed path (#244) | v0.2.2 |
+| **Typed rollback contracts** | Declarative restored-state + restoration-evidence on RollbackStep (#245) | v0.2.2 |
+| **Requirement-traceability gate** | Every plan step traces back to an acceptance criterion (#255) | v0.2.2 |
+| **Machine-actionable findings** | Edge targeting, observed-state, evidence refs, schema versioning (#243) | v0.2.2 |
+| **Decision-context capture** | Model metadata + unsupported-evidence frequency in boundary runner (#242) | v0.2.2 |
+| **Indirect-injection defense** | Capability-scoped state transitions + tool-result provenance (#249, #258) | v0.2.2 |
+| **Benign-twin control** | 11 benign twins measure injection isolation vs gate strictness (#260) | v0.2.2 |
+| **Compositional injection traps** | Individually feasible steps harmful in combination (#256) | v0.2.2 |
+| **Escalation audit trail** | Actor field, explain output, identity plumbing (#261) | v0.2.2 |
+| **Cost-vs-rigor guardrails** | Immutable gates config prevents skipping deterministic gates (#262) | v0.2.2 |
+| **Critic satisfaction signals** | Strict mode approves when critic explicitly endorses (#254) | v0.2.2 |
+| **Adaptive revision cap** | Strict goals cap at 1 revision to save LLM calls (#251) | v0.2.2 |
+| **Failure-origin taxonomy** | 51 bugs classified by first-detectable layer (#264) | v0.2.2 |
 
 ### What It Is Not
 
@@ -164,20 +177,18 @@ See [API Reference](docs/reference/api.md) for full CLI docs, HTTP endpoints, an
 
 170 goals across 40 domains, all run against a real LLM (gpt-4o-mini via OpenRouter):
 
-| Metric | v0.2.1 Result | v0.2.0 Result |
+| Metric | v0.2.2 Result | v0.2.1 Result |
 |--------|---------------|---------------|
 | Balanced goals approved | **73/73 (100%)** | **73/73 (100%)** |
-| Strict goals escalated | **96/97 (99%)** ⚠ 1 transient error | **97/97 (100%)** |
-| Adversarial goals escalated | **8/8 (100%)** | **8/8 (100%)** |
+| Strict goals escalated | **96/97 (99%)** ⚠ 1 transient error | **96/97 (99%)** ⚠ 1 transient error |
+| Adversarial goals escalated | **11/11 (100%)** ⚠ 3 adversarial-policy added | **8/8 (100%)** |
 | True failures | **0** | **0** |
 | Deterministic gate passes | **170/170 (100%)** | **170/170 (100%)** |
-| Verdict deltas vs prior | 30 — all attributable | — |
-| Deterministic tests | **1295 pass** | **90 pass** |
-| Benchmarks | **3/3** | **3/3** |
+| Deterministic tests | **1342 pass** | **1294 pass** |
+| Benchmarks | **5** | **3** |
 | **Scorecard A** | **PASS** | **PASS** |
-| **Scorecard B (pass\*)** | **100%** | **100%** |
 
-Full results: [field-test-results-0.2.1.md](docs/field-test/v0.2.1/field-test-results-0.2.1.md) | [v0.2.0 results](docs/field-test/v0.2.0/field-test-results-0.2.0.md)
+Full results: [field-test-results.md](docs/field-test/v0.2.2/field-test-results.md) | [v0.2.1 results](docs/field-test/v0.2.1/field-test-results-0.2.1.md)
 
 ---
 

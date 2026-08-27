@@ -2,7 +2,7 @@
 
 > **Status:** Measurement spec (v0.2.2) — implementation deferred to partner-runner integration.
 > **Author:** Debashish Ghosal · **Date:** 2026-08-26
-> **F-07 companion:** Operational cost benchmark (#221, shipped v0.2.1)
+> **F-07 companion:** Operational cost benchmark (#221, shipped v0.2.1, baseline for v0.2.2)
 
 ---
 

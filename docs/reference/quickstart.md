@@ -1,4 +1,4 @@
-# User Guide — v0.2.1
+# User Guide — v0.2.2
 
 ## Install
 

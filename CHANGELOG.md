@@ -1,5 +1,42 @@
 # Changelog
 
+## v0.2.2 (2026-08-26)
+
+### Foundation Corrections (M1)
+- Fixed "Zero True Failures" prose contradiction in v0.2.1 field test report (#246)
+- Reconciled `plan_oscillation_detected` count from 3 to 5 (#247)
+- Removed 75 pytest-cov artifacts from `src/` and added `*.py,cover` to `.gitignore` (#248)
+- Reconciled 1294/1295 test count discrepancy in v0.2.1 docs (#263)
+- Created failure-origin taxonomy classifying 51 bugs by first-detectable layer (#264)
+
+### Gate & Schema Hardening (M2)
+- Runtime precondition verification on by default (mode defaults to `before-each-step`) (#244)
+- Typed rollback restoration contracts: `restores_state` + `restoration_evidence` on `RollbackStep` (#245)
+- Requirement-traceability gate: opt-in `satisfies` field on `Task` (#255)
+- Machine-actionable finding contract: `edge_id`, `observed_state`, `evidence_refs`, `FINDING_SCHEMA_VERSION` (#243)
+- Decision-context capture + unsupported-evidence frequency metric in live-boundary runner (#242)
+
+### Security & Injection Resistance (M3)
+- Wired `approving_authority` through CLI/HTTP/MCP surfaces (#238)
+- Fixed field_test_harness escalation auto-approve (scope, deny path, wrong-principal test) (#253)
+- 11 benign-twin goal files for adversarial goals — measures injection isolation vs gate strictness (#260)
+- Tool-result provenance + capability-scoped state transitions module (#249, #258)
+- 3 compositional injection trap goals (individually feasible, harmful in combination) (#256)
+- Well-formed malicious plan detection tests — structural gates pass, intent is malicious (#259)
+
+### Operational & Audit (M4)
+- Cost-vs-rigor guardrails: immutable `GatesConfig` with validation (#262)
+- Escalation audit trail: `resolved_by` field, `build_explain` shows accurate status after resolution (#261)
+- Critic satisfaction signals: `CRITIC_SATISFIED` reason code for strict mode approval (#254)
+- Adaptive revision cap: strict goals reduce to 1 revision (opt-in, default off) (#251)
+- Critic/planner capability tier split: config example for separate model tiers (#257)
+- Multi-model planner comparison benchmark script (#252)
+- Downstream error rate measurement specification (#250)
+
+### Known Issues
+- TUI/studio/IDE extensions deferred to v0.3.0 (#133, #135, #136, #138, #154, #157)
+- `approving_authority` wiring completed in this release (#238, resolves F-14)
+
 ## v0.2.1 (2026-08-23)
 
 ### Hardening
