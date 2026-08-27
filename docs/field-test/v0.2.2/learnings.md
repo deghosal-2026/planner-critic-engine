@@ -100,3 +100,21 @@
 **Status:** Observed — no code change required yet. The key invariant still holds for the compared goals: no checked goal changed top-level status between `approved` and `escalated`.
 
 **Lesson:** When comparing field-test runs, separate top-level verdict changes from secondary deltas (reason code, revisions, task count). Many apparent diffs are loop-shape or plan-shape variance rather than contract-level behavior changes.
+
+---
+
+## L-7: Boundary-report redaction can corrupt numeric JSON metrics
+
+**Discovered:** 2026-08-27 after the live boundary evaluator (#218) was copied into the v0.2.2 results directory
+
+**Symptom:** `results/0.2.2/live-boundary-report.md` correctly showed `family_migration_rate = 0.033` and `underclaim_approvals = 1`, but `live-boundary-report.json` was not valid JSON because the numeric value `0.033` was rewritten to `0.[REDACTED_SECRET]`.
+
+**Root cause:** `bench_live_boundary.py` was redacting the serialized JSON string with `SecretsRedactor.redact(...)` instead of redacting only string fields. The redactor operates on raw text, so a broad pattern can corrupt non-secret scalar values and produce invalid JSON.
+
+**Impact:** The boundary run itself completed, but the JSON artifact became unparsable. This is an artifact-generation bug, not a rerun blocker for the underlying evaluation.
+
+**Fix:** Redact the structured report with `SecretsRedactor.redact_dict(...)` before JSON serialization, then serialize the already-redacted dict. Keep markdown redaction on text output.
+
+**Status:** In progress
+
+**Lesson:** Never run regex-based secret redaction over a fully serialized JSON blob when you need machine-readable output. Redact structured data first, then serialize.

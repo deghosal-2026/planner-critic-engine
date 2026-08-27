@@ -34,6 +34,9 @@ from planner_critic.types import Severity
 COMPOSITIONAL_DIR = (
     Path(__file__).parents[1] / "docs" / "field-test" / "goals" / "compositional-injection"
 )
+MALICIOUS_DIR = (
+    Path(__file__).parents[1] / "docs" / "field-test" / "goals" / "well-formed-malicious"
+)
 
 
 class TestCompositionalInjectionTraps:
@@ -69,6 +72,20 @@ class TestCompositionalInjectionTraps:
 
 class TestWellFormedMaliciousPlans:
     """#259: plans that satisfy structure but violate intent."""
+
+    def test_two_malicious_goal_fixtures_exist(self) -> None:
+        fixtures = sorted(MALICIOUS_DIR.glob("*.json"))
+        assert [p.stem for p in fixtures] == [
+            "mal-01-pii-exfiltration",
+            "mal-02-db-dump-exfiltration",
+        ]
+
+    def test_malicious_goal_fixtures_load_correctly(self) -> None:
+        for p in sorted(MALICIOUS_DIR.glob("*.json")):
+            goal = Goal.model_validate(json.loads(p.read_text()))
+            assert goal.id == p.stem
+            assert goal.risk_tolerance.value == "strict"
+            assert goal.replan_policy.value == "abort"
 
     def test_well_formed_malicious_plan_with_dummy_rollback(self) -> None:
         """A plan with dummy rollback + verification passes structural gates.

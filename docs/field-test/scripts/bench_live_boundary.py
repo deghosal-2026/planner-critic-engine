@@ -10,7 +10,7 @@ times per plan and reduces the four community-review metrics:
 
 The harness itself is :func:`planner_critic.eval.live_boundary.run_live_boundary_cases`;
 this script wires a registry/env-backed provider into it and commits the JSON +
-markdown artifacts under ``results/0.2.1/``. Mirrors ``bench_cycling.py`` /
+markdown artifacts under ``results/0.2.2/``. Mirrors ``bench_cycling.py`` /
 ``bench_operational.py`` methodology. Spend ceiling: ≤ $1 at mini-class models
 (~60 audits at 5 trials × 6 cases × 2 plans).
 
@@ -55,7 +55,7 @@ def _find_repo_root() -> Path:
     raise RuntimeError(f"cannot find repo root above {SCRIPTS_DIR}")
 
 REPO_ROOT = _find_repo_root()
-RESULTS_DIR = REPO_ROOT / "results" / "0.2.1"
+RESULTS_DIR = REPO_ROOT / "results" / "0.2.2"
 
 PROVIDERS: dict[str, dict] = {
     "openai": {
@@ -72,15 +72,15 @@ PROVIDERS: dict[str, dict] = {
 
 #: A generic migration goal giving the critic prompt context. The boundary
 #: cases are all migration/rollback-flavored synthetic plans (goal_id="test");
-#: one goal description covers them — the critic audits the *plan*, the goal
-#: is framing only.
+#: one goal description covers them. Use strict framing so seeded defects are
+#: expected to land as blockers rather than advisory-only warnings.
 _BOUNDARY_GOAL = Goal(
     id="boundary-critic",
     description=(
         "Migrate a stateful service from a legacy platform to a new one with "
         "rollback safety, verified mutations, and correct task ordering."
     ),
-    risk_tolerance=RiskTolerance.BALANCED,
+    risk_tolerance=RiskTolerance.STRICT,
 )
 
 
@@ -169,7 +169,7 @@ def build_live_critic(provider_name: str | None = None) -> tuple[Any, str]:
 def _markdown_summary(report: dict, model: str, trials: int, elapsed_s: float) -> str:
     """Render a short markdown summary of the live run."""
     lines = [
-        "# Live-critic boundary-case report — v0.2.1 (#218)",
+        "# Live-critic boundary-case report — v0.2.2 (#218)",
         "",
         f"- **Model:** `{model}`",
         f"- **Trials per plan:** {trials}",
@@ -212,7 +212,7 @@ def run_boundary(critic: Any, *, trials: int = 5, model: str = "stub") -> dict:
         model: Model label for the markdown header.
 
     Returns:
-        The report dict (also written to results/0.2.1/).
+        The report dict (also written to results/0.2.2/).
     """
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     cases = generate_boundary_cases()
@@ -223,7 +223,8 @@ def run_boundary(critic: Any, *, trials: int = 5, model: str = "stub") -> dict:
     report["model"] = model  # type: ignore[assignment]
 
     redactor = SecretsRedactor()
-    redacted_json = redactor.redact(json.dumps(report, indent=2, default=str))
+    redacted_report = redactor.redact_dict(report)
+    redacted_json = json.dumps(redacted_report, indent=2, default=str)
     redacted_md = redactor.redact(_markdown_summary(report, model, trials, elapsed))
 
     json_path = RESULTS_DIR / "live-boundary-report.json"

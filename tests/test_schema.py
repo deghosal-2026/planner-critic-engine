@@ -200,9 +200,7 @@ class TestRollbackStepLenientCoercion:
         """A proper list is unchanged."""
         from planner_critic.schema.plan import RollbackStep
 
-        rb = RollbackStep(
-            trigger="fail", action="revert", restores_state=["a", "b"]
-        )
+        rb = RollbackStep(trigger="fail", action="revert", restores_state=["a", "b"])
         assert rb.restores_state == ["a", "b"]
 
     def test_none_unchanged(self) -> None:

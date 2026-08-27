@@ -100,4 +100,4 @@
 | ✅ P2 subsystem hermetic | ✅ 93 passed |
 | ✅ P4 benchmarks | ✅ all pass |
 | ⏳ P3 LLM (goals sweep) | COMPLETE — 181 runs (170 inherited + 11 new) |
-| ⏳ P3 LLM (boundary #218) | PENDING — run `--subsystem --all --run-llm --no-goals` |
+| ✅ P3 LLM (boundary #218) | COMPLETE — 6 cases × 5 trials, 60 audits, `underclaim_approvals=1` |
