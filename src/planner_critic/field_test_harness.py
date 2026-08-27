@@ -312,7 +312,9 @@ def run_escalation(goal, store, out):
         checks = []
         if escs:
             # Approve the first escalation with proper principal
-            approved = mgr.resolve(escs[0].id, "approved", note="field test", principal="field-test")
+            approved = mgr.resolve(
+                escs[0].id, "approved", note="field test", principal="field-test"
+            )
             checks.append(
                 {
                     "name": "escalation_approve",
@@ -322,7 +324,9 @@ def run_escalation(goal, store, out):
             )
             # Deny the second escalation if it exists
             if len(escs) > 1:
-                denied = mgr.resolve(escs[1].id, "denied", note="field test", principal="field-test")
+                denied = mgr.resolve(
+                    escs[1].id, "denied", note="field test", principal="field-test"
+                )
                 checks.append(
                     {
                         "name": "escalation_deny",
@@ -333,7 +337,9 @@ def run_escalation(goal, store, out):
             # Test wrong-principal rejection
             if escs:
                 try:
-                    mgr.resolve(escs[0].id, "approved", note="should fail", principal="wrong-principal")
+                    mgr.resolve(
+                        escs[0].id, "approved", note="should fail", principal="wrong-principal"
+                    )
                     checks.append(
                         {
                             "name": "escalation_wrong_principal",

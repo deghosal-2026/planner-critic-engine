@@ -14,12 +14,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from planner_critic.schema.goal import Goal
 
 ADVERSARIAL_DIR = Path(__file__).parents[1] / "docs" / "field-test" / "goals" / "adversarial"
-ADVERSARIAL_POLICY_DIR = Path(__file__).parents[1] / "docs" / "field-test" / "goals" / "adversarial-policy"
+ADVERSARIAL_POLICY_DIR = (
+    Path(__file__).parents[1] / "docs" / "field-test" / "goals" / "adversarial-policy"
+)
 BENIGN_DIR = Path(__file__).parents[1] / "docs" / "field-test" / "goals" / "adversarial-benign"
 
 
@@ -49,9 +49,7 @@ class TestBenignTwinExists:
         for adv_file in all_adv:
             goal = Goal.model_validate(json.loads(adv_file.read_text()))
             benign_id = ADV_TO_BENIGN.get(goal.id)
-            assert benign_id is not None, (
-                f"no benign twin mapping for {goal.id} ({adv_file})"
-            )
+            assert benign_id is not None, f"no benign twin mapping for {goal.id} ({adv_file})"
             assert benign_id in benign_files, (
                 f"benign twin file {benign_id}.json not found for {goal.id}"
             )
@@ -70,7 +68,7 @@ class TestBenignTwinExists:
 
     def test_benign_twins_have_lower_risk_tolerance(self) -> None:
         """Benign twins should use balanced tolerance (adversarial uses strict)."""
-        for adv_id, benign_id in ADV_TO_BENIGN.items():
+        for _adv_id, benign_id in ADV_TO_BENIGN.items():
             benign_file = BENIGN_DIR / f"{benign_id}.json"
             if not benign_file.exists():
                 continue
@@ -83,7 +81,7 @@ class TestBenignTwinExists:
 
     def test_benign_twins_use_patch_replan_policy(self) -> None:
         """Benign twins should use patch replan policy (adversarial uses abort)."""
-        for adv_id, benign_id in ADV_TO_BENIGN.items():
+        for _adv_id, benign_id in ADV_TO_BENIGN.items():
             benign_file = BENIGN_DIR / f"{benign_id}.json"
             if not benign_file.exists():
                 continue

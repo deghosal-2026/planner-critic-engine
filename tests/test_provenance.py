@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from planner_critic.provenance import (
     CapabilityLevel,
     ToolResultProvenance,
@@ -101,9 +99,7 @@ class TestToolResultProvenance:
 
     def test_explicit_capability_overrides_source(self) -> None:
         """Explicit capability overrides source-based default."""
-        prov = ToolResultProvenance(
-            source="web_fetch", capability=CapabilityLevel.ADMIN_OVERRIDE
-        )
+        prov = ToolResultProvenance(source="web_fetch", capability=CapabilityLevel.ADMIN_OVERRIDE)
         assert prov.can_perform("approve")
 
     def test_check_returns_reason(self) -> None:

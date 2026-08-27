@@ -13,8 +13,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from planner_critic.gates import run_deterministic_gates
 from planner_critic.reason_codes import (
     MISSING_ROLLBACK,
@@ -33,7 +31,9 @@ from planner_critic.schema.plan import (
 )
 from planner_critic.types import Severity
 
-COMPOSITIONAL_DIR = Path(__file__).parents[1] / "docs" / "field-test" / "goals" / "compositional-injection"
+COMPOSITIONAL_DIR = (
+    Path(__file__).parents[1] / "docs" / "field-test" / "goals" / "compositional-injection"
+)
 
 
 class TestCompositionalInjectionTraps:

@@ -159,9 +159,9 @@ class ToolResultProvenance:
 
 
 __all__ = [
+    "TRANSITION_REQUIREMENTS",
     "CapabilityLevel",
     "ToolResultProvenance",
-    "TRANSITION_REQUIREMENTS",
     "check_transition_capability",
     "default_capability_for_source",
 ]

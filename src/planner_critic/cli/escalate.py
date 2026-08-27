@@ -59,12 +59,20 @@ def build_escalate_parser() -> argparse.ArgumentParser:
     approve.add_argument("escalation_id", help="Escalation id")
     approve.add_argument("--patch", default=None, help="PlanVersion JSON to store and re-critique")
     approve.add_argument("--note", default="", help="Resolution note")
-    approve.add_argument("--principal", default=None, help="Approving principal (required when approving_authority is set)")
+    approve.add_argument(
+        "--principal",
+        default=None,
+        help="Approving principal (required when approving_authority is set)",
+    )
 
     deny = sub.add_parser("deny", help="Deny an escalation")
     deny.add_argument("escalation_id", help="Escalation id")
     deny.add_argument("--note", default="", help="Resolution note")
-    deny.add_argument("--principal", default=None, help="Denying principal (required when approving_authority is set)")
+    deny.add_argument(
+        "--principal",
+        default=None,
+        help="Denying principal (required when approving_authority is set)",
+    )
     return parser
 
 
