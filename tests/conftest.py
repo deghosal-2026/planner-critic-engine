@@ -49,6 +49,7 @@ def make_task(
     rollback: dict[str, object] | None = None,
     parallel_group: str | None = None,
     preconditions: list[dict[str, object]] | None = None,
+    satisfies: str | None = None,
 ) -> Task:
     """Build a task with explicit but convenient defaults."""
     return Task.model_validate(
@@ -63,6 +64,7 @@ def make_task(
             "rollback": rollback,
             "parallel_group": parallel_group,
             "preconditions": preconditions or [],
+            "satisfies": satisfies,
         }
     )
 

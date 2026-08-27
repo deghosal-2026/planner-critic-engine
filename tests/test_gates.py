@@ -32,7 +32,7 @@ class TestSchemaValidGate:
 
     def test_blank_task_id_flagged(self) -> None:
         """A blank task id is a structural flaw."""
-        findings = run_deterministic_gates(make_plan(tasks=[make_task("valid"), make_task(" ")]))
+        findings = run_deterministic_gates(make_plan(tasks=[make_task("valid", satisfies="criterion"), make_task(" ", satisfies="criterion")]))
         assert PLAN_SCHEMA_INVALID in {f.reason_code for f in findings}
 
 
@@ -42,7 +42,7 @@ class TestDepCyclesGate:
     def test_cycle_flagged(self) -> None:
         """t1 -> t2 -> t1 is a cycle."""
         plan = make_plan(
-            tasks=[make_task("t1"), make_task("t2")],
+            tasks=[make_task("t1", satisfies="criterion"), make_task("t2", satisfies="criterion")],
             dependencies=[hard_dep("t1", "t2"), hard_dep("t2", "t1")],
         )
         findings = run_deterministic_gates(plan)
@@ -54,7 +54,7 @@ class TestDepCyclesGate:
     def test_longer_cycle_flagged(self) -> None:
         """t1 -> t2 -> t3 -> t1 is flagged too."""
         plan = make_plan(
-            tasks=[make_task("t1"), make_task("t2"), make_task("t3")],
+            tasks=[make_task("t1", satisfies="criterion"), make_task("t2", satisfies="criterion"), make_task("t3", satisfies="criterion")],
             dependencies=[
                 hard_dep("t1", "t2"),
                 hard_dep("t2", "t3"),
@@ -66,7 +66,7 @@ class TestDepCyclesGate:
     def test_dag_passes(self) -> None:
         """A plain DAG is not flagged."""
         plan = make_plan(
-            tasks=[make_task("t1"), make_task("t2")],
+            tasks=[make_task("t1", satisfies="criterion"), make_task("t2", satisfies="criterion")],
             dependencies=[hard_dep("t1", "t2")],
         )
         assert DEPENDENCY_CYCLE not in {f.reason_code for f in run_deterministic_gates(plan)}
@@ -78,7 +78,7 @@ class TestOrderingGate:
     def test_reversed_order_flagged(self) -> None:
         """t2 runs before t1 but depends on it."""
         plan = make_plan(
-            tasks=[make_task("t2"), make_task("t1")],
+            tasks=[make_task("t2", satisfies="criterion"), make_task("t1", satisfies="criterion")],
             dependencies=[hard_dep("t1", "t2")],
         )
         findings = run_deterministic_gates(plan)
@@ -90,14 +90,14 @@ class TestOrderingGate:
     def test_correct_order_passes(self) -> None:
         """t1 before t2 with t1->t2 is fine."""
         plan = make_plan(
-            tasks=[make_task("t1"), make_task("t2")],
+            tasks=[make_task("t1", satisfies="criterion"), make_task("t2", satisfies="criterion")],
             dependencies=[hard_dep("t1", "t2")],
         )
         assert UNSAFE_ORDERING not in {f.reason_code for f in run_deterministic_gates(plan)}
 
     def test_no_dependencies_passes(self) -> None:
         """No edges → no ordering findings."""
-        plan = make_plan(tasks=[make_task("t1"), make_task("t2")])
+        plan = make_plan(tasks=[make_task("t1", satisfies="criterion"), make_task("t2", satisfies="criterion")])
         assert UNSAFE_ORDERING not in {f.reason_code for f in run_deterministic_gates(plan)}
 
 
@@ -106,7 +106,7 @@ class TestVerificationGate:
 
     def test_high_risk_without_verification_flagged(self) -> None:
         """A critical task with no verification is a blocker."""
-        plan = make_plan(tasks=[make_task("t1", risk_class="critical")])
+        plan = make_plan(tasks=[make_task("t1", risk_class="critical", satisfies="criterion")])
         findings = run_deterministic_gates(plan)
         codes = {f.reason_code for f in findings}
         assert MISSING_VERIFICATION in codes
@@ -116,7 +116,7 @@ class TestVerificationGate:
 
     def test_high_blast_radius_flagged(self) -> None:
         """blast_radius=critical without verification is flagged."""
-        plan = make_plan(tasks=[make_task("t1", blast_radius="critical")])
+        plan = make_plan(tasks=[make_task("t1", blast_radius="critical", satisfies="criterion")])
         assert MISSING_VERIFICATION in {f.reason_code for f in run_deterministic_gates(plan)}
 
     def test_verification_present_passes(self) -> None:
@@ -127,6 +127,7 @@ class TestVerificationGate:
                     "t1",
                     risk_class="critical",
                     verification={"what": "x", "how": "y", "expected": "z"},
+                    satisfies="criterion",
                 )
             ]
         )
@@ -134,7 +135,7 @@ class TestVerificationGate:
 
     def test_medium_risk_skipped(self) -> None:
         """Medium-risk tasks are not required to carry verification."""
-        plan = make_plan(tasks=[make_task("t1")])
+        plan = make_plan(tasks=[make_task("t1", satisfies="criterion")])
         assert MISSING_VERIFICATION not in {f.reason_code for f in run_deterministic_gates(plan)}
 
 
@@ -143,7 +144,7 @@ class TestRollbackGate:
 
     def test_high_risk_without_rollback_flagged(self) -> None:
         """A critical task with no rollback is a blocker."""
-        plan = make_plan(tasks=[make_task("t1", risk_class="high")])
+        plan = make_plan(tasks=[make_task("t1", risk_class="high", satisfies="criterion")])
         findings = run_deterministic_gates(plan)
         assert MISSING_ROLLBACK in {f.reason_code for f in findings}
         bad = next(f for f in findings if f.reason_code == MISSING_ROLLBACK)
@@ -157,6 +158,7 @@ class TestRollbackGate:
                     "t1",
                     risk_class="high",
                     rollback={"trigger": "fail", "action": "undo", "safety_guard": "g"},
+                    satisfies="criterion",
                 )
             ]
         )
@@ -169,7 +171,7 @@ class TestPreconditionsGate:
     def test_unreferenced_precondition_flagged(self) -> None:
         """A precondition with no source is unverifiable."""
         plan = make_plan(
-            tasks=[make_task("t1", preconditions=[{"description": "p", "fact": "some fact"}])]
+            tasks=[make_task("t1", preconditions=[{"description": "p", "fact": "some fact"}], satisfies="criterion")]
         )
         assert UNVERIFIED_PRECONDITION in {f.reason_code for f in run_deterministic_gates(plan)}
 
@@ -177,12 +179,13 @@ class TestPreconditionsGate:
         """A precondition referencing an earlier task id is grounded."""
         plan = make_plan(
             tasks=[
-                make_task("t1"),
+                make_task("t1", satisfies="criterion"),
                 make_task(
                     "t2",
                     preconditions=[
                         {"description": "p", "fact": "t1 output", "established_by": "t1"}
                     ],
+                    satisfies="criterion",
                 ),
             ]
         )
@@ -201,6 +204,7 @@ class TestPreconditionsGate:
                             "probe": {"kind": "db_query", "query": "select 1", "expected": "1"},
                         }
                     ],
+                    satisfies="criterion",
                 )
             ]
         )
@@ -220,8 +224,9 @@ class TestPreconditionsGate:
                     preconditions=[
                         {"description": "p", "fact": "later output", "established_by": "t2"}
                     ],
+                    satisfies="criterion",
                 ),
-                make_task("t2"),
+                make_task("t2", satisfies="criterion"),
             ]
         )
         assert UNVERIFIED_PRECONDITION in {f.reason_code for f in run_deterministic_gates(plan)}
@@ -233,6 +238,7 @@ class TestPreconditionsGate:
                 make_task(
                     "t1",
                     preconditions=[{"description": "p", "fact": "own", "established_by": "t1"}],
+                    satisfies="criterion",
                 )
             ]
         )
@@ -246,8 +252,8 @@ class TestParallelSafetyGate:
         """Two critical tasks in the same group is a concurrency hazard."""
         plan = make_plan(
             tasks=[
-                make_task("t1", risk_class="high", parallel_group="g"),
-                make_task("t2", risk_class="high", parallel_group="g"),
+                make_task("t1", risk_class="high", parallel_group="g", satisfies="criterion"),
+                make_task("t2", risk_class="high", parallel_group="g", satisfies="criterion"),
             ]
         )
         findings = run_deterministic_gates(plan)
@@ -257,8 +263,8 @@ class TestParallelSafetyGate:
         """One high-blast task per group is fine."""
         plan = make_plan(
             tasks=[
-                make_task("t1", risk_class="high", parallel_group="g"),
-                make_task("t2", risk_class="low", parallel_group="g"),
+                make_task("t1", risk_class="high", parallel_group="g", satisfies="criterion"),
+                make_task("t2", risk_class="low", parallel_group="g", satisfies="criterion"),
             ]
         )
         assert UNSAFE_PARALLELIZATION not in {f.reason_code for f in run_deterministic_gates(plan)}
@@ -269,16 +275,16 @@ class TestOrchestrator:
 
     def test_clean_plan_has_no_findings(self) -> None:
         """A fully-validated low-risk plan passes every gate."""
-        plan = make_plan(tasks=[make_task("t1"), make_task("t2")])
+        plan = make_plan(tasks=[make_task("t1", satisfies="criterion"), make_task("t2", satisfies="criterion")])
         assert run_deterministic_gates(plan) == []
 
     def test_deterministic_equal_plans_equal_findings(self) -> None:
         """Identical plan → identical findings (F-74 CI assertion)."""
         plan = make_plan(
             tasks=[
-                make_task("t1", risk_class="high", parallel_group="g"),
-                make_task("t2", risk_class="high", parallel_group="g"),
-                make_task("t3", preconditions=[{"description": "unmet", "fact": "nope"}]),
+                make_task("t1", risk_class="high", parallel_group="g", satisfies="criterion"),
+                make_task("t2", risk_class="high", parallel_group="g", satisfies="criterion"),
+                make_task("t3", preconditions=[{"description": "unmet", "fact": "nope"}], satisfies="criterion"),
             ]
         )
         plan2 = plan.model_copy(deep=True)
@@ -290,9 +296,9 @@ class TestOrchestrator:
         """The orchestrator returns findings from every gate when all flaws are seeded."""
         plan = make_plan(
             tasks=[
-                make_task("t1", risk_class="high", parallel_group="g"),
-                make_task("t2", risk_class="high", parallel_group="g"),
-                make_task("t3", preconditions=[{"description": "unmet", "fact": "nope"}]),
+                make_task("t1", risk_class="high", parallel_group="g", satisfies="criterion"),
+                make_task("t2", risk_class="high", parallel_group="g", satisfies="criterion"),
+                make_task("t3", preconditions=[{"description": "unmet", "fact": "nope"}], satisfies="criterion"),
             ]
         )
         findings = run_deterministic_gates(plan)

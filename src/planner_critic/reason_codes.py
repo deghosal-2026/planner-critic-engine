@@ -28,6 +28,7 @@ ROLLBACK_SELF_DEPENDENT: Literal["rollback_self_dependent"] = "rollback_self_dep
 ROLLBACK_INCONSISTENT_STATE: Literal["rollback_inconsistent_state"] = "rollback_inconsistent_state"
 ROLLBACK_POST_CONSUMED: Literal["rollback_post_consumed"] = "rollback_post_consumed"
 ROLLBACK_STATE_UNDECLARED: Literal["rollback_state_undeclared"] = "rollback_state_undeclared"
+STEP_NOT_TRACED_TO_CRITERION: Literal["step_not_traced_to_criterion"] = "step_not_traced_to_criterion"
 FAMILY_HISTOGRAM_CYCLING: Literal["family_histogram_cycling"] = "family_histogram_cycling"
 
 # --- Deterministic auto-fix codes (PRD §2.6, M2) ------------------------------
@@ -208,6 +209,7 @@ ReasonCode: TypeAlias = Literal[
     "rollback_inconsistent_state",
     "rollback_post_consumed",
     "rollback_state_undeclared",
+    "step_not_traced_to_criterion",
     "family_histogram_cycling",
     "auto_repaired_ordering",
     "auto_closed_precondition",
@@ -328,6 +330,11 @@ REASON_CODE_DESCRIPTIONS: dict[ReasonCode, str] = {
         "A high-blast-radius task has a rollback but does not declare what "
         "state it restores — add restores_state and restoration_evidence "
         "for verifiable recovery"
+    ),
+    STEP_NOT_TRACED_TO_CRITERION: (
+        "A plan step does not trace to any acceptance criterion bound to "
+        "the goal — the plan may be structurally sound but semantically "
+        "wrong (delivering the wrong goal)"
     ),
     FAMILY_HISTOGRAM_CYCLING: (
         "The blocker-family histogram repeats at lag ≥ 2 while consecutive "

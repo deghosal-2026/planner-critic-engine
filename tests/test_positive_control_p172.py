@@ -31,6 +31,7 @@ def _golden_plan() -> PlanVersion:
                     "risk_class": "low",
                     "preconditions": [],
                     "verification": {"what": "x", "how": "y", "expected": "z"},
+                    "satisfies": "criterion",
                 },
                 {
                     "id": "t2",
@@ -55,6 +56,7 @@ def _golden_plan() -> PlanVersion:
                         "how": "run checks",
                         "expected": "pass",
                     },
+                    "satisfies": "criterion",
                 },
             ],
             "dependencies": [{"from_task": "t1", "to_task": "t2", "kind": "hard"}],

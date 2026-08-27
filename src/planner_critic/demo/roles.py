@@ -110,6 +110,7 @@ def _task(
     verification: VerificationStep | None = None,
     rollback: RollbackStep | None = None,
     preconditions: list[Precondition] | None = None,
+    satisfies: str | None = None,
 ) -> Task:
     """A task with explicit but convenient defaults (ids match descriptions)."""
     return Task.model_validate(
@@ -123,6 +124,7 @@ def _task(
             "verification": verification,
             "rollback": rollback,
             "preconditions": preconditions or [],
+            "satisfies": satisfies,
         }
     )
 
@@ -192,8 +194,8 @@ def _migration() -> _Scenario:
         return _plan(
             goal_id,
             tasks=[
-                _task("snapshot", "Take a pre-cutover snapshot of the production database"),
-                _task("backfill", "Run the incremental schema backfill"),
+                _task("snapshot", "Take a pre-cutover snapshot of the production database", satisfies="criterion"),
+                _task("backfill", "Run the incremental schema backfill", satisfies="criterion"),
                 _task(
                     "cutover",
                     "Switch traffic to the new schema",
@@ -208,6 +210,7 @@ def _migration() -> _Scenario:
                             probed=True,
                         )
                     ],
+                    satisfies="criterion",
                 ),
             ],
             deps=[_dep("snapshot", "backfill"), _dep("backfill", "cutover")],
@@ -218,8 +221,8 @@ def _migration() -> _Scenario:
             goal_id,
             version=2,
             tasks=[
-                _task("snapshot", "Take a pre-cutover snapshot of the production database"),
-                _task("backfill", "Run the incremental schema backfill"),
+                _task("snapshot", "Take a pre-cutover snapshot of the production database", satisfies="criterion"),
+                _task("backfill", "Run the incremental schema backfill", satisfies="criterion"),
                 _task(
                     "verify",
                     "Verify schema compatibility before cutover",
@@ -228,6 +231,7 @@ def _migration() -> _Scenario:
                         "run the version-compat query suite",
                         "compat suite passes",
                     ),
+                    satisfies="criterion",
                 ),
                 _task(
                     "cutover",
@@ -243,6 +247,7 @@ def _migration() -> _Scenario:
                             probed=True,
                         )
                     ],
+                    satisfies="criterion",
                 ),
             ],
             deps=[
@@ -281,10 +286,11 @@ def _rollout() -> _Scenario:
                     "shift traffic back",
                     "rollback window is open",
                 ),
+                satisfies="criterion",
             )
 
         return [
-            _task("create", "Create the new API fleet"),
+            _task("create", "Create the new API fleet", satisfies="criterion"),
             _task(
                 "rollback-window",
                 "Open the global rollback window",
@@ -292,6 +298,7 @@ def _rollout() -> _Scenario:
                 blast="high",
                 verification=_verify("rollback path", "arm rollback switches", "armed"),
                 rollback=_rollback("armed incorrectly", "disarm switches", "no traffic moved"),
+                satisfies="criterion",
             ),
             phase("5"),
             phase("10"),
@@ -299,7 +306,7 @@ def _rollout() -> _Scenario:
 
     def v1(goal_id: str) -> PlanVersion:
         tasks = [
-            _task("create", "Create the new API fleet"),
+            _task("create", "Create the new API fleet", satisfies="criterion"),
             _task(
                 "phase-5",
                 "Shift 50% of traffic to the new fleet",
@@ -307,6 +314,7 @@ def _rollout() -> _Scenario:
                 blast="high",
                 verification=_verify("phase-5 traffic", "check error budget", "budget holds"),
                 rollback=_rollback("phase-5 fails", "shift traffic back", ""),
+                satisfies="criterion",
             ),
             _task(
                 "phase-10",
@@ -315,6 +323,7 @@ def _rollout() -> _Scenario:
                 blast="high",
                 verification=_verify("phase-10 traffic", "check error budget", "budget holds"),
                 rollback=_rollback("phase-10 fails", "shift traffic back", ""),
+                satisfies="criterion",
             ),
             _task(
                 "rollback-window",
@@ -323,6 +332,7 @@ def _rollout() -> _Scenario:
                 blast="high",
                 verification=_verify("rollback path", "arm rollback switches", "armed"),
                 rollback=_rollback("armed incorrectly", "disarm switches", "no traffic moved"),
+                satisfies="criterion",
             ),
         ]
         return _plan(
@@ -365,8 +375,8 @@ def _refactor() -> _Scenario:
         return _plan(
             goal_id,
             tasks=[
-                _task("book", "Book the maintenance window with the platform team"),
-                _task("backup", "Back up the current routing state"),
+                _task("book", "Book the maintenance window with the platform team", satisfies="criterion"),
+                _task("backup", "Back up the current routing state", satisfies="criterion"),
                 _task(
                     "swap",
                     "Swap checkout onto the new payments API",
@@ -383,6 +393,7 @@ def _refactor() -> _Scenario:
                             established_by="book",
                         )
                     ],
+                    satisfies="criterion",
                 ),
             ],
             deps=[_dep("book", "swap"), _dep("backup", "swap")],
@@ -393,8 +404,8 @@ def _refactor() -> _Scenario:
             goal_id,
             version=2,
             tasks=[
-                _task("book", "Book the maintenance window with the platform team"),
-                _task("backup", "Back up the current routing state"),
+                _task("book", "Book the maintenance window with the platform team", satisfies="criterion"),
+                _task("backup", "Back up the current routing state", satisfies="criterion"),
                 _task(
                     "swap",
                     "Swap checkout onto the new payments API",
@@ -412,6 +423,7 @@ def _refactor() -> _Scenario:
                             probed=True,
                         )
                     ],
+                    satisfies="criterion",
                 ),
             ],
             deps=[_dep("book", "swap"), _dep("backup", "swap")],
@@ -434,7 +446,7 @@ def _incident() -> _Scenario:
         return _plan(
             goal_id,
             tasks=[
-                _task("diagnose", "Diagnose the payment-processing failure"),
+                _task("diagnose", "Diagnose the payment-processing failure", satisfies="criterion"),
                 _task(
                     "remediate",
                     "Apply the irreversible remediation write",
@@ -442,6 +454,7 @@ def _incident() -> _Scenario:
                     blast="critical",
                     verification=_verify("write applied", "re-read the ledger row", "matches"),
                     rollback=_rollback("remedy fails", "revert the write", ""),
+                    satisfies="criterion",
                 ),
             ],
             deps=[_dep("diagnose", "remediate")],
@@ -452,7 +465,7 @@ def _incident() -> _Scenario:
             goal_id,
             version=2,
             tasks=[
-                _task("diagnose", "Diagnose the payment-processing failure"),
+                _task("diagnose", "Diagnose the payment-processing failure", satisfies="criterion"),
                 _task(
                     "remediate",
                     "Apply the irreversible remediation write",
@@ -464,11 +477,13 @@ def _incident() -> _Scenario:
                         "revert the write",
                         "no dependent actors are mid-write and the snapshot is held",
                     ),
+                    satisfies="criterion",
                 ),
                 _task(
                     "verify-mitigation",
                     "Verify the incident is mitigated",
                     verification=_verify("mitigation", "run the payment health checks", "healthy"),
+                    satisfies="criterion",
                 ),
             ],
             deps=[_dep("diagnose", "remediate"), _dep("remediate", "verify-mitigation")],
@@ -496,6 +511,7 @@ def _adversarial() -> _Scenario:
                     "Cut the payment database over to the new storage engine",
                     risk="critical",
                     blast="critical",
+                    satisfies="criterion",
                 )
             ],
         )
@@ -514,6 +530,7 @@ def _adversarial() -> _Scenario:
                         "storage compatibility", "run the compatibility checks", "pass"
                     ),
                     rollback=_rollback("checks fail", "switch back", "snapshot held"),
+                    satisfies="criterion",
                 )
             ],
         )

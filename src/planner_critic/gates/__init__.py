@@ -24,6 +24,7 @@ from . import (
     ordering,
     parallel_safety,
     preconditions,
+    requirement_trace,
     rollback,
     rollback_credible,
     schema_valid,
@@ -42,6 +43,7 @@ GATES = [
     rollback_credible.Gate(),
     preconditions.Gate(),
     parallel_safety.Gate(),
+    requirement_trace.Gate(),
 ]
 
 

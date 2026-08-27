@@ -155,6 +155,12 @@ class Task(BaseModel):
     rollback: RollbackStep | None = None
     risk_class: RiskClass = RiskClass.MEDIUM
     blast_radius: str = Field(default="medium", description="low|medium|high|critical")
+    satisfies: str | None = Field(
+        default=None,
+        description="Reference to the acceptance criterion this step satisfies. "
+        "When set, the requirement-traceability gate verifies this criterion "
+        "is bound to the goal. Optional for backward compatibility.",
+    )
 
 
 class Dependency(BaseModel):
