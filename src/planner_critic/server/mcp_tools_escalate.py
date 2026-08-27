@@ -57,6 +57,7 @@ def escalate_approve(
     escalation_id: str,
     note: str = "",
     patch_json: str | None = None,
+    principal: str | None = None,
 ) -> dict[str, object]:
     """Approve an escalation, optionally patching the plan first.
 
@@ -65,6 +66,7 @@ def escalate_approve(
         escalation_id: The escalation to approve.
         note: Optional resolution note.
         patch_json: Optional PlanVersion JSON to store and re-critique.
+        principal: Approving principal (required when approving_authority is set).
 
     Returns:
         The resolved escalation dictionary.
@@ -74,7 +76,7 @@ def escalate_approve(
         if patch_json is not None:
             patch = PlanVersion.from_dict(json.loads(patch_json))
             manager.patch_and_recritique(plan_id=patch.id, patch=patch, critic=_GateOnlyCritic())
-        resolved = manager.resolve(escalation_id, "approved", note=note)
+        resolved = manager.resolve(escalation_id, "approved", note=note, principal=principal)
         return resolved.model_dump(mode="json")
     finally:
         store.close()
@@ -84,6 +86,7 @@ def escalate_deny(
     store_path: str,
     escalation_id: str,
     note: str = "",
+    principal: str | None = None,
 ) -> dict[str, object]:
     """Deny an escalation.
 
@@ -91,13 +94,14 @@ def escalate_deny(
         store_path: Path to the SQLite plan store.
         escalation_id: The escalation to deny.
         note: Optional resolution note.
+        principal: Denying principal (required when approving_authority is set).
 
     Returns:
         The resolved escalation dictionary.
     """
     store, manager = _open_manager(store_path)
     try:
-        resolved = manager.resolve(escalation_id, "denied", note=note)
+        resolved = manager.resolve(escalation_id, "denied", note=note, principal=principal)
         return resolved.model_dump(mode="json")
     finally:
         store.close()

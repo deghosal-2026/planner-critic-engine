@@ -299,7 +299,8 @@ class PlannerCriticHTTPServer:
     def _handle_escalate_approve(self, escalation_id: str, body: dict[str, Any]) -> dict[str, Any]:
         manager = EscalationManager(self.store)
         note = (body or {}).get("note", "")
-        resolved = manager.resolve(escalation_id, "approved", note=note)
+        principal = (body or {}).get("principal")
+        resolved = manager.resolve(escalation_id, "approved", note=note, principal=principal)
         return {
             "status": 200,
             "data": resolved.model_dump(mode="json"),
@@ -310,7 +311,8 @@ class PlannerCriticHTTPServer:
     def _handle_escalate_deny(self, escalation_id: str, body: dict[str, Any]) -> dict[str, Any]:
         manager = EscalationManager(self.store)
         note = (body or {}).get("note", "")
-        resolved = manager.resolve(escalation_id, "denied", note=note)
+        principal = (body or {}).get("principal")
+        resolved = manager.resolve(escalation_id, "denied", note=note, principal=principal)
         return {
             "status": 200,
             "data": resolved.model_dump(mode="json"),

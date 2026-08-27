@@ -59,10 +59,12 @@ def build_escalate_parser() -> argparse.ArgumentParser:
     approve.add_argument("escalation_id", help="Escalation id")
     approve.add_argument("--patch", default=None, help="PlanVersion JSON to store and re-critique")
     approve.add_argument("--note", default="", help="Resolution note")
+    approve.add_argument("--principal", default=None, help="Approving principal (required when approving_authority is set)")
 
     deny = sub.add_parser("deny", help="Deny an escalation")
     deny.add_argument("escalation_id", help="Escalation id")
     deny.add_argument("--note", default="", help="Resolution note")
+    deny.add_argument("--principal", default=None, help="Denying principal (required when approving_authority is set)")
     return parser
 
 
@@ -116,14 +118,16 @@ def _run_approve(manager: EscalationManager, args: argparse.Namespace) -> int:
             patch=patch,
             critic=_DeterministicCritic(),
         )
-    resolved = manager.resolve(args.escalation_id, "approved", note=args.note)
+    principal = args.principal or None
+    resolved = manager.resolve(args.escalation_id, "approved", note=args.note, principal=principal)
     print(f"escalation {resolved.id} approved")
     return 0
 
 
 def _run_deny(manager: EscalationManager, args: argparse.Namespace) -> int:
     """Deny an escalation."""
-    resolved = manager.resolve(args.escalation_id, "denied", note=args.note)
+    principal = args.principal or None
+    resolved = manager.resolve(args.escalation_id, "denied", note=args.note, principal=principal)
     print(f"escalation {resolved.id} denied")
     return 0
 
