@@ -10,7 +10,7 @@
 [![Coverage](https://img.shields.io/badge/coverage-91%25-brightgreen)](https://github.com/deghosal-2026/planner-critic-engine/actions)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14184/badge)](https://www.bestpractices.dev/projects/14184)
-[![Field Test](https://img.shields.io/badge/field%20test-170%20goals%2C%200%20failures-brightgreen)](docs/field-test/v0.2.2/field-test-results.md)
+[![Field Test](https://img.shields.io/badge/field%20test-183%20goals%2C%200%20failures-brightgreen)](docs/field-test/v0.2.2/field-test-results-0.2.2.md)
 
 **Hierarchical task planning with an independent LLM critic. A planner decomposes a goal into a structured plan; a critic audits every subtask; the plan is revised until approval — or escalated to a human.**
 
@@ -188,7 +188,7 @@ See [API Reference](docs/reference/api.md) for full CLI docs, HTTP endpoints, an
 | Benchmarks | **5** | **3** |
 | **Scorecard A** | **PASS** | **PASS** |
 
-Full results: [field-test-results.md](docs/field-test/v0.2.2/field-test-results.md) | [v0.2.1 results](docs/field-test/v0.2.1/field-test-results-0.2.1.md)
+Full results: [field-test-results-0.2.2.md](docs/field-test/v0.2.2/field-test-results-0.2.2.md) | [v0.2.1 results](docs/field-test/v0.2.1/field-test-results-0.2.1.md)
 
 ---
 
@@ -196,10 +196,12 @@ Full results: [field-test-results.md](docs/field-test/v0.2.2/field-test-results.
 
 | Doc | Path | Contents |
 |-----|------|----------|
-| **Field Test Results v0.2.1** | [results](docs/field-test/v0.2.1/field-test-results-0.2.1.md) | BLUF, regression diff, per-goal data, scorecards, blocker analysis |
+| **Field Test Results v0.2.2** | [results](docs/field-test/v0.2.2/field-test-results-0.2.2.md) | BLUF, regression diff, per-goal data, scorecards, blocker analysis |
+| **Field Test Results v0.2.1** | [results](docs/field-test/v0.2.1/field-test-results-0.2.1.md) | v0.2.1 results for reference |
 | **Field Test Results v0.2.0** | [results](docs/field-test/v0.2.0/field-test-results-0.2.0.md) | v0.2.0 results for reference |
 | **Field Test Results v0.1.0** | [results](docs/field-test/v0.1.0/field-test-results-0.1.0.md) | v0.1.0 results for reference |
 | **Field Test Plan** | [plan](docs/field-test/README.md) | Corpus, invariant assertions, execution guide |
+| **Release Notes v0.2.2** | [release-notes](docs/reference/release-notes-v0.2.2.md) | What's new, M1-M5 changes, field test results |
 | **Release Notes v0.2.1** | [release-notes](docs/reference/release-notes-v0.2.1.md) | What's new, hardening, field test results |
 | **Release Notes v0.2.0** | [release-notes](docs/reference/release-notes-v0.2.0.md) | v0.2.0 release notes for reference |
 | **Release Notes v0.1.0** | [release-notes](docs/reference/release-notes-v0.1.0.md) | v0.1.0 release notes for reference |
@@ -212,7 +214,8 @@ Full results: [field-test-results.md](docs/field-test/v0.2.2/field-test-results.
 | **Developer Surfaces Design** | [developer-surfaces](docs/design/developer-surfaces-design.md) | CLI commands, decorator, seed Rego |
 | **Integration Surfaces Design** | [integration](docs/design/integration-surfaces-design.md) | CI runners, AutoGen, notifier |
 | **Security** | [security](SECURITY.md) | Security policy, OWASP, OpenSSF |
-| **WBS Index (v0.2.1)** | [wbs](docs/wbs/v0.2.1/wbs-v0.2.1-index.md) | Milestone overview, dependency graph |
+| **WBS Index (v0.2.2)** | [wbs](docs/wbs/v0.2.2/wbs-v0.2.2-index.md) | Milestone overview, dependency graph, M1-M6 |
+| **WBS Index (v0.2.1)** | [wbs](docs/wbs/v0.2.1/wbs-v0.2.1-index.md) | v0.2.1 WBS for reference |
 | **WBS Index (v0.2.0)** | [wbs](docs/wbs/v0.2.0/wbs-v0.2.0-index.md) | v0.2.0 WBS for reference |
 
 ---

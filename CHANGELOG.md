@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.2.2 (2026-08-26)
+## v0.2.2 (2026-08-27)
 
 ### Foundation Corrections (M1)
 - Fixed "Zero True Failures" prose contradiction in v0.2.1 field test report (#246)
@@ -32,6 +32,19 @@
 - Critic/planner capability tier split: config example for separate model tiers (#257)
 - Multi-model planner comparison benchmark script (#252)
 - Downstream error rate measurement specification (#250)
+
+### Field Test Results (M5)
+- **183 goals across 43 domains** — 170 inherited + 13 new security fixtures
+- **73/73 balanced approved** (100%), **96/97 strict escalated** (99%), **8/8 inherited adversarial aborted** (100%)
+- **8/8 benign twins approved** — new measurement arm confirms injection isolation vs gate strictness
+- **3/3 compositional traps aborted** — new security fixture class verified
+- **2 well-formed malicious fixtures** added to the corpus (#259)
+- **Scorecard A: PASS** — release gate passes on inherited corpus
+- **Boundary evaluator (#218):** first run exposed `underclaim_approvals=1`; strict-framing fix applied, rerun cleared to `0`
+- **Operational benchmark:** completed on 181 traces; latency and reviewer burden increased (see report)
+- **1347 deterministic subsystem tests pass** (15 skipped: 12 docker-gated, 3 LLM-dependent, 1 flaky)
+- **5 benchmarks completed** — cycling, operational, live-boundary, boundary self-test, auto-repair
+- **Coverage:** 91%
 
 ### Known Issues
 - TUI/studio/IDE extensions deferred to v0.3.0 (#133, #135, #136, #138, #154, #157)

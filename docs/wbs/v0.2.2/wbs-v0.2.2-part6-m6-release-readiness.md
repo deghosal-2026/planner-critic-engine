@@ -105,13 +105,13 @@ M6 is the final release readiness gate. All issues are strictly sequential — e
 - WBS index: already created at `docs/wbs/v0.2.2/wbs-v0.2.2-index.md`
 
 **Completion checklist:**
-- [ ] README points to v0.2.2
-- [ ] CHANGELOG has complete v0.2.2 entry
-- [ ] Release notes published and reviewed
-- [ ] API reference matches current code
-- [ ] Failure-mode register updated with M1-M4 assumptions
-- [ ] WBS index created for v0.2.2
-- [ ] No stale-doc contradictions (grep sweep for "0.2.1-only" claims)
+- [x] README points to v0.2.2
+- [x] CHANGELOG has complete v0.2.2 entry
+- [x] Release notes published and reviewed
+- [x] API reference matches current code
+- [x] Failure-mode register updated with M1-M4 assumptions
+- [x] WBS index created for v0.2.2
+- [x] No stale-doc contradictions (grep sweep for "0.2.1-only" claims)
 
 ---
 
@@ -179,7 +179,7 @@ Before M6 closes, the following must be true:
 - [ ] **Lint clean**: `ruff check src/ tests/` + `ruff format --check` 0 errors
 - [ ] **Type check**: `mypy --strict src/ tests/` 0 errors
 - [ ] **Test coverage**: `pytest --cov=src/ --cov-report=term` reports >90%
-- [ ] **Documents updated**: all docs reviewed and consistent for the release (README, CHANGELOG, release notes, API reference, failure-mode register, WBS index)
+- [x] **Documents updated**: all docs reviewed and consistent for the release (README, CHANGELOG, release notes, API reference, failure-mode register, WBS index)
 - [ ] **Clean checkin**: no debug code, no print statements, no TODOs
 
 ### Pre-Release Aggregate Gate (M6-specific)
@@ -194,20 +194,20 @@ Before M6 closes, the following must be true:
 - [ ] **Security scans**: truffleHog clean, dependency audit clean
 - [ ] **Field test**: 170/170 goals, Scorecard A PASS, intended-deltas-only regression
 - [ ] **Docker tests**: green against the rebuilt 0.2.2 image
-- [ ] **Docs**: complete and consistent, no stale-doc contradictions
+- [x] **Docs**: complete and consistent, no stale-doc contradictions
 - [ ] **PyPI**: v0.2.2 published with release-notes link
 
 ## Version Bump Checklist
 
 | Location | Change | Done |
 |----------|--------|------|
-| `pyproject.toml:3` | `version = "0.2.1"` → `"0.2.2"` | [ ] |
-| `src/planner_critic/__init__.py:32` | `__version__ = "0.2.1"` → `"0.2.2"` | [ ] |
-| `Dockerfile:16` | pinned wheel filename `0.2.1` → `0.2.2` | [ ] |
-| `README.md:7,20` | PyPI badge + status line | [ ] |
-| `docs/reference/quickstart.md:1` | header version | [ ] |
-| `CHANGELOG.md` | new `## v0.2.2` entry | [ ] |
-| `docs/reference/release-notes-v0.2.2.md` | new file | [ ] |
+| `pyproject.toml:3` | `version = "0.2.1"` → `"0.2.2"` | [x] |
+| `src/planner_critic/__init__.py:32` | `__version__ = "0.2.1"` → `"0.2.2"` | [x] |
+| `Dockerfile:16` | pinned wheel filename `0.2.1` → `0.2.2` | [x] |
+| `README.md:7,20` | PyPI badge + status line | [x] |
+| `docs/reference/quickstart.md:1` | header version | [x] |
+| `CHANGELOG.md` | new `## v0.2.2` entry | [x] |
+| `docs/reference/release-notes-v0.2.2.md` | new file | [x] |
 
 ---
 
