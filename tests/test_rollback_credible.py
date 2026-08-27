@@ -27,6 +27,7 @@ from planner_critic.reason_codes import (
     ROLLBACK_INCONSISTENT_STATE,
     ROLLBACK_POST_CONSUMED,
     ROLLBACK_SELF_DEPENDENT,
+    ROLLBACK_STATE_UNDECLARED,
     ROLLBACK_UNREACHABLE,
 )
 from planner_critic.schema.plan import Task
@@ -206,3 +207,80 @@ class TestBoundaryCases:
         codes_a = {f.reason_code for f in run_deterministic_gates(case.plan_a)}
         assert ROLLBACK_POST_CONSUMED not in codes_a
         assert case.expected_reason_code == "rollback_post_consumed"
+
+
+class TestTypedRestorationContracts:
+    """Tests for #245: typed rollback restoration contracts."""
+
+    def test_high_blast_without_typed_restoration_emits_advisory(self) -> None:
+        """High-blast task with rollback but no typed restoration fields yields advisory."""
+        plan = make_plan(tasks=[_high("t1")])
+        findings = [
+            f for f in run_deterministic_gates(plan) if f.reason_code == ROLLBACK_STATE_UNDECLARED
+        ]
+        assert len(findings) == 1
+        assert findings[0].task_id == "t1"
+
+    def test_typed_restoration_clears_advisory(self) -> None:
+        """High-blast task with restores_state declared does not get the advisory."""
+        task = make_task(
+            "t1",
+            action="migrate",
+            risk_class="high",
+            blast_radius="high",
+            rollback={"trigger": "fail", "action": "revert", "restores_state": ["db_schema"]},
+        )
+        plan = make_plan(tasks=[task])
+        codes = {f.reason_code for f in run_deterministic_gates(plan)}
+        assert ROLLBACK_STATE_UNDECLARED not in codes
+
+    def test_restoration_evidence_clears_advisory(self) -> None:
+        """High-blast task with restoration_evidence declared does not get the advisory."""
+        task = make_task(
+            "t1",
+            action="migrate",
+            risk_class="high",
+            blast_radius="high",
+            rollback={
+                "trigger": "fail",
+                "action": "revert",
+                "restoration_evidence": "verify schema version matches",
+            },
+        )
+        plan = make_plan(tasks=[task])
+        codes = {f.reason_code for f in run_deterministic_gates(plan)}
+        assert ROLLBACK_STATE_UNDECLARED not in codes
+
+    def test_typed_restoration_exempts_post_consumed(self) -> None:
+        """Producer with typed restoration exempts its consumers from post-consumed risk."""
+        producer = make_task(
+            "t1",
+            action="migrate",
+            risk_class="high",
+            blast_radius="high",
+            rollback={
+                "trigger": "fail",
+                "action": "revert",
+                "restores_state": ["db_schema"],
+                "restoration_evidence": "verify schema",
+            },
+        )
+        consumer = make_task("t2", action="read", risk_class="low", blast_radius="low")
+        plan = make_plan(tasks=[producer, consumer], dependencies=[hard_dep("t1", "t2")])
+        codes = {f.reason_code for f in run_deterministic_gates(plan)}
+        assert ROLLBACK_POST_CONSUMED not in codes, (
+            "producer with typed restoration should exempt consumer from post-consumed"
+        )
+
+    def test_low_blast_task_no_advisory(self) -> None:
+        """Low-blast task with rollback but no typed restoration does not get advisory."""
+        task = make_task(
+            "t1",
+            action="migrate",
+            risk_class="low",
+            blast_radius="low",
+            rollback={"trigger": "fail", "action": "revert"},
+        )
+        plan = make_plan(tasks=[task])
+        codes = {f.reason_code for f in run_deterministic_gates(plan)}
+        assert ROLLBACK_STATE_UNDECLARED not in codes

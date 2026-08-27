@@ -19,6 +19,7 @@ from planner_critic.demo.roles import ScriptedCritic, ScriptedPlanner
 from planner_critic.demo.runner import narrative, run_demo
 from planner_critic.engine import Engine
 from planner_critic.gates import run_deterministic_gates
+from planner_critic.reason_codes import ROLLBACK_STATE_UNDECLARED
 from planner_critic.loop import LoopConfig
 from planner_critic.regate import ReGateResult
 from planner_critic.schema.goal import Goal
@@ -75,7 +76,9 @@ def test_scripted_critic_flags_v1_and_passes_v2(corpus_goals: dict[str, Goal]) -
         assert findings[0].task_id == flaw["task_id"], name
 
         v2 = planner.revise(v1, findings)
-        assert run_deterministic_gates(v2) == [], name
+        # Filter out the v0.2.2 advisory for legacy rollbacks without typed restoration
+        v2_blockers = [f for f in run_deterministic_gates(v2) if f.reason_code != ROLLBACK_STATE_UNDECLARED]
+        assert v2_blockers == [], name
         assert critic.audit(v2, []) == [], name
 
 

@@ -17,10 +17,9 @@ from dataclasses import dataclass, field
 from typing import Literal, cast
 
 from .probe.base import ProbeKind, ProbeRequest, run_probe
-from .reason_codes import RUNTIME_PRECONDITION_STALE
 from .schema.plan import Task
 from .store.base import PlanStore
-from .types import ApprovedPlan, Severity
+from .types import ApprovedPlan
 
 
 @dataclass

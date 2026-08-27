@@ -76,13 +76,31 @@ class VerificationStep(BaseModel):
 
 
 class RollbackStep(BaseModel):
-    """How to undo a task: trigger condition, action, and safety guard."""
+    """How to undo a task: trigger condition, action, and safety guard.
+
+    Starting in v0.2.2, high-blast-radius tasks should also declare what
+    state they restore and how that restoration is verified. These fields
+    are optional — when absent, the ``rollback_credible`` gate derives
+    credibility from surrounding structure as before (backward-compatible).
+    """
 
     model_config = ConfigDict(frozen=True)
 
     trigger: str = Field(min_length=1, description="What condition triggers the rollback")
     action: str = Field(min_length=1, description="What the rollback does")
     safety_guard: str = Field(default="", description="Guard that must hold before rolling back")
+    restores_state: list[str] = Field(
+        default_factory=list,
+        description="Facts the undo re-establishes (referencing precondition ledger fact keys). "
+        "When present, the rollback_credible gate validates these against the plan graph. "
+        "When absent (legacy), credibility is derived from surrounding structure.",
+    )
+    restoration_evidence: str | None = Field(
+        default=None,
+        description="How to verify the state was restored after rollback. "
+        "When present, rollback_credible treats it as satisfying the "
+        "re-establishment exemption for inconsistent-state / post-consumed patterns.",
+    )
 
 
 class EnvProbe(BaseModel):

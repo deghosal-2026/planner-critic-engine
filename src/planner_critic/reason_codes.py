@@ -27,6 +27,7 @@ ROLLBACK_UNREACHABLE: Literal["rollback_unreachable"] = "rollback_unreachable"
 ROLLBACK_SELF_DEPENDENT: Literal["rollback_self_dependent"] = "rollback_self_dependent"
 ROLLBACK_INCONSISTENT_STATE: Literal["rollback_inconsistent_state"] = "rollback_inconsistent_state"
 ROLLBACK_POST_CONSUMED: Literal["rollback_post_consumed"] = "rollback_post_consumed"
+ROLLBACK_STATE_UNDECLARED: Literal["rollback_state_undeclared"] = "rollback_state_undeclared"
 FAMILY_HISTOGRAM_CYCLING: Literal["family_histogram_cycling"] = "family_histogram_cycling"
 
 # --- Deterministic auto-fix codes (PRD §2.6, M2) ------------------------------
@@ -206,6 +207,7 @@ ReasonCode: TypeAlias = Literal[
     "rollback_self_dependent",
     "rollback_inconsistent_state",
     "rollback_post_consumed",
+    "rollback_state_undeclared",
     "family_histogram_cycling",
     "auto_repaired_ordering",
     "auto_closed_precondition",
@@ -321,6 +323,11 @@ REASON_CODE_DESCRIPTIONS: dict[ReasonCode, str] = {
         "A consumer runs inside a producer's write→rollback window with no "
         "verification or rollback of its own — a rollback would erase state "
         "the consumer already used (dual-write window)"
+    ),
+    ROLLBACK_STATE_UNDECLARED: (
+        "A high-blast-radius task has a rollback but does not declare what "
+        "state it restores — add restores_state and restoration_evidence "
+        "for verifiable recovery"
     ),
     FAMILY_HISTOGRAM_CYCLING: (
         "The blocker-family histogram repeats at lag ≥ 2 while consecutive "

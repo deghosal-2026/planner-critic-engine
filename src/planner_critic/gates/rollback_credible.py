@@ -34,6 +34,7 @@ from ..reason_codes import (
     ROLLBACK_INCONSISTENT_STATE,
     ROLLBACK_POST_CONSUMED,
     ROLLBACK_SELF_DEPENDENT,
+    ROLLBACK_STATE_UNDECLARED,
     ROLLBACK_UNREACHABLE,
 )
 from ..rollback_synth import _NON_REVERSIBLE_ACTIONS
@@ -52,6 +53,12 @@ def _bare_consumer(task: Task) -> bool:
     return task.verification is None and task.rollback is None
 
 
+def _has_typed_restoration(task: Task) -> bool:
+    """True when the task declares typed restoration fields."""
+    rb = task.rollback
+    return bool(rb and (rb.restores_state or rb.restoration_evidence))
+
+
 class Gate(BaseGate):
     """Flags high-risk rollbacks that exist but cannot credibly undo."""
 
@@ -64,9 +71,8 @@ class Gate(BaseGate):
             plan: The typed plan to audit.
 
         Returns:
-            Findings in gate-stable order (per producer: unreachable,
-            self-dependent, then inconsistent-state / post-consumed per
-            consumer). Empty when every claimed rollback is credible.
+            Findings in gate-stable order. Empty when every claimed rollback
+            is credible.
         """
         id_to_index = {task.id: index for index, task in enumerate(plan.tasks)}
         by_id = {task.id: task for task in plan.tasks}
@@ -109,6 +115,42 @@ class Gate(BaseGate):
 
             if producer.rollback is None:
                 continue
+
+            # Typed restoration contract check (v0.2.2) — advisory, not blocker
+            if not _has_typed_restoration(producer):
+                findings.append(
+                    Finding(
+                        id=f"rollback_credible:{plan.id}:{plan.version}:{producer.id}:{ROLLBACK_STATE_UNDECLARED}",
+                        task_id=producer.id,
+                        version=plan.version,
+                        severity=Severity.WARNING,
+                        reason_code=ROLLBACK_STATE_UNDECLARED,
+                        message=(
+                            f"high-risk task {producer.id!r} has rollback but does not declare "
+                            f"what state it restores (restores_state) or how restoration is "
+                            f"verified (restoration_evidence)"
+                        ),
+                        suggested_fix="Add restores_state and restoration_evidence fields to the rollback step",
+                    )
+                )
+            else:
+                # Contradiction check: restores_state facts must not be self-referential
+                restores_set = set(producer.rollback.restores_state)
+                for pre in producer.preconditions:
+                    if pre.established_by == producer.id and pre.fact in restores_set:
+                        findings.append(
+                            self._finding(
+                                plan,
+                                producer.id,
+                                ROLLBACK_SELF_DEPENDENT,
+                                f"restores_state fact {pre.fact!r} is a precondition "
+                                f"claimed by the task itself — contradictory declaration",
+                                "Remove the self-referential fact from restores_state or "
+                                "establish it from an earlier task",
+                                index=self_dep_n,
+                            )
+                        )
+                        self_dep_n += 1
 
             for code, consumer_id in _state_risks(plan, producer, by_id, id_to_index, consumers_of):
                 if code == ROLLBACK_POST_CONSUMED:
@@ -177,11 +219,21 @@ def _state_risks(
 ) -> list[tuple[str, str]]:
     """Find later tasks whose basis does not survive this producer's rollback.
 
+    Tasks with typed restoration evidence (restoration_evidence present)
+    or typed restoration contracts (restores_state declared) on the producer
+    are exempt from the post-consumed and inconsistent-state patterns.
+
     Returns ``(reason_code, offending_task_id)`` pairs: one per bare consumer
     whose precondition basis or declared consumption would be invalidated by
     restoring the producer's pre-write state.
     """
     risks: list[tuple[str, str]] = []
+
+    # If the producer declares typed restoration, its consumers are exempt
+    # from post-consumed / inconsistent-state risks
+    if _has_typed_restoration(producer):
+        return risks
+
     producer_index = id_to_index[producer.id]
     seen: set[str] = set()
     for dep_to in consumers_of.get(producer.id, []):
