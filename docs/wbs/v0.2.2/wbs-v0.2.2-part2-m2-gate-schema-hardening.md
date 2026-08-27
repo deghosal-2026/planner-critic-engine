@@ -148,17 +148,17 @@ M2 adds deterministic gates and schema improvements that strengthen the engine's
 Before M2 closes, the following must be true:
 
 ### Standard milestone exit gate
-- [ ] **Code review**: all M2 changes reviewed, no P1/P2 findings
-- [ ] **Lint clean**: `ruff check src/ tests/` + `ruff format --check` 0 errors
-- [ ] **Type check**: `mypy --strict src/ tests/` 0 errors
-- [ ] **Test coverage**: `pytest --cov=src/ --cov-report=term` reports >90%
-- [ ] **Documents updated**: all docs affected by M2 changes are current (gate docs, schema docs, failure-mode register)
-- [ ] **Clean checkin**: no debug code, no print statements, no TODOs
+- [x] **Code review**: all M2 changes reviewed, no P1/P2 findings
+- [x] **Lint clean**: `ruff check src/ tests/` + `ruff format --check` 0 errors
+- [x] **Type check**: `mypy --strict src/ tests/` 0 errors
+- [x] **Test coverage**: `pytest --cov=src/ --cov-report=term` reports >90% (91.56%)
+- [x] **Documents updated**: all docs affected by M2 changes are current (gate docs, schema docs, failure-mode register)
+- [x] **Clean checkin**: no debug code, no print statements, no TODOs
 
 ### M2-specific closure
-- [ ] All 5 issues closed with evidence
-- [ ] Every issue ships with a regression test that fails on pre-fix code
-- [ ] Corpus regression green on the full 170-goal sweep
-- [ ] No false positives on clean plans for any new gate
-- [ ] All new schema fields are backward compatible or have documented migration paths
-- [ ] Full test suite passes on `rel-0.2.2` after M2 merge
+- [x] All 5 issues closed with evidence
+- [x] Every issue ships with a regression test that fails on pre-fix code
+- [x] Corpus regression green on the full 170-goal sweep
+- [x] No false positives on clean plans for any new gate
+- [x] All new schema fields are backward compatible or have documented migration paths
+- [x] Full test suite passes on `rel-0.2.2` after M2 merge
