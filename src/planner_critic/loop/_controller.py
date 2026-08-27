@@ -75,7 +75,9 @@ def _critic_satisfied(findings: list[Finding]) -> bool:
     This lets strict goals approve when the critic has nothing to object to,
     rather than strictly escalating on any finding.
     """
-    return all(f.severity is not Severity.BLOCKER and f.severity is not Severity.WARNING for f in findings)
+    return all(
+        f.severity is not Severity.BLOCKER and f.severity is not Severity.WARNING for f in findings
+    )
 
 
 @dataclass(frozen=True)
