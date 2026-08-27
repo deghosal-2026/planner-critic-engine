@@ -84,6 +84,7 @@ class LoopConfig:
 
     mode: CriticMode = "deterministic-first"
     revision_cap: int = 3
+    adaptive_revision_cap: bool = False
     auto_repair: bool = True
     precondition_closer: bool = True
     oscillation_window: int = 4
@@ -353,6 +354,13 @@ def _run(
         config.revision_cap,
         goal.risk_tolerance,
     )
+
+    # Adaptive revision cap: strict goals always escalate (the LLM critic
+    # always finds something), so cap at 1 to save LLM calls
+    effective_cap = config.revision_cap
+    if config.adaptive_revision_cap and goal.risk_tolerance.value == "strict" and effective_cap > 1:
+        effective_cap = 1
+        logger.info("loop: strict goal — adaptive cap reduced to 1")
     try:
         logger.info("loop: planner.decompose(goal=%s)", goal.id)
         plan = planner.decompose(goal)
@@ -384,12 +392,12 @@ def _run(
     sig_history: list[str] = []
     hist_history: list[FamilyHistogram] = []
 
-    for revision in range(1, config.revision_cap + 1):
+    for revision in range(1, effective_cap + 1):
         state.record_revision()
         logger.info(
             "loop: revision %d/%d — plan=%s v%d",
             revision,
-            config.revision_cap,
+            effective_cap,
             plan.id,
             plan.version,
         )
@@ -441,7 +449,7 @@ def _run(
                     cast("ReasonCode", run_budget_hit),
                     revision,
                 )
-            if revision < config.revision_cap:
+            if revision < effective_cap:
                 plan = _revise_or_raise(
                     planner,
                     plan,
@@ -580,7 +588,7 @@ def _run(
             return _escalate(goal, plan, findings, "family_histogram_cycling", revision)
 
         prior_plan, prior_findings = plan, findings
-        if revision < config.revision_cap:
+        if revision < effective_cap:
             logger.info("loop: revising plan (revision %d → %d)", revision, revision + 1)
             next_id = f"plan-{goal.id}-r{revision + 1}"
             plan = _revise_or_raise(planner, plan, findings, next_id=next_id)
@@ -590,7 +598,7 @@ def _run(
                     logger.info("ledger (post-revise): %s", diag.get("message", ""))
 
     logger.info("loop: revision cap reached → escalate")
-    return _escalate(goal, plan, prior_findings or [], "revision_cap_reached", config.revision_cap)
+    return _escalate(goal, plan, prior_findings or [], "revision_cap_reached", effective_cap)
 
 
 def _has_blocker(findings: list[Finding]) -> bool:
