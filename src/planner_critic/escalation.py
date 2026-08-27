@@ -130,6 +130,7 @@ class EscalationManager:
                 "status": decision,
                 "resolution": note,
                 "resolved_at": datetime.now(UTC),
+                "resolved_by": principal,
             }
         )
         self._store.put_escalation(resolved)

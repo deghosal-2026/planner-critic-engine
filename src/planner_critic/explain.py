@@ -75,8 +75,15 @@ def explain(store: PlanStore, plan_id: str) -> ExplainResult:
         is_last = i == len(steps) - 1
 
         if is_last and escalation is not None:
-            action = "escalated"
-            reason = _escalation_reason(escalation)
+            if escalation.status == "approved":
+                action = "approved"
+                reason = f"Approved after escalation: {escalation.question}"
+            elif escalation.status == "denied":
+                action = "denied"
+                reason = f"Denied after escalation: {escalation.question}"
+            else:
+                action = "escalated"
+                reason = _escalation_reason(escalation)
         elif is_last and escalation is None:
             action = "approved"
             reason = _approval_reason(step.findings)

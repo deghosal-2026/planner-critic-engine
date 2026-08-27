@@ -148,6 +148,9 @@ class Escalation(BaseModel):
     status: Literal["open", "approved", "denied"] = "open"
     resolution: str | None = None
     resolved_at: datetime | None = None
+    resolved_by: str | None = Field(
+        default=None, description="Who resolved this escalation (principal name)"
+    )
 
 
 class ExecutionTrace(BaseModel):
