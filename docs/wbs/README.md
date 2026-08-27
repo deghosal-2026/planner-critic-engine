@@ -2,15 +2,29 @@
 
 Work Breakdown Structure — milestone plans and task breakdowns for all versions.
 
-> **Live status:** v0.2.1 work runs on branch **`0.2.1-m11`** with issues attached to the [**0.2.1-M11 Community Review Hardening**](https://github.com/deghosal-2026/planner-critic-engine/milestone/13) GitHub milestone. Each WBS task row links its issue; flip the checkbox when closing the issue. Titles carry the `[0.2.1-Mx]` prefix reflecting the milestone.
+> **Live status:** v0.2.2 work runs on branch **`rel-0.2.2`** with issues attached to the [**v0.2.2-M1 … v0.2.2-M6**](https://github.com/deghosal-2026/planner-critic-engine/milestones) GitHub milestones. Each WBS task row links its issue; flip the checkbox when closing the issue. Titles carry the `[v0.2.2]` prefix reflecting the milestone.
 >
-> **Version split note:** the rest of the docs tree ([`docs/design`](design), [`docs/architecture`](architecture), [`docs/reference`](reference), [`docs/field-test`](field-test)) is upgraded **in place** for the latest release. The v0.1.0 WBS below is **frozen history** — it records the shipped plan and its commits; do not edit those files.
+> **Version split note:** the rest of the docs tree ([`docs/design`](design), [`docs/architecture`](architecture), [`docs/reference`](reference), [`docs/field-test`](field-test)) is upgraded **in place** for the latest release. The v0.2.1 and v0.1.0 WBS below are **frozen history** — they record the shipped plans and their commits; do not edit those files.
 
-## Active — v0.2.1
+## Active — v0.2.2 (branch `rel-0.2.2`)
+
+> v0.2.2 issues are attached to the **v0.2.2-M1 … v0.2.2-M6** GitHub milestones. Community-driven hardening from the dev.to PlannerCritic series (Parts 4–9 comment threads). See the [index](v0.2.2/wbs-v0.2.2-index.md) for the dependency graph.
 
 | File | Milestones | GitHub Issues | Status |
 |------|-----------|---------------|--------|
-| [v0.2.1/wbs-v0.2.1-index.md](v0.2.1/wbs-v0.2.1-index.md) | P1 (Bug-Fix Sweep of v0.2.0, pending triage) + M11 (Community Review Hardening + closure gate) + M12 (Release Readiness: quality gate, field tests, docker tests, security, docs, packaging, ship); version bump checklist, patch exit gates (Index) | [#215–231](https://github.com/deghosal-2026/planner-critic-engine/issues/215) | Active |
+| [v0.2.2/wbs-v0.2.2-index.md](v0.2.2/wbs-v0.2.2-index.md) | M1–M6 overview, dependency graph, version bump checklist, open decisions (Index) | [#238–277](https://github.com/deghosal-2026/planner-critic-engine/issues/238) | Active |
+| [v0.2.2/wbs-v0.2.2-part1-m1-foundation-corrections.md](v0.2.2/wbs-v0.2.2-part1-m1-foundation-corrections.md) | M1 (Foundation Corrections) | [#246–248](https://github.com/deghosal-2026/planner-critic-engine/issues/246), #263, #264 | Active |
+| [v0.2.2/wbs-v0.2.2-part2-m2-gate-schema-hardening.md](v0.2.2/wbs-v0.2.2-part2-m2-gate-schema-hardening.md) | M2 (Gate & Schema Hardening) | [#242–245](https://github.com/deghosal-2026/planner-critic-engine/issues/242), #255 | Active |
+| [v0.2.2/wbs-v0.2.2-part3-m3-security-injection-resistance.md](v0.2.2/wbs-v0.2.2-part3-m3-security-injection-resistance.md) | M3 (Security & Injection Resistance) | #238, #249, #253, #256, #258, #259, #260 | Active |
+| [v0.2.2/wbs-v0.2.2-part4-m4-operational-audit.md](v0.2.2/wbs-v0.2.2-part4-m4-operational-audit.md) | M4 (Operational & Audit) | #250–252, #254, #257, #261, #262 | Active |
+| [v0.2.2/wbs-v0.2.2-part5-m5-field-test-release.md](v0.2.2/wbs-v0.2.2-part5-m5-field-test-release.md) | M5 (Field Test & Release) | [#265–271](https://github.com/deghosal-2026/planner-critic-engine/issues/265) | Active |
+| [v0.2.2/wbs-v0.2.2-part6-m6-release-readiness.md](v0.2.2/wbs-v0.2.2-part6-m6-release-readiness.md) | M6 (Release Readiness) | [#272–277](https://github.com/deghosal-2026/planner-critic-engine/issues/272) | Active |
+
+## Shipped — v0.2.1
+
+| File | Milestones | GitHub Issues | Status |
+|------|-----------|---------------|--------|
+| [v0.2.1/wbs-v0.2.1-index.md](v0.2.1/wbs-v0.2.1-index.md) | P1 (Bug-Fix Sweep of v0.2.0) + M11 (Community Review Hardening) + M12 (Release Readiness) | [#215–231](https://github.com/deghosal-2026/planner-critic-engine/issues/215) | Shipped |
 
 ## Shipped — v0.2.0
 
