@@ -305,15 +305,64 @@ def run_store(goal, plan, store, out):
 
 def run_escalation(goal, store, out):
     try:
-        mgr = EscalationManager(store)
-        escs = mgr.list_escalations()
-        for e in escs[:2]:
-            mgr.resolve(e.id, "approved", note="field test")
+        mgr = EscalationManager(store, approving_authority="field-test")
+        all_escs = mgr.list_escalations()
+        # Scope to the current goal only
+        escs = [e for e in all_escs if e.plan_id.startswith(goal.id)]
+        checks = []
+        if escs:
+            # Approve the first escalation with proper principal
+            approved = mgr.resolve(escs[0].id, "approved", note="field test", principal="field-test")
+            checks.append(
+                {
+                    "name": "escalation_approve",
+                    "pass": approved.status == "approved",
+                    "message": f"approved {approved.id}",
+                }
+            )
+            # Deny the second escalation if it exists
+            if len(escs) > 1:
+                denied = mgr.resolve(escs[1].id, "denied", note="field test", principal="field-test")
+                checks.append(
+                    {
+                        "name": "escalation_deny",
+                        "pass": denied.status == "denied",
+                        "message": f"denied {denied.id}",
+                    }
+                )
+            # Test wrong-principal rejection
+            if escs:
+                try:
+                    mgr.resolve(escs[0].id, "approved", note="should fail", principal="wrong-principal")
+                    checks.append(
+                        {
+                            "name": "escalation_wrong_principal",
+                            "pass": False,
+                            "message": "wrong principal was not rejected",
+                        }
+                    )
+                except PermissionError:
+                    checks.append(
+                        {
+                            "name": "escalation_wrong_principal",
+                            "pass": True,
+                            "message": "wrong principal correctly rejected",
+                        }
+                    )
+        else:
+            checks.append(
+                {
+                    "name": "escalation_approve",
+                    "pass": True,
+                    "message": "no escalations to test",
+                }
+            )
         t = {
             "dimension": "escalation",
             "goal_id": goal.id,
-            "pass": True,
+            "pass": all(c["pass"] for c in checks),
             "escalation_count": len(escs),
+            "checks": checks,
         }
     except Exception as e:
         t = {"dimension": "escalation", "goal_id": goal.id, "pass": False, "error": str(e)}
