@@ -100,6 +100,7 @@ BUDGET_EXCEEDED: Literal["budget_exceeded"] = "budget_exceeded"
 REPLAN_ABORTED: Literal["replan_aborted"] = "replan_aborted"
 APPROVED: Literal["approved"] = "approved"
 PLANNING_UNAVAILABLE: Literal["planning_unavailable"] = "planning_unavailable"
+CRITIC_SATISFIED: Literal["critic_satisfied"] = "critic_satisfied"
 
 # --- Approval / fail-closed codes -------------------------------------------
 APPROVAL_THRESHOLD_NOT_MET: Literal["approval_threshold_not_met"] = "approval_threshold_not_met"
@@ -243,6 +244,7 @@ ReasonCode: TypeAlias = Literal[
     "replan_aborted",
     "approved",
     "planning_unavailable",
+    "critic_satisfied",
     "approval_threshold_not_met",
     "runtime_precondition_stale",
     "llm_feasibility",
@@ -375,6 +377,10 @@ REASON_CODE_DESCRIPTIONS: dict[ReasonCode, str] = {
     REPLAN_ABORTED: "replan_policy=abort: the loop escalated without revising",
     APPROVED: "Loop terminated by meeting the approval threshold",
     PLANNING_UNAVAILABLE: "A provider failed; planning is unavailable and must fail closed",
+    CRITIC_SATISFIED: (
+        "The LLM critic explicitly endorsed the plan — no blockers found "
+        "and the plan is structurally sound enough to approve"
+    ),
     APPROVAL_THRESHOLD_NOT_MET: "Findings do not meet the goal's risk-tolerance threshold",
     RUNTIME_PRECONDITION_STALE: (
         "A precondition that held at planning time was stale at execution time — "

@@ -46,6 +46,7 @@ from ..gates import run_deterministic_gates
 from ..gates.base import BaseGate
 from ..ledger import PreconditionLedger
 from ..reason_codes import (
+    CRITIC_SATISFIED,
     RUN_BUDGET_EXCEEDED,
     ReasonCode,
 )
@@ -64,6 +65,17 @@ from .oscillation import compute_plan_signature, detect_oscillation
 from .regression import regression_detected
 
 logger = logging.getLogger(__name__)
+
+
+def _critic_satisfied(findings: list[Finding]) -> bool:
+    """Determine if the critic explicitly endorsed the plan.
+
+    A critic is 'satisfied' when it produced no blocker findings and no
+    warnings — i.e., it explicitly endorsed the plan as safe to execute.
+    This lets strict goals approve when the critic has nothing to object to,
+    rather than strictly escalating on any finding.
+    """
+    return all(f.severity is not Severity.BLOCKER and f.severity is not Severity.WARNING for f in findings)
 
 
 @dataclass(frozen=True)
@@ -480,6 +492,22 @@ def _run(
                 reason_code="approved",
                 approved_plan=approved,
             )
+
+        # Critic satisfaction signal: if the critic explicitly endorsed the plan
+        # (no blockers, no warnings), approve even under strict mode
+        if _critic_satisfied(findings):
+            # Only approve if there are no deterministic gate blockers
+            gate_blockers = [f for f in gate_findings if f.severity is Severity.BLOCKER]
+            if not gate_blockers:
+                approved = approval.approve(plan, thresholds)
+                logger.info("loop: critic satisfied → APPROVED plan=%s v%d", plan.id, plan.version)
+                return LoopResult(
+                    status="approved",
+                    plan=plan,
+                    findings=findings,
+                    reason_code=CRITIC_SATISFIED,
+                    approved_plan=approved,
+                )
 
         if budget_exceeded(goal.constraints.budget, state):
             logger.info("loop: budget exceeded → escalate")
