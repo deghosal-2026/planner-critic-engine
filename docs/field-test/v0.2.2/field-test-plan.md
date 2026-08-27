@@ -442,9 +442,9 @@ The field test executes in 4 phases:
 | `docs/field-test/scripts/run-field.py --validate --all` | P0 | Pre-run assertion validation |
 | `pytest tests/` | P1 | Full deterministic test suite |
 | `docs/field-test/scripts/run-field.py --all --output docs/field-test/v0.2.2/` | P2 | 170-goal LLM regression sweep |
-| `docs/field-test/v0.2.1/scripts/bench_operational.py` | P3 | Operational benchmark |
-| `docs/field-test/v0.2.1/scripts/bench_live_boundary.py` | P3 | Boundary evaluator |
-| `docs/field-test/v0.2.2/scripts/bench_multi_model.py` | P3 | Multi-model comparison |
+| `docs/field-test/scripts/bench_operational.py` | P3 | Operational benchmark |
+| `docs/field-test/scripts/bench_live_boundary.py` | P3 | Boundary evaluator |
+| `docs/field-test/scripts/bench_multi_model.py` | P3 | Multi-model comparison |
 
 ### 8.3 Scoring
 
@@ -464,7 +464,7 @@ Results are reported in `docs/field-test/v0.2.2/field-test-results.md` with:
 1. **Field test results** — `docs/field-test/v0.2.2/field-test-results.md`
 2. **Benchmark reports** — JSON output files in `docs/field-test/v0.2.2/results/`
 3. **Traces** — per-goal traces in `docs/field-test/v0.2.2/reports/`
-4. **Scripts** — benchmark scripts in `docs/field-test/v0.2.2/scripts/`
+4. **Scripts** — benchmark scripts in `docs/field-test/scripts/`
 5. **WBS update** — M5 task checklist updated with results
 
 ---
