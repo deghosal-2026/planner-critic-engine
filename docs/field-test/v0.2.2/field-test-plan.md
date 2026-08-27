@@ -435,16 +435,16 @@ The field test executes in 4 phases:
 | **P2** | Full regression sweep — re-run all 170 goals, compare vs v0.2.1 baseline | Yes | P1 | 30 min |
 | **P3** | Benchmarks (§7.1–§7.3) — operational, boundary, multi-model | Yes | P2 | 60 min |
 
-### 8.2 Execution Scripts
+### 8.2 Execution Commands
 
-| Script | Phase | Purpose |
-|--------|-------|---------|
-| `docs/field-test/scripts/run-field.py --validate --all` | P0 | Pre-run assertion validation |
-| `pytest tests/` | P1 | Full deterministic test suite |
-| `docs/field-test/scripts/run-field.py --all --output docs/field-test/v0.2.2/` | P2 | 170-goal LLM regression sweep |
-| `docs/field-test/scripts/bench_operational.py` | P3 | Operational benchmark |
-| `docs/field-test/scripts/bench_live_boundary.py` | P3 | Boundary evaluator |
-| `docs/field-test/scripts/bench_multi_model.py` | P3 | Multi-model comparison |
+| Step | Command | Phase | Purpose |
+|------|---------|-------|---------|
+| P0 | `pytest tests/ --tb=short -q` | P0 | Full deterministic test suite (1342+ tests, $0) |
+| P1 | `python3 docs/field-test/scripts/run-field.py --validate --all` | P1 | Pre-run assertion validation ($0) |
+| P2 | `python3 docs/field-test/scripts/run-field.py --all --output results/0.2.2` | P2 | 170-goal LLM regression sweep (~$0.49) |
+| P3a | `python3 docs/field-test/scripts/bench_operational.py` | P3 | Operational benchmark |
+| P3b | `python3 docs/field-test/scripts/bench_live_boundary.py` | P3 | Boundary evaluator |
+| P3c | `python3 docs/field-test/scripts/bench_multi_model.py --roles multi-model.toml` | P3 | Multi-model comparison (requires separate config) |
 
 ### 8.3 Scoring
 
