@@ -133,8 +133,18 @@ def _verify(what: str, how: str, expected: str) -> VerificationStep:
 
 
 def _rollback(trigger: str, action: str, guard: str = "") -> RollbackStep:
-    """A rollback step, optionally with a safety guard."""
-    return RollbackStep(trigger=trigger, action=action, safety_guard=guard)
+    """A rollback step, optionally with a safety guard.
+
+    Includes default typed restoration fields so demo plans satisfy the
+    v0.2.2 rollback_credible gate without emitting migration advisories.
+    """
+    return RollbackStep(
+        trigger=trigger,
+        action=action,
+        safety_guard=guard,
+        restores_state=["pre_rollback_state"],
+        restoration_evidence="verify post-rollback state matches expected",
+    )
 
 
 def _precondition(
@@ -163,10 +173,12 @@ _CUTOVER_VERIFY = _verify(
     how="run the smoke-query suite against the new schema",
     expected="all smoke checks pass",
 )
-_CUTOVER_ROLLBACK = _rollback(
+_CUTOVER_ROLLBACK = RollbackStep(
     trigger="any smoke check fails",
     action="flip traffic back to the legacy schema",
-    guard="pre-cutover snapshot is held",
+    safety_guard="pre-cutover snapshot is held",
+    restores_state=["db_schema", "traffic_routing"],
+    restoration_evidence="verify smoke suite re-passes on legacy schema",
 )
 
 

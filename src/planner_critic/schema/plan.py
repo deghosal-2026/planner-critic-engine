@@ -89,11 +89,13 @@ class RollbackStep(BaseModel):
     trigger: str = Field(min_length=1, description="What condition triggers the rollback")
     action: str = Field(min_length=1, description="What the rollback does")
     safety_guard: str = Field(default="", description="Guard that must hold before rolling back")
-    restores_state: list[str] = Field(
-        default_factory=list,
+    restores_state: list[str] | None = Field(
+        default=None,
         description="Facts the undo re-establishes (referencing precondition ledger fact keys). "
+        "``None`` means legacy prose-only rollback (backward-compatible). "
+        "An empty list ``[]`` means the author explicitly declined to declare state. "
         "When present, the rollback_credible gate validates these against the plan graph. "
-        "When absent (legacy), credibility is derived from surrounding structure.",
+        "When absent (None), credibility is derived from surrounding structure.",
     )
     restoration_evidence: str | None = Field(
         default=None,

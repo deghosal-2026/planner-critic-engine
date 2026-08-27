@@ -54,9 +54,18 @@ def _bare_consumer(task: Task) -> bool:
 
 
 def _has_typed_restoration(task: Task) -> bool:
-    """True when the task declares typed restoration fields."""
+    """True when the task declares typed restoration fields.
+
+    ``None`` means legacy prose-only (no typed fields) — not typed.
+    ``[]`` means explicitly empty — also not typed.
+    Non-empty list or restoration_evidence — typed.
+    """
     rb = task.rollback
-    return bool(rb and (rb.restores_state or rb.restoration_evidence))
+    if rb is None:
+        return False
+    has_state = rb.restores_state is not None and len(rb.restores_state) > 0
+    has_evidence = rb.restoration_evidence is not None
+    return has_state or has_evidence
 
 
 class Gate(BaseGate):
@@ -135,7 +144,7 @@ class Gate(BaseGate):
                 )
             else:
                 # Contradiction check: restores_state facts must not be self-referential
-                restores_set = set(producer.rollback.restores_state)
+                restores_set = set(producer.rollback.restores_state or [])
                 for pre in producer.preconditions:
                     if pre.established_by == producer.id and pre.fact in restores_set:
                         findings.append(

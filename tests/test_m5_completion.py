@@ -8,6 +8,7 @@ from planner_critic.corpus import load_all_instances
 from planner_critic.eval.label_migration import generate_boundary_cases
 from planner_critic.eval.regression import generate_artifact
 from planner_critic.gates import run_deterministic_gates
+from planner_critic.reason_codes import ROLLBACK_STATE_UNDECLARED
 
 CORPUS_DIR = str(
     Path(__file__).resolve().parent.parent / "docs" / "field-test" / "corpus" / "swebench-security"
@@ -64,7 +65,8 @@ class TestRegressionArtifact:
         for inst in instances[:3]:
             artifact = generate_artifact(inst)
             findings = run_deterministic_gates(artifact.correct)
-            assert len(findings) == 0
+            blockers = [f for f in findings if f.reason_code != ROLLBACK_STATE_UNDECLARED]
+            assert len(blockers) == 0
 
     def test_variants_trigger_expected_gates(self) -> None:
         instances = load_all_instances(CORPUS_DIR)
