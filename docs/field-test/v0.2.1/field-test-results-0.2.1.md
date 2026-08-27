@@ -89,7 +89,7 @@ The field test was run in four phases, cost-tiered so hermetic ($0) work runs fi
 
 ## BLUF (Bottom Line Up Front)
 
-**The engine works.** 170 real-world ops goals were planned by a real LLM, audited by deterministic gates + an LLM critic, and the loop terminated correctly on 169 of 170. **Zero true failures.** The core loop (decompose → gates → critic → revise → approve/escalate) is sound across 40 domains.
+**The engine works.** 170 real-world ops goals were planned by a real LLM, audited by deterministic gates + an LLM critic, and the loop terminated correctly on 169 of 170. **Zero field-test-found engine issues.** The core loop (decompose → gates → critic → revise → approve/escalate) is sound across 40 domains. (Scorecard B records 1 True Fail — a transient LLM provider error on `mch-04-blast-radius`, not an engine logic defect.)
 
 - **73/73 balanced goals approved** (100%) — findings are advisory warnings, gates are the hard floor
 - **96/97 strict goals escalated** (99%) — the LLM critic always finds blockers/warnings; strict means zero tolerance
@@ -149,7 +149,7 @@ The field test plan specifies 170 goals across 40 domains (inherited from v0.2.0
 | Adversarial | 8 | 0 | 8 | 0 | 100% |
 | **Total** | **170** | **73** | **96** | **1** | **99%** |
 
-**Scorecard B: 99% pass.** Every goal behaves correctly under its tolerance semantics, except 1 transient provider error.
+**Scorecard B: 99% pass.** Every goal behaves correctly under its tolerance semantics, except 1 transient provider error (`mch-04-blast-radius`: `planning_unavailable`). The True Fail = 1 is a transient LLM provider error, not an engine logic defect — the engine correctly failed closed (escalated as error, not approved).
 
 ### Regression Diff vs v0.2.0
 
