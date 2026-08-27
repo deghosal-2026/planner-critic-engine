@@ -13,7 +13,7 @@ from conftest import (
     make_task,
 )
 from planner_critic.approval import ApprovalGate, resolve_threshold
-from planner_critic.engine import Engine
+from planner_critic.engine import Engine, GatesConfig
 from planner_critic.loop import LoopConfig
 from planner_critic.schema.goal import RiskTolerance
 from planner_critic.types import ApprovedPlan, PlanningError, Severity
@@ -106,3 +106,72 @@ class TestEngineFacade:
         )
         result = engine.plan(make_goal())
         assert result.status == "escalated"
+
+
+class TestGatesConfig:
+    """Immutable gate configuration — prevents skipping deterministic gates."""
+
+    def test_default_config_all_gates_enabled(self) -> None:
+        """Default GatesConfig has all gates enabled."""
+        cfg = GatesConfig()
+        assert cfg.precondition_closer
+        assert cfg.verification_ordering
+        assert cfg.rollback_credible
+        assert cfg.requirement_trace
+        cfg.validate()  # should not raise
+
+    def test_all_disabled_raises(self) -> None:
+        """All gates disabled raises ValueError."""
+        cfg = GatesConfig(
+            precondition_closer=False,
+            verification_ordering=False,
+            rollback_credible=False,
+            requirement_trace=False,
+        )
+        with pytest.raises(ValueError, match="All deterministic gates are disabled"):
+            cfg.validate()
+
+    def test_engine_with_gates_config(self) -> None:
+        """Engine accepts GatesConfig and validates it."""
+        engine = Engine(
+            planner=ScriptedPlanner([make_plan()]),
+            critic=EmptyCritic(),
+            gates_config=GatesConfig(),
+        )
+        assert engine.gates_config.precondition_closer
+
+    def test_engine_rejects_all_disabled_gates(self) -> None:
+        """Engine construction raises when all gates disabled."""
+        with pytest.raises(ValueError, match="All deterministic gates are disabled"):
+            Engine(
+                planner=ScriptedPlanner([make_plan()]),
+                critic=EmptyCritic(),
+                gates_config=GatesConfig(
+                    precondition_closer=False,
+                    verification_ordering=False,
+                    rollback_credible=False,
+                    requirement_trace=False,
+                ),
+            )
+
+    def test_single_gate_enabled_passes_validation(self) -> None:
+        """At least one gate enabled passes validation."""
+        cfg = GatesConfig(
+            precondition_closer=False,
+            verification_ordering=False,
+            rollback_credible=True,
+            requirement_trace=False,
+        )
+        cfg.validate()  # should not raise
+
+    def test_budget_config_does_not_affect_gates(self) -> None:
+        """Budget config (revision_cap) does not affect gate configuration."""
+        engine = Engine(
+            planner=ScriptedPlanner([make_plan()]),
+            critic=EmptyCritic(),
+            config=LoopConfig(revision_cap=1),
+            gates_config=GatesConfig(),
+        )
+        # Gates should still be enabled even with tight budget
+        assert engine.gates_config.precondition_closer
+        assert engine.gates_config.verification_ordering
