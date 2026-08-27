@@ -307,3 +307,42 @@ class TestOrchestrator:
         assert MISSING_ROLLBACK in codes
         assert UNSAFE_PARALLELIZATION in codes
         assert UNVERIFIED_PRECONDITION in codes
+
+
+class TestMachineActionableFinding:
+    """Tests for #243: machine-actionable finding contract."""
+
+    def test_ordering_gate_emits_edge_id(self) -> None:
+        """ordering_sane finding includes edge_id, observed_state, evidence_refs."""
+        plan = make_plan(
+            tasks=[make_task("t2", satisfies="criterion"), make_task("t1", satisfies="criterion")],
+            dependencies=[hard_dep("t1", "t2")],
+        )
+        findings = [f for f in run_deterministic_gates(plan) if f.reason_code == UNSAFE_ORDERING]
+        assert len(findings) >= 1, (
+            f"expected ordering gate to fire for t2 before t1, got codes: "
+            f"{[f.reason_code for f in run_deterministic_gates(plan)]}"
+        )
+        f = findings[0]
+        assert f.edge_id == "t1->t2"
+        assert f.observed_state is not None
+        assert "t1" in f.observed_state and "t2" in f.observed_state
+        assert len(f.evidence_refs) >= 1
+        assert f.finding_schema_version == "0.2.0"
+
+    def test_legacy_finding_round_trip(self) -> None:
+        """A legacy-style finding (no new fields) loads without error."""
+        from planner_critic.types import Finding
+
+        legacy = Finding(
+            id="test:1:1:t1",
+            task_id="t1",
+            version=1,
+            severity=Severity.BLOCKER,
+            reason_code=UNSAFE_ORDERING,
+            message="test",
+        )
+        assert legacy.edge_id is None
+        assert legacy.observed_state is None
+        assert legacy.evidence_refs == []
+        assert legacy.finding_schema_version == "0.2.0"

@@ -111,7 +111,7 @@ class Gate(BaseGate):
                 consumer = plan.tasks[consumer_index]
                 pre_state = _is_pre_state_check(consumer)
                 if consumer_index < producer_index and not pre_state:
-                    findings.append(self._finding(plan, consumer_id, producer_id=producer.id))
+                    findings.append(self._finding(plan, consumer_id, producer_id=producer.id, id_to_index=id_to_index))
                 elif consumer_index > producer_index and pre_state:
                     findings.append(
                         self._finding(
@@ -119,6 +119,7 @@ class Gate(BaseGate):
                             consumer_id,
                             producer_id=producer.id,
                             detail="pre-state check ran after the mutation",
+                            id_to_index=id_to_index,
                         )
                     )
 
@@ -139,6 +140,7 @@ class Gate(BaseGate):
                             sibling.id,
                             producer.id,
                             detail=f"parallel group {producer.parallel_group!r}",
+                            id_to_index=id_to_index,
                         )
                     )
         return findings
@@ -150,6 +152,7 @@ class Gate(BaseGate):
         producer_id: str,
         *,
         detail: str = "",
+        id_to_index: dict[str, int] | None = None,
     ) -> Finding:
         """Build one VERIFICATION_AFTER_CONSUMER blocker.
 
@@ -175,6 +178,11 @@ class Gate(BaseGate):
                 f"Order task {consumer_id!r} after {producer_id!r}'s verification "
                 f"(or move it out of parallel group {group!r})"
             ),
+            edge_id=f"{producer_id}->{consumer_id}",
+            observed_state=f"consumer {consumer_id!r} runs at position "
+            f"{(id_to_index or {}).get(consumer_id, '?')} while producer {producer_id!r}'s "
+            f"verification is at position {(id_to_index or {}).get(producer_id, '?')}{where}",
+            evidence_refs=[f"hard_dep:{producer_id}->{consumer_id}"],
         )
 
 

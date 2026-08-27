@@ -49,6 +49,10 @@ class Gate(BaseGate):
                         reason_code=UNSAFE_ORDERING,
                         message=f"task {succ!r} is ordered before its hard dependency {pred!r}",
                         suggested_fix=f"Reorder the plan so task {succ!r} appears after {pred!r}",
+                        edge_id=f"{pred}->{succ}",
+                        observed_state=f"task {succ!r} at position {id_to_index[succ]} "
+                        f"appears before dependency {pred!r} at position {id_to_index[pred]}",
+                        evidence_refs=[f"hard_dep:{pred}->{succ}"],
                     )
                 )
         return findings

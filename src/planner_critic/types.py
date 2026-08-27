@@ -24,6 +24,9 @@ from .schema.goal import RiskTolerance
 from .schema.plan import PlanVersion
 
 
+FINDING_SCHEMA_VERSION = "0.2.0"
+
+
 class Severity(StrEnum):
     """Graded severity of a critique finding."""
 
@@ -63,6 +66,11 @@ class Finding(BaseModel):
     guardrail. ``drift_delta`` = normalized - raw (negative = downgrade,
     zero = no drift). Both fields default to ``severity`` for backward
     compatibility with legacy findings.
+
+    ``edge_id`` captures the producer→consumer pair for ordering-family
+    defects, so the planner revises against a concrete missing edge rather
+    than a prose message. ``observed_state`` records what the gate actually
+    observed. ``evidence_refs`` points to the structural facts that fired.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -90,6 +98,25 @@ class Finding(BaseModel):
     drift_delta: int = Field(
         default=0,
         description="normalized_severity - raw_severity (negative = downgrade, zero = no drift)",
+    )
+    edge_id: str | None = Field(
+        default=None,
+        description="Canonical producer→consumer edge for ordering defects, "
+        "e.g. 'pred->succ'. None for task-level findings.",
+    )
+    observed_state: str | None = Field(
+        default=None,
+        description="One-line factual observation the defect rests on, "
+        "e.g. 'verification after consumer ran'.",
+    )
+    evidence_refs: list[str] = Field(
+        default_factory=list,
+        description="Stable pointers to the structural facts that fired: "
+        "precondition fact keys, dependency-edge ids, action-registry entries.",
+    )
+    finding_schema_version: str = Field(
+        default=FINDING_SCHEMA_VERSION,
+        description="Schema version of this finding. Bumped when finding semantics change.",
     )
 
     def __str__(self) -> str:
