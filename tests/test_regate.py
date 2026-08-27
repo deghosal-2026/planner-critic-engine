@@ -189,3 +189,74 @@ def test_unknown_task_id_raises_value_error() -> None:
 
     with pytest.raises(ValueError, match="t2"):
         check_preconditions(approved, "t2", store, ReGateConfig(mode="before-each-step"))
+
+
+def test_default_mode_is_before_each_step() -> None:
+    """Default config mode is 'before-each-step' (not 'off')."""
+    cfg = ReGateConfig()
+    assert cfg.mode == "before-each-step"
+
+
+def test_coverage_counts_reported_on_pass(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Coverage counts (checked, probe_backed, unprobe_backed, total) are reported on pass."""
+    task = Task(
+        id="t1",
+        description="a task",
+        preconditions=[
+            Precondition(
+                description="must be prod",
+                fact="env=prod",
+                probe=EnvProbe(kind="env_var", query="ENV", expected="prod"),
+            ),
+            Precondition(description="must be healthy", fact="health=ok"),
+        ],
+    )
+    approved = _make_approved_plan([task])
+    store = InMemoryStore()
+
+    def _fake_run_probe(request: ProbeRequest) -> ProbeResult:
+        return ProbeResult(
+            kind=request.kind, query=request.query, observed="prod", matched=True, ok=True
+        )
+
+    monkeypatch.setattr("planner_critic.regate.run_probe", _fake_run_probe)
+
+    result = check_preconditions(approved, "t1", store, ReGateConfig(mode="before-each-step"))
+
+    assert result.status == "pass"
+    assert result.checked == 1
+    assert result.probe_backed == 1
+    assert result.unprobe_backed == 1
+    assert result.total == 2
+
+
+def test_coverage_counts_reported_on_stale(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Coverage counts are reported on stale status too."""
+    task = Task(
+        id="t1",
+        description="a task",
+        preconditions=[
+            Precondition(
+                description="must be prod",
+                fact="env=prod",
+                probe=EnvProbe(kind="env_var", query="ENV", expected="prod"),
+            ),
+        ],
+    )
+    approved = _make_approved_plan([task])
+    store = InMemoryStore()
+
+    def _fake_run_probe(request: ProbeRequest) -> ProbeResult:
+        return ProbeResult(
+            kind=request.kind, query=request.query, observed="staging", matched=False, ok=True
+        )
+
+    monkeypatch.setattr("planner_critic.regate.run_probe", _fake_run_probe)
+
+    result = check_preconditions(approved, "t1", store, ReGateConfig(mode="before-each-step"))
+
+    assert result.status == "stale"
+    assert result.checked == 1
+    assert result.probe_backed == 1
+    assert result.unprobe_backed == 0
+    assert result.total == 1

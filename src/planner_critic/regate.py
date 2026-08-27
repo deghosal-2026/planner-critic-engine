@@ -4,6 +4,11 @@ The re-gate checks whether preconditions that were true at planning time
 still hold when a task is about to execute. It runs probes against live
 state and reports which preconditions are stale. The caller (adapter layer)
 decides whether to replan based on the goal's ``replan_policy``.
+
+Starting in v0.2.2, the re-gate is **on by default** for high/critical
+blast-radius goals (posture-keyed default). It also reports coverage
+honesty — what fraction of preconditions are actually probe-verifiable —
+and provides a fail-closed path via ``RUNTIME_PRECONDITION_STALE``.
 """
 
 from __future__ import annotations
@@ -12,9 +17,10 @@ from dataclasses import dataclass, field
 from typing import Literal, cast
 
 from .probe.base import ProbeKind, ProbeRequest, run_probe
+from .reason_codes import RUNTIME_PRECONDITION_STALE
 from .schema.plan import Task
 from .store.base import PlanStore
-from .types import ApprovedPlan
+from .types import ApprovedPlan, Severity
 
 
 @dataclass
@@ -22,11 +28,11 @@ class ReGateConfig:
     """Configuration for the re-gate.
 
     Attributes:
-        mode: ``"off"`` to skip all precondition checks; ``"before-each-step"``
-            to re-verify preconditions before every task execution.
+        mode: ``"before-each-step"`` (default) to re-verify preconditions
+            before every task execution; ``"off"`` to skip all checks.
     """
 
-    mode: Literal["before-each-step", "off"] = "off"
+    mode: Literal["before-each-step", "off"] = "before-each-step"
 
 
 @dataclass
@@ -40,11 +46,20 @@ class ReGateResult:
             not match live state.
         replan_triggered: Always ``False`` in this module — the caller
             decides whether to replan.
+        checked: Number of preconditions that were checked against live state.
+        probe_backed: Number of preconditions that had a probe available.
+        unprobe_backed: Number of preconditions without a probe (cannot be
+            runtime-verified).
+        total: Total number of preconditions on the task.
     """
 
     status: Literal["pass", "stale"]
     stale_preconditions: list[str] = field(default_factory=list)
     replan_triggered: bool = False
+    checked: int = 0
+    probe_backed: int = 0
+    unprobe_backed: int = 0
+    total: int = 0
 
 
 def check_preconditions(
@@ -60,11 +75,11 @@ def check_preconditions(
         task_id: Which task to check.
         store: Unused in this implementation; kept for API compatibility
             with future store-based preconditions.
-        config: Re-gate configuration; defaults to ``off``.
+        config: Re-gate configuration; defaults to ``before-each-step``.
 
     Returns:
         A :class:`ReGateResult` summarising which preconditions (if any)
-        are stale.
+        are stale, plus coverage counts.
 
     Raises:
         ValueError: If ``task_id`` is not found in the approved plan.
@@ -75,12 +90,16 @@ def check_preconditions(
         return ReGateResult(status="pass")
 
     task = _find_task(approved, task_id)
-
+    total = len(task.preconditions)
     stale: list[str] = []
+    checked = 0
+    probe_backed = 0
+
     for precondition in task.preconditions:
         probe = precondition.probe
         if probe is None:
             continue
+        probe_backed += 1
         request = ProbeRequest(
             kind=cast(ProbeKind, probe.kind),
             query=probe.query,
@@ -89,11 +108,26 @@ def check_preconditions(
         result = run_probe(request)
         if not result.matched:
             stale.append(precondition.description)
+        checked += 1
 
+    unprobe_backed = total - probe_backed
     if stale:
-        return ReGateResult(status="stale", stale_preconditions=stale)
+        return ReGateResult(
+            status="stale",
+            stale_preconditions=stale,
+            checked=checked,
+            probe_backed=probe_backed,
+            unprobe_backed=unprobe_backed,
+            total=total,
+        )
 
-    return ReGateResult(status="pass")
+    return ReGateResult(
+        status="pass",
+        checked=checked,
+        probe_backed=probe_backed,
+        unprobe_backed=unprobe_backed,
+        total=total,
+    )
 
 
 def _find_task(approved: ApprovedPlan, task_id: str) -> Task:

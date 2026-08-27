@@ -99,6 +99,7 @@ PLANNING_UNAVAILABLE: Literal["planning_unavailable"] = "planning_unavailable"
 
 # --- Approval / fail-closed codes -------------------------------------------
 APPROVAL_THRESHOLD_NOT_MET: Literal["approval_threshold_not_met"] = "approval_threshold_not_met"
+RUNTIME_PRECONDITION_STALE: Literal["runtime_precondition_stale"] = "runtime_precondition_stale"
 
 # --- LLM critic heuristic codes (PRD §2.5.1, F-80) ---------------------------
 LLM_FEASIBILITY: Literal["llm_feasibility"] = "llm_feasibility"
@@ -237,6 +238,7 @@ ReasonCode: TypeAlias = Literal[
     "approved",
     "planning_unavailable",
     "approval_threshold_not_met",
+    "runtime_precondition_stale",
     "llm_feasibility",
     "llm_risk",
     "llm_missing_steps",
@@ -358,6 +360,10 @@ REASON_CODE_DESCRIPTIONS: dict[ReasonCode, str] = {
     APPROVED: "Loop terminated by meeting the approval threshold",
     PLANNING_UNAVAILABLE: "A provider failed; planning is unavailable and must fail closed",
     APPROVAL_THRESHOLD_NOT_MET: "Findings do not meet the goal's risk-tolerance threshold",
+    RUNTIME_PRECONDITION_STALE: (
+        "A precondition that held at planning time was stale at execution time — "
+        "live state contradicted the plan's assumption"
+    ),
     LLM_FEASIBILITY: "LLM critic: task is not achievable with the stated environment/tools",
     LLM_RISK: "LLM critic: risk/blast-radius exceeds the goal's tolerance",
     LLM_MISSING_STEPS: "LLM critic: an obvious prerequisite or step is missing",
