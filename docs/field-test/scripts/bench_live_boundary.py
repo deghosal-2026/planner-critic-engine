@@ -57,7 +57,7 @@ def _find_repo_root() -> Path:
 
 
 REPO_ROOT = _find_repo_root()
-RESULTS_DIR = REPO_ROOT / "results" / "0.2.2"
+RESULTS_DIR = REPO_ROOT / "results" / "0.2.3"
 
 PROVIDERS: dict[str, dict] = {
     "openai": {
