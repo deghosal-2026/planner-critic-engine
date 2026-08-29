@@ -101,20 +101,40 @@ Scope: three community-raised correction issues from the dev.to series, plus the
 - [ ] Code review completed
 - [ ] Merged to `feature-v0.2.3`
 
-## 4. M2 — Field Test (#281–#289)
+## 4. M2 — Field Test (#281–#285, #288, #309–#316)
 
-Execution order: #281 plan → #282 download corpus → #283 write scripts → #284 execute sweep → #285 fix issues → #286 capture learnings → #287 update report → #288 closure.
+> **What changed from v0.2.2:** Four new verification dimensions. (1) Gate Canary — run `plancritic gates canary --check` before/after sweep; assert all 10 gates fire. (2) Transit-integrity check — verify redaction does not corrupt numeric JSON in boundary evaluator. (3) Frozen-Claim Protocol extended — `plancritic release verify --strict` with denominator completeness, artifact freeze, determinism boundaries. (4) DecisionContext population — verify trial records have populated metadata, not "unknown". (5) Comparison table and narrative documenting delta vs v0.2.2.
 
-| Issue | Scope | Gate to close |
-|-------|-------|---------------|
-| [#281](https://github.com/deghosal-2026/planner-critic-engine/issues/281) | Field test plan — scope, corpus, pass/fail criteria | Plan published; scope includes 183 goals + Gate Canary verification |
-| [#282](https://github.com/deghosal-2026/planner-critic-engine/issues/282) | Download corpus for field test | Corpus downloaded; all 183 goals available locally |
-| [#283](https://github.com/deghosal-2026/planner-critic-engine/issues/283) | Write field test scripts | `bench_gate_canary`, `bench_release_verify` written; runners updated |
-| [#284](https://github.com/deghosal-2026/planner-critic-engine/issues/284) | Execute field test sweep | 183 goals complete; Gate Canary passes; release verification green |
-| [#285](https://github.com/deghosal-2026/planner-critic-engine/issues/285) | Fix issues found during field test | All regression issues fixed; root causes documented |
-| [#286](https://github.com/deghosal-2026/planner-critic-engine/issues/286) | Capture learnings from field test | Learnings documented in `docs/field-test/v0.2.3/learnings.md` |
-| [#287](https://github.com/deghosal-2026/planner-critic-engine/issues/287) | Update field test report | Report committed to `docs/field-test/v0.2.3/` |
-| [#288](https://github.com/deghosal-2026/planner-critic-engine/issues/288) | Closure — run all tests, lint strict, close field test | Full deterministic suite green; Docker integration tests pass; ruff + mypy strict clean; coverage > 90%; field test report complete; all M1 changes merged and verified |
+Execution order: #309 plan → #282 corpus → #310 fixtures → #311 scripts → #284 execute → #285 fix → #314 comparison → #315 conclusions → #316 report creation → #312 learnings → #288 closure.
+
+| Issue | Title | Scope | New fixtures / scripts needed | Gate to close |
+|-------|-------|-------|-------------------------------|---------------|
+| [#309](https://github.com/deghosal-2026/planner-critic-engine/issues/309) | Write field test plan — scope, corpus, pass/fail criteria | Updated plan reflecting 4 new verification dimensions + comparison methodology | — | Plan published; pass/fail criteria include Gate Canary (10/10), transit-integrity (0 corruption), authority enforcement (3 surfaces), DecisionContext (0 unknown), comparison delta documented |
+| [#282](https://github.com/deghosal-2026/planner-critic-engine/issues/282) | Download corpus for field test | 183-goal corpus download | — | Corpus available locally |
+| [#310](https://github.com/deghosal-2026/planner-critic-engine/issues/310) | Create field test fixtures — Gate Canary, transit-integrity, authority | 10 gate canary pairs (tests/canary/), transit-integrity fixtures (3 cases), authority enforcement contracts, DecisionContext stubs | 10 canary fixtures, 3 transit-integrity fixtures, 3+ authority contracts, 1 stub critic | All fixtures created and validated |
+| [#311](https://github.com/deghosal-2026/planner-critic-engine/issues/311) | Write bench scripts — bench_gate_canary, bench_release_verify, bench_transit_integrity | 3 new bench scripts + updates to existing runners | `bench_gate_canary.py`, `bench_release_verify.py`, `bench_transit_integrity.py`; updated `bench_live_boundary.py` with DecisionContext | All scripts written; seam assertions at new boundaries |
+| [#284](https://github.com/deghosal-2026/planner-critic-engine/issues/284) | Execute field test sweep — 183 goals, Gate Canary, release verification | Full sweep with all new verification | — | 183 goals complete; Gate Canary 10/10; transit-integrity 0 events; verify --strict pass |
+| [#285](https://github.com/deghosal-2026/planner-critic-engine/issues/285) | Fix issues found during field test execution | Regression fixes | — | All issues fixed; root causes documented |
+| [#314](https://github.com/deghosal-2026/planner-critic-engine/issues/314) | Create comparison table — v0.2.3 vs v0.2.2 baseline | Per-metric delta table across all dimensions | — | Comparison table published; each delta has root cause documented |
+| [#315](https://github.com/deghosal-2026/planner-critic-engine/issues/315) | Update field test report — conclusions and comparison narrative | Conclusion sections: executive summary, findings, regressions, improvements, new capabilities | — | Narrative written; honest assessment of better/worse/unchanged |
+| [#316](https://github.com/deghosal-2026/planner-critic-engine/issues/316) | Create FIELD_TEST_REPORT.md and learnings.md for v0.2.3 | Full report document with all sections | — | Report committed to `docs/field-test/v0.2.3/` |
+| [#312](https://github.com/deghosal-2026/planner-critic-engine/issues/312) | Capture learnings from field test | Learnings on Gate Canary, transit-integrity, authority, DecisionContext, comparison process | — | `docs/field-test/v0.2.3/learnings.md` written |
+| [#288](https://github.com/deghosal-2026/planner-critic-engine/issues/288) | Closure — run all tests, lint strict, close field test | M2 exit gate | — | Full deterministic suite green; Docker tests pass; ruff + mypy strict clean; coverage > 90%; field test report complete; all M1 changes merged and verified |
+
+### M2 Exit Gate
+
+- [ ] All 11 issues closed
+- [ ] All 4 new verification dimensions pass (Gate Canary 10/10, transit-integrity 0 events, authority 3 surfaces, DecisionContext 0 unknown)
+- [ ] Comparison table published — every metric delta documented against v0.2.2
+- [ ] Conclusion narrative written — honest better/worse/unchanged assessment
+- [ ] 10 canary fixtures + 3 transit-integrity fixtures + 3 bench scripts committed
+- [ ] Full deterministic test suite green
+- [ ] Docker integration tests pass
+- [ ] Ruff clean, mypy strict clean
+- [ ] Test coverage > 90%
+- [ ] Field test report published at `docs/field-test/v0.2.3/`
+- [ ] Learnings documented
+- [ ] Code review completed
 
 ## 5. M3 — Release Readiness (#290–#295)
 
