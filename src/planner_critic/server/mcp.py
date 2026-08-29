@@ -112,6 +112,10 @@ _TOOL_DEFINITIONS = [
                     "type": "string",
                     "description": "Optional PlanVersion JSON to patch",
                 },
+                "principal": {
+                    "type": "string",
+                    "description": "Approving principal (required when approving_authority is set)",
+                },
             },
             "required": ["escalation_id"],
         },
@@ -124,6 +128,10 @@ _TOOL_DEFINITIONS = [
             "properties": {
                 "escalation_id": {"type": "string"},
                 "note": {"type": "string"},
+                "principal": {
+                    "type": "string",
+                    "description": "Denying principal (required when approving_authority is set)",
+                },
             },
             "required": ["escalation_id"],
         },
@@ -292,6 +300,7 @@ class PlannerCriticMCPServer:
         escalation_id: str,
         note: str = "",
         patch_json: str | None = None,
+        principal: str | None = None,
     ) -> dict[str, Any]:
         """Approve an escalation."""
         try:
@@ -300,6 +309,7 @@ class PlannerCriticMCPServer:
                 escalation_id,
                 note=note,
                 patch_json=patch_json,
+                principal=principal,
             )
             return {"status": "ok", "escalation": result}
         except Exception as exc:
@@ -309,10 +319,13 @@ class PlannerCriticMCPServer:
         self,
         escalation_id: str,
         note: str = "",
+        principal: str | None = None,
     ) -> dict[str, Any]:
         """Deny an escalation."""
         try:
-            result = esc.escalate_deny(self.store_path, escalation_id, note=note)
+            result = esc.escalate_deny(
+                self.store_path, escalation_id, note=note, principal=principal
+            )
             return {"status": "ok", "escalation": result}
         except Exception as exc:
             return {"status": "error", "error": str(exc)}

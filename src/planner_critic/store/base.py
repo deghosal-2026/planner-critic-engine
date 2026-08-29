@@ -20,6 +20,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..schema.plan import Dependency, PlanVersion
+from ..schema.acceptance import AcceptanceContract
 from ..types import Escalation, ExecutionTrace, Finding
 from .replan_trace import ReplanLink
 
@@ -260,6 +261,25 @@ class PlanStore(ABC):
     def close(self) -> None:
         """Close the store and release resources."""
 
+    @abstractmethod
+    def put_acceptance_contract(self, contract: AcceptanceContract) -> None:
+        """Persist an acceptance contract for a goal.
+
+        Args:
+            contract: The contract to store, keyed by goal_id.
+        """
+
+    @abstractmethod
+    def get_acceptance_contract(self, goal_id: str) -> AcceptanceContract | None:
+        """Fetch the acceptance contract for a goal, if any.
+
+        Args:
+            goal_id: The goal whose contract to fetch.
+
+        Returns:
+            The bound contract, or None if no contract exists.
+        """
+
     def warn_and_continue(self, err: Exception) -> None:
         """Side-channel contract (§7.2): warn, then let the caller continue.
 
@@ -302,6 +322,7 @@ class InMemoryStore(PlanStore):
         self._replan_links: dict[tuple[str, int], ReplanLink] = {}
         self._missed_critiques: dict[str, str] = {}
         self._signatures: dict[tuple[str, int], str] = {}
+        self._contracts: dict[str, AcceptanceContract] = {}
 
     def close(self) -> None:
         """No-op for in-memory store."""
@@ -392,6 +413,14 @@ class InMemoryStore(PlanStore):
         """Return stored signatures for a plan, newest first."""
         items = [(v, s) for (pid, v), s in self._signatures.items() if pid == plan_id]
         return sorted(items, key=lambda x: -x[0])
+
+    def put_acceptance_contract(self, contract: AcceptanceContract) -> None:
+        """Persist an acceptance contract by goal_id."""
+        self._contracts[contract.goal_id] = contract
+
+    def get_acceptance_contract(self, goal_id: str) -> AcceptanceContract | None:
+        """Return the acceptance contract for a goal, or None."""
+        return self._contracts.get(goal_id)
 
 
 def _compute_diff(a: PlanVersion, b: PlanVersion) -> PlanDiff:

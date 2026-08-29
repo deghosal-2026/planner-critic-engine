@@ -15,7 +15,7 @@ import json
 from pathlib import Path
 from typing import Literal, cast
 
-from ..escalation import EscalationManager
+from ..escalation import EscalationManager, build_escalation_manager
 from ..roles import CriticRole
 from ..schema.plan import PlanVersion
 from ..store.base import StoreUnavailable
@@ -89,7 +89,10 @@ def run_escalate(argv: list[str]) -> int:
     try:
         store = SQLiteStore(args.store)
         try:
-            manager = EscalationManager(store)
+            if args.action in ("approve", "deny"):
+                manager = build_escalation_manager(store, escalation_id=args.escalation_id)
+            else:
+                manager = EscalationManager(store)
             if args.action == "list":
                 return _run_list(manager, args.status)
             if args.action == "approve":

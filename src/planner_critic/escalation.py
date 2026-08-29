@@ -27,6 +27,7 @@ from typing import Literal
 
 from .gates import run_deterministic_gates
 from .roles import CriticRole
+from .schema.acceptance import AcceptanceContract
 from .schema.plan import PlanVersion
 from .store.base import PlanStore
 from .types import Escalation, Finding, Severity
@@ -202,4 +203,48 @@ class EscalationManager:
         raise ValueError(f"unknown escalation {escalation_id!r}")
 
 
-__all__ = ["EscalationManager"]
+__all__ = ["EscalationManager", "build_escalation_manager"]
+
+
+def build_escalation_manager(
+    store: PlanStore,
+    goal_id: str | None = None,
+    escalation_id: str | None = None,
+) -> EscalationManager:
+    """Build an EscalationManager with authority pre-bound from the store.
+
+    Looks up the :class:`~planner_critic.schema.acceptance.AcceptanceContract`
+    from the store and extracts its ``approving_authority``. When no contract
+    exists (legacy runs), the manager is constructed without bound authority
+    and ``resolve`` accepts any principal.
+
+    Args:
+        store: The plan store containing the contract.
+        goal_id: Look up the contract by goal id directly.
+        escalation_id: Alternative — look up the escalation's plan to derive
+            the goal id. Only one of ``goal_id`` or ``escalation_id`` should
+            be provided.
+
+    Returns:
+        An ``EscalationManager`` with ``approving_authority`` pre-bound.
+    """
+    if goal_id is None and escalation_id is not None:
+        try:
+            esc = store.get_escalation(escalation_id)
+            if esc is not None:
+                plan = store.get_plan(esc.plan_id)
+                if plan is not None:
+                    goal_id = plan.goal_id
+        except Exception:
+            pass
+
+    authority: str | None = None
+    if goal_id is not None:
+        try:
+            contract = store.get_acceptance_contract(goal_id)
+            if contract is not None:
+                authority = contract.approving_authority
+        except Exception:
+            pass
+
+    return EscalationManager(store, approving_authority=authority)
