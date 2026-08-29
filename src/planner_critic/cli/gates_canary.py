@@ -21,7 +21,7 @@ from ..gates.base import BaseGate
 from ..schema.plan import PlanVersion
 from ..types import HeuristicFamily, Severity
 
-CANARY_FIXTURES_DIR = Path(__file__).resolve().parent.parent.parent.parent / "tests" / "canary"
+CANARY_FIXTURES_DIR = Path(__file__).resolve().parent.parent / "canary"
 
 
 class CanaryResult:
@@ -187,18 +187,12 @@ def run_canary_check(canary_dir: str | None = None) -> list[CanaryResult]:
     return results
 
 
-def main(argv: list[str]) -> int:
-    """Run the gate canary CLI.
-
-    Args:
-        argv: CLI arguments.
-
-    Returns:
-        Exit code: 0 if all gates pass, 1 if any gate fails.
-    """
+def build_gates_parser() -> argparse.ArgumentParser:
+    """Build the ``gates canary`` subcommand parser."""
     parser = argparse.ArgumentParser(
         prog="plancritic gates canary",
         description="Deterministic gate health check (exit 1 on any regression)",
+        add_help=False,
     )
     parser.add_argument(
         "--check",
@@ -215,7 +209,21 @@ def main(argv: list[str]) -> int:
         default=None,
         help="Override canary fixtures directory",
     )
-    args = parser.parse_args(argv)
+    return parser
+
+
+def run_gates_canary(argv: list[str]) -> int:
+    """Run the gate canary CLI subcommand.
+
+    Args:
+        argv: CLI arguments (after 'gates canary').
+
+    Returns:
+        Exit code: 0 if all gates pass, 1 if any gate fails.
+    """
+    import argparse
+
+    args = build_gates_parser().parse_args(argv)
 
     results = run_canary_check(canary_dir=args.canary_dir)
 
@@ -251,4 +259,7 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(run_gates_canary(sys.argv[1:]))
+
+
+__all__ = ["build_gates_parser", "run_gates_canary", "run_canary_check"]
