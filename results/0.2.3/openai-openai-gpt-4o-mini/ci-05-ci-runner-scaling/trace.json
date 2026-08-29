@@ -1,0 +1,222 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-05-ci-runner-scaling",
+  "duration_seconds": 12.42,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-ci-05-ci-runner-scaling-r2",
+    "goal_id": "ci-05-ci-runner-scaling",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "ci-05-ci-runner-scaling",
+    "created_at": "2026-08-29T21:36:44.798182Z",
+    "tasks": [
+      {
+        "id": "setup_ec2",
+        "description": "Set up auto-scaling group on EC2",
+        "action": "create",
+        "target": "auto-scaling-group",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "auto-scaling group status",
+          "how": "check AWS console",
+          "expected": "active"
+        },
+        "rollback": {
+          "trigger": "setup fails",
+          "action": "delete auto-scaling group",
+          "safety_guard": "verify no instances are running",
+          "restores_state": [
+            "none"
+          ],
+          "restoration_evidence": "confirm no active components exist"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_runner",
+        "description": "Configure GitHub Actions runner registration",
+        "action": "configure",
+        "target": "github-runner",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "runner registration status",
+          "how": "check GitHub settings",
+          "expected": "registered"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "reset configuration",
+          "safety_guard": "ensure registration is not active",
+          "restores_state": [
+            "unregistered status"
+          ],
+          "restoration_evidence": "check runner list for absence"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "handle_scale_up",
+        "description": "Implement scale-up on demand",
+        "action": "develop",
+        "target": "scale-up",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "number of active runners",
+          "how": "check EC2 instances",
+          "expected": "at least 1 runner for each job"
+        },
+        "rollback": {
+          "trigger": "scale-up fails",
+          "action": "revert scale-up configuration",
+          "safety_guard": "ensure no additional runners are launched",
+          "restores_state": [
+            "original scale-up settings"
+          ],
+          "restoration_evidence": "validate runner count and scale settings"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "handle_scale_down",
+        "description": "Implement scale-down on idle",
+        "action": "develop",
+        "target": "scale-down",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "at least one job is idle",
+            "fact": "job_queue_empty",
+            "established_by": "handle_scale_up",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "number of remaining runners after scale down",
+          "how": "check EC2 instances",
+          "expected": "no more than necessary runners active"
+        },
+        "rollback": {
+          "trigger": "scale-down fails",
+          "action": "revert scale-down configuration",
+          "safety_guard": "ensure at least one runner remains",
+          "restores_state": [
+            "current number of active runners"
+          ],
+          "restoration_evidence": "validate number of EC2 instances active"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup_ec2",
+        "to_task": "configure_runner",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_runner",
+        "to_task": "handle_scale_up",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "handle_scale_up",
+        "to_task": "handle_scale_down",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:handle_scale_down",
+      "task_id": "handle_scale_down",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'handle_scale_down' depends on 'job_queue_empty' fact which is not established by a prior task.",
+      "suggested_fix": "Establish the 'job_queue_empty' fact in a previous task or ensure it is verified before running 'handle_scale_down'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:feasibility:setup_ec2",
+      "task_id": "setup_ec2",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Setting up an auto-scaling group on EC2 may not be achievable in the stated environment without appropriate IAM permissions.",
+      "suggested_fix": "Ensure the executing environment has the necessary IAM permissions to create and manage EC2 auto-scaling groups.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:configure_runner",
+      "task_id": "configure_runner",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "'configure_runner' task is ordered before establishing a successful auto-scaling group in 'setup_ec2'.",
+      "suggested_fix": "Reorder tasks to ensure 'setup_ec2' completes successfully before 'configure_runner' starts.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

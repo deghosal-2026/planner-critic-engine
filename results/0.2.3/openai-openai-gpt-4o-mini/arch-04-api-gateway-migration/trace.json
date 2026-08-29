@@ -1,0 +1,267 @@
+{
+  "dimension": "core-api",
+  "goal_id": "arch-04-api-gateway-migration",
+  "duration_seconds": 25.63,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-arch-04-api-gateway-migration-r2",
+    "goal_id": "arch-04-api-gateway-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "arch-04-api-gateway-migration-plan",
+    "created_at": "2026-08-29T21:32:20.839000Z",
+    "tasks": [
+      {
+        "id": "export-nginx-config",
+        "description": "Export NGINX configuration",
+        "action": "export",
+        "target": "nginx-config",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "config file presence and content",
+          "how": "check file size and specific tokens",
+          "expected": "non-empty and valid config"
+        },
+        "rollback": {
+          "trigger": "export fails",
+          "action": "use previous config",
+          "safety_guard": "ensure config backup exists",
+          "restores_state": [
+            "nginx-config reverted to previous version"
+          ],
+          "restoration_evidence": "check if previous config is in use"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "translate-to-kong-config",
+        "description": "Translate NGINX config to Kong declarative config",
+        "action": "translate",
+        "target": "kong-config",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "export-nginx-config has completed successfully",
+            "fact": "nginx_config_exported",
+            "established_by": "export-nginx-config",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "kong config validity",
+          "how": "run kong config check command",
+          "expected": "no errors in config"
+        },
+        "rollback": {
+          "trigger": "translation fails",
+          "action": "revert changes",
+          "safety_guard": "verify original nginx config integrity",
+          "restores_state": [
+            "kong-config reverted to previous version"
+          ],
+          "restoration_evidence": "check if previous kong config is in use"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy-kong",
+        "description": "Deploy Kong API gateway alongside NGINX",
+        "action": "deploy",
+        "target": "kong",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "translate-to-kong-config has completed successfully",
+            "fact": "kong_config_translated",
+            "established_by": "translate-to-kong-config",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Kong deployment status",
+          "how": "check deployment logs and service status",
+          "expected": "Kong is running and healthy"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "undeploy Kong",
+          "safety_guard": "check NGINX availability",
+          "restores_state": [
+            "Kong undeployed"
+          ],
+          "restoration_evidence": "verify NGINX is back in service"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "route-shadow-traffic",
+        "description": "Route shadow traffic to Kong for validation",
+        "action": "shadow",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "deploy-kong has completed successfully",
+            "fact": "kong_deployed",
+            "established_by": "deploy-kong",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic flow",
+          "how": "monitor logs for shadowed requests",
+          "expected": "logs show traffic to both NGINX and Kong"
+        },
+        "rollback": {
+          "trigger": "shadow traffic issues",
+          "action": "stop shadowing",
+          "safety_guard": "ensure traffic returns to NGINX",
+          "restores_state": [
+            "traffic rerouted back to NGINX"
+          ],
+          "restoration_evidence": "check if traffic flow solely to NGINX"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover-dns-to-kong",
+        "description": "Cutover DNS to Kong API gateway",
+        "action": "update",
+        "target": "dns",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "route-shadow-traffic has completed successfully",
+            "fact": "shadow_traffic_validated",
+            "established_by": "route-shadow-traffic",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "DNS propagation",
+          "how": "check DNS resolution",
+          "expected": "DNS resolves to Kong IP"
+        },
+        "rollback": {
+          "trigger": "dns cutover fails",
+          "action": "revert DNS to NGINX",
+          "safety_guard": "monitor service availability",
+          "restores_state": [
+            "DNS reverted to NGINX"
+          ],
+          "restoration_evidence": "check DNS resolution returns to previous NGINX IP"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "export-nginx-config",
+        "to_task": "translate-to-kong-config",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "translate-to-kong-config",
+        "to_task": "deploy-kong",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-kong",
+        "to_task": "route-shadow-traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "route-shadow-traffic",
+        "to_task": "cutover-dns-to-kong",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:deploy-kong",
+      "task_id": "deploy-kong",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The deployment of Kong requires a successful translation of NGINX config, which may fail if the config is invalid.",
+      "suggested_fix": "Ensure that the configuration translation is validated prior to deploying Kong.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:cutover-dns-to-kong",
+      "task_id": "cutover-dns-to-kong",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Cutover DNS should not occur until shadow traffic has been validated without issues.",
+      "suggested_fix": "Reorder the tasks so that cutting over DNS only happens after shadow traffic validation is confirmed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:arch-04-api-gateway-migration:2:2",
+    "plan_id": "plan-arch-04-api-gateway-migration-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:feasibility:deploy-kong",
+    "question": "Plan for goal 'arch-04-api-gateway-migration' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,274 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dr-02-point-in-time-restore",
+  "duration_seconds": 12.47,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-dr-02-point-in-time-restore-r2",
+    "goal_id": "dr-02-point-in-time-restore",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "dr-02-point-in-time-restore",
+    "created_at": "2026-08-29T21:36:35.753180Z",
+    "tasks": [
+      {
+        "id": "identify_restore_point",
+        "description": "Identify the restore point timestamp (T-2 hours)",
+        "action": "identify",
+        "target": "timestamp",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "current timestamp is available",
+            "fact": "current_timestamp_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "pitr_restore",
+        "description": "Run PITR restore to the isolated environment",
+        "action": "restore",
+        "target": "isolated_db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "restored database state",
+          "how": "compare row counts",
+          "expected": "row counts match expected values"
+        },
+        "rollback": {
+          "trigger": "restore fails",
+          "action": "abort restore",
+          "safety_guard": "ensure no partial data remains",
+          "restores_state": [
+            "isolated_db in pre-restore state"
+          ],
+          "restoration_evidence": "logged restore attempt details"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_data",
+        "description": "Verify row counts and critical records in the restored database",
+        "action": "verify",
+        "target": "isolated_db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "critical record integrity",
+          "how": "check expected records",
+          "expected": "all critical records present"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "revert to previous state",
+          "safety_guard": "keep a snapshot of original state",
+          "restores_state": [
+            "isolated_db in a consistent state"
+          ],
+          "restoration_evidence": "critical records reviewed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "test_application_compatibility",
+        "description": "Run application tests against the restored database",
+        "action": "test",
+        "target": "isolated_db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application functionality",
+          "how": "run regression tests",
+          "expected": "no critical failures"
+        },
+        "rollback": {
+          "trigger": "tests fail",
+          "action": "revert to original application",
+          "safety_guard": "backup current application state",
+          "restores_state": [
+            "application in last stable state"
+          ],
+          "restoration_evidence": "test reports and logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cleanup_environment",
+        "description": "Securely delete the restored database and clean up the environment",
+        "action": "cleanup",
+        "target": "isolated_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "tests completed successfully",
+            "fact": "tests_passing",
+            "established_by": "test_application_compatibility",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "environment integrity post-cleanup",
+          "how": "confirm no residual data exists",
+          "expected": "environment is clean"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "identify_restore_point",
+        "to_task": "pitr_restore",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "pitr_restore",
+        "to_task": "verify_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_data",
+        "to_task": "test_application_compatibility",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test_application_compatibility",
+        "to_task": "cleanup_environment",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:pitr_restore",
+      "task_id": "pitr_restore",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The PITR restore depends on the identify_restore_point task which may not have verified the current_timestamp_available fact, creating a risk of restoring at an incorrect timestamp.",
+      "suggested_fix": "Ensure the current timestamp is verified before running the PITR restore.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:pitr_restore",
+      "task_id": "pitr_restore",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The PITR restore task is ordered before verifying that the current timestamp is available, violating the prerequisite ordering.",
+      "suggested_fix": "Reorder tasks to place 'identify_restore_point' before 'pitr_restore'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:pitr_restore",
+      "task_id": "pitr_restore",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The rollback procedure for the PITR restore lacks specific guidelines on handling data that may be corrupted post-restore.",
+      "suggested_fix": "Add a step for checking integrity after the restore and define a process for handling corrupted data.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:verify_data",
+      "task_id": "verify_data",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Verification steps should also include checking for any corrupted rows, which are significant risk factors mentioned in the goal.",
+      "suggested_fix": "Incorporate additional verification for data integrity regarding corrupted rows.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:cleanup_environment",
+      "task_id": "cleanup_environment",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The cleanup step could also cover the validation of any dependencies or state changes impacted by the tests conducted on the application.",
+      "suggested_fix": "Include a step to validate dependencies of the application before cleanup.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

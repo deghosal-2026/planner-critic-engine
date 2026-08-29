@@ -1,0 +1,275 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-02-terraform-migration",
+  "duration_seconds": 18.21,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-inf-02-terraform-migration-r2",
+    "goal_id": "inf-02-terraform-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "inf-02-terraform-migration",
+    "created_at": "2026-08-29T21:31:33.136155Z",
+    "tasks": [
+      {
+        "id": "backup_state",
+        "description": "Backup current Terraform state",
+        "action": "backup",
+        "target": "terraform_state",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "backup status",
+          "how": "check backup logs",
+          "expected": "backup completed successfully"
+        },
+        "rollback": {
+          "trigger": "backup fails",
+          "action": "notify of failure and retry",
+          "safety_guard": "alert on failure",
+          "restores_state": [
+            "terraform_state"
+          ],
+          "restoration_evidence": "backup logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "setup_dynamodb",
+        "description": "Set up DynamoDB for state locking",
+        "action": "create",
+        "target": "dynamodb_table",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DynamoDB service is available",
+            "fact": "dynamodb_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "migrate_state",
+        "description": "Migrate Terraform state to S3 backend",
+        "action": "migrate",
+        "target": "s3_backend",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DynamoDB setup is complete",
+            "fact": "dynamodb_table_created",
+            "established_by": "setup_dynamodb",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "S3 state presence",
+          "how": "list S3 bucket",
+          "expected": "state file exists"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore from backup_state",
+          "safety_guard": "verify state integrity",
+          "restores_state": [
+            "terraform_state"
+          ],
+          "restoration_evidence": "state integrity checks"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "apply_migration",
+        "description": "Apply the migration changes",
+        "action": "apply",
+        "target": "terraform_apply",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "apply result",
+          "how": "check apply output",
+          "expected": "no errors in output"
+        },
+        "rollback": {
+          "trigger": "apply fails",
+          "action": "revert to previous state",
+          "safety_guard": "confirm state match",
+          "restores_state": [
+            "previous_state"
+          ],
+          "restoration_evidence": "state verification logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_migration",
+        "description": "Verify the migration success",
+        "action": "verify",
+        "target": "state_verification",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "state stability",
+          "how": "run plan",
+          "expected": "no changes detected"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "notify of failure and rollback",
+          "safety_guard": "alert on failure",
+          "restores_state": [
+            "known_good_state"
+          ],
+          "restoration_evidence": "migration logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "backup_state",
+        "to_task": "migrate_state",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_dynamodb",
+        "to_task": "migrate_state",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate_state",
+        "to_task": "apply_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "apply_migration",
+        "to_task": "verify_migration",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:backup_state",
+      "task_id": "backup_state",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Backup current Terraform state must be achievable in the production environment with the specified tools, ensure no compatibility issues exist.",
+      "suggested_fix": "Verify that terraform backup operations are supported in your production environment.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:migrate_state",
+      "task_id": "migrate_state",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The migration task depends on DynamoDB setup completion but lacks a verification mechanism for the setup task's success before proceeding with migration.",
+      "suggested_fix": "Add a verification step to check if DynamoDB is properly configured before migration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:apply_migration",
+      "task_id": "apply_migration",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback action for applying changes does not specify how to confirm state match effectively, risking incomplete restoration process.",
+      "suggested_fix": "Define clear steps to verify the state match before restoring previous state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:verify_migration",
+      "task_id": "verify_migration",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider implementing additional checks or edge cases in the verification step to ensure thorough validation of migration success.",
+      "suggested_fix": "Include checks for consistency in state after migration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:inf-02-terraform-migration:2:2",
+    "plan_id": "plan-inf-02-terraform-migration-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:feasibility:backup_state",
+    "question": "Plan for goal 'inf-02-terraform-migration' cannot be approved: blockers remain (llm_feasibility; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

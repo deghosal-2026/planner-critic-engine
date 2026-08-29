@@ -1,0 +1,309 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mao-03-distributed-rollback",
+  "duration_seconds": 32.65,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-mao-03-distributed-rollback-r4",
+    "goal_id": "mao-03-distributed-rollback",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-mao-03-distributed-rollback-r3",
+    "created_at": "2026-08-29T21:45:48.758979Z",
+    "tasks": [
+      {
+        "id": "validate_environment",
+        "description": "Ensure production environment is ready",
+        "action": "validate",
+        "target": "environment",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Production environment is in good state",
+            "fact": "env_validated",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy_schema",
+        "description": "Deploy schema changes",
+        "action": "deploy",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "schema version",
+          "how": "run schema validation",
+          "expected": "v2"
+        },
+        "rollback": {
+          "trigger": "Schema deployment fails",
+          "action": "rollback schema changes",
+          "safety_guard": "verify schema integrity",
+          "restores_state": [
+            "previous schema state"
+          ],
+          "restoration_evidence": "validate schema against previous version"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy_api",
+        "description": "Deploy API changes",
+        "action": "deploy",
+        "target": "api",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "API version",
+          "how": "run API health checks",
+          "expected": "v1.2"
+        },
+        "rollback": {
+          "trigger": "API deployment fails",
+          "action": "rollback API changes",
+          "safety_guard": "verify API functionality",
+          "restores_state": [
+            "previous API state"
+          ],
+          "restoration_evidence": "run API functionality tests"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_schema_output",
+        "description": "Verify schema deployment output",
+        "action": "verify",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Schema deployment was successful",
+            "fact": "schema_deployment_verified",
+            "established_by": "deploy_schema",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "schema integrity",
+          "how": "check schema consistency",
+          "expected": "expected schema state"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_api_output",
+        "description": "Verify API deployment output",
+        "action": "verify",
+        "target": "api",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "API deployment was successful",
+            "fact": "api_deployment_verified",
+            "established_by": "deploy_api",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "API response consistency",
+          "how": "check API responses against expected values",
+          "expected": "expected API state"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "manage_traffic",
+        "description": "Manage traffic to the new API",
+        "action": "manage",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "traffic routing",
+          "how": "check traffic logs",
+          "expected": "directed to new API"
+        },
+        "rollback": {
+          "trigger": "Traffic management fails",
+          "action": "revert traffic settings",
+          "safety_guard": "verify traffic distribution",
+          "restores_state": [
+            "previous traffic settings"
+          ],
+          "restoration_evidence": "check traffic metrics"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "validate_environment",
+        "to_task": "deploy_api",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "validate_environment",
+        "to_task": "deploy_schema",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "validate_environment",
+        "to_task": "manage_traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_schema",
+        "to_task": "verify_schema_output",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_api",
+        "to_task": "verify_api_output",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_schema_output",
+        "to_task": "manage_traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_api_output",
+        "to_task": "manage_traffic",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:manage_traffic",
+      "task_id": "manage_traffic",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Traffic management is sequenced before both API and schema verification outputs are successful, which violates rollback order requirements.",
+      "suggested_fix": "Reorder tasks to ensure 'verify_schema_output' and 'verify_api_output' complete before 'manage_traffic'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:deploy_schema",
+      "task_id": "deploy_schema",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for schema deployment lacks a verification step to ensure schema integrity after rollback, posing a risk.",
+      "suggested_fix": "Add a verification step after rollback to confirm schema integrity before proceeding.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:deploy_api",
+      "task_id": "deploy_api",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for API deployment lacks a verification step to ensure API functionality after rollback, posing a risk.",
+      "suggested_fix": "Add a verification step after rollback to confirm API functionality before proceeding.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:manage_traffic",
+      "task_id": "manage_traffic",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Managing traffic depends on the outputs of deployments that have not been verified yet.",
+      "suggested_fix": "Implement checks to ensure 'verify_schema_output' and 'verify_api_output' are complete and successful before executing 'manage_traffic'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mao-03-distributed-rollback:4:4",
+    "plan_id": "plan-mao-03-distributed-rollback-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:manage_traffic",
+    "question": "Plan for goal 'mao-03-distributed-rollback' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

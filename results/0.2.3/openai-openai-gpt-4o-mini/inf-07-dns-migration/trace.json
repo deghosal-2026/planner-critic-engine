@@ -1,0 +1,323 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-07-dns-migration",
+  "duration_seconds": 43.17,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-inf-07-dns-migration-r4",
+    "goal_id": "inf-07-dns-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-inf-07-dns-migration-r3",
+    "created_at": "2026-08-29T21:33:37.714474Z",
+    "tasks": [
+      {
+        "id": "lower_ttl",
+        "description": "Lower the TTL for DNS records",
+        "action": "update_ttl",
+        "target": "dns_records",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DNS records are accessible",
+            "fact": "dns_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "current TTL value",
+          "how": "check DNS records",
+          "expected": "lowered TTL"
+        },
+        "rollback": {
+          "trigger": "TTL change causes issues",
+          "action": "restore previous TTL",
+          "safety_guard": "verifyDNS",
+          "restores_state": [
+            "previous TTL state"
+          ],
+          "restoration_evidence": "evidence of previous TTL"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update_records",
+        "description": "Update DNS records to point to new region",
+        "action": "update_dns",
+        "target": "dns_records",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "TTL change has been applied",
+            "fact": "ttl_lowered",
+            "established_by": "lower_ttl",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "DNS records",
+          "how": "run dig command",
+          "expected": "records point to eu-west-1"
+        },
+        "rollback": {
+          "trigger": "DNS update fails",
+          "action": "revert DNS records to previous settings",
+          "safety_guard": "verifyDNS",
+          "restores_state": [
+            "previous DNS settings"
+          ],
+          "restoration_evidence": "evidence of previous DNS"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "confirm_dns_updated",
+        "description": "Confirm DNS records are updated",
+        "action": "check_dns_updated",
+        "target": "dns_records",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DNS records have been updated",
+            "fact": "dns_updated",
+            "established_by": "update_records",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "DNS updated status",
+          "how": "run dig command",
+          "expected": "dns_updated is true"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "low",
+        "satisfies": null
+      },
+      {
+        "id": "verify_dns_update",
+        "description": "Verify that DNS records have been updated successfully",
+        "action": "check_dns_updated",
+        "target": "dns_records",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Update DNS records task completed",
+            "fact": "dns_updated",
+            "established_by": "update_records",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Confirmation of DNS records update",
+          "how": "run dig command",
+          "expected": "records point to eu-west-1"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "low",
+        "satisfies": null
+      },
+      {
+        "id": "monitor_traffic",
+        "description": "Monitor traffic shift to new DNS region",
+        "action": "monitor_traffic",
+        "target": "dns_traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DNS records have been confirmed updated",
+            "fact": "dns_updated",
+            "established_by": "confirm_dns_updated",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic patterns",
+          "how": "analyze traffic logs",
+          "expected": "traffic expected to increase towards eu-west-1"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_traffic_shift",
+        "description": "Verify that traffic is shifting towards new DNS region",
+        "action": "check_traffic_shift",
+        "target": "dns_traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Traffic monitoring is in place",
+            "fact": "traffic_monitored",
+            "established_by": "monitor_traffic",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Traffic shift confirmation",
+          "how": "analyze traffic patterns",
+          "expected": "traffic increase towards eu-west-1"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_failover",
+        "description": "Verify failover works to new region",
+        "action": "check_failover",
+        "target": "failover_mechanism",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Traffic monitoring is confirmed",
+            "fact": "traffic_shift_verified",
+            "established_by": "verify_traffic_shift",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "failover response",
+          "how": "simulate failure",
+          "expected": "traffic reroutes to eu-west-1"
+        },
+        "rollback": {
+          "trigger": "failover check fails",
+          "action": "reset failover settings",
+          "safety_guard": "verifyFailoverSettings",
+          "restores_state": [
+            "previous failover settings"
+          ],
+          "restoration_evidence": "evidence of previous failover settings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "lower_ttl",
+        "to_task": "update_records",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_records",
+        "to_task": "confirm_dns_updated",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "confirm_dns_updated",
+        "to_task": "monitor_traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_traffic",
+        "to_task": "verify_failover",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:update_records",
+      "task_id": "update_records",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Update DNS records task should not occur until the TTL change has been verified as complete.",
+      "suggested_fix": "Ensure that the update_records task is executed only after the TTL change is confirmed to be successful.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:verify_failover",
+      "task_id": "verify_failover",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Failover verification lacks a sound rollback plan for restoring previous failover settings if the failover check fails.",
+      "suggested_fix": "Implement a rollback procedure that ensures previous failover settings can be restored safely.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:confirm_dns_updated",
+      "task_id": "confirm_dns_updated",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Confirm DNS updated task relies on a fact 'dns_updated' that has not been established by a prior task.",
+      "suggested_fix": "Establish the 'dns_updated' fact through verification from the update_records task before confirming the DNS records.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:inf-07-dns-migration:4:4",
+    "plan_id": "plan-inf-07-dns-migration-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:update_records",
+    "question": "Plan for goal 'inf-07-dns-migration' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

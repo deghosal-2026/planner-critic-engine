@@ -1,0 +1,242 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-03-tls-rotation",
+  "duration_seconds": 21.2,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-ir-03-tls-rotation-r2",
+    "goal_id": "ir-03-tls-rotation",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "ir-03-tls-rotation-v1",
+    "created_at": "2026-08-29T21:27:47.452254Z",
+    "tasks": [
+      {
+        "id": "generate_cert",
+        "description": "Generate new TLS certificate using ACM",
+        "action": "generate",
+        "target": "TLS certificate",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AWS credentials are configured",
+            "fact": "aws_credentials_set",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "new TLS certificate availability",
+          "how": "check ACM for new cert details",
+          "expected": "new cert successfully created"
+        },
+        "rollback": {
+          "trigger": "cert generation fails",
+          "action": "revert to previous cert generation process",
+          "safety_guard": "verify that previous cert is still valid",
+          "restores_state": [
+            "previous cert is active"
+          ],
+          "restoration_evidence": "check validity of previous cert"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update_albs",
+        "description": "Update each ALB listener to use the new TLS certificate",
+        "action": "update",
+        "target": "ALB listeners",
+        "parallel_group": "update_alb_group",
+        "preconditions": [
+          {
+            "description": "New TLS certificate has been generated",
+            "fact": "new_cert_generated",
+            "established_by": "generate_cert",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "ALB listener uses new TLS certificate",
+          "how": "check ALB listener configuration",
+          "expected": "listener updated to new cert"
+        },
+        "rollback": {
+          "trigger": "ALB update fails or invalid cert",
+          "action": "reassociate old TLS certificate",
+          "safety_guard": "ensure previous cert is still valid",
+          "restores_state": [
+            "old cert is active"
+          ],
+          "restoration_evidence": "check validity of previous cert"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_connectivity",
+        "description": "Verify HTTPS connectivity on each ALB endpoint",
+        "action": "verify",
+        "target": "ALB endpoints",
+        "parallel_group": "verify_connectivity_group",
+        "preconditions": [
+          {
+            "description": "Each ALB has been updated with the new cert",
+            "fact": "albs_updated",
+            "established_by": "update_albs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "HTTPS connectivity and valid cert chain",
+          "how": "curl commands to check cert",
+          "expected": "valid chain with new cert serial"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "revert to old certificates on ALBs",
+          "safety_guard": "confirm old certs are valid",
+          "restores_state": [
+            "old cert is active"
+          ],
+          "restoration_evidence": "check validity of previous cert"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "generate_cert",
+        "to_task": "update_albs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_albs",
+        "to_task": "verify_connectivity",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": [
+      {
+        "id": "update_alb_branch",
+        "kind": "fan_out",
+        "tasks": [
+          "update_albs",
+          "verify_connectivity"
+        ],
+        "join": "all"
+      }
+    ]
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:generate_cert",
+      "task_id": "generate_cert",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Certificate generation requires AWS credentials to be configured.",
+      "suggested_fix": "Ensure that AWS credentials are properly configured before executing the generate_cert task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:risk:update_albs",
+      "task_id": "update_albs",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Updating ALB listeners with the new certificate poses a risk of service downtime if an error occurs during the update.",
+      "suggested_fix": "Consider performing updates in smaller batches or during low-traffic periods to mitigate potential service interruptions.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:verify_connectivity",
+      "task_id": "verify_connectivity",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Verification process could include additional checks for DNS propagation or unexpected service interruptions post-ALB update.",
+      "suggested_fix": "Add steps to check for DNS propagation and service availability after verifying connectivity.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:update_albs",
+      "task_id": "update_albs",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback plan does not specify restoration steps for potential issues caused by outdated ALB configurations.",
+      "suggested_fix": "Clarify the rollback plan to include detailed steps for restoring ALB configurations in case of failure.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-03-tls-rotation:2:2",
+    "plan_id": "plan-ir-03-tls-rotation-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:feasibility:generate_cert",
+    "question": "Plan for goal 'ir-03-tls-rotation' cannot be approved: blockers remain (llm_feasibility). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

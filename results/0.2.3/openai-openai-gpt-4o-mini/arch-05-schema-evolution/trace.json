@@ -1,0 +1,423 @@
+{
+  "dimension": "core-api",
+  "goal_id": "arch-05-schema-evolution",
+  "duration_seconds": 29.29,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-arch-05-schema-evolution-r3",
+    "goal_id": "arch-05-schema-evolution",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-arch-05-schema-evolution-r2",
+    "created_at": "2026-08-29T21:32:47.054380Z",
+    "tasks": [
+      {
+        "id": "register-schema",
+        "description": "Register new Avro schema v2 with Schema Registry under compatibility mode",
+        "action": "register",
+        "target": "schema-registry",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "schema registration",
+          "how": "check Schema Registry logs",
+          "expected": "v2 registered under compatibility mode"
+        },
+        "rollback": {
+          "trigger": "registration fails",
+          "action": "revert compatibility mode",
+          "safety_guard": "ensure v1 schema remains active",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "validate-compatibility",
+        "description": "Validate backward/forward compatibility of the new schema",
+        "action": "validate",
+        "target": "compatibility",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "compatibility results",
+          "how": "run compatibility tests",
+          "expected": "no compatibility issues"
+        },
+        "rollback": {
+          "trigger": "validation fails",
+          "action": "rollback schema to v1",
+          "safety_guard": "ensure compatibility tests pass",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy-producers",
+        "description": "Deploy updated producers to write Avro schema v2",
+        "action": "deploy",
+        "target": "producers",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "producer status",
+          "how": "check producer logs",
+          "expected": "producing using v2 schema"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to previous producer version",
+          "safety_guard": "monitor producer logs and reset",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-consumers",
+        "description": "Verify consumers handle both v1 and v2 schemas",
+        "action": "verify",
+        "target": "consumers",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "consumer compatibility",
+          "how": "test consumer with two schema versions",
+          "expected": "consumers operate on both v1 and v2"
+        },
+        "rollback": {
+          "trigger": "consumer fails",
+          "action": "revert consumer to handle only v1",
+          "safety_guard": "check consumer compatibility",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deprecate-v1-schema",
+        "description": "Deprecate the v1 schema in Schema Registry",
+        "action": "deprecate",
+        "target": "schema-registry",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "v2 schema verified by consumers",
+            "fact": "consumers_verified",
+            "established_by": "verify-consumers",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deprecation success",
+          "how": "check Schema Registry for v1 status",
+          "expected": "v1 marked as deprecated"
+        },
+        "rollback": {
+          "trigger": "deprecation fails",
+          "action": "restore v1 schema",
+          "safety_guard": "ensure v2 compatibility confirmed",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "register-schema",
+        "to_task": "validate-compatibility",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "validate-compatibility",
+        "to_task": "deploy-producers",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-producers",
+        "to_task": "verify-consumers",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-consumers",
+        "to_task": "deprecate-v1-schema",
+        "kind": "hard",
+        "reason": "ensure task is completed and verified before proceeding"
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plan-arch-05-schema-evolution-r3:3:register-schema:rollback_state_undeclared",
+      "task_id": "register-schema",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'register-schema' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-arch-05-schema-evolution-r3:3:validate-compatibility:rollback_state_undeclared",
+      "task_id": "validate-compatibility",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'validate-compatibility' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-arch-05-schema-evolution-r3:3:deploy-producers:rollback_state_undeclared",
+      "task_id": "deploy-producers",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'deploy-producers' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-arch-05-schema-evolution-r3:3:verify-consumers:rollback_state_undeclared",
+      "task_id": "verify-consumers",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify-consumers' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-arch-05-schema-evolution-r3:3:register-schema:rollback_state_undeclared",
+      "task_id": "register-schema",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'register-schema' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-arch-05-schema-evolution-r3:3:validate-compatibility:rollback_state_undeclared",
+      "task_id": "validate-compatibility",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'validate-compatibility' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-arch-05-schema-evolution-r3:3:deploy-producers:rollback_state_undeclared",
+      "task_id": "deploy-producers",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'deploy-producers' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-arch-05-schema-evolution-r3:3:verify-consumers:rollback_state_undeclared",
+      "task_id": "verify-consumers",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify-consumers' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:validate-compatibility",
+      "task_id": "validate-compatibility",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'validate-compatibility' should not execute before confirming that the schema has been successfully registered in the 'register-schema' task.",
+      "suggested_fix": "Add a hard dependency from 'validate-compatibility' to 'register-schema'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:deploy-producers",
+      "task_id": "deploy-producers",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'deploy-producers' depends on previous validation of compatibility, but the verification of the compatibility step is not explicitly inspected before deployment.",
+      "suggested_fix": "Ensure that 'deploy-producers' includes a dependency check on 'validate-compatibility'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:weak_rollback:register-schema",
+      "task_id": "register-schema",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback procedure currently ensures only v1 schema remains active but lacks clear restoration evidence which can validate the rollback was successful.",
+      "suggested_fix": "Provide specific evidence that can confirm the rollback state in the 'register-schema' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:weak_rollback:validate-compatibility",
+      "task_id": "validate-compatibility",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "There is no clear restoration evidence if compatibility validation fails, potentially leaving the environment in an uncertain state.",
+      "suggested_fix": "Define restoration evidence that indicates a successful rollback in case of compatibility validation failure.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:missing_steps:deprecate-v1-schema",
+      "task_id": "deprecate-v1-schema",
+      "version": 3,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Task 'deprecate-v1-schema' does not cover the scenario of consumers failing post-deprecation of v1 schema that could lead to data loss or inconsistency.",
+      "suggested_fix": "Consider adding contingency plans or additional checks before executing deprecation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:arch-05-schema-evolution:3:3",
+    "plan_id": "plan-arch-05-schema-evolution-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:validate-compatibility",
+    "question": "Plan for goal 'arch-05-schema-evolution' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,234 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-05-rate-limiting",
+  "duration_seconds": 14.19,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-inf-05-rate-limiting-r2",
+    "goal_id": "inf-05-rate-limiting",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "inf-05-rate-limiting-plan",
+    "created_at": "2026-08-29T21:32:47.850804Z",
+    "tasks": [
+      {
+        "id": "define_limits",
+        "description": "Define rate limiting parameters for the API gateway",
+        "action": "define",
+        "target": "rate_limits",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "API gateway is accessible",
+            "fact": "api_gateway_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy_limits",
+        "description": "Deploy rate limiting configuration to API gateway",
+        "action": "deploy",
+        "target": "api_gateway",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "deployed configuration",
+          "how": "check API gateway settings",
+          "expected": "rated limits applied correctly"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "revert to previous configuration",
+          "safety_guard": "verify previous configuration integrity",
+          "restores_state": [
+            "previous configuration"
+          ],
+          "restoration_evidence": "previous configuration documented"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "test_limits",
+        "description": "Test the rate limiting functionality",
+        "action": "test",
+        "target": "rate_limits",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "API response under load",
+          "how": "use jmeter to simulate traffic",
+          "expected": "response within defined limits"
+        },
+        "rollback": {
+          "trigger": "tests fail",
+          "action": "remove rate limits",
+          "safety_guard": "ensure API functionality restored",
+          "restores_state": [
+            "original rate limits"
+          ],
+          "restoration_evidence": "backup of original limits"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "tune_limits",
+        "description": "Tune rate limiting for optimal throughput",
+        "action": "tune",
+        "target": "rate_limits",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "test results are satisfactory",
+            "fact": "test_passed",
+            "established_by": "test_limits",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "tuning effectiveness",
+          "how": "analyze throughput metrics",
+          "expected": "optimal throughput achieved"
+        },
+        "rollback": {
+          "trigger": "tuning fails",
+          "action": "reset to previous limits",
+          "safety_guard": "verifying API functionality",
+          "restores_state": [
+            "previous limits"
+          ],
+          "restoration_evidence": "settings captured during prior tests"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define_limits",
+        "to_task": "deploy_limits",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_limits",
+        "to_task": "test_limits",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test_limits",
+        "to_task": "tune_limits",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:deploy_limits",
+      "task_id": "deploy_limits",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'deploy_limits' has no preconditions established, making it unsafe to execute without defining rate limiting parameters first.",
+      "suggested_fix": "Add a precondition that checks if 'define_limits' has completed successfully before proceeding to 'deploy_limits'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:deploy_limits",
+      "task_id": "deploy_limits",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'deploy_limits' lacks assurance of restoring all necessary states if the deployment fails.",
+      "suggested_fix": "Ensure that the rollback action clearly states how to restore all configurations comprehensively.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:test_limits",
+      "task_id": "test_limits",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'test_limits' does not guarantee restoration of all affected states if the tests fail.",
+      "suggested_fix": "Clarify how original state will be restored in all scenarios, including edge cases.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:tune_limits",
+      "task_id": "tune_limits",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding steps to monitor performance after tuning, as well as contingencies if throughput is not improved.",
+      "suggested_fix": "Include additional verification steps post-tuning to evaluate performance and further tune if necessary.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

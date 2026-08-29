@@ -1,0 +1,310 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-02-security-incident",
+  "duration_seconds": 46.03,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-ir-02-security-incident-r4",
+    "goal_id": "ir-02-security-incident",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-ir-02-security-incident-r3",
+    "created_at": "2026-08-29T21:27:24.893846Z",
+    "tasks": [
+      {
+        "id": "revoke-ingress",
+        "description": "Revoke security group ingress access for the compromised IAM key",
+        "action": "revoke",
+        "target": "sg_ingress",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "security group rules",
+          "how": "describe-security-group",
+          "expected": "previous rules not present"
+        },
+        "rollback": {
+          "trigger": "revoke fails",
+          "action": "restore previous security group ingress rules",
+          "safety_guard": "verify security group rules",
+          "restores_state": [
+            "revoke-ingress successful"
+          ],
+          "restoration_evidence": "logged security group rules before revocation"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-revoke-ingress",
+        "description": "Verify that security group ingress has been revoked successfully",
+        "action": "verify",
+        "target": "sg_ingress",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "security group rules",
+          "how": "describe-security-group",
+          "expected": "previous rules not present"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "alert security team",
+          "safety_guard": "monitor security group rules",
+          "restores_state": [
+            "verification of ingress rules successful"
+          ],
+          "restoration_evidence": "confirmed changes in security group rules"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "rotate-keys",
+        "description": "Rotate all IAM keys associated with the compromised user",
+        "action": "rotate",
+        "target": "iam_keys",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Revoke ingress completed successfully",
+            "fact": "revoke_completed",
+            "established_by": "verify-revoke-ingress",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "IAM key status",
+          "how": "list-iam-keys",
+          "expected": "all keys in rotation status"
+        },
+        "rollback": {
+          "trigger": "rotation fails",
+          "action": "restore previous IAM keys",
+          "safety_guard": "verify restored keys functionality",
+          "restores_state": [
+            "keys in operational status"
+          ],
+          "restoration_evidence": "logs of previous keys prior to rotation"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "snapshot-volumes",
+        "description": "Take a forensic EBS snapshot of every attached volume",
+        "action": "snapshot",
+        "target": "ebs_volumes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EBS volumes are attached to the instance",
+            "fact": "volumes_attached",
+            "established_by": "verify-revoke-ingress",
+            "probe": null
+          },
+          {
+            "description": "Keys have been rotated successfully",
+            "fact": "keys_rotated",
+            "established_by": "rotate-keys",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "EBS snapshot status",
+          "how": "describe-snapshots",
+          "expected": "all volumes have recent snapshots"
+        },
+        "rollback": {
+          "trigger": "snapshot fails",
+          "action": "notify incident response team",
+          "safety_guard": "confirm volume attachment",
+          "restores_state": [
+            "EBS volume attachment confirmed"
+          ],
+          "restoration_evidence": "logs confirming EBS volume attachment status"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "check-cloudtrail",
+        "description": "Verify no further anomalous API calls appear in the next 5 minutes of CloudTrail",
+        "action": "check",
+        "target": "cloudtrail",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "CloudTrail logs",
+          "how": "get-cloudtrail-events",
+          "expected": "no anomalous API calls in the next 5 minutes"
+        },
+        "rollback": {
+          "trigger": "anomalies found",
+          "action": "alert security team and initiate incident response",
+          "safety_guard": "monitor anomalies continually",
+          "restores_state": [
+            "incident response triggered"
+          ],
+          "restoration_evidence": "log of anomalies detected and response initiated"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "revoke-ingress",
+        "to_task": "verify-revoke-ingress",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-revoke-ingress",
+        "to_task": "rotate-keys",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rotate-keys",
+        "to_task": "snapshot-volumes",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "snapshot-volumes",
+        "to_task": "check-cloudtrail",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:feasibility:revoke-ingress",
+      "task_id": "revoke-ingress",
+      "version": 4,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The action to revoke security group ingress access may fail if the security group does not allow modifications in the production environment due to existing rules or policies.",
+      "suggested_fix": "Ensure that IAM policies permit changes to the security group in the production environment.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:rotate-keys",
+      "task_id": "rotate-keys",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task to rotate IAM keys depends on successful completion of revoking ingress access, but the order of these tasks could lead to a situation where keys are rotated before the ingress is revoked, allowing continued access during the rotation process.",
+      "suggested_fix": "Ensure that the rotation of keys is strictly sequenced after the successful verification of ingress revoke.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:snapshot-volumes",
+      "task_id": "snapshot-volumes",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task to take EBS snapshots depends on verifying that keys have been rotated, which is established by the rotate-keys task. However, if that task fails and is not adequately verified, the addressability of the volumes might not be secure yet.",
+      "suggested_fix": "Introduce a verification step after key rotation to confirm that it has been completed successfully before proceeding to snapshot volumes.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:snapshot-volumes",
+      "task_id": "snapshot-volumes",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for taking EBS snapshots involves notifying the incident response team but does not restore the state of the EBS volumes' attachment or their status, creating a high potential blast radius.",
+      "suggested_fix": "Implement a rollback strategy that includes confirming the restoration of the EBS volume attachment as part of the rollback process.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:risk:check-cloudtrail",
+      "task_id": "check-cloudtrail",
+      "version": 4,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "There is a significant risk if anomalous API calls appear within the 5-minute threshold after taking snapshots which may indicate a compromised state of the environment that could lead to further incidents.",
+      "suggested_fix": "Consider extending the monitoring period or implementing automated responses to anomalies detected during the initial verification window.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-02-security-incident:4:4",
+    "plan_id": "plan-ir-02-security-incident-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:feasibility:revoke-ingress",
+    "question": "Plan for goal 'ir-02-security-incident' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

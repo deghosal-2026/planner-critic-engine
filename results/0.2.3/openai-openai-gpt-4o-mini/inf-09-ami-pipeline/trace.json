@@ -1,0 +1,318 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-09-ami-pipeline",
+  "duration_seconds": 25.4,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-inf-09-ami-pipeline-r2",
+    "goal_id": "inf-09-ami-pipeline",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "inf-09-ami-pipeline-v1",
+    "created_at": "2026-08-29T21:34:56.412456Z",
+    "tasks": [
+      {
+        "id": "build-ami",
+        "description": "Build base AMI from Amazon Linux 2",
+        "action": "build",
+        "target": "ami",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "AMI ID",
+          "how": "check in AWS console",
+          "expected": "AMI should be listed"
+        },
+        "rollback": {
+          "trigger": "AMI build fails",
+          "action": "destroy partially built AMI",
+          "safety_guard": "verify AMI integrity",
+          "restores_state": [
+            "no AMI created"
+          ],
+          "restoration_evidence": "AMI build log"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "bake-dependencies",
+        "description": "Bake application dependencies into AMI",
+        "action": "bake",
+        "target": "ami",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "dependencies installation status",
+          "how": "run validation script",
+          "expected": "all dependencies should be installed"
+        },
+        "rollback": {
+          "trigger": "bake process fails",
+          "action": "rebuild base AMI",
+          "safety_guard": "verify original AMI integrity",
+          "restores_state": [
+            "dependencies not installed"
+          ],
+          "restoration_evidence": "bake log"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "apply-hardening",
+        "description": "Apply CIS hardening baseline to AMI",
+        "action": "apply",
+        "target": "ami",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "CIS compliance status",
+          "how": "run compliance checker",
+          "expected": "compliance report should meet baseline"
+        },
+        "rollback": {
+          "trigger": "hardening process fails",
+          "action": "restore from pre-hardening AMI",
+          "safety_guard": "verify pre-hardening AMI integrity",
+          "restores_state": [
+            "AMIs not hardened"
+          ],
+          "restoration_evidence": "hardening log"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "run-security-scans",
+        "description": "Run security scans (Trivy, CIS-CAT)",
+        "action": "scan",
+        "target": "ami",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "scan results",
+          "how": "check scan reports",
+          "expected": "no critical vulnerabilities should be present"
+        },
+        "rollback": {
+          "trigger": "scans fail",
+          "action": "rebuild AMI with latest configurations",
+          "safety_guard": "verify new AMI integrity",
+          "restores_state": [
+            "AMI contains vulnerabilities"
+          ],
+          "restoration_evidence": "scan reports"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "promote-ami",
+        "description": "Promote AMI through environments (dev \u2192 staging \u2192 prod)",
+        "action": "promote",
+        "target": "ami",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "AMI promotion status",
+          "how": "check environment AMI usage",
+          "expected": "new AMI should be used in target environment"
+        },
+        "rollback": {
+          "trigger": "promotion fails",
+          "action": "revert to previous AMI version",
+          "safety_guard": "verify previous AMI integrity",
+          "restores_state": [
+            "previous AMI active"
+          ],
+          "restoration_evidence": "promotion log"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update-auto-scaling",
+        "description": "Update auto-scaling groups to use the new AMI",
+        "action": "update",
+        "target": "auto-scaling group",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AMI has been successfully promoted",
+            "fact": "ami_promoted",
+            "established_by": "promote-ami",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "auto-scaling group AMI version",
+          "how": "check auto-scaling group configuration",
+          "expected": "auto-scaling group should be using the new AMI"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "revert to old AMI in auto-scaling group",
+          "safety_guard": "verify old AMI integrity",
+          "restores_state": [
+            "previous AMI in use"
+          ],
+          "restoration_evidence": "auto-scaling group config log"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "build-ami",
+        "to_task": "bake-dependencies",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "bake-dependencies",
+        "to_task": "apply-hardening",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "apply-hardening",
+        "to_task": "run-security-scans",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run-security-scans",
+        "to_task": "promote-ami",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote-ami",
+        "to_task": "update-auto-scaling",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:update-auto-scaling",
+      "task_id": "update-auto-scaling",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'update-auto-scaling' is ordered before its hard prerequisite 'promote-ami' has been verified.",
+      "suggested_fix": "Reorder the tasks to ensure 'promote-ami' is completed and verified before 'update-auto-scaling'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:update-auto-scaling",
+      "task_id": "update-auto-scaling",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'update-auto-scaling' depends on 'ami_promoted', which is not verified by a prior task.",
+      "suggested_fix": "Ensure that 'ami_promoted' is a verifiable outcome of the 'promote-ami' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:run-security-scans",
+      "task_id": "run-security-scans",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Weak rollback in 'run-security-scans': rebuilding AMI with latest configurations does not guarantee vulnerability resolution.",
+      "suggested_fix": "Implement a rollback that restores the AMI to a known good state if vulnerabilities are found.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:apply-hardening",
+      "task_id": "apply-hardening",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding a precondition to ensure dependencies are installed before applying CIS hardening.",
+      "suggested_fix": "Add a check or dependency on 'bake-dependencies' before 'apply-hardening'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:risk:promote-ami",
+      "task_id": "promote-ami",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Promoting AMI without verification may introduce application failures in the next environment.",
+      "suggested_fix": "Include automated checks to validate the AMI's functionality before promotion.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

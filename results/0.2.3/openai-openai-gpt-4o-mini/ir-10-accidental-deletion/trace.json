@@ -1,0 +1,262 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-10-accidental-deletion",
+  "duration_seconds": 17.46,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-ir-10-accidental-deletion-r2",
+    "goal_id": "ir-10-accidental-deletion",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "ir-10-accidental-deletion-plan",
+    "created_at": "2026-08-29T21:30:41.069447Z",
+    "tasks": [
+      {
+        "id": "stop-writes",
+        "description": "Stop all writes to the database",
+        "action": "stop",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "write activity has stopped",
+          "how": "check write activity logs",
+          "expected": "no active write operations"
+        },
+        "rollback": {
+          "trigger": "failed to stop writes",
+          "action": "restart application writers",
+          "safety_guard": "check write activity log",
+          "restores_state": [
+            "db state prior to stopping writes"
+          ],
+          "restoration_evidence": "log report of active transactions before stop"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "identify-deletion-timestamp",
+        "description": "Identify the exact deletion timestamp from logs",
+        "action": "query",
+        "target": "db logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "logs are accessible",
+            "fact": "logs_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "timestamp of deletion",
+          "how": "examine query results for deletion timestamps",
+          "expected": "exact deletion timestamp retrieved"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "restore-db-pitr",
+        "description": "Restore the database to a point-in-time just before deletion",
+        "action": "restore",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "database state",
+          "how": "compare row counts and checksums",
+          "expected": "10M customer rows restored"
+        },
+        "rollback": {
+          "trigger": "restore fails",
+          "action": "execute latest backup",
+          "safety_guard": "ensure backup validity",
+          "restores_state": [
+            "db state to latest backup"
+          ],
+          "restoration_evidence": "backup logs and integrity checks"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "reapply-data-logs",
+        "description": "Reconcile any data created after the restore point",
+        "action": "reapply",
+        "target": "application logs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data consistency",
+          "how": "run data integrity checks",
+          "expected": "no data loss identified"
+        },
+        "rollback": {
+          "trigger": "reapply fails",
+          "action": "roll back to pre-log state",
+          "safety_guard": "validate application log format",
+          "restores_state": [
+            "application log state prior to reapply"
+          ],
+          "restoration_evidence": "log integrity reports"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "implement-preventive-controls",
+        "description": "Implement table-level drop protection and stricter RBAC",
+        "action": "configure",
+        "target": "db security",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "security settings",
+          "how": "audit security configurations",
+          "expected": "drop protection and RBAC settings enforced"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "revert to prior security settings",
+          "safety_guard": "confirm previous settings backup",
+          "restores_state": [
+            "previous security configuration"
+          ],
+          "restoration_evidence": "audit logs of previous configurations"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "stop-writes",
+        "to_task": "identify-deletion-timestamp",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "identify-deletion-timestamp",
+        "to_task": "restore-db-pitr",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "restore-db-pitr",
+        "to_task": "reapply-data-logs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "reapply-data-logs",
+        "to_task": "implement-preventive-controls",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:identify-deletion-timestamp",
+      "task_id": "identify-deletion-timestamp",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'identify-deletion-timestamp' is dependent on 'stop-writes' which has not been executed yet.",
+      "suggested_fix": "Ensure 'stop-writes' is completed before executing 'identify-deletion-timestamp'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:restore-db-pitr",
+      "task_id": "restore-db-pitr",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'restore-db-pitr' is dependent on 'identify-deletion-timestamp' which has not been executed yet.",
+      "suggested_fix": "Ensure 'identify-deletion-timestamp' is completed before executing 'restore-db-pitr'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:reapply-data-logs",
+      "task_id": "reapply-data-logs",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'reapply-data-logs' is dependent on 'restore-db-pitr' which has not been executed yet.",
+      "suggested_fix": "Ensure 'restore-db-pitr' is completed before executing 'reapply-data-logs'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:implement-preventive-controls",
+      "task_id": "implement-preventive-controls",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'implement-preventive-controls' is dependent on 'reapply-data-logs' which has not been executed yet.",
+      "suggested_fix": "Ensure 'reapply-data-logs' is completed before executing 'implement-preventive-controls'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

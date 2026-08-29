@@ -1,0 +1,244 @@
+{
+  "dimension": "core-api",
+  "goal_id": "cm-03-pii-redaction",
+  "duration_seconds": 13.03,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-cm-03-pii-redaction-r2",
+    "goal_id": "cm-03-pii-redaction",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "cm-03-pii-redaction-plan",
+    "created_at": "2026-08-29T21:40:12.672703Z",
+    "tasks": [
+      {
+        "id": "identify_pii_fields",
+        "description": "Identify all PII fields in application logs",
+        "action": "scan",
+        "target": "application logs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "identified PII fields",
+          "how": "compare against expected list",
+          "expected": "all PII fields identified"
+        },
+        "rollback": {
+          "trigger": "identification fails",
+          "action": "revert to previous analysis",
+          "safety_guard": "confirm previous identification accuracy",
+          "restores_state": [
+            "previous PII identification accuracy"
+          ],
+          "restoration_evidence": "previous analysis report"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy_redaction_sidecar",
+        "description": "Deploy a log redaction sidecar with FluentBit and Lua filter",
+        "action": "deploy",
+        "target": "FluentBit",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "sidecar functionality",
+          "how": "check logs for PII before and after",
+          "expected": "no PII should appear in logs"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "remove redaction sidecar",
+          "safety_guard": "verify logs are intact",
+          "restores_state": [
+            "logs without redaction sidecar"
+          ],
+          "restoration_evidence": "log integrity check"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_elasticsearch_pipelines",
+        "description": "Configure Elasticsearch ingest pipelines for redaction",
+        "action": "configure",
+        "target": "Elasticsearch pipelines",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "FluentBit is deployed",
+            "fact": "sidecar_deployed",
+            "established_by": "deploy_redaction_sidecar",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "pipeline configuration",
+          "how": "test ingestion with sample data",
+          "expected": "data flows through pipelines correctly"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_redaction",
+        "description": "Verify redaction is working on sampled logs",
+        "action": "verify",
+        "target": "sampled logs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "samples from logs",
+          "how": "run checks for PII presence",
+          "expected": "no PII present in sampled logs"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "adjust redaction rules",
+          "safety_guard": "ensure previous rules are restored",
+          "restores_state": [
+            "previous redaction rules"
+          ],
+          "restoration_evidence": "review of previous rules"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "tune_false_positive_rate",
+        "description": "Tune false-positive rate",
+        "action": "adjust",
+        "target": "redaction rules",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "redaction has been verified",
+            "fact": "redaction_verified",
+            "established_by": "verify_redaction",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "false positive rates",
+          "how": "analyze log results",
+          "expected": "acceptable levels of false positives"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "identify_pii_fields",
+        "to_task": "deploy_redaction_sidecar",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_redaction_sidecar",
+        "to_task": "configure_elasticsearch_pipelines",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_elasticsearch_pipelines",
+        "to_task": "verify_redaction",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_redaction",
+        "to_task": "tune_false_positive_rate",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:configure_elasticsearch_pipelines",
+      "task_id": "configure_elasticsearch_pipelines",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'configure_elasticsearch_pipelines' depends on 'deploy_redaction_sidecar', but this dependency's verification status is not confirmed before this task runs.",
+      "suggested_fix": "Ensure 'deploy_redaction_sidecar' is verified before proceeding to 'configure_elasticsearch_pipelines'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:tune_false_positive_rate",
+      "task_id": "tune_false_positive_rate",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'tune_false_positive_rate' is sequenced before verifying its prerequisite 'verify_redaction'.",
+      "suggested_fix": "Reorder 'tune_false_positive_rate' to run after 'verify_redaction'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:identify_pii_fields",
+      "task_id": "identify_pii_fields",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The task 'identify_pii_fields' could provide feedback on common false positives for better accuracy in redaction.",
+      "suggested_fix": "Include steps to analyze common false positive trends during the identification of PII fields.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

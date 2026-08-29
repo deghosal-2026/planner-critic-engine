@@ -1,0 +1,214 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-08-git-branch-strategy",
+  "duration_seconds": 16.95,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-ci-08-git-branch-strategy-r2",
+    "goal_id": "ci-08-git-branch-strategy",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plan-ci-08",
+    "created_at": "2026-08-29T21:38:02.953490Z",
+    "tasks": [
+      {
+        "id": "create_feature_branch",
+        "description": "Create a feature branch from main",
+        "action": "create_branch",
+        "target": "feature_branch",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "main branch is up-to-date",
+            "fact": "main_updated",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "ensure_checks",
+        "description": "Ensure required checks are established for PR",
+        "action": "set_checks",
+        "target": "pull_request",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "feature branch exists",
+            "fact": "feature_branch_created",
+            "established_by": "create_feature_branch",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "checks status",
+          "how": "query PR checks API",
+          "expected": "checks present"
+        },
+        "rollback": {
+          "trigger": "checks not established",
+          "action": "remove checks",
+          "safety_guard": "confirm removal success",
+          "restores_state": [
+            "checks absent"
+          ],
+          "restoration_evidence": "verify checks removal success"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "squash_merge",
+        "description": "Squash merge the feature branch into main",
+        "action": "merge",
+        "target": "main",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "checks have passed",
+            "fact": "checks_passed",
+            "established_by": "ensure_checks",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "main branch state",
+          "how": "check branch history",
+          "expected": "merge commit present"
+        },
+        "rollback": {
+          "trigger": "merge fails",
+          "action": "rollback merge",
+          "safety_guard": "verify main integrity",
+          "restores_state": [
+            "main branch without feature"
+          ],
+          "restoration_evidence": "verify branch state after rollback"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "delete_source_branch",
+        "description": "Delete the source branch after merge",
+        "action": "delete_branch",
+        "target": "feature_branch",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "feature branch merged successfully",
+            "fact": "feature_branch_merged",
+            "established_by": "squash_merge",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "feature branch existence",
+          "how": "check branch list",
+          "expected": "feature branch not present"
+        },
+        "rollback": {
+          "trigger": "delete fails",
+          "action": "restore branch",
+          "safety_guard": "confirm branch restoration success",
+          "restores_state": [
+            "feature_branch exists"
+          ],
+          "restoration_evidence": "verify feature branch presence"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "create_feature_branch",
+        "to_task": "ensure_checks",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "ensure_checks",
+        "to_task": "squash_merge",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "squash_merge",
+        "to_task": "delete_source_branch",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:ensure_checks",
+      "task_id": "ensure_checks",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Checks are established before ensuring they are present.",
+      "suggested_fix": "Reorder tasks to ensure required checks are established and verified before task ensure_checks.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:squash_merge",
+      "task_id": "squash_merge",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Squash merge task depends on checks_passed without verification of checks presence.",
+      "suggested_fix": "Ensure that the success of checks is verified before proceeding to squash_merge.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

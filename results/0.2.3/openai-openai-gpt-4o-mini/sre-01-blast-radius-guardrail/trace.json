@@ -1,0 +1,373 @@
+{
+  "dimension": "core-api",
+  "goal_id": "sre-01-blast-radius-guardrail",
+  "duration_seconds": 98.96,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-sre-01-blast-radius-guardrail-r4",
+    "goal_id": "sre-01-blast-radius-guardrail",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-sre-01-blast-radius-guardrail-r3",
+    "created_at": "2026-08-29T21:38:10.518884Z",
+    "tasks": [
+      {
+        "id": "check_health",
+        "description": "Check the health of the API pods",
+        "action": "check",
+        "target": "api_pods",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kubectl is configured",
+            "fact": "kubectl_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "kubectl configuration",
+          "how": "run kubectl config view",
+          "expected": "valid configuration"
+        },
+        "rollback": {
+          "trigger": "check fails",
+          "action": "notify operator",
+          "safety_guard": "kubectl configuration validated",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_api_pods_healthy",
+        "description": "Verify API pods are healthy",
+        "action": "check",
+        "target": "api_pods",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Health check completed for batch 1",
+            "fact": "health_check_passed_batch_1",
+            "established_by": "health_check_batch_1",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "API pods health",
+          "how": "validate health status",
+          "expected": "pods are healthy"
+        },
+        "rollback": null,
+        "risk_class": "low",
+        "blast_radius": "small",
+        "satisfies": null
+      },
+      {
+        "id": "drain_pods_batch_1",
+        "description": "Drain 25% of the pods in the first batch",
+        "action": "drain",
+        "target": "api_pods",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "API pods are healthy",
+            "fact": "api_pods_healthy",
+            "established_by": "verify_api_pods_healthy",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "pod status",
+          "how": "kubectl get pods",
+          "expected": "drained"
+        },
+        "rollback": {
+          "trigger": "drain fails",
+          "action": "restore pod",
+          "safety_guard": "check pod status",
+          "restores_state": [
+            "original pod state"
+          ],
+          "restoration_evidence": "pod status verified"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "health_check_batch_1",
+        "description": "Run health checks after draining first batch",
+        "action": "check",
+        "target": "api_pods",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Pods are drained in first batch",
+            "fact": "pods_drained_batch_1",
+            "established_by": "drain_pods_batch_1",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "API response",
+          "how": "send requests to API",
+          "expected": "successful responses"
+        },
+        "rollback": {
+          "trigger": "health check fails",
+          "action": "restore pod from batch 1",
+          "safety_guard": "verify pod functionality",
+          "restores_state": [
+            "original pods of batch 1"
+          ],
+          "restoration_evidence": "pod functionality verified"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "drain_pods_batch_2",
+        "description": "Drain 25% of the pods in the second batch",
+        "action": "drain",
+        "target": "api_pods",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Health check passed for first batch",
+            "fact": "health_check_passed_batch_1",
+            "established_by": "health_check_batch_1",
+            "probe": null
+          },
+          {
+            "description": "Verify health check results from batch 1 are valid",
+            "fact": "health_check_passed_batch_1",
+            "established_by": "health_check_batch_1",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "pod status",
+          "how": "kubectl get pods",
+          "expected": "drained"
+        },
+        "rollback": {
+          "trigger": "drain fails",
+          "action": "restore pod",
+          "safety_guard": "check pod status",
+          "restores_state": [
+            "original pod state"
+          ],
+          "restoration_evidence": "pod status verified"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "health_check_batch_2",
+        "description": "Run health checks after draining second batch",
+        "action": "check",
+        "target": "api_pods",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Pods are drained in second batch",
+            "fact": "pods_drained_batch_2",
+            "established_by": "drain_pods_batch_2",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "API response",
+          "how": "send requests to API",
+          "expected": "successful responses"
+        },
+        "rollback": {
+          "trigger": "health check fails",
+          "action": "restore pod from batch 2",
+          "safety_guard": "verify pod functionality",
+          "restores_state": [
+            "original pods of batch 2"
+          ],
+          "restoration_evidence": "pod functionality verified"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "drain_pods_batch_3",
+        "description": "Drain remaining pods in the final batch",
+        "action": "drain",
+        "target": "api_pods",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Health check passed for second batch",
+            "fact": "health_check_passed_batch_2",
+            "established_by": "health_check_batch_2",
+            "probe": null
+          },
+          {
+            "description": "Verify health check results from batch 2 are valid",
+            "fact": "health_check_passed_batch_2",
+            "established_by": "health_check_batch_2",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "pod status",
+          "how": "kubectl get pods",
+          "expected": "drained"
+        },
+        "rollback": {
+          "trigger": "drain fails",
+          "action": "restore remaining pods",
+          "safety_guard": "check pod status",
+          "restores_state": [
+            "original pod state"
+          ],
+          "restoration_evidence": "pod status verified"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "health_check_final",
+        "description": "Run final health checks after draining all pods",
+        "action": "check",
+        "target": "api_pods",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Pods are drained in final batch",
+            "fact": "pods_drained_final_batch",
+            "established_by": "drain_pods_batch_3",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "API response",
+          "how": "send requests to API",
+          "expected": "successful responses"
+        },
+        "rollback": {
+          "trigger": "health check fails",
+          "action": "restore all drained pods",
+          "safety_guard": "verify pod functionality",
+          "restores_state": [
+            "original state of all drained pods"
+          ],
+          "restoration_evidence": "pod functionality verified"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_health",
+        "to_task": "verify_api_pods_healthy",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_api_pods_healthy",
+        "to_task": "drain_pods_batch_1",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "drain_pods_batch_1",
+        "to_task": "health_check_batch_1",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "health_check_batch_1",
+        "to_task": "drain_pods_batch_2",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "drain_pods_batch_2",
+        "to_task": "health_check_batch_2",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "health_check_batch_2",
+        "to_task": "drain_pods_batch_3",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "drain_pods_batch_3",
+        "to_task": "health_check_final",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "preconditions_referenced:plan-sre-01-blast-radius-guardrail-r4:4:verify_api_pods_healthy:health_check_passed_batch_1",
+      "task_id": "verify_api_pods_healthy",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "blocker",
+      "reason_code": "unverified_precondition",
+      "message": "precondition 'health_check_passed_batch_1' on task 'verify_api_pods_healthy' references no established fact from an earlier task",
+      "suggested_fix": "Point the precondition at an earlier task that establishes 'health_check_passed_batch_1'",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:sre-01-blast-radius-guardrail:4:4",
+    "plan_id": "plan-sre-01-blast-radius-guardrail-r4",
+    "version": 4,
+    "blocker_finding_id": "preconditions_referenced:plan-sre-01-blast-radius-guardrail-r4:4:verify_api_pods_healthy:health_check_passed_batch_1",
+    "question": "Plan for goal 'sre-01-blast-radius-guardrail' cannot be approved: blockers remain (unverified_precondition). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

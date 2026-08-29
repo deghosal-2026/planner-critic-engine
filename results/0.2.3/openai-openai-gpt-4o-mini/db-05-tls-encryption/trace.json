@@ -1,0 +1,301 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-05-tls-encryption",
+  "duration_seconds": 42.21,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-db-05-tls-encryption-r4",
+    "goal_id": "db-05-tls-encryption",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-db-05-tls-encryption-r3",
+    "created_at": "2026-08-29T21:27:39.962887Z",
+    "tasks": [
+      {
+        "id": "verify_microservices_health",
+        "description": "Verify that all microservices are reachable and healthy",
+        "action": "check",
+        "target": "microservices",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "microservices health status",
+          "how": "ping each microservice",
+          "expected": "all microservices respond healthy"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "report failure",
+          "safety_guard": "ensure communication channels are functioning",
+          "restores_state": [
+            "microservices_health_unknown"
+          ],
+          "restoration_evidence": "successful rechecks after rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update_service_certificates",
+        "description": "Update service with CA certificate, client certificate, and client key",
+        "action": "update",
+        "target": "microservices",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Microservice health verified",
+            "fact": "microservices_health_verified",
+            "established_by": "verify_microservices_health",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service connectivity",
+          "how": "attempt TLS connection",
+          "expected": "successful connection with TLS"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "revert to previous configuration",
+          "safety_guard": "confirm old certificates are intact",
+          "restores_state": [
+            "previous microservice configuration"
+          ],
+          "restoration_evidence": "successful attempt to connect with old certificates"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_service_certificates",
+        "description": "Verify that all microservices have valid certificates",
+        "action": "check",
+        "target": "microservices certificates",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Microservices updated with new certificates",
+            "fact": "microservices_certificates_updated",
+            "established_by": "update_service_certificates",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "certificate validity",
+          "how": "validate certificates for each microservice",
+          "expected": "all certificates are valid"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "report failure",
+          "safety_guard": "ensure all services can be rechecked",
+          "restores_state": [
+            "certificates_verification_failed"
+          ],
+          "restoration_evidence": "successful rechecks after rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "enforce_tls",
+        "description": "Configure PostgreSQL to enforce TLS 1.3 connections",
+        "action": "configure",
+        "target": "postgresql",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Certified microservices verified",
+            "fact": "certificates_validated",
+            "established_by": "verify_service_certificates",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "pg_stat_ssl status",
+          "how": "run `SELECT * FROM pg_stat_ssl`",
+          "expected": "all connections use TLS 1.3"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "restore previous postgresql configuration",
+          "safety_guard": "verify no service dependencies are affected",
+          "restores_state": [
+            "previous PostgreSQL configuration"
+          ],
+          "restoration_evidence": "successful connections post-restoration"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor_connections",
+        "description": "Monitor for failed TLS connections",
+        "action": "monitor",
+        "target": "connection_logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "TLS enforced",
+            "fact": "tls_enforced",
+            "established_by": "enforce_tls",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "number of connection failures",
+          "how": "analyze connection logs",
+          "expected": "no failed TLS connections"
+        },
+        "rollback": {
+          "trigger": "monitoring fails",
+          "action": "reconfigure monitoring setup",
+          "safety_guard": "confirm previous monitoring settings are restored",
+          "restores_state": [
+            "previous monitoring configuration"
+          ],
+          "restoration_evidence": "successful monitoring functionality post-rollback"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "verify_microservices_health",
+        "to_task": "update_service_certificates",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_service_certificates",
+        "to_task": "verify_service_certificates",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_service_certificates",
+        "to_task": "enforce_tls",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "enforce_tls",
+        "to_task": "monitor_connections",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:update_service_certificates",
+      "task_id": "update_service_certificates",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'update_service_certificates' is ordered before the task 'verify_microservices_health' has established that microservices are healthy.",
+      "suggested_fix": "Reorder the tasks to ensure 'verify_microservices_health' is executed before 'update_service_certificates'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:verify_service_certificates",
+      "task_id": "verify_service_certificates",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'verify_service_certificates' is ordered before the task 'update_service_certificates' has established that microservices have been updated with new certificates.",
+      "suggested_fix": "Reorder the tasks to ensure 'update_service_certificates' is completed before 'verify_service_certificates'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:enforce_tls",
+      "task_id": "enforce_tls",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'enforce_tls' is ordered before the task 'verify_service_certificates' has established that all microservices have valid certificates.",
+      "suggested_fix": "Reorder the tasks to ensure 'verify_service_certificates' is completed before 'enforce_tls'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:monitor_connections",
+      "task_id": "monitor_connections",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'monitor_connections' is ordered before the task 'enforce_tls' has established that TLS 1.3 is enforced.",
+      "suggested_fix": "Reorder the tasks to ensure 'enforce_tls' is completed before 'monitor_connections'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-05-tls-encryption:4:4",
+    "plan_id": "plan-db-05-tls-encryption-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:update_service_certificates",
+    "question": "Plan for goal 'db-05-tls-encryption' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

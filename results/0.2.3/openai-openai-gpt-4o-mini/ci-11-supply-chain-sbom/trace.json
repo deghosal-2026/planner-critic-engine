@@ -1,0 +1,304 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-11-supply-chain-sbom",
+  "duration_seconds": 22.05,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-ci-11-supply-chain-sbom-r2",
+    "goal_id": "ci-11-supply-chain-sbom",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "ci-11-supply-chain-sbom-plan",
+    "created_at": "2026-08-29T21:39:05.473375Z",
+    "tasks": [
+      {
+        "id": "syft_integration",
+        "description": "Integrate Syft for SBOM generation in CI pipelines",
+        "action": "integrate",
+        "target": "CI pipelines",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CI environment is set up",
+            "fact": "ci_env_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "SBOM generation success",
+          "how": "run integration tests",
+          "expected": "no errors in SBOM generation"
+        },
+        "rollback": {
+          "trigger": "integration failure",
+          "action": "remove Syft integration",
+          "safety_guard": "ensure CI pipelines are stable",
+          "restores_state": [
+            "CI pipeline without Syft integration"
+          ],
+          "restoration_evidence": "successful restoration of previous integration tests"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "artifact_signing",
+        "description": "Sign container images with Cosign",
+        "action": "sign",
+        "target": "container images",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Cosign is installed",
+            "fact": "cosign_installed",
+            "established_by": "syft_integration",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "image signatures",
+          "how": "verify signatures with Cosign",
+          "expected": "all images have valid signatures"
+        },
+        "rollback": {
+          "trigger": "signing key compromise",
+          "action": "rotate signing keys",
+          "safety_guard": "notify security team",
+          "restores_state": [
+            "previously signed images"
+          ],
+          "restoration_evidence": "log of previous image signatures"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "provenance_attestation",
+        "description": "Generate SLSA Level 3 provenance attestation",
+        "action": "attest",
+        "target": "build outputs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Provenance framework is configured",
+            "fact": "provenance_ready",
+            "established_by": "syft_integration",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "provenance attestations",
+          "how": "query attestation database",
+          "expected": "attestations are valid and complete"
+        },
+        "rollback": {
+          "trigger": "attestation failure",
+          "action": "revert to previous state",
+          "safety_guard": "backup previous attestations",
+          "restores_state": [
+            "previous provenance attestations"
+          ],
+          "restoration_evidence": "log of previous attestation state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "policy_enforcement",
+        "description": "Configure policy enforcement to reject unsigned images in production",
+        "action": "configure",
+        "target": "production policies",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kyverno is operational",
+            "fact": "kyverno_operational",
+            "established_by": "syft_integration",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "policy enforcement logs",
+          "how": "review production policy logs",
+          "expected": "all unsigned images are rejected"
+        },
+        "rollback": {
+          "trigger": "policy misconfiguration",
+          "action": "restore previous policy settings",
+          "safety_guard": "backup policy configurations",
+          "restores_state": [
+            "previous policy configurations"
+          ],
+          "restoration_evidence": "log of previous policy settings"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "image_verification",
+        "description": "Verify that all deployed images have valid signatures and SBOM",
+        "action": "verify",
+        "target": "deployed images",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "All images are deployed",
+            "fact": "images_deployed",
+            "established_by": "policy_enforcement",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "valid signatures and SBOMs",
+          "how": "check image registry for signatures and SBOMs",
+          "expected": "all images meet policy criteria"
+        },
+        "rollback": {
+          "trigger": "verification failure",
+          "action": "alert dev team and halt deployments",
+          "safety_guard": "review deployment logs",
+          "restores_state": [
+            "deployed state before verification"
+          ],
+          "restoration_evidence": "deployment log prior to verification"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "syft_integration",
+        "to_task": "artifact_signing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "syft_integration",
+        "to_task": "provenance_attestation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "artifact_signing",
+        "to_task": "image_verification",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provenance_attestation",
+        "to_task": "image_verification",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "syft_integration",
+        "to_task": "policy_enforcement",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:artifact_signing",
+      "task_id": "artifact_signing",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'artifact_signing' is ordered before 'syft_integration', which is a hard prerequisite.",
+      "suggested_fix": "Ensure 'syft_integration' is completed before 'artifact_signing'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:provenance_attestation",
+      "task_id": "provenance_attestation",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'provenance_attestation' is ordered before 'syft_integration', which is a hard prerequisite.",
+      "suggested_fix": "Ensure 'syft_integration' is completed before 'provenance_attestation'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:policy_enforcement",
+      "task_id": "policy_enforcement",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'policy_enforcement' is ordered before 'syft_integration', which is a hard prerequisite.",
+      "suggested_fix": "Ensure 'syft_integration' is completed before 'policy_enforcement'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:image_verification",
+      "task_id": "image_verification",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'image_verification' is ordered before 'artifact_signing' and 'provenance_attestation', both of which are hard prerequisites.",
+      "suggested_fix": "Ensure 'artifact_signing' and 'provenance_attestation' are completed before 'image_verification'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,413 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mob-02-forced-upgrade",
+  "duration_seconds": 39.22,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-mob-02-forced-upgrade-r4",
+    "goal_id": "mob-02-forced-upgrade",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-mob-02-forced-upgrade-r3",
+    "created_at": "2026-08-29T21:51:08.487102Z",
+    "tasks": [
+      {
+        "id": "deploy_api_gate",
+        "description": "Deploy the API version gate to reject calls from app versions < 3.0",
+        "action": "deploy",
+        "target": "API gateway",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "API gateway is ready for deployment",
+            "fact": "api_gateway_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "API response for old app versions",
+          "how": "make API calls from version < 3.0",
+          "expected": "426 Upgrade Required"
+        },
+        "rollback": {
+          "trigger": "deployment fails or blocks legitimate clients",
+          "action": "disable API version gate",
+          "safety_guard": "verify functionality of legitimate clients",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_deploy_api_gate",
+        "description": "Verify successful deployment of the API version gate",
+        "action": "check_status",
+        "target": "API gateway",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "API gateway deployment is initiated",
+            "fact": "deploy_api_gate_done",
+            "established_by": "deploy_api_gate",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment status",
+          "how": "check deployment logs",
+          "expected": "deployment successful"
+        },
+        "rollback": null,
+        "risk_class": "low",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "trigger_upgrade_prompts",
+        "description": "Trigger in-app upgrade prompts for users with old versions",
+        "action": "send_push_notification_and_banner",
+        "target": "users",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "User data is accessible",
+            "fact": "user_data_ready",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "API gate is successfully deployed",
+            "fact": "deploy_api_gate_verified",
+            "established_by": "verify_deploy_api_gate",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "engagement with push notifications",
+          "how": "track user interactions",
+          "expected": "increase in upgrade attempts"
+        },
+        "rollback": {
+          "trigger": "notifications cause user complaints",
+          "action": "stop sending prompts",
+          "safety_guard": "monitor user feedback",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor_upgrade_funnel",
+        "description": "Monitor the conversion rate and count of remaining old-version users",
+        "action": "analyze_data",
+        "target": "conversion_metrics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Analytics tools are configured",
+            "fact": "analytics_ready",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "Upgrade prompts have been successfully engaged",
+            "fact": "upgrade_prompts_engaged",
+            "established_by": "trigger_upgrade_prompts",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "conversion metrics report",
+          "how": "collect data over time",
+          "expected": "accurate reflection of user conversion"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_sunset_window_passed",
+        "description": "Verify that the sunset window has passed based on monitoring data",
+        "action": "check_data",
+        "target": "sunset_window",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Monitor upgrade funnel data is available",
+            "fact": "monitor_upgrade_funnel_done",
+            "established_by": "monitor_upgrade_funnel",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "sunset window status",
+          "how": "analyze funnel data",
+          "expected": "confirm sunset window has passed"
+        },
+        "rollback": null,
+        "risk_class": "low",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "decommission_old_shims",
+        "description": "Decommission old API compatibility shims after the sunset window",
+        "action": "remove_shims",
+        "target": "API",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Sunset window has passed",
+            "fact": "sunset_window_passed",
+            "established_by": "verify_sunset_window_passed",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "functionality of new API",
+          "how": "run integration tests",
+          "expected": "no errors in API calls"
+        },
+        "rollback": {
+          "trigger": "old API shims are still needed",
+          "action": "restore old shims",
+          "safety_guard": "confirm dependency on old versions",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_api_gate",
+        "to_task": "verify_deploy_api_gate",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_deploy_api_gate",
+        "to_task": "trigger_upgrade_prompts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "trigger_upgrade_prompts",
+        "to_task": "monitor_upgrade_funnel",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_upgrade_funnel",
+        "to_task": "verify_sunset_window_passed",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_sunset_window_passed",
+        "to_task": "decommission_old_shims",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plan-mob-02-forced-upgrade-r4:4:deploy_api_gate:rollback_state_undeclared",
+      "task_id": "deploy_api_gate",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'deploy_api_gate' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-mob-02-forced-upgrade-r4:4:trigger_upgrade_prompts:rollback_state_undeclared",
+      "task_id": "trigger_upgrade_prompts",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'trigger_upgrade_prompts' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-mob-02-forced-upgrade-r4:4:decommission_old_shims:rollback_state_undeclared",
+      "task_id": "decommission_old_shims",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'decommission_old_shims' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-mob-02-forced-upgrade-r4:4:deploy_api_gate:rollback_state_undeclared",
+      "task_id": "deploy_api_gate",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'deploy_api_gate' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-mob-02-forced-upgrade-r4:4:trigger_upgrade_prompts:rollback_state_undeclared",
+      "task_id": "trigger_upgrade_prompts",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'trigger_upgrade_prompts' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-mob-02-forced-upgrade-r4:4:decommission_old_shims:rollback_state_undeclared",
+      "task_id": "decommission_old_shims",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'decommission_old_shims' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:trigger_upgrade_prompts",
+      "task_id": "trigger_upgrade_prompts",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'trigger_upgrade_prompts' is sequenced before the hard prerequisite 'verify_deploy_api_gate' is completed successfully.",
+      "suggested_fix": "Reorder 'trigger_upgrade_prompts' to execute only after 'verify_deploy_api_gate' is successful.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:deploy_api_gate",
+      "task_id": "deploy_api_gate",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for 'deploy_api_gate' lacks clear evidence of restoration state, which is critical in case of deployment failure.",
+      "suggested_fix": "Define and establish clear evidence that confirms the state of functionality for legitimate clients after rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:decommission_old_shims",
+      "task_id": "decommission_old_shims",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for 'decommission_old_shims' lacks specifics on how to confirm the dependency on old versions, making the plan potentially unsafe.",
+      "suggested_fix": "Include a detailed verification step to ensure it's clearly established that old shims are indeed needed before proceeding with decommissioning.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mob-02-forced-upgrade:4:4",
+    "plan_id": "plan-mob-02-forced-upgrade-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:trigger_upgrade_prompts",
+    "question": "Plan for goal 'mob-02-forced-upgrade' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

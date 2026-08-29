@@ -1,0 +1,470 @@
+{
+  "dimension": "core-api",
+  "goal_id": "data-04-streaming-pipeline",
+  "duration_seconds": 32.54,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-data-04-streaming-pipeline-r3",
+    "goal_id": "data-04-streaming-pipeline",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-data-04-streaming-pipeline-r2",
+    "created_at": "2026-08-29T21:42:28.283183Z",
+    "tasks": [
+      {
+        "id": "deploy-kafka",
+        "description": "Deploy Kafka cluster",
+        "action": "deploy",
+        "target": "kafka",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Kafka is running",
+          "how": "check Kafka health",
+          "expected": "Kafka healthy"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "destroy kafka",
+          "safety_guard": "verify kafka is not accessible",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy-flink",
+        "description": "Deploy Flink cluster",
+        "action": "deploy",
+        "target": "flink",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kafka is operational",
+            "fact": "kafka_healthy",
+            "established_by": "deploy-kafka",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Flink is running",
+          "how": "check Flink health",
+          "expected": "Flink healthy"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "destroy flink",
+          "safety_guard": "verify flink is not accessible",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy-s3",
+        "description": "Setup S3 bucket",
+        "action": "setup",
+        "target": "s3",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "S3 service is reachable",
+            "fact": "s3_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "setup-throughput-monitoring",
+        "description": "Set up Prometheus to monitor throughput",
+        "action": "setup",
+        "target": "prometheus",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Flink is operational",
+            "fact": "flink_healthy",
+            "established_by": "deploy-flink",
+            "probe": null
+          },
+          {
+            "description": "Prometheus is reachable",
+            "fact": "prometheus_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Prometheus is active",
+          "how": "check Prometheus status",
+          "expected": "Prometheus operational"
+        },
+        "rollback": {
+          "trigger": "setup fails",
+          "action": "tear down Prometheus setup",
+          "safety_guard": "verify Prometheus is not consuming resources",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-throughput",
+        "description": "Verify data throughput from Kafka to Flink",
+        "action": "verify",
+        "target": "throughput",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Prometheus is operational",
+            "fact": "prometheus_healthy",
+            "established_by": "setup-throughput-monitoring",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data throughput",
+          "how": "run Prometheus queries",
+          "expected": "throughput above threshold"
+        },
+        "rollback": {
+          "trigger": "throughput below threshold",
+          "action": "adjust Kafka settings",
+          "safety_guard": "ensure Kafka settings are restored",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-checkpointing",
+        "description": "Verify Flink checkpointing mechanism",
+        "action": "verify",
+        "target": "checkpointing",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Flink is operational",
+            "fact": "flink_healthy",
+            "established_by": "deploy-flink",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "checkpoint status",
+          "how": "check Flink UI",
+          "expected": "checkpoints are successful"
+        },
+        "rollback": {
+          "trigger": "checkpointing fails",
+          "action": "trigger manual checkpoint",
+          "safety_guard": "verify checkpoint data",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy-kafka",
+        "to_task": "deploy-flink",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-flink",
+        "to_task": "setup-throughput-monitoring",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup-throughput-monitoring",
+        "to_task": "verify-throughput",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-flink",
+        "to_task": "verify-checkpointing",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plan-data-04-streaming-pipeline-r3:3:deploy-kafka:rollback_state_undeclared",
+      "task_id": "deploy-kafka",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'deploy-kafka' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-data-04-streaming-pipeline-r3:3:deploy-flink:rollback_state_undeclared",
+      "task_id": "deploy-flink",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'deploy-flink' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-data-04-streaming-pipeline-r3:3:verify-throughput:rollback_state_undeclared",
+      "task_id": "verify-throughput",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify-throughput' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-data-04-streaming-pipeline-r3:3:verify-checkpointing:rollback_state_undeclared",
+      "task_id": "verify-checkpointing",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify-checkpointing' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-data-04-streaming-pipeline-r3:3:deploy-kafka:rollback_state_undeclared",
+      "task_id": "deploy-kafka",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'deploy-kafka' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-data-04-streaming-pipeline-r3:3:deploy-flink:rollback_state_undeclared",
+      "task_id": "deploy-flink",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'deploy-flink' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-data-04-streaming-pipeline-r3:3:verify-throughput:rollback_state_undeclared",
+      "task_id": "verify-throughput",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify-throughput' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-data-04-streaming-pipeline-r3:3:verify-checkpointing:rollback_state_undeclared",
+      "task_id": "verify-checkpointing",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify-checkpointing' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:deploy-flink",
+      "task_id": "deploy-flink",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Flink deployment should not proceed unless Kafka is operational.",
+      "suggested_fix": "Ensure that the 'deploy-flink' task waits for a successful verification of the 'deploy-kafka' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:setup-throughput-monitoring",
+      "task_id": "setup-throughput-monitoring",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Prometheus' operational status is dependent on an external fact that is not verified by earlier tasks.",
+      "suggested_fix": "Add a task to verify Prometheus service reachability before proceeding with 'setup-throughput-monitoring'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:weak_rollback:setup-throughput-monitoring",
+      "task_id": "setup-throughput-monitoring",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for Prometheus setup is weak due to lack of clear restoration state.",
+      "suggested_fix": "Define a clear restoration state or evidence for the rollback of 'setup-throughput-monitoring'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:verify-throughput",
+      "task_id": "verify-throughput",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Depends on Prometheus being operational, which is not verified in a preceding task.",
+      "suggested_fix": "Ensure verification of Prometheus health before proceeding to 'verify-throughput'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:verify-checkpointing",
+      "task_id": "verify-checkpointing",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Depends on Flink being operational, which should be verified before this step.",
+      "suggested_fix": "Confirm Flink health in a preceding task before proceeding with 'verify-checkpointing'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:data-04-streaming-pipeline:3:3",
+    "plan_id": "plan-data-04-streaming-pipeline-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:deploy-flink",
+    "question": "Plan for goal 'data-04-streaming-pipeline' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

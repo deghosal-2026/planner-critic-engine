@@ -1,0 +1,348 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-11-read-replica-routing",
+  "duration_seconds": 31.31,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-db-11-read-replica-routing-r2",
+    "goal_id": "db-11-read-replica-routing",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "db-11-read-replica-routing-plan",
+    "created_at": "2026-08-29T21:31:32.260363Z",
+    "tasks": [
+      {
+        "id": "provision_replicas",
+        "description": "Provision 2 read replicas in different AZs",
+        "action": "provision",
+        "target": "read_replicas",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "database is reachable",
+            "fact": "db_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replica status",
+          "how": "check replication health",
+          "expected": "both replicas running"
+        },
+        "rollback": {
+          "trigger": "provisioning fails",
+          "action": "terminate incomplete replicas",
+          "safety_guard": "confirm no data loss",
+          "restores_state": [
+            "no replicas provisioned"
+          ],
+          "restoration_evidence": "confirmation of no active replicas"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_pgbouncer",
+        "description": "Configure PgBouncer connection pooling with read/write split rules",
+        "action": "configure",
+        "target": "PgBouncer",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PgBouncer is provisioned",
+            "fact": "pgbouncer_provisioned",
+            "established_by": "provision_replicas",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "PgBouncer configuration",
+          "how": "check config file",
+          "expected": "config includes read/write split rules"
+        },
+        "rollback": {
+          "trigger": "PgBouncer configuration fails",
+          "action": "reset PgBouncer to default settings",
+          "safety_guard": "validate retention of existing connections",
+          "restores_state": [
+            "PgBouncer in previous valid state"
+          ],
+          "restoration_evidence": "confirmation of valid PgBouncer state"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_replica_lag",
+        "description": "Verify replica lag < 100ms",
+        "action": "check",
+        "target": "replica_lag",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "replicas are healthy",
+            "fact": "replicas_healthy",
+            "established_by": "provision_replicas",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replication lag",
+          "how": "query lag metrics",
+          "expected": "< 100ms"
+        },
+        "rollback": {
+          "trigger": "lag exceeds 100ms",
+          "action": "reconfigure replication parameters",
+          "safety_guard": "monitor for adverse impacts",
+          "restores_state": [
+            "replication parameters set to healthy limits"
+          ],
+          "restoration_evidence": "confirmation of adjusted replication parameters"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "drain_read_traffic",
+        "description": "Slowly drain read traffic from primary to replicas (10% \u2192 50% \u2192 100% over 4 hours)",
+        "action": "drain",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PgBouncer is configured",
+            "fact": "pgbouncer_configured",
+            "established_by": "configure_pgbouncer",
+            "probe": null
+          },
+          {
+            "description": "replica lag verified",
+            "fact": "lag_verified",
+            "established_by": "verify_replica_lag",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic distribution",
+          "how": "monitor read traffic metrics",
+          "expected": "all read traffic shifts to replicas"
+        },
+        "rollback": {
+          "trigger": "stale reads detected",
+          "action": "redirect all reads back to primary",
+          "safety_guard": "ensure no commits are lost",
+          "restores_state": [
+            "all read traffic directed to primary"
+          ],
+          "restoration_evidence": "confirmation of traffic redirection to primary"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor_stale_reads",
+        "description": "Monitor for stale-read issues",
+        "action": "monitor",
+        "target": "reads",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "read traffic has been drained",
+            "fact": "traffic_drained",
+            "established_by": "drain_read_traffic",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "stale reads",
+          "how": "conduct read tests",
+          "expected": "no stale reads detected"
+        },
+        "rollback": {
+          "trigger": "stale reads found",
+          "action": "revert to primary for reads",
+          "safety_guard": "ensure no commits are lost",
+          "restores_state": [
+            "reads redirect to primary"
+          ],
+          "restoration_evidence": "confirmation of redirection to primary for reads"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_failover_behavior",
+        "description": "Verify failover behavior if a replica goes down",
+        "action": "test",
+        "target": "failover",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "replicas are functioning",
+            "fact": "replicas_functional",
+            "established_by": "provision_replicas",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "failover response",
+          "how": "simulate replica failure",
+          "expected": "system redirects traffic to primary without interruption"
+        },
+        "rollback": {
+          "trigger": "failover fails",
+          "action": "revert to primary for reads",
+          "safety_guard": "ensure data consistency",
+          "restores_state": [
+            "reads redirect to primary"
+          ],
+          "restoration_evidence": "confirmation of traffic redirection back to primary"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "provision_replicas",
+        "to_task": "configure_pgbouncer",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provision_replicas",
+        "to_task": "verify_replica_lag",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_pgbouncer",
+        "to_task": "drain_read_traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_replica_lag",
+        "to_task": "drain_read_traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "drain_read_traffic",
+        "to_task": "monitor_stale_reads",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provision_replicas",
+        "to_task": "verify_failover_behavior",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:drain_read_traffic",
+      "task_id": "drain_read_traffic",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'drain_read_traffic' is dependent on 'configure_pgbouncer' and 'verify_replica_lag', but the latter has no established context to ensure its success before proceeding.",
+      "suggested_fix": "Ensure that the 'verify_replica_lag' task is successfully completed before executing 'drain_read_traffic'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:drain_read_traffic",
+      "task_id": "drain_read_traffic",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'drain_read_traffic' depends on 'pgbouncer_configured' and 'lag_verified' conditions, but there's no guarantee these will be true before its execution.",
+      "suggested_fix": "Add verification steps to confirm that both PgBouncer is configured and the replication lag is verified prior to draining traffic.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:drain_read_traffic",
+      "task_id": "drain_read_traffic",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The plan lacks detail on how to monitor the gradual draining of traffic and handle potential traffic spikes.",
+      "suggested_fix": "Consider including additional monitoring and mitigation strategies during each step of the traffic draining process.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:monitor_stale_reads",
+      "task_id": "monitor_stale_reads",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "There is no plan to periodically report on the status of stale reads throughout the traffic draining phase.",
+      "suggested_fix": "Integrate periodic checks during the draining phase to prevent going too long without monitoring for stale reads.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

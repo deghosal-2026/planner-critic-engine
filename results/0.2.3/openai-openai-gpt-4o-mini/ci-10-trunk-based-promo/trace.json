@@ -1,0 +1,325 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-10-trunk-based-promo",
+  "duration_seconds": 23.64,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-ci-10-trunk-based-promo-r2",
+    "goal_id": "ci-10-trunk-based-promo",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "ci-10-trunk-based-promo-v1",
+    "created_at": "2026-08-29T21:38:40.663292Z",
+    "tasks": [
+      {
+        "id": "configure_branch_protection",
+        "description": "Configure branch protection rules on main branch",
+        "action": "configure",
+        "target": "branch protection",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "main branch exists",
+            "fact": "main_branch_present",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "branch protection rules",
+          "how": "check GitHub settings",
+          "expected": "require PR, require CI, require review"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "restore previous branch settings",
+          "safety_guard": "verify branch settings are intact",
+          "restores_state": [
+            "previous branch protection settings"
+          ],
+          "restoration_evidence": "check GitHub branch protection settings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "setup_auto_deploy",
+        "description": "Set up auto-deploy to staging on merge to main",
+        "action": "setup",
+        "target": "auto-deploy to staging",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "branch protection configured",
+            "fact": "branch_protection_set",
+            "established_by": "configure_branch_protection",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment status",
+          "how": "check ArgoCD logs",
+          "expected": "deployment successful"
+        },
+        "rollback": {
+          "trigger": "auto-deploy fails",
+          "action": "disable auto-deploy",
+          "safety_guard": "ensure no partial deployments",
+          "restores_state": [
+            "previous auto-deploy configuration"
+          ],
+          "restoration_evidence": "check ArgoCD configuration for previous setup"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "run_integration_tests",
+        "description": "Run integration and smoke tests on staging",
+        "action": "run",
+        "target": "integration tests",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "auto-deploy setup",
+            "fact": "auto_deploy_configured",
+            "established_by": "setup_auto_deploy",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "test results",
+          "how": "review test reports",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "tests fail",
+          "action": "revert changes in staging",
+          "safety_guard": "ensure staging is stable",
+          "restores_state": [
+            "previous stable state of staging"
+          ],
+          "restoration_evidence": "verify staging environment health"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_promotion_gate",
+        "description": "Configure the promotion gate requiring green tests and manual approval for production",
+        "action": "configure",
+        "target": "promotion gate",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "integration tests completed",
+            "fact": "integration_tests_passed",
+            "established_by": "run_integration_tests",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "promotion gate settings",
+          "how": "check configuration",
+          "expected": "requires green tests and manual approval"
+        },
+        "rollback": {
+          "trigger": "promotion gate misconfigured",
+          "action": "restore previous promotion settings",
+          "safety_guard": "verify promotion settings valid",
+          "restores_state": [
+            "previous promotion gate configuration"
+          ],
+          "restoration_evidence": "check promotion gate settings against previous version"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_rollback_path",
+        "description": "Verify rollback path if production deployment fails",
+        "action": "verify",
+        "target": "rollback process",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "promotion gate configured",
+            "fact": "promotion_gate_set",
+            "established_by": "configure_promotion_gate",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "rollback documentation",
+          "how": "review rollback plan",
+          "expected": "clear rollback steps defined"
+        },
+        "rollback": {
+          "trigger": "rollback process unclear",
+          "action": "document rollback steps",
+          "safety_guard": "ensure team is informed",
+          "restores_state": [
+            "clear and documented rollback process"
+          ],
+          "restoration_evidence": "communication records of rollback plan"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "configure_branch_protection",
+        "to_task": "setup_auto_deploy",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_auto_deploy",
+        "to_task": "run_integration_tests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_integration_tests",
+        "to_task": "configure_promotion_gate",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_promotion_gate",
+        "to_task": "verify_rollback_path",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:configure_branch_protection",
+      "task_id": "configure_branch_protection",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The task depends on the main branch existing, but this fact is not guaranteed in the current environment setup.",
+      "suggested_fix": "Ensure that the environment checks or creates the main branch before configuring branch protection.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:setup_auto_deploy",
+      "task_id": "setup_auto_deploy",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task is dependent on branch protection configuration, but the configuration is not verified before proceeding with the setup.",
+      "suggested_fix": "Reorder the tasks to ensure branch protection is verified before setup of auto-deploy.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:run_integration_tests",
+      "task_id": "run_integration_tests",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The integration tests are set to run before the auto-deploy setup is verified as successful.",
+      "suggested_fix": "Ensure that the auto-deploy setup is confirmed successful before starting integration tests.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:configure_promotion_gate",
+      "task_id": "configure_promotion_gate",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Configuring the promotion gate occurs before verifying that the integration tests have passed, which is unsafe.",
+      "suggested_fix": "Reorder the tasks so that the promotion gate configuration can only occur after successful integration tests.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:verify_rollback_path",
+      "task_id": "verify_rollback_path",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Verifying the rollback path is set to occur before the promotion gate is configured, which could lead to unknown issues during production deployment.",
+      "suggested_fix": "Ensure the promote gate configuration is completed and validated before verifying the rollback path.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ci-10-trunk-based-promo:2:2",
+    "plan_id": "plan-ci-10-trunk-based-promo-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:feasibility:configure_branch_protection",
+    "question": "Plan for goal 'ci-10-trunk-based-promo' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

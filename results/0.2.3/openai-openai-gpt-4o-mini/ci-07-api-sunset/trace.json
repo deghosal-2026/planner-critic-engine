@@ -1,0 +1,418 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-07-api-sunset",
+  "duration_seconds": 45.88,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-ci-07-api-sunset-r4",
+    "goal_id": "ci-07-api-sunset",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-ci-07-api-sunset-r3",
+    "created_at": "2026-08-29T21:37:42.498073Z",
+    "tasks": [
+      {
+        "id": "check_api_v1_deployed",
+        "description": "Check if API v1 is deployed",
+        "action": "check",
+        "target": "API v1",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "API deployment status",
+          "how": "check deployment logs",
+          "expected": "API v1 is deployed"
+        },
+        "rollback": {
+          "trigger": "check fails",
+          "action": "report failure",
+          "safety_guard": "verify API status",
+          "restores_state": [
+            "API v1 not deployed"
+          ],
+          "restoration_evidence": "API deployment status indicates not deployed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deprecate_api",
+        "description": "Deprecate API v1 with Sunset header",
+        "action": "update",
+        "target": "API v1",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "API v1 is confirmed as deployed",
+            "fact": "api_v1_deployed",
+            "established_by": "check_api_v1_deployed",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "API response headers",
+          "how": "check header in response",
+          "expected": "Sunset header present"
+        },
+        "rollback": {
+          "trigger": "deprecation fails",
+          "action": "remove Sunset header",
+          "safety_guard": "verify API response",
+          "restores_state": [
+            "API v1 operational"
+          ],
+          "restoration_evidence": "Sunset header no longer present"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_consumers_list",
+        "description": "Verify that consumers list is ready",
+        "action": "verify",
+        "target": "consumers list",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "consumers list status",
+          "how": "check readiness documentation",
+          "expected": "consumers list is ready"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "report issue",
+          "safety_guard": "notify team",
+          "restores_state": [
+            "consumers list not ready"
+          ],
+          "restoration_evidence": "readiness documentation shows consumers list not ready"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "notify_consumers",
+        "description": "Notify known consumers about deprecation",
+        "action": "notify",
+        "target": "slack, pagerduty",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Known consumers list is available",
+            "fact": "consumers_list_ready",
+            "established_by": "verify_consumers_list",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "notification status",
+          "how": "check notification logs",
+          "expected": "notifications sent successfully"
+        },
+        "rollback": {
+          "trigger": "notification fails",
+          "action": "resend notifications",
+          "safety_guard": "verify notification status",
+          "restores_state": [
+            "consumers notified"
+          ],
+          "restoration_evidence": "notifications logs updated"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_api_v2_stable",
+        "description": "Verify API v2 stability",
+        "action": "verify",
+        "target": "API v2",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "API stability status",
+          "how": "check performance metrics",
+          "expected": "API v2 is stable"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "report instability",
+          "safety_guard": "notify team",
+          "restores_state": [
+            "API v2 unstable"
+          ],
+          "restoration_evidence": "performance metrics indicate instability"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "redirect_traffic",
+        "description": "Redirect traffic from API v1 to v2",
+        "action": "update",
+        "target": "API gateway",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "API v2 is stable",
+            "fact": "api_v2_stable",
+            "established_by": "verify_api_v2_stable",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "API traffic routing",
+          "how": "monitor with datadog",
+          "expected": "traffic directed to v2"
+        },
+        "rollback": {
+          "trigger": "redirect fails",
+          "action": "restore API v1 routing",
+          "safety_guard": "verify traffic routing",
+          "restores_state": [
+            "API v1 routing operational"
+          ],
+          "restoration_evidence": "traffic logs showing v1 routing"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor_orphaned_calls",
+        "description": "Monitor for orphaned calls to API v1",
+        "action": "monitor",
+        "target": "datadog",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Redirect traffic completed",
+            "fact": "traffic_redirected",
+            "established_by": "redirect_traffic",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "monitoring status",
+          "how": "check datadog logs",
+          "expected": "no orphaned calls detected"
+        },
+        "rollback": {
+          "trigger": "monitoring setup fails",
+          "action": "reconfigure monitoring",
+          "safety_guard": "verify monitoring configured",
+          "restores_state": [
+            "monitoring operational"
+          ],
+          "restoration_evidence": "monitoring logs present"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "remove_v1_code",
+        "description": "Remove v1 code from repository",
+        "action": "delete",
+        "target": "git repository",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Orphaned calls monitored",
+            "fact": "orphaned_calls_checked",
+            "established_by": "monitor_orphaned_calls",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "repository contents",
+          "how": "check commit history",
+          "expected": "v1 code not present"
+        },
+        "rollback": {
+          "trigger": "removal issues",
+          "action": "restore v1 code",
+          "safety_guard": "verify repository integrity",
+          "restores_state": [
+            "v1 code restored"
+          ],
+          "restoration_evidence": "commit history showing v1 code"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_api_v1_deployed",
+        "to_task": "deprecate_api",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deprecate_api",
+        "to_task": "verify_consumers_list",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_consumers_list",
+        "to_task": "notify_consumers",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "notify_consumers",
+        "to_task": "verify_api_v2_stable",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_api_v2_stable",
+        "to_task": "redirect_traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "redirect_traffic",
+        "to_task": "monitor_orphaned_calls",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_orphaned_calls",
+        "to_task": "remove_v1_code",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:feasibility:deprecate_api",
+      "task_id": "deprecate_api",
+      "version": 4,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Deprecating API v1 with Sunset header cannot be achieved without ensuring the API v1 is deployed first.",
+      "suggested_fix": "Ensure that 'check_api_v1_deployed' task is completed successfully before executing 'deprecate_api'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:remove_v1_code",
+      "task_id": "remove_v1_code",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Removing v1 code is scheduled before checking for orphaned calls monitoring.",
+      "suggested_fix": "Reorder tasks to ensure 'monitor_orphaned_calls' is completed before 'remove_v1_code'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:notify_consumers",
+      "task_id": "notify_consumers",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'notify_consumers' depends on the validity of the 'consumers_list_ready' fact which is not confirmed until 'verify_consumers_list' is completed.",
+      "suggested_fix": "Ensure the dependency for 'notify_consumers' is verified properly through 'verify_consumers_list'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:redirect_traffic",
+      "task_id": "redirect_traffic",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'redirect_traffic' does not provide a guarantee that API v1 will be fully operational after restoration.",
+      "suggested_fix": "Enhance the rollback action for 'redirect_traffic' to ensure proper verification of API v1's operational status post-rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:missing_steps:monitor_orphaned_calls",
+      "task_id": "monitor_orphaned_calls",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding a step to review the logs after monitoring for orphaned calls to ensure there are no residual issues.",
+      "suggested_fix": "Add a verification step after 'monitor_orphaned_calls' to validate the absence of orphaned calls effectively.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ci-07-api-sunset:4:4",
+    "plan_id": "plan-ci-07-api-sunset-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:feasibility:deprecate_api",
+    "question": "Plan for goal 'ci-07-api-sunset' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

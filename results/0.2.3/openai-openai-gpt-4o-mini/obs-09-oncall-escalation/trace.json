@@ -1,0 +1,274 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-09-oncall-escalation",
+  "duration_seconds": 23.81,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-obs-09-oncall-escalation-r2",
+    "goal_id": "obs-09-oncall-escalation",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "obs-09-oncall-escalation-plan",
+    "created_at": "2026-08-29T21:27:50.313566Z",
+    "tasks": [
+      {
+        "id": "define-rotation",
+        "description": "Define on-call rotation for primary and secondary responders",
+        "action": "create_on_call_rotation",
+        "target": "PagerDuty",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "SRE team roster is up-to-date",
+            "fact": "team_roster_updated",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure-escalation",
+        "description": "Configure escalation rules in PagerDuty",
+        "action": "set_escalation_rules",
+        "target": "PagerDuty",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "On-call rotation defined",
+            "fact": "rotation_defined",
+            "established_by": "define-rotation",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "escalation rules",
+          "how": "check PagerDuty settings",
+          "expected": "rules accurately set for primary, secondary, and manager"
+        },
+        "rollback": {
+          "trigger": "prior escalation setup fails",
+          "action": "revert to previous escalation rules",
+          "safety_guard": "verify previous setup is intact",
+          "restores_state": [
+            "previous escalation rules"
+          ],
+          "restoration_evidence": "previous setup verified to match original configuration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "setup-routing",
+        "description": "Set up service-to-team routing rules",
+        "action": "configure_routing_rules",
+        "target": "PagerDuty",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Escalation rules configured",
+            "fact": "escalation_configured",
+            "established_by": "configure-escalation",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "routing rules",
+          "how": "test routing configurations",
+          "expected": "services correctly routed to respective teams"
+        },
+        "rollback": {
+          "trigger": "routing misconfiguration detected",
+          "action": "restore previous routing settings",
+          "safety_guard": "confirm restored settings are correct",
+          "restores_state": [
+            "previous routing settings"
+          ],
+          "restoration_evidence": "settings verified to match original configurations"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure-policies",
+        "description": "Configure business-hours vs after-hours policies",
+        "action": "set_time_policies",
+        "target": "PagerDuty",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Routing rules established",
+            "fact": "routing_setup_complete",
+            "established_by": "setup-routing",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "time policies",
+          "how": "check configuration settings in PagerDuty",
+          "expected": "business-hours and after-hours policies configured correctly"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "run-drill",
+        "description": "Run a drill to verify that paging works",
+        "action": "execute_drill",
+        "target": "SRE team",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Policies configured",
+            "fact": "policies_set",
+            "established_by": "configure-policies",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "drill response times",
+          "how": "measure response during drill",
+          "expected": "responses within defined SLA"
+        },
+        "rollback": {
+          "trigger": "drill fails",
+          "action": "review drill execution and adjust process",
+          "safety_guard": "ensure team feedback is incorporated",
+          "restores_state": [
+            "SRE team drill process"
+          ],
+          "restoration_evidence": "drill results and improvements documented"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "document-runbook",
+        "description": "Document the runbook for the on-call process",
+        "action": "create_runbook",
+        "target": "shared drive",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Drill completed",
+            "fact": "drill_successful",
+            "established_by": "run-drill",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "runbook document",
+          "how": "review document for completeness",
+          "expected": "runbook accurately reflects on-call processes"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define-rotation",
+        "to_task": "configure-escalation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-escalation",
+        "to_task": "setup-routing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup-routing",
+        "to_task": "configure-policies",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-policies",
+        "to_task": "run-drill",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run-drill",
+        "to_task": "document-runbook",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:configure-escalation",
+      "task_id": "configure-escalation",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'configure-escalation' is sequenced before its prerequisite 'define-rotation' is verified as complete.",
+      "suggested_fix": "Ensure 'define-rotation' is completed and verified before proceeding to 'configure-escalation'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:run-drill",
+      "task_id": "run-drill",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding a step to evaluate the representation of the drill compared to a real incident.",
+      "suggested_fix": "Include a checklist to confirm the drill scenario reflects actual incident conditions.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

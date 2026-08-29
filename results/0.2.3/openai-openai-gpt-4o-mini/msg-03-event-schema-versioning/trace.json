@@ -1,0 +1,418 @@
+{
+  "dimension": "core-api",
+  "goal_id": "msg-03-event-schema-versioning",
+  "duration_seconds": 47.19,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-msg-03-event-schema-versioning-r3",
+    "goal_id": "msg-03-event-schema-versioning",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-msg-03-event-schema-versioning-r2",
+    "created_at": "2026-08-29T21:50:12.516760Z",
+    "tasks": [
+      {
+        "id": "register_avro_schema",
+        "description": "Register Avro schemas in Schema Registry",
+        "action": "register",
+        "target": "Schema Registry",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Schema Registry is reachable",
+            "fact": "schema_registry_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "registered schema",
+          "how": "query Schema Registry",
+          "expected": "schema exists"
+        },
+        "rollback": {
+          "trigger": "registration fails",
+          "action": "remove schemas from Schema Registry",
+          "safety_guard": "verify schemas removed successfully",
+          "restores_state": [
+            "no schemas present"
+          ],
+          "restoration_evidence": "schema query returns no results"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_backward_compatibility",
+        "description": "Configure backward compatibility checks",
+        "action": "configure",
+        "target": "Schema Registry",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Avro schema registered",
+            "fact": "schema_registered",
+            "established_by": "register_avro_schema",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "compatibility setting",
+          "how": "query Schema Registry",
+          "expected": "backward compatibility enabled"
+        },
+        "rollback": {
+          "trigger": "config fails",
+          "action": "reset to previous compatibility setting",
+          "safety_guard": "verify previous setting restored",
+          "restores_state": [
+            "previous setting"
+          ],
+          "restoration_evidence": "query returns previous setting"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy_schema_v2",
+        "description": "Deploy schema version 2 for the 'order.created' event",
+        "action": "deploy",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Backward compatibility configured",
+            "fact": "compatibility_configured",
+            "established_by": "configure_backward_compatibility",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployed schema version",
+          "how": "query Schema Registry",
+          "expected": "version 2"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "re-deploy schema v1",
+          "safety_guard": "verify v1 is operational",
+          "restores_state": [
+            "schema v1 active"
+          ],
+          "restoration_evidence": "query Schema Registry for version 1"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "migrate_producers_v2",
+        "description": "Migrate producers to emit v2 events",
+        "action": "migrate",
+        "target": "producers",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Schema v2 deployed",
+            "fact": "schema_v2_deployed",
+            "established_by": "deploy_schema_v2",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "producer event version",
+          "how": "test producer outputs",
+          "expected": "v2 events"
+        },
+        "rollback": {
+          "trigger": "migration incomplete",
+          "action": "restore previous producer version",
+          "safety_guard": "verify previous version emits correctly",
+          "restores_state": [
+            "previous producer version active"
+          ],
+          "restoration_evidence": "producer outputs emit previous version events"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "migrate_consumers_v2",
+        "description": "Migrate consumers to handle both v1 and v2",
+        "action": "migrate",
+        "target": "consumers",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Producers migrated to v2",
+            "fact": "producers_migrated",
+            "established_by": "migrate_producers_v2",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "consumer event handling",
+          "how": "test consumer outputs",
+          "expected": "v1 and v2 events processed without errors"
+        },
+        "rollback": {
+          "trigger": "migration incomplete",
+          "action": "restore previous consumer version",
+          "safety_guard": "verify previous version processes correctly",
+          "restores_state": [
+            "previous consumer version active"
+          ],
+          "restoration_evidence": "consumer outputs emit previous version events"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_compatibility",
+        "description": "Verify compatibility between v1 and v2 schemas",
+        "action": "verify",
+        "target": "schemas",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Consumers migrated to v2",
+            "fact": "consumers_migrated",
+            "established_by": "migrate_consumers_v2",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "schema compatibility",
+          "how": "run compatibility checks",
+          "expected": "compatibility verified"
+        },
+        "rollback": {
+          "trigger": "compatibility check fails",
+          "action": "revert to v1 schemas",
+          "safety_guard": "restore consumer functionality",
+          "restores_state": [
+            "schema v1 active"
+          ],
+          "restoration_evidence": "query Schema Registry for version 1"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deprecate_v1",
+        "description": "Deprecate v1 schemas and inform stakeholders",
+        "action": "deprecate",
+        "target": "schemas",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Compatibility verified",
+            "fact": "compatibility_verified",
+            "established_by": "verify_compatibility",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deprecation status",
+          "how": "check stakeholder notification",
+          "expected": "stakeholders informed of deprecation"
+        },
+        "rollback": {
+          "trigger": "deprecation fails",
+          "action": "revert deprecation",
+          "safety_guard": "ensure stakeholders informed of restoration",
+          "restores_state": [
+            "v1 schemas active"
+          ],
+          "restoration_evidence": "query Schema Registry for v1 presence"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "register_avro_schema",
+        "to_task": "configure_backward_compatibility",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_backward_compatibility",
+        "to_task": "deploy_schema_v2",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_schema_v2",
+        "to_task": "migrate_producers_v2",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate_producers_v2",
+        "to_task": "migrate_consumers_v2",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate_consumers_v2",
+        "to_task": "verify_compatibility",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_compatibility",
+        "to_task": "deprecate_v1",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:feasibility:deploy_schema_v2",
+      "task_id": "deploy_schema_v2",
+      "version": 3,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Task 'deploy_schema_v2' cannot be executed before verifying backward compatibility is configured.",
+      "suggested_fix": "Ensure 'configure_backward_compatibility' is completed prior to 'deploy_schema_v2'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:migrate_producers_v2",
+      "task_id": "migrate_producers_v2",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'migrate_producers_v2' is ordered before verifying that schema version 2 has been successfully deployed.",
+      "suggested_fix": "Move 'migrate_producers_v2' after 'deploy_schema_v2' to ensure proper sequencing.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:migrate_consumers_v2",
+      "task_id": "migrate_consumers_v2",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'migrate_consumers_v2' is dependent on 'migrate_producers_v2', which has unsafe sequencing due to the preceding tasks.",
+      "suggested_fix": "Resolve issues in 'migrate_producers_v2' and ensure it is sequenced properly.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:verify_compatibility",
+      "task_id": "verify_compatibility",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'verify_compatibility' depends on consumers being migrated to version 2, but this migration is not verified before this task.",
+      "suggested_fix": "Add a verification step to ensure 'migrate_consumers_v2' completes successfully before 'verify_compatibility'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:weak_rollback:migrate_producers_v2",
+      "task_id": "migrate_producers_v2",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback procedure for 'migrate_producers_v2' does not guarantee all previous versions will emit correctly in case of an issue.",
+      "suggested_fix": "Enhance the rollback to verify complete state restoration and functionality of producers.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:weak_rollback:migrate_consumers_v2",
+      "task_id": "migrate_consumers_v2",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action for 'migrate_consumers_v2' does not provide assurance that consumers will revert back to a fully operational state.",
+      "suggested_fix": "Ensure rollback includes verification of proper consumer function after restoration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:msg-03-event-schema-versioning:3:3",
+    "plan_id": "plan-msg-03-event-schema-versioning-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:feasibility:deploy_schema_v2",
+    "question": "Plan for goal 'msg-03-event-schema-versioning' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

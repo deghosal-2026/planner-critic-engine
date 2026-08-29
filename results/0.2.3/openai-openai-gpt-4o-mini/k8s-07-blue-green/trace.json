@@ -1,0 +1,398 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-07-blue-green",
+  "duration_seconds": 51.89,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-k8s-07-blue-green-r3",
+    "goal_id": "k8s-07-blue-green",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-k8s-07-blue-green-r2",
+    "created_at": "2026-08-29T21:42:46.710014Z",
+    "tasks": [
+      {
+        "id": "create-green-deployment",
+        "description": "Create green deployment for payments API",
+        "action": "deploy",
+        "target": "green-deployment",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "green deployment status",
+          "how": "check deployment rollout status",
+          "expected": "deployment available"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to blue deployment",
+          "safety_guard": "ensure blue deployment is healthy",
+          "restores_state": [
+            "blue deployment active"
+          ],
+          "restoration_evidence": "blue deployment is healthy and reachable"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "create-green-service",
+        "description": "Create green service for payments API",
+        "action": "deploy",
+        "target": "green-service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Green deployment must exist",
+            "fact": "green_deployment_created",
+            "established_by": "create-green-deployment",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "green service status",
+          "how": "check service availability",
+          "expected": "service is accessible"
+        },
+        "rollback": {
+          "trigger": "service creation fails",
+          "action": "remove green service",
+          "safety_guard": "ensure legacy service is operational",
+          "restores_state": [
+            "legacy service active"
+          ],
+          "restoration_evidence": "legacy service is healthy and reachable"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "create-green-ingress",
+        "description": "Create green ingress for payments API",
+        "action": "deploy",
+        "target": "green-ingress",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Green service must exist",
+            "fact": "green_service_created",
+            "established_by": "create-green-service",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "green ingress status",
+          "how": "check ingress availability",
+          "expected": "ingress is configured"
+        },
+        "rollback": {
+          "trigger": "ingress creation fails",
+          "action": "remove green ingress",
+          "safety_guard": "ensure legacy ingress is operational",
+          "restores_state": [
+            "legacy ingress active"
+          ],
+          "restoration_evidence": "legacy ingress is healthy and reachable"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "run-smoke-tests",
+        "description": "Run smoke tests against green service",
+        "action": "test",
+        "target": "green-service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Green ingress must exist",
+            "fact": "green_ingress_created",
+            "established_by": "create-green-ingress",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "smoke test results",
+          "how": "check test logs",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "smoke tests fail",
+          "action": "revert ingress to blue service",
+          "safety_guard": "ensure blue service is operational",
+          "restores_state": [
+            "blue ingress active"
+          ],
+          "restoration_evidence": "blue ingress is healthy and reachable"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "run-health-checks",
+        "description": "Run comprehensive health checks against green service",
+        "action": "test",
+        "target": "green-service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Green service must be responding",
+            "fact": "green_service_healthy",
+            "established_by": "run-smoke-tests",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "health check results",
+          "how": "check health check metrics",
+          "expected": "all health checks pass"
+        },
+        "rollback": {
+          "trigger": "health checks fail",
+          "action": "revert ingress to blue service",
+          "safety_guard": "ensure blue service is operational",
+          "restores_state": [
+            "blue ingress active"
+          ],
+          "restoration_evidence": "blue ingress is healthy and reachable"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "switch-ingress",
+        "description": "Switch ingress to point to green service",
+        "action": "update",
+        "target": "ingress",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "All health checks must pass",
+            "fact": "health_checks_passed",
+            "established_by": "run-health-checks",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "current ingress target",
+          "how": "check ingress configuration",
+          "expected": "ingress points to green service"
+        },
+        "rollback": {
+          "trigger": "switch fails",
+          "action": "revert ingress to blue service",
+          "safety_guard": "ensure blue service is operational",
+          "restores_state": [
+            "blue ingress active"
+          ],
+          "restoration_evidence": "blue ingress is healthy and reachable"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor-green",
+        "description": "Monitor green stack for 30 minutes",
+        "action": "monitor",
+        "target": "green-service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Ingress must point to green service",
+            "fact": "ingress_switched_to_green",
+            "established_by": "switch-ingress",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "monitoring results",
+          "how": "check monitoring logs",
+          "expected": "no critical issues found"
+        },
+        "rollback": {
+          "trigger": "monitoring anomaly detected",
+          "action": "revert ingress to blue service",
+          "safety_guard": "ensure blue service is operational",
+          "restores_state": [
+            "blue ingress active"
+          ],
+          "restoration_evidence": "blue ingress is healthy and reachable"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "decommission-blue",
+        "description": "Drain and decommission blue stack",
+        "action": "delete",
+        "target": "blue-stack",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Monitoring period must be completed",
+            "fact": "monitoring_complete",
+            "established_by": "monitor-green",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "blue stack decommission status",
+          "how": "check decommissioning progress",
+          "expected": "blue stack is successfully decommissioned"
+        },
+        "rollback": {
+          "trigger": "decommissioning fails",
+          "action": "restore blue stack",
+          "safety_guard": "ensure green service is operational",
+          "restores_state": [
+            "blue stack active"
+          ],
+          "restoration_evidence": "blue stack is healthy and reachable"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "create-green-deployment",
+        "to_task": "create-green-service",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create-green-service",
+        "to_task": "create-green-ingress",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create-green-ingress",
+        "to_task": "run-smoke-tests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run-smoke-tests",
+        "to_task": "run-health-checks",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run-health-checks",
+        "to_task": "switch-ingress",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "switch-ingress",
+        "to_task": "monitor-green",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor-green",
+        "to_task": "decommission-blue",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:run-smoke-tests",
+      "task_id": "run-smoke-tests",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The smoke tests should run only after the green ingress is verified, but they are running in parallel to ingress creation which can lead to testing before readiness.",
+      "suggested_fix": "Ensure 'run-smoke-tests' is only executed after 'create-green-ingress' has confirmed the ingress is configured.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:run-health-checks",
+      "task_id": "run-health-checks",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Health checks should run after confirming the smoke tests pass; however, they are scheduled to run before smoke test completion.",
+      "suggested_fix": "Run 'run-health-checks' only after successful completion of 'run-smoke-tests'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:switch-ingress",
+      "task_id": "switch-ingress",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The switch-ingress step relies on health checks to pass, but health checks only verify the service after smoke tests\u2014creating a dependency that is not verified through the established tasks.",
+      "suggested_fix": "Ensure that 'health_checks_passed' is validated after 'run-health-checks' to establish correctness before switching ingress.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-07-blue-green:3:3",
+    "plan_id": "plan-k8s-07-blue-green-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:run-smoke-tests",
+    "question": "Plan for goal 'k8s-07-blue-green' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

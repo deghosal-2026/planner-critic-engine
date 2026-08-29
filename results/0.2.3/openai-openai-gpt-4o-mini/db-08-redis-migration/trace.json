@@ -1,0 +1,429 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-08-redis-migration",
+  "duration_seconds": 32.87,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-db-08-redis-migration-r3",
+    "goal_id": "db-08-redis-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-db-08-redis-migration-r2",
+    "created_at": "2026-08-29T21:29:28.623232Z",
+    "tasks": [
+      {
+        "id": "dual_write_setup",
+        "description": "Implement dual-write pattern in application code",
+        "action": "update_application",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "dual-write functionality",
+          "how": "run integration tests",
+          "expected": "write to both Memcached and Redis"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback application to previous version",
+          "safety_guard": "verify application functionality",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "data_transfer",
+        "description": "Transfer data from Memcached to Redis using Redis-Shake",
+        "action": "migrate_data",
+        "target": "Redis",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dual write setup is verified",
+            "fact": "dual_write_verified",
+            "established_by": "dual_write_setup",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "cache data consistency",
+          "how": "run cache verification scripts",
+          "expected": "all keys migrated without loss"
+        },
+        "rollback": {
+          "trigger": "data transfer fails",
+          "action": "restore from Memcached backup",
+          "safety_guard": "verify backup integrity",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitoring_setup",
+        "description": "Set up monitoring dashboards in Grafana",
+        "action": "configure_monitoring",
+        "target": "Grafana",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data transfer is verified",
+            "fact": "data_transfer_verified",
+            "established_by": "data_transfer",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "monitoring functionality",
+          "how": "check Grafana dashboards",
+          "expected": "all dashboards are operational"
+        },
+        "rollback": {
+          "trigger": "monitoring setup fails",
+          "action": "revert to previous monitoring setup",
+          "safety_guard": "ensure accurate monitoring",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover_preparation",
+        "description": "Prepare for switch over to Redis reads",
+        "action": "validate_setup",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Monitoring setup is complete",
+            "fact": "monitoring_operational",
+            "established_by": "monitoring_setup",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application read pattern",
+          "how": "monitor read logs",
+          "expected": "100% reads from Memcached before cutover"
+        },
+        "rollback": {
+          "trigger": "validation fails",
+          "action": "revert to Memcached reads",
+          "safety_guard": "ensure application stability",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover_execution",
+        "description": "Execute cutover to Redis for reads",
+        "action": "switch_reads",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Cutover preparation is validated",
+            "fact": "cutover_preparation_verified",
+            "established_by": "cutover_preparation",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "read hit rates",
+          "how": "validate Grafana metrics",
+          "expected": "cache hit rates > 95%"
+        },
+        "rollback": {
+          "trigger": "cutover issues arise",
+          "action": "switch back to Memcached",
+          "safety_guard": "ensure no data loss",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "decommission_memcached",
+        "description": "Decommission the Memcached cluster",
+        "action": "shutdown_cluster",
+        "target": "Memcached",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Cutover execution is verified",
+            "fact": "cutover_execution_verified",
+            "established_by": "cutover_execution",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Memcached shutdown verification",
+          "how": "check cluster status",
+          "expected": "cluster is completely shut down"
+        },
+        "rollback": {
+          "trigger": "decommissioning issues arise",
+          "action": "restore Memcached cluster",
+          "safety_guard": "verify data integrity",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "dual_write_setup",
+        "to_task": "data_transfer",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "data_transfer",
+        "to_task": "monitoring_setup",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitoring_setup",
+        "to_task": "cutover_preparation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover_preparation",
+        "to_task": "cutover_execution",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover_execution",
+        "to_task": "decommission_memcached",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plan-db-08-redis-migration-r3:3:dual_write_setup:rollback_state_undeclared",
+      "task_id": "dual_write_setup",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'dual_write_setup' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-db-08-redis-migration-r3:3:data_transfer:rollback_state_undeclared",
+      "task_id": "data_transfer",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'data_transfer' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-db-08-redis-migration-r3:3:cutover_preparation:rollback_state_undeclared",
+      "task_id": "cutover_preparation",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'cutover_preparation' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-db-08-redis-migration-r3:3:cutover_execution:rollback_state_undeclared",
+      "task_id": "cutover_execution",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'cutover_execution' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-db-08-redis-migration-r3:3:dual_write_setup:rollback_state_undeclared",
+      "task_id": "dual_write_setup",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'dual_write_setup' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-db-08-redis-migration-r3:3:data_transfer:rollback_state_undeclared",
+      "task_id": "data_transfer",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'data_transfer' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-db-08-redis-migration-r3:3:cutover_preparation:rollback_state_undeclared",
+      "task_id": "cutover_preparation",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'cutover_preparation' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-db-08-redis-migration-r3:3:cutover_execution:rollback_state_undeclared",
+      "task_id": "cutover_execution",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'cutover_execution' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:cutover_execution",
+      "task_id": "cutover_execution",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Cutover execution task is dependent on cutover preparation but does not validate that the application is still in a safe state to switch to Redis reads.",
+      "suggested_fix": "Add an additional validation step before cutover execution to ensure application stability and readiness for the cutover.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:decommission_memcached",
+      "task_id": "decommission_memcached",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Decommission Memcached task depends on cutover execution being verified, but does not validate that cache hit rates are above 95% after cutover.",
+      "suggested_fix": "Ensure that decommissioning of Memcached only occurs after validation of cache hit rates and application performance post-cutover.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-08-redis-migration:3:3",
+    "plan_id": "plan-db-08-redis-migration-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:cutover_execution",
+    "question": "Plan for goal 'db-08-redis-migration' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

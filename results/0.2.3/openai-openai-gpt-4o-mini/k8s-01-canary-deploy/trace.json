@@ -1,0 +1,416 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-01-canary-deploy",
+  "duration_seconds": 80.67,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-k8s-01-canary-deploy-r4",
+    "goal_id": "k8s-01-canary-deploy",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-k8s-01-canary-deploy-r3",
+    "created_at": "2026-08-29T21:38:51.410542Z",
+    "tasks": [
+      {
+        "id": "check_cluster_health",
+        "description": "Verify that the Kubernetes cluster is in a healthy state",
+        "action": "check",
+        "target": "cluster health",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "cluster health status",
+          "how": "kubectl get nodes",
+          "expected": "all nodes are ready"
+        },
+        "rollback": {
+          "trigger": "cluster health check fails",
+          "action": "notify operator",
+          "safety_guard": "ensure operator informed",
+          "restores_state": [
+            "alert generated"
+          ],
+          "restoration_evidence": "confirm alert logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "setup_canary",
+        "description": "Set up the canary deployment for the new version of the web service",
+        "action": "create",
+        "target": "canary deployment",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kubernetes cluster is healthy",
+            "fact": "cluster_healthy",
+            "established_by": "check_cluster_health",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "canary deployment exists",
+          "how": "kubectl get deployments",
+          "expected": "canary deployment listed"
+        },
+        "rollback": {
+          "trigger": "canary deployment setup fails",
+          "action": "delete canary deployment",
+          "safety_guard": "verify canary deployment does not exist",
+          "restores_state": [
+            "no canary deployment exists"
+          ],
+          "restoration_evidence": "verify canary not listed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "health_check_5",
+        "description": "Perform health checks at 5% traffic",
+        "action": "check",
+        "target": "canary service health",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary deployment exists",
+            "fact": "canary_deployment_exists",
+            "established_by": "setup_canary",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "canary service health",
+          "how": "check health endpoint",
+          "expected": "healthy response"
+        },
+        "rollback": {
+          "trigger": "health checks fail",
+          "action": "revert traffic to 0% for canary",
+          "safety_guard": "verify traffic is at 0%",
+          "restores_state": [
+            "traffic is at 0%"
+          ],
+          "restoration_evidence": "kubectl get virtualservice"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "ramp_traffic_5",
+        "description": "Ramp traffic to 5% for canary version",
+        "action": "update",
+        "target": "VirtualService",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "health checks completed and verified at 5% traffic",
+            "fact": "health_check_5_verified",
+            "established_by": "health_check_5",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic distribution",
+          "how": "kubectl get virtualservice",
+          "expected": "5% traffic to canary"
+        },
+        "rollback": {
+          "trigger": "health checks fail",
+          "action": "revert traffic to 0% for canary",
+          "safety_guard": "verify traffic is at 0%",
+          "restores_state": [
+            "traffic is at 0%"
+          ],
+          "restoration_evidence": "kubectl get virtualservice"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor_errors",
+        "description": "Monitor 5xx error rates",
+        "action": "monitor",
+        "target": "error rates",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "5xx error rate",
+          "how": "check logs and metrics",
+          "expected": "< 1% over a 2-minute window"
+        },
+        "rollback": {
+          "trigger": "error rate exceeds threshold",
+          "action": "rollback deployment",
+          "safety_guard": "verify previous stable version is running",
+          "restores_state": [
+            "previous stable version is running"
+          ],
+          "restoration_evidence": "check deployment history"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "ramp_traffic_50",
+        "description": "Ramp traffic to 50% for canary version",
+        "action": "update",
+        "target": "VirtualService",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "health checks completed and verified at 5% traffic",
+            "fact": "health_check_5_verified",
+            "established_by": "health_check_5",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic distribution",
+          "how": "kubectl get virtualservice",
+          "expected": "50% traffic to canary"
+        },
+        "rollback": {
+          "trigger": "health checks fail",
+          "action": "revert traffic to 5% for canary",
+          "safety_guard": "verify traffic is at 5%",
+          "restores_state": [
+            "traffic is at 5%"
+          ],
+          "restoration_evidence": "kubectl get virtualservice"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "health_check_50",
+        "description": "Perform health checks at 50% traffic",
+        "action": "check",
+        "target": "canary service health",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "traffic is at 50% for canary",
+            "fact": "traffic_at_50",
+            "established_by": "ramp_traffic_50",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "canary service health",
+          "how": "check health endpoint",
+          "expected": "healthy response"
+        },
+        "rollback": {
+          "trigger": "health checks fail",
+          "action": "revert traffic to 5% for canary",
+          "safety_guard": "verify traffic is at 5%",
+          "restores_state": [
+            "traffic is at 5%"
+          ],
+          "restoration_evidence": "kubectl get virtualservice"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "ramp_traffic_100",
+        "description": "Ramp traffic to 100% for canary version",
+        "action": "update",
+        "target": "VirtualService",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "health checks completed and verified at 50% traffic",
+            "fact": "health_check_50_verified",
+            "established_by": "health_check_50",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic distribution",
+          "how": "kubectl get virtualservice",
+          "expected": "100% traffic to canary"
+        },
+        "rollback": {
+          "trigger": "health checks fail",
+          "action": "revert traffic to 50% for canary",
+          "safety_guard": "verify traffic is at 50%",
+          "restores_state": [
+            "traffic is at 50%"
+          ],
+          "restoration_evidence": "kubectl get virtualservice"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "health_check_100",
+        "description": "Perform health checks at 100% traffic",
+        "action": "check",
+        "target": "canary service health",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "traffic is at 100% for canary",
+            "fact": "traffic_at_100",
+            "established_by": "ramp_traffic_100",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "canary service health",
+          "how": "check health endpoint",
+          "expected": "healthy response"
+        },
+        "rollback": {
+          "trigger": "health checks fail",
+          "action": "revert traffic to 50% for canary",
+          "safety_guard": "verify traffic is at 50%",
+          "restores_state": [
+            "traffic is at 50%"
+          ],
+          "restoration_evidence": "kubectl get virtualservice"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_cluster_health",
+        "to_task": "setup_canary",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_canary",
+        "to_task": "ramp_traffic_5",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "ramp_traffic_5",
+        "to_task": "health_check_5",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "health_check_5",
+        "to_task": "monitor_errors",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "monitor_errors",
+        "to_task": "ramp_traffic_50",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "ramp_traffic_50",
+        "to_task": "health_check_50",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "health_check_50",
+        "to_task": "ramp_traffic_100",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "ramp_traffic_100",
+        "to_task": "health_check_100",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "ordering_sane:plan-k8s-01-canary-deploy-r4:4:ramp_traffic_5",
+      "task_id": "health_check_5",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "blocker",
+      "reason_code": "unsafe_ordering",
+      "message": "task 'health_check_5' is ordered before its hard dependency 'ramp_traffic_5'",
+      "suggested_fix": "Reorder the plan so task 'health_check_5' appears after 'ramp_traffic_5'",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": "ramp_traffic_5->health_check_5",
+      "observed_state": "task 'health_check_5' at position 2 appears before dependency 'ramp_traffic_5' at position 3",
+      "evidence_refs": [
+        "hard_dep:ramp_traffic_5->health_check_5"
+      ],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "verification_ordering:plan-k8s-01-canary-deploy-r4:4:health_check_5:ramp_traffic_5",
+      "task_id": "health_check_5",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "blocker",
+      "reason_code": "verification_after_consumer",
+      "message": "task 'health_check_5' consumes the state produced by high-risk task 'ramp_traffic_5' without waiting for its verification point",
+      "suggested_fix": "Order task 'health_check_5' after 'ramp_traffic_5''s verification (or move it out of parallel group None)",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": "ramp_traffic_5->health_check_5",
+      "observed_state": "consumer 'health_check_5' runs at position 2 while producer 'ramp_traffic_5''s verification is at position 3",
+      "evidence_refs": [
+        "hard_dep:ramp_traffic_5->health_check_5"
+      ],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-01-canary-deploy:4:4",
+    "plan_id": "plan-k8s-01-canary-deploy-r4",
+    "version": 4,
+    "blocker_finding_id": "ordering_sane:plan-k8s-01-canary-deploy-r4:4:ramp_traffic_5",
+    "question": "Plan for goal 'k8s-01-canary-deploy' cannot be approved: blockers remain (unsafe_ordering; verification_after_consumer). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=9"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

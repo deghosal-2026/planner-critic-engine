@@ -1,0 +1,270 @@
+{
+  "dimension": "core-api",
+  "goal_id": "data-06-cdc-rebuild",
+  "duration_seconds": 17.25,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-data-06-cdc-rebuild-r2",
+    "goal_id": "data-06-cdc-rebuild",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "data-06-cdc-rebuild",
+    "created_at": "2026-08-29T21:43:20.923076Z",
+    "tasks": [
+      {
+        "id": "identify_lag",
+        "description": "Identify the cause of replication lag due to consumer outage",
+        "action": "check",
+        "target": "replication lag source",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "lag source identified",
+          "how": "log review",
+          "expected": "consumer outage"
+        },
+        "rollback": {
+          "trigger": "fail to identify cause",
+          "action": "revert to previous state",
+          "safety_guard": "validate downtime duration",
+          "restores_state": [
+            "previous lag state"
+          ],
+          "restoration_evidence": "log of previous state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "capture_wal_position",
+        "description": "Capture current WAL position to resume from",
+        "action": "capture",
+        "target": "WAL position",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "WAL position",
+          "how": "check WAL logs",
+          "expected": "current position logged"
+        },
+        "rollback": {
+          "trigger": "capture fails",
+          "action": "retry capturing WAL position",
+          "safety_guard": "ensure valid WAL position",
+          "restores_state": [
+            "previous WAL position"
+          ],
+          "restoration_evidence": "log of recent WAL captures"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "replay_changes",
+        "description": "Replay missed changes from WAL archive",
+        "action": "replay",
+        "target": "update target system",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "WAL position has been captured",
+            "fact": "wal_position_captured",
+            "established_by": "capture_wal_position",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "changes replay completion",
+          "how": "query target state",
+          "expected": "target is updated without duplicates"
+        },
+        "rollback": {
+          "trigger": "replay causes duplicates",
+          "action": "rollback changes",
+          "safety_guard": "validate changes with source data",
+          "restores_state": [
+            "target state before replay"
+          ],
+          "restoration_evidence": "log of previous target state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_data_parity",
+        "description": "Verify data parity between source and target after replay",
+        "action": "verify",
+        "target": "data consistency",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "All previous tasks completed successfully",
+            "fact": "previous_tasks_successful",
+            "established_by": "replay_changes",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data parity",
+          "how": "compare records",
+          "expected": "data matches between source and target"
+        },
+        "rollback": {
+          "trigger": "parity check fails",
+          "action": "restore previous target state",
+          "safety_guard": "ensure backup integrity",
+          "restores_state": [
+            "previous target state"
+          ],
+          "restoration_evidence": "verified backup of target state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover_consumers",
+        "description": "Cutover consumers back to real-time CDC stream",
+        "action": "cutover",
+        "target": "data stream",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "successful cutover",
+          "how": "monitor consumer metrics",
+          "expected": "consumers are in real-time mode"
+        },
+        "rollback": {
+          "trigger": "cutover misses events",
+          "action": "switch back to replay",
+          "safety_guard": "ensure event log integrity",
+          "restores_state": [
+            "previous consumer state"
+          ],
+          "restoration_evidence": "log of missed events"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "identify_lag",
+        "to_task": "capture_wal_position",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "capture_wal_position",
+        "to_task": "replay_changes",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "replay_changes",
+        "to_task": "verify_data_parity",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_data_parity",
+        "to_task": "cutover_consumers",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:capture_wal_position",
+      "task_id": "capture_wal_position",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'capture_wal_position' depends on 'wal_position_captured', which is not verified as completed by a prior task. This may lead to executing this task without the necessary prerequisite.",
+      "suggested_fix": "Ensure that 'wal_position_captured' is established correctly and that 'capture_wal_position' runs only after it is verified.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:replay_changes",
+      "task_id": "replay_changes",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'replay_changes' is ordered before verifying that 'capture_wal_position' has permanently succeeded in capturing the WAL position. This could lead to a scenario where missed changes are replayed without having a confirmed WAL position.",
+      "suggested_fix": "Change the sequence so 'capture_wal_position' completes successfully before 'replay_changes' executes.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:cutover_consumers",
+      "task_id": "cutover_consumers",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'cutover_consumers' only switches back to replay if events are missed, which may not cover all failure scenarios. It lacks a comprehensive rollback strategy for all potential failure points during cutover.",
+      "suggested_fix": "Develop a more robust rollback plan that accounts for additional failure modes during cutover.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:data-06-cdc-rebuild:2:2",
+    "plan_id": "plan-data-06-cdc-rebuild-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unverified_dependencies:capture_wal_position",
+    "question": "Plan for goal 'data-06-cdc-rebuild' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

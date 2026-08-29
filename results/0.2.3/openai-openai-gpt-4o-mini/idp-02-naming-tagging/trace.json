@@ -1,0 +1,204 @@
+{
+  "dimension": "core-api",
+  "goal_id": "idp-02-naming-tagging",
+  "duration_seconds": 13.33,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-idp-02-naming-tagging-r2",
+    "goal_id": "idp-02-naming-tagging",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "idp-02-naming-tagging-plan",
+    "created_at": "2026-08-29T21:26:04.309703Z",
+    "tasks": [
+      {
+        "id": "set-tags",
+        "description": "Set corporate metadata tags for the RDS instance",
+        "action": "tag",
+        "target": "rds",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "tags applied",
+          "how": "describe rds instance",
+          "expected": "cost-center, team-ownership, environment tags present"
+        },
+        "rollback": {
+          "trigger": "tagging fails",
+          "action": "remove tags",
+          "safety_guard": "verify absence of unauthorized tags",
+          "restores_state": [
+            "tags removed"
+          ],
+          "restoration_evidence": "run describe rds instance to confirm no unauthorized tags present"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "provision-rds",
+        "description": "Provision the RDS PostgreSQL instance",
+        "action": "create",
+        "target": "rds",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "tags are successfully applied",
+            "fact": "tags_applied_successfully",
+            "established_by": "set-tags",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "rds instance status",
+          "how": "check rds status",
+          "expected": "available"
+        },
+        "rollback": {
+          "trigger": "provisioning fails",
+          "action": "destroy rds instance",
+          "safety_guard": "verify no resources left",
+          "restores_state": [
+            "no rds instance"
+          ],
+          "restoration_evidence": "confirm no rds instance exists in the account"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "set-tags",
+        "to_task": "provision-rds",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:provision-rds",
+      "task_id": "provision-rds",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'provision-rds' is ordered before the successful execution of its hard prerequisite 'set-tags'.",
+      "suggested_fix": "Ensure that 'provision-rds' only runs after 'set-tags' has successfully completed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:set-tags",
+      "task_id": "set-tags",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback procedure for 'set-tags' relies on verifying absence of unauthorized tags but does not define action if verification fails.",
+      "suggested_fix": "Add a remediation step in the rollback for 'set-tags' if unauthorized tags are still present after execution.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:provision-rds",
+      "task_id": "provision-rds",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The dependency on 'set-tags' for applying tags may not be fully verified if there are issues in the tagging step.",
+      "suggested_fix": "Add a verification step prior to 'provision-rds' to ensure tags are indeed applied, rather than relying on the existence of 'tags_applied_successfully'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:risk:set-tags",
+      "task_id": "set-tags",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "info",
+      "reason_code": "llm_risk",
+      "message": "The risk class for 'set-tags' is high, which could impact overall plan execution if not handled carefully.",
+      "suggested_fix": null,
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:risk:provision-rds",
+      "task_id": "provision-rds",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "info",
+      "reason_code": "llm_risk",
+      "message": "Risk class for 'provision-rds' is critical, indicating significant potential impact if it fails.",
+      "suggested_fix": null,
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:idp-02-naming-tagging:2:2",
+    "plan_id": "plan-idp-02-naming-tagging-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:provision-rds",
+    "question": "Plan for goal 'idp-02-naming-tagging' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=2"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

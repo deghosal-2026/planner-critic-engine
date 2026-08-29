@@ -1,0 +1,275 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-06-cis-remediation",
+  "duration_seconds": 15.65,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-ir-06-cis-remediation-r2",
+    "goal_id": "ir-06-cis-remediation",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "ir-06-cis-remediation-plan",
+    "created_at": "2026-08-29T21:28:48.829836Z",
+    "tasks": [
+      {
+        "id": "run_scan",
+        "description": "Run kube-bench to scan the EKS cluster",
+        "action": "scan",
+        "target": "EKS cluster",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kube-bench is installed",
+            "fact": "kube_bench_installed",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "EKS cluster is reachable",
+            "fact": "eks_cluster_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "categorize_findings",
+        "description": "Categorize scan findings into HIGH/MEDIUM/LOW severity",
+        "action": "categorize",
+        "target": "findings",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Scan has been completed",
+            "fact": "scan_completed",
+            "established_by": "run_scan",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "remediate_high_findings",
+        "description": "Remediate all HIGH severity findings",
+        "action": "remediate",
+        "target": "HIGH findings",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "resolved HIGH findings",
+          "how": "re-run scan",
+          "expected": "0 HIGH findings"
+        },
+        "rollback": {
+          "trigger": "remediation fails",
+          "action": "revert changes made during remediation",
+          "safety_guard": "verify initial configuration",
+          "restores_state": [
+            "initial state of HIGH findings"
+          ],
+          "restoration_evidence": "log of changes reverted"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "re_scan",
+        "description": "Re-scan to confirm all HIGH findings are resolved",
+        "action": "scan",
+        "target": "EKS cluster",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "scan results",
+          "how": "check findings",
+          "expected": "0 HIGH findings"
+        },
+        "rollback": {
+          "trigger": "scan fails",
+          "action": "restore previous cluster state",
+          "safety_guard": "verify cluster health",
+          "restores_state": [
+            "previous cluster state"
+          ],
+          "restoration_evidence": "snapshot of cluster state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "generate_report",
+        "description": "Generate PDF summary report of score changes",
+        "action": "generate",
+        "target": "report",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Re-scan completed successfully",
+            "fact": "re_scan_completed",
+            "established_by": "re_scan",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "report content",
+          "how": "review PDF for accuracy",
+          "expected": "report matches scan results"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "run_scan",
+        "to_task": "categorize_findings",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "categorize_findings",
+        "to_task": "remediate_high_findings",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "remediate_high_findings",
+        "to_task": "re_scan",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "re_scan",
+        "to_task": "generate_report",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:run_scan",
+      "task_id": "run_scan",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Kube-bench installation status is uncertain; unable to guarantee execution feasibility.",
+      "suggested_fix": "Verify that kube-bench is installed and accessible before running the scan.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:remediate_high_findings",
+      "task_id": "remediate_high_findings",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No prerequisites are listed for determining the scope of HIGH severity findings.",
+      "suggested_fix": "Add steps to assess which HIGH findings are actionable and outline remediation tasks required.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:remediate_high_findings",
+      "task_id": "remediate_high_findings",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback procedure for remediation may not restore the environment fully if partial changes are made.",
+      "suggested_fix": "Ensure rollback can fully revert to the last known good configuration, not just revert individual changes.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:re_scan",
+      "task_id": "re_scan",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback procedure does not account for changes made during remediation that may affect scan outcomes.",
+      "suggested_fix": "Review rollback to ensure it covers all necessary elements of the previous cluster state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:generate_report",
+      "task_id": "generate_report",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Report generation depends on re_scan but doesn't verify if remediation changes correctly influenced the scan results.",
+      "suggested_fix": "Ensure that the outcome of re_scan is verified before proceeding to generate the report.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

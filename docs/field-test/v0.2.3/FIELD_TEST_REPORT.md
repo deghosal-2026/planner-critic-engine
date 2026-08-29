@@ -4,7 +4,7 @@
 > **Provider:** OpenRouter `openai/gpt-4o-mini` (both planner and critic roles)
 > **Loop:** deterministic-first · revision_cap=4
 > **Coverage:** 183 of 183 goals across 43 domains · **Full corpus complete**
-> **Cost:** ~$0.05
+> **Cost:** ~$0.60
 > **Config:** `OPENROUTER_API_KEY` env var
 
 ---
@@ -140,8 +140,8 @@ Same four-phase approach as v0.2.2, with the addition of the Gate Canary as a pr
 | P0 — validate | `run-field.py --validate --all` | $0 | ~5 min |
 | P1 — deterministic pytest | `pytest tests/ -q --no-cov` | $0 | ~5 min |
 | P2 — subsystem hermetic + gate canary | `pytest tests/field_test/` + `plancritic gates canary --check` | $0 | ~1 min |
-| P3 — LLM goals sweep | `run-field.py --subsystem --all --run-llm --no-boundary` (×4 parallel batches) | ~$0.05 | ~2 hr |
-| P3 — boundary evaluator | `run-field.py --subsystem --all --run-llm --no-goals` | ~$0.01 | ~3 min |
+| P3 — LLM goals sweep | `run-field.py --subsystem --all --run-llm --no-boundary` (×4 parallel batches) | ~$0.55 | ~2 hr |
+| P3 — boundary evaluator | `run-field.py --subsystem --all --run-llm --no-goals` | ~$0.05 | ~3 min |
 | P3 — Docker integration | `PC_INTEGRATION=1 pytest tests/docker/` | $0 | ~2 min |
 
 ---

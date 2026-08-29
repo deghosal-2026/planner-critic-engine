@@ -1,0 +1,368 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-11-node-taint-specialized",
+  "duration_seconds": 22.86,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-k8s-11-node-taint-specialized-r2",
+    "goal_id": "k8s-11-node-taint-specialized",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plan-k8s-11-node-taint-specialized",
+    "created_at": "2026-08-29T21:44:35.148155Z",
+    "tasks": [
+      {
+        "id": "identify_gpu_nodes",
+        "description": "Identify GPU nodes in the EKS cluster",
+        "action": "get",
+        "target": "gpu nodes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EKS cluster is accessible",
+            "fact": "eks_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "identify_spot_nodes",
+        "description": "Identify spot instance nodes in the EKS cluster",
+        "action": "get",
+        "target": "spot nodes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EKS cluster is accessible",
+            "fact": "eks_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "apply_taints_gpu",
+        "description": "Apply taints to GPU nodes to prevent non-GPU workloads",
+        "action": "apply",
+        "target": "gpu nodes",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "taints on GPU nodes",
+          "how": "run kubectl describe nodes",
+          "expected": "taint exists: nvidia.com/gpu=true:NoSchedule"
+        },
+        "rollback": {
+          "trigger": "taint application fails",
+          "action": "remove taint from GPU nodes",
+          "safety_guard": "verify node conditions after rollback",
+          "restores_state": [
+            "no taint on GPU nodes"
+          ],
+          "restoration_evidence": "check nodes for absence of taint"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "apply_taints_spot",
+        "description": "Apply taints to spot instance nodes to prevent non-spot workloads",
+        "action": "apply",
+        "target": "spot nodes",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "taints on spot nodes",
+          "how": "run kubectl describe nodes",
+          "expected": "taint exists: spot=true:NoSchedule"
+        },
+        "rollback": {
+          "trigger": "taint application fails",
+          "action": "remove taint from spot nodes",
+          "safety_guard": "verify node conditions after rollback",
+          "restores_state": [
+            "no taint on spot nodes"
+          ],
+          "restoration_evidence": "check nodes for absence of taint"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update_workload_manifests",
+        "description": "Update workload manifests with appropriate tolerations and node selectors",
+        "action": "update",
+        "target": "workload manifests",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "workload manifests",
+          "how": "run kubectl apply",
+          "expected": "manifests include correct tolerations and node selectors"
+        },
+        "rollback": {
+          "trigger": "manifest update fails",
+          "action": "revert manifests to previous version",
+          "safety_guard": "verify previous workload state",
+          "restores_state": [
+            "previous version of manifests"
+          ],
+          "restoration_evidence": "check manifests for previous tolerations"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_non_gpu_eviction",
+        "description": "Verify that non-GPU workloads are evicted from GPU nodes",
+        "action": "check",
+        "target": "non-GPU workloads",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "non-GPU workload status",
+          "how": "run kubectl get pods",
+          "expected": "no non-GPU workloads on GPU nodes"
+        },
+        "rollback": {
+          "trigger": "incorrect eviction",
+          "action": "reapply tolerations to workloads",
+          "safety_guard": "monitor workload status",
+          "restores_state": [
+            "previous tolerations on workloads"
+          ],
+          "restoration_evidence": "check if workloads are tolerating again"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_spot_scheduling",
+        "description": "Verify spot workloads are only scheduled on spot nodes",
+        "action": "check",
+        "target": "spot workload scheduling",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "spot workload scheduling",
+          "how": "run kubectl get pods",
+          "expected": "all workloads scheduled on designated spot nodes"
+        },
+        "rollback": {
+          "trigger": "incorrect scheduling",
+          "action": "adjust tolerations of workloads",
+          "safety_guard": "monitor scheduling events",
+          "restores_state": [
+            "previous tolerations adjusted"
+          ],
+          "restoration_evidence": "check scheduling logs for correct tolerations"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor_scheduling_failures",
+        "description": "Monitor scheduling failures for workloads",
+        "action": "monitor",
+        "target": "scheduling events",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "monitoring system is active",
+            "fact": "prometheus_up",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "scheduling events",
+          "how": "check logs for failure events",
+          "expected": "log entries for any scheduling failures"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "identify_gpu_nodes",
+        "to_task": "apply_taints_gpu",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "identify_spot_nodes",
+        "to_task": "apply_taints_spot",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "apply_taints_gpu",
+        "to_task": "update_workload_manifests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "apply_taints_spot",
+        "to_task": "update_workload_manifests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_workload_manifests",
+        "to_task": "verify_non_gpu_eviction",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_workload_manifests",
+        "to_task": "verify_spot_scheduling",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_non_gpu_eviction",
+        "to_task": "monitor_scheduling_failures",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_spot_scheduling",
+        "to_task": "monitor_scheduling_failures",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:apply_taints_gpu",
+      "task_id": "apply_taints_gpu",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'apply_taints_gpu' is sequenced before the prerequisite task 'identify_gpu_nodes' is complete.",
+      "suggested_fix": "Ensure 'identify_gpu_nodes' completes before 'apply_taints_gpu'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:apply_taints_spot",
+      "task_id": "apply_taints_spot",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'apply_taints_spot' is sequenced before the prerequisite task 'identify_spot_nodes' is complete.",
+      "suggested_fix": "Ensure 'identify_spot_nodes' completes before 'apply_taints_spot'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:update_workload_manifests",
+      "task_id": "update_workload_manifests",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'update_workload_manifests' depends on taint application but does not verify its success before execution.",
+      "suggested_fix": "Add verification for successful completion of 'apply_taints_gpu' and 'apply_taints_spot' before 'update_workload_manifests'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:verify_non_gpu_eviction",
+      "task_id": "verify_non_gpu_eviction",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'verify_non_gpu_eviction' depends on 'update_workload_manifests' completion but does not verify that the manifests include correct tolerations and node selectors.",
+      "suggested_fix": "Add a verification step after 'update_workload_manifests' to verify the expected states before executing 'verify_non_gpu_eviction'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:verify_spot_scheduling",
+      "task_id": "verify_spot_scheduling",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'verify_spot_scheduling' depends on 'update_workload_manifests' completion but does not verify that the manifests include correct tolerations and node selectors.",
+      "suggested_fix": "Add a verification step after 'update_workload_manifests' to verify the expected states before executing 'verify_spot_scheduling'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

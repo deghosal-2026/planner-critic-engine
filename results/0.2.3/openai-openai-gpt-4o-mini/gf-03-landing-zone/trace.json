@@ -1,0 +1,321 @@
+{
+  "dimension": "core-api",
+  "goal_id": "gf-03-landing-zone",
+  "duration_seconds": 24.5,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-gf-03-landing-zone-r2",
+    "goal_id": "gf-03-landing-zone",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "gf-03-landing-zone",
+    "created_at": "2026-08-29T21:43:47.435373Z",
+    "tasks": [
+      {
+        "id": "create_org",
+        "description": "Create an AWS Organization",
+        "action": "create",
+        "target": "organizations",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "organization ID",
+          "how": "retrieve organization details",
+          "expected": "valid organization ID"
+        },
+        "rollback": {
+          "trigger": "organization creation fails",
+          "action": "notify admin and retry",
+          "safety_guard": "verify AWS service availability",
+          "restores_state": [
+            "organization not created"
+          ],
+          "restoration_evidence": "check organization list"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "create_accounts",
+        "description": "Create required accounts (audit, shared-services, prod)",
+        "action": "create",
+        "target": "accounts",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "account list",
+          "how": "list accounts",
+          "expected": "3 accounts created"
+        },
+        "rollback": {
+          "trigger": "account creation fails",
+          "action": "delete previously created accounts",
+          "safety_guard": "verify account status",
+          "restores_state": [
+            "accounts not created"
+          ],
+          "restoration_evidence": "check account list post-rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "setup_sso",
+        "description": "Set up AWS SSO with MFA enforcement",
+        "action": "configure",
+        "target": "sso",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "SSO configuration",
+          "how": "check SSO settings",
+          "expected": "MFA enabled and accessible"
+        },
+        "rollback": {
+          "trigger": "SSO setup fails",
+          "action": "remove SSO and restore previous access",
+          "safety_guard": "confirm access settings",
+          "restores_state": [
+            "previous SSO settings"
+          ],
+          "restoration_evidence": "review SSO configurations"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "apply_guardrails",
+        "description": "Apply guardrails with SCP policies",
+        "action": "apply",
+        "target": "guardrails",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "SCP policies",
+          "how": "list SCPs",
+          "expected": "all guardrails applied correctly"
+        },
+        "rollback": {
+          "trigger": "guardrail application fails",
+          "action": "remove guardrails",
+          "safety_guard": "verify previous SCP status",
+          "restores_state": [
+            "no guardrails applied"
+          ],
+          "restoration_evidence": "check SCP policies list"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_network",
+        "description": "Configure VPCs and Transit Gateway",
+        "action": "configure",
+        "target": "network",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "network setup",
+          "how": "test routing",
+          "expected": "correct Transit Gateway routing"
+        },
+        "rollback": {
+          "trigger": "network configuration fails",
+          "action": "delete VPCs and reconfigure",
+          "safety_guard": "verify network status",
+          "restores_state": [
+            "VPCs not configured"
+          ],
+          "restoration_evidence": "check routing status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_guardrails",
+        "description": "Verify that guardrails are enforced",
+        "action": "verify",
+        "target": "guardrails enforcement",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "enforcement status",
+          "how": "audit account activities",
+          "expected": "no violations detected"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "alert admin and reassess",
+          "safety_guard": "document enforcement results",
+          "restores_state": [
+            "guardrails verification incomplete"
+          ],
+          "restoration_evidence": "review audit logs for corrective actions"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "create_org",
+        "to_task": "create_accounts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_accounts",
+        "to_task": "setup_sso",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_sso",
+        "to_task": "apply_guardrails",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "apply_guardrails",
+        "to_task": "configure_network",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_network",
+        "to_task": "verify_guardrails",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:create_accounts",
+      "task_id": "create_accounts",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'create_accounts' is sequenced before verifying the organization creation, which is a hard prerequisite.",
+      "suggested_fix": "Reorder tasks to ensure 'create_org' is completed and verified before 'create_accounts'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:setup_sso",
+      "task_id": "setup_sso",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'setup_sso' depends on the successful creation of accounts, which is not verified before execution.",
+      "suggested_fix": "Add a verification step for 'create_accounts' before proceeding to 'setup_sso'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:apply_guardrails",
+      "task_id": "apply_guardrails",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'apply_guardrails' is dependent on the completion of 'setup_sso', which has unverified dependencies.",
+      "suggested_fix": "Ensure the successful verification of 'setup_sso' before executing 'apply_guardrails'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:configure_network",
+      "task_id": "configure_network",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'configure_network' relies on successful application of guardrails, which has unverified dependencies.",
+      "suggested_fix": "Add verification for 'apply_guardrails' before moving to 'configure_network'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:verify_guardrails",
+      "task_id": "verify_guardrails",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'verify_guardrails' requires confirmation that guardrails are applied, which has unverified dependencies.",
+      "suggested_fix": "Ensure 'configure_network' is successfully completed and verified before proceeding to 'verify_guardrails'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:gf-03-landing-zone:2:2",
+    "plan_id": "plan-gf-03-landing-zone-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:create_accounts",
+    "question": "Plan for goal 'gf-03-landing-zone' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}
