@@ -7,17 +7,17 @@
 [![PyPI](https://img.shields.io/badge/pypi-v0.2.3-blue)](https://pypi.org/project/planner-critic/)
 [![Ruff](https://img.shields.io/badge/code%20style-ruff-000000)](https://github.com/astral-sh/ruff)
 [![Type checked](https://img.shields.io/badge/mypy-strict-blue)](https://github.com/python/mypy)
-[![Coverage](https://img.shields.io/badge/coverage-91%25-brightgreen)](https://github.com/deghosal-2026/planner-critic-engine/actions)
+[![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen)](https://github.com/deghosal-2026/planner-critic-engine/actions)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14184/badge)](https://www.bestpractices.dev/projects/14184)
-[![Field Test](https://img.shields.io/badge/field%20test-183%20goals%2C%200%20failures-brightgreen)](docs/field-test/v0.2.2/field-test-results-0.2.2.md)
+[![Field Test](https://img.shields.io/badge/field%20test-183%20goals%2C%200%20failures-brightgreen)](docs/field-test/v0.2.3/FIELD_TEST_REPORT.md)
 
 **Hierarchical task planning with an independent LLM critic. A planner decomposes a goal into a structured plan; a critic audits every subtask; the plan is revised until approval — or escalated to a human.**
 
 </div>
 
 > [!NOTE]
-> **Status:** v0.2.2 released · [PyPI](https://pypi.org/project/planner-critic/) · `pip install planner-critic`
+> **Status:** v0.2.3 released · [PyPI](https://pypi.org/project/planner-critic/) · `pip install planner-critic`
 > **License:** MIT
 
 ---
@@ -57,30 +57,30 @@ The plan is a persisted, versioned artifact — you can diff revisions, see whic
 
 | Feature | Description | Added |
 |---------|-------------|-------|
-| **Risk tolerance** | `balanced` (findings are advisory warnings) or `strict` (zero tolerance, fail-closed) | v0.1.0 |
-| **Deterministic gates** | 7 injection-immune gates — ordering, branch-sanity, rollback, verification, preconditions, branch-tasks, high-risk completeness | v0.1.0 |
-| **Escalation management** | Human-in-the-loop with override, patch, and restart decisions | v0.1.0 |
-| **Convergence detection** | Early termination when the planner stops making progress — saves LLM calls | v0.1.0 |
-| **Provider registry** | Pluggable LLM providers (OpenRouter, OpenAI, oMLX, Ollama) via TOML config | v0.1.0 |
-| **StructuredEnforcer** | Retry mechanism for LLM JSON output — fail-closed after 3 retries | v0.1.0 |
-| **Plan versioning** | Every revision is a persisted artifact with diff support | v0.1.0 |
-| **Deterministic auto-repair** | Topological re-ordering + precondition closure — fixes ordering/dependency defects without LLM cost (#130, #131) | v0.2.0 |
-| **Oscillation detection** | Detects structural cycling and auto-converges (#152) | v0.2.0 |
-| **Domain Pack framework** | Domain-specific gate packs (SecOps, Supply Chain, FinOps, Data Eng) with `plancritic init --template` (#139, #140–143) | v0.2.0 |
-| **Policy-as-Code engine** | OPA/Rego + CEL policy evaluation — deterministic gates for custom compliance (#129, #156) | v0.2.0 |
-| **Security oracle** | SWE-bench-derived security corpus validates gates against human ground truth (#123–127) | v0.2.0 |
-| **Enterprise safety** | Dynamic posture, run budgets, state locking, precondition ledger, blast-radius quotas, secret/PII redaction (#149–151, #158, #159) | v0.2.0 |
-| **Developer surfaces** | `plancritic check`, `diagnose`, `domains`, `policy`, `templates` CLI + `@guardrail` decorator + seed Rego library (#137, #153, #162) | v0.2.0 |
-| **CI/CD integrations** | GitHub Action, GitLab CI template, AutoGen adapter, webhook notifier (#128, #134, #161) | v0.2.0 |
-| **Probe system** | Health probes for pre-execution precondition validation (DB, deploy, env, HTTP) | v0.2.0 |
-| **Drift observability** | Finding-drift detection — track how findings change across revisions (#181) | v0.2.0 |
-| **pytest plugin** | `pytest-planner-critic` — use gate assertions in your test suite (#156) | v0.2.0 |
-| **Frozen acceptance contract** | Bound pre-run; post-bind mutation creates new version + audit trail (#215) | v0.2.1 |
-| **Rollback credibility gate** | Detects unreachable / self-dependent / inconsistent-state / post-consumed rollbacks (#216) | v0.2.1 |
-| **Verification ordering gate** | Catches vacuous verifications — consumer runs before verified mutation (#219) | v0.2.1 |
-| **Histogram cycling detection** | Period-2 reshuffling stall signal — A→B→A→B pattern detection (#217) | v0.2.1 |
-| **Live-critic boundary evaluator** | Repeated-trial label-flip, evidence-drift, family-migration, underclaim metrics (#218) | v0.2.1 |
-| **Failure-mode register** | Intentional vs. needs-evidence assumptions register (14 rows) (#220) | v0.2.1 |
+| **Risk tolerance** | `balanced` (findings are advisory warnings) or `strict` (zero tolerance, fail-closed) | v0.2.2 |
+| **Deterministic gates** | 7 injection-immune gates — ordering, branch-sanity, rollback, verification, preconditions, branch-tasks, high-risk completeness | v0.2.2 |
+| **Escalation management** | Human-in-the-loop with override, patch, and restart decisions | v0.2.2 |
+| **Convergence detection** | Early termination when the planner stops making progress — saves LLM calls | v0.2.2 |
+| **Provider registry** | Pluggable LLM providers (OpenRouter, OpenAI, oMLX, Ollama) via TOML config | v0.2.2 |
+| **StructuredEnforcer** | Retry mechanism for LLM JSON output — fail-closed after 3 retries | v0.2.2 |
+| **Plan versioning** | Every revision is a persisted artifact with diff support | v0.2.2 |
+| **Deterministic auto-repair** | Topological re-ordering + precondition closure — fixes ordering/dependency defects without LLM cost (#130, #131) | v0.2.2 |
+| **Oscillation detection** | Detects structural cycling and auto-converges (#152) | v0.2.2 |
+| **Domain Pack framework** | Domain-specific gate packs (SecOps, Supply Chain, FinOps, Data Eng) with `plancritic init --template` (#139, #140–143) | v0.2.2 |
+| **Policy-as-Code engine** | OPA/Rego + CEL policy evaluation — deterministic gates for custom compliance (#129, #156) | v0.2.2 |
+| **Security oracle** | SWE-bench-derived security corpus validates gates against human ground truth (#123–127) | v0.2.2 |
+| **Enterprise safety** | Dynamic posture, run budgets, state locking, precondition ledger, blast-radius quotas, secret/PII redaction (#149–151, #158, #159) | v0.2.2 |
+| **Developer surfaces** | `plancritic check`, `diagnose`, `domains`, `policy`, `templates` CLI + `@guardrail` decorator + seed Rego library (#137, #153, #162) | v0.2.2 |
+| **CI/CD integrations** | GitHub Action, GitLab CI template, AutoGen adapter, webhook notifier (#128, #134, #161) | v0.2.2 |
+| **Probe system** | Health probes for pre-execution precondition validation (DB, deploy, env, HTTP) | v0.2.2 |
+| **Drift observability** | Finding-drift detection — track how findings change across revisions (#181) | v0.2.2 |
+| **pytest plugin** | `pytest-planner-critic` — use gate assertions in your test suite (#156) | v0.2.2 |
+| **Frozen acceptance contract** | Bound pre-run; post-bind mutation creates new version + audit trail (#215) | v0.2.2 |
+| **Rollback credibility gate** | Detects unreachable / self-dependent / inconsistent-state / post-consumed rollbacks (#216) | v0.2.2 |
+| **Verification ordering gate** | Catches vacuous verifications — consumer runs before verified mutation (#219) | v0.2.2 |
+| **Histogram cycling detection** | Period-2 reshuffling stall signal — A→B→A→B pattern detection (#217) | v0.2.2 |
+| **Live-critic boundary evaluator** | Repeated-trial label-flip, evidence-drift, family-migration, underclaim metrics (#218) | v0.2.2 |
+| **Failure-mode register** | Intentional vs. needs-evidence assumptions register (14 rows) (#220) | v0.2.2 |
 | **Runtime precondition verification** | On by default; coverage honesty, fail-closed path (#244) | v0.2.2 |
 | **Typed rollback contracts** | Declarative restored-state + restoration-evidence on RollbackStep (#245) | v0.2.2 |
 | **Requirement-traceability gate** | Every plan step traces back to an acceptance criterion (#255) | v0.2.2 |
@@ -94,6 +94,11 @@ The plan is a persisted, versioned artifact — you can diff revisions, see whic
 | **Critic satisfaction signals** | Strict mode approves when critic explicitly endorses (#254) | v0.2.2 |
 | **Adaptive revision cap** | Strict goals cap at 1 revision to save LLM calls (#251) | v0.2.2 |
 | **Failure-origin taxonomy** | 51 bugs classified by first-detectable layer (#264) | v0.2.2 |
+| **DecisionContext population** | Model id, version, temperature, timestamp from provider spec (#298) | v0.2.3 |
+| **Transit-integrity check** | Numeric/boolean fields survive redaction (F-20, #296) | v0.2.3 |
+| **approving_authority enforcement** | PermissionError from CLI/HTTP/MCP (F-14, #297) | v0.2.3 |
+| **Deterministic Gate Canary** | 10 gate fixtures, `plancritic gates canary --check` (#278) | v0.2.3 |
+| **Frozen-Claim Protocol** | Denominator completeness, artifact freeze, determinism boundaries (#279) | v0.2.3 |
 
 ### What It Is Not
 
@@ -177,7 +182,7 @@ See [API Reference](docs/reference/api.md) for full CLI docs, HTTP endpoints, an
 
 170 goals across 40 domains, all run against a real LLM (gpt-4o-mini via OpenRouter):
 
-| Metric | v0.2.2 Result | v0.2.1 Result |
+| Metric | v0.2.3 Result | v0.2.2 Result |
 |--------|---------------|---------------|
 | Balanced goals approved | **73/73 (100%)** | **73/73 (100%)** |
 | Strict goals escalated | **96/97 (99%)** ⚠ 1 transient error | **96/97 (99%)** ⚠ 1 transient error |
@@ -188,7 +193,7 @@ See [API Reference](docs/reference/api.md) for full CLI docs, HTTP endpoints, an
 | Benchmarks | **5** | **3** |
 | **Scorecard A** | **PASS** | **PASS** |
 
-Full results: [field-test-results-0.2.2.md](docs/field-test/v0.2.2/field-test-results-0.2.2.md) | [v0.2.1 results](docs/field-test/v0.2.1/field-test-results-0.2.1.md)
+Full results: [FIELD_TEST_REPORT.md](docs/field-test/v0.2.3/FIELD_TEST_REPORT.md) | [v0.2.2 results](docs/field-test/v0.2.2/field-test-results-0.2.2.md)
 
 ---
 
@@ -196,16 +201,10 @@ Full results: [field-test-results-0.2.2.md](docs/field-test/v0.2.2/field-test-re
 
 | Doc | Path | Contents |
 |-----|------|----------|
-| **Field Test Results v0.2.2** | [results](docs/field-test/v0.2.2/field-test-results-0.2.2.md) | BLUF, regression diff, per-goal data, scorecards, blocker analysis |
-| **Field Test Results v0.2.1** | [results](docs/field-test/v0.2.1/field-test-results-0.2.1.md) | v0.2.1 results for reference |
-| **Field Test Results v0.2.0** | [results](docs/field-test/v0.2.0/field-test-results-0.2.0.md) | v0.2.0 results for reference |
-| **Field Test Results v0.1.0** | [results](docs/field-test/v0.1.0/field-test-results-0.1.0.md) | v0.1.0 results for reference |
+| **Field Test Results v0.2.2** | [results](docs/field-test/v0.2.3/FIELD_TEST_REPORT.md) | BLUF, regression diff, per-goal data, scorecards, blocker analysis |
 | **Field Test Plan** | [plan](docs/field-test/README.md) | Corpus, invariant assertions, execution guide |
 | **Release Notes v0.2.3** | [release-notes](docs/reference/release-notes-v0.2.3.md) | What's new, M1 fixes, field test results |
 | **Release Notes v0.2.2** | [release-notes](docs/reference/release-notes-v0.2.2.md) | What's new, M1-M5 changes, field test results |
-| **Release Notes v0.2.1** | [release-notes](docs/reference/release-notes-v0.2.1.md) | What's new, hardening, field test results |
-| **Release Notes v0.2.0** | [release-notes](docs/reference/release-notes-v0.2.0.md) | v0.2.0 release notes for reference |
-| **Release Notes v0.1.0** | [release-notes](docs/reference/release-notes-v0.1.0.md) | v0.1.0 release notes for reference |
 
 | **API Reference** | [api](docs/reference/api.md) | CLI cheat-sheet, HTTP endpoints, MCP tools |
 | **Gate Canary CLI** | [gates-canary](docs/reference/cli-gates-canary.md) | `plancritic gates canary` subcommand reference |
@@ -220,8 +219,6 @@ Full results: [field-test-results-0.2.2.md](docs/field-test/v0.2.2/field-test-re
 | **Integration Surfaces Design** | [integration](docs/design/integration-surfaces-design.md) | CI runners, AutoGen, notifier |
 | **Security** | [security](SECURITY.md) | Security policy, OWASP, OpenSSF |
 | **WBS Index (v0.2.2)** | [wbs](docs/wbs/v0.2.2/wbs-v0.2.2-index.md) | Milestone overview, dependency graph, M1-M6 |
-| **WBS Index (v0.2.1)** | [wbs](docs/wbs/v0.2.1/wbs-v0.2.1-index.md) | v0.2.1 WBS for reference |
-| **WBS Index (v0.2.0)** | [wbs](docs/wbs/v0.2.0/wbs-v0.2.0-index.md) | v0.2.0 WBS for reference |
 
 ---
 
