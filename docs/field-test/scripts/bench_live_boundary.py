@@ -36,14 +36,15 @@ from pathlib import Path
 from typing import Any
 
 from planner_critic.eval.label_migration import generate_boundary_cases
-from planner_critic.eval.live_boundary import run_live_boundary_cases
+from planner_critic.eval.live_boundary import DecisionContext, run_live_boundary_cases
 from planner_critic.redaction import SecretsRedactor
 from planner_critic.schema.goal import Goal, RiskTolerance
 
 API_KEY = os.environ.get("OPENROUTER_API_KEY")
 MLX_API_KEY = os.environ.get("MLX_API_KEY", "omlx-test")
 
-SCRIPTS_DIR = Path(__file__).resolve().parent          # docs/field-test/scripts
+SCRIPTS_DIR = Path(__file__).resolve().parent  # docs/field-test/scripts
+
 
 def _find_repo_root() -> Path:
     """Walk up from ``SCRIPTS_DIR`` until we find ``pyproject.toml``."""
@@ -53,6 +54,7 @@ def _find_repo_root() -> Path:
             return here
         here = here.parent
     raise RuntimeError(f"cannot find repo root above {SCRIPTS_DIR}")
+
 
 REPO_ROOT = _find_repo_root()
 RESULTS_DIR = REPO_ROOT / "results" / "0.2.2"
@@ -87,7 +89,7 @@ _BOUNDARY_GOAL = Goal(
 class _StubCritic:
     """Hermetic stand-in for ``--self-test``: deterministic blocker on plan_b."""
 
-    def audit(self, plan: Any, findings: list) -> list:  # noqa: ANN401
+    def audit(self, plan: Any, findings: list) -> list:
         from planner_critic.types import Finding, HeuristicFamily, Severity
 
         return [
@@ -103,18 +105,16 @@ class _StubCritic:
         ]
 
 
-def build_provider(provider_name: str | None = None) -> tuple[Any, str]:
-    """Resolve a live critic provider + a human-readable model label.
+def build_provider(provider_name: str | None = None) -> tuple[Any, str, str, float | None]:
+    """Resolve a live critic provider + model label + model version + temperature.
 
     Args:
         provider_name: ``"openai"`` or ``"omlx"`` for known configs; None
             falls back to plancritic.toml or LLM_* env vars.
 
     Returns:
-        (provider, model_label) where provider is an LLMProvider-ready object.
-
-    Raises:
-        RuntimeError: if no provider can be configured.
+        (provider, model_label, model_version, temperature) where provider is
+        an LLMProvider-ready object.
     """
     from planner_critic.llm.registry import ProviderRegistry
     from planner_critic.llm.transport_openai import OpenAICompatibleProvider
@@ -129,6 +129,8 @@ def build_provider(provider_name: str | None = None) -> tuple[Any, str]:
                 api_key=spec["api_key"],
             ),
             spec["model"],
+            "",
+            None,
         )
 
     toml_path = REPO_ROOT / "plancritic.toml"
@@ -136,7 +138,7 @@ def build_provider(provider_name: str | None = None) -> tuple[Any, str]:
         registry = ProviderRegistry.load(toml_path)
         if "critic" in registry.roles:
             spec = registry.providers[registry.roles["critic"]]
-            return registry.get_provider("critic"), spec.model
+            return registry.get_provider("critic"), spec.model, spec.model_version, spec.temperature
 
     base_url = os.environ.get("LLM_BASE_URL", "").strip()
     model = os.environ.get("LLM_MODEL", "").strip()
@@ -155,15 +157,21 @@ def build_provider(provider_name: str | None = None) -> tuple[Any, str]:
             api_key=api_key,
         ),
         model,
+        "",
+        None,
     )
 
 
-def build_live_critic(provider_name: str | None = None) -> tuple[Any, str]:
-    """Build a live LLMCritic bound to the boundary goal + provider."""
+def build_live_critic(provider_name: str | None = None) -> tuple[Any, str, str, float | None]:
+    """Build a live LLMCritic bound to the boundary goal + provider.
+
+    Returns:
+        (critic, model_label, model_version, temperature)
+    """
     from planner_critic.critique.critic import LLMCritic
 
-    provider, model = build_provider(provider_name)
-    return LLMCritic(_BOUNDARY_GOAL, provider), model
+    provider, model, model_version, temperature = build_provider(provider_name)
+    return LLMCritic(_BOUNDARY_GOAL, provider), model, model_version, temperature
 
 
 def _markdown_summary(report: dict, model: str, trials: int, elapsed_s: float) -> str:
@@ -203,13 +211,20 @@ def _markdown_summary(report: dict, model: str, trials: int, elapsed_s: float) -
     return "\n".join(lines)
 
 
-def run_boundary(critic: Any, *, trials: int = 5, model: str = "stub") -> dict:
+def run_boundary(
+    critic: Any,
+    *,
+    trials: int = 5,
+    model: str = "stub",
+    decision_context: DecisionContext | None = None,
+) -> dict:
     """Run the boundary cases through ``critic`` and write report artifacts.
 
     Args:
         critic: Any CriticRole (live LLMCritic or a stub for self-test).
         trials: Repetitions per plan.
         model: Model label for the markdown header.
+        decision_context: Metadata about the critic model for attribution.
 
     Returns:
         The report dict (also written to results/0.2.2/).
@@ -218,7 +233,9 @@ def run_boundary(critic: Any, *, trials: int = 5, model: str = "stub") -> dict:
     cases = generate_boundary_cases()
     print(f"Running {len(cases)} boundary cases × {trials} trials × 2 plans...")
     start = time.time()
-    report = run_live_boundary_cases(critic, cases=cases, trials=trials)
+    report = run_live_boundary_cases(
+        critic, cases=cases, trials=trials, decision_context=decision_context
+    )
     elapsed = time.time() - start
     report["model"] = model  # type: ignore[assignment]
 
@@ -296,8 +313,18 @@ def main(argv: list[str]) -> None:
         if arg == "--provider" and i + 1 < len(argv):
             provider = argv[i + 1]
 
-    critic, model = build_live_critic(provider_name=provider)
-    run_boundary(critic, trials=trials, model=model_label or model)
+    import datetime
+    import hashlib
+
+    critic, model, model_version, temperature = build_live_critic(provider_name=provider)
+    ctx = DecisionContext(
+        model_id=model,
+        model_version=model_version,
+        temperature=temperature if temperature is not None else 0.0,
+        system_prompt_hash=hashlib.sha256(b"boundary-critic-prompt-v1").hexdigest()[:16],
+        timestamp=datetime.datetime.now(datetime.UTC).isoformat(),
+    )
+    run_boundary(critic, trials=trials, model=model_label or model, decision_context=ctx)
 
 
 if __name__ == "__main__":
