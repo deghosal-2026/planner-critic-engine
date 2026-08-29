@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from planner_critic.redaction import RedactMode, SecretsRedactor
+import pytest
+
+from planner_critic.redaction import IntegrityFailure, RedactMode, SecretsRedactor, verify_transit_integrity
 
 
 class TestSecretsRedactor:
@@ -103,3 +105,84 @@ class TestSecretsRedactor:
         data = {"tasks": [{"name": "auth", "key": "AKIAIOSFODNN7EXAMPLE"}]}
         result = redactor.redact_dict(data)
         assert "[REDACTED_SECRET]" in result["tasks"][0]["key"]
+
+
+class TestTransitIntegrity:
+    """Transit-integrity check for redaction layer (#296, F-20)."""
+
+    def test_numeric_fields_survive_redaction(self) -> None:
+        """Numeric fields must remain unchanged after redact_dict."""
+        redactor = SecretsRedactor()
+        data = {
+            "label_flip_rate": 0.033,
+            "count": 42,
+            "ratio": 0.5,
+            "name": "safe text",
+        }
+        redacted = redactor.redact_dict(data)
+        violations = verify_transit_integrity(data, redacted)
+        assert len(violations) == 0
+
+    def test_boolean_fields_survive_redaction(self) -> None:
+        """Boolean fields must remain unchanged."""
+        redactor = SecretsRedactor()
+        data = {"active": True, "verified": False, "name": "test"}
+        redacted = redactor.redact_dict(data)
+        violations = verify_transit_integrity(data, redacted)
+        assert len(violations) == 0
+
+    def test_nested_numeric_fields_survive(self) -> None:
+        """Nested dicts with numeric fields must survive."""
+        redactor = SecretsRedactor()
+        data = {"results": {"score": 0.95, "count": 100, "label": "safe"}}
+        redacted = redactor.redact_dict(data)
+        violations = verify_transit_integrity(data, redacted)
+        assert len(violations) == 0
+
+    def test_detects_numeric_corruption(self) -> None:
+        """Transit-integrity check catches numeric corruption."""
+        original = {"score": 0.033}
+        redacted_bad = {"score": 0.0}
+        with pytest.raises(IntegrityFailure) as exc:
+            verify_transit_integrity(original, redacted_bad)
+        assert "0.033" in str(exc.value)
+
+    def test_strict_mode_detects_string_change_without_placeholder(self) -> None:
+        """Strict mode flags string changes that don't contain a placeholder."""
+        original = {"name": "hello world"}
+        redacted = {"name": "goodbye world"}
+        with pytest.raises(IntegrityFailure) as exc:
+            verify_transit_integrity(original, redacted, strict=True)
+        assert "name" in str(exc.value)
+
+    def test_strict_mode_allows_redacted_placeholder(self) -> None:
+        """Strict mode allows string changes that contain redaction placeholders."""
+        original = {"secret": "my key is AKIAIOSFODNN7EXAMPLE"}
+        redactor = SecretsRedactor()
+        redacted = redactor.redact_dict(original)
+        violations = verify_transit_integrity(original, redacted, strict=True)
+        assert len(violations) == 0
+
+    def test_detects_missing_key(self) -> None:
+        """Transit-integrity check catches missing keys."""
+        original = {"score": 0.5, "name": "test"}
+        redacted = {"score": 0.5}
+        with pytest.raises(IntegrityFailure) as exc:
+            verify_transit_integrity(original, redacted)
+        assert "name" in str(exc.value)
+
+    def test_redact_dict_preserves_int_type(self) -> None:
+        """redact_dict preserves int types (does not convert to float)."""
+        redactor = SecretsRedactor()
+        data = {"count": 0, "items": 42}
+        redacted = redactor.redact_dict(data)
+        assert isinstance(redacted["count"], int)
+        assert isinstance(redacted["items"], int)
+
+    def test_redact_dict_preserves_bool_type(self) -> None:
+        """redact_dict preserves bool types (does not convert to int)."""
+        redactor = SecretsRedactor()
+        data = {"is_active": True, "is_deleted": False}
+        redacted = redactor.redact_dict(data)
+        assert redacted["is_active"] is True
+        assert redacted["is_deleted"] is False
