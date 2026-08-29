@@ -14,9 +14,9 @@
 
 | M# | Name | GitHub milestone | Issues | Status |
 |----|------|------------------|--------|--------|
-| **M1** | Corrections + Features | v0.2.3-M1 | [#278](https://github.com/deghosal-2026/planner-critic-engine/issues/278), [#279](https://github.com/deghosal-2026/planner-critic-engine/issues/279), [#296](https://github.com/deghosal-2026/planner-critic-engine/issues/296), [#297](https://github.com/deghosal-2026/planner-critic-engine/issues/297), [#298](https://github.com/deghosal-2026/planner-critic-engine/issues/298) | Planned |
-| **M2** | Field Test | v0.2.3-M2 | [#281–#289](https://github.com/deghosal-2026/planner-critic-engine/issues/281) | Planned |
-| **M3** | Release Readiness | v0.2.3-M3 | [#290–#295](https://github.com/deghosal-2026/planner-critic-engine/issues/290) | Planned |
+| **M1** | Corrections + Features | v0.2.3-M1 | [#278](https://github.com/deghosal-2026/planner-critic-engine/issues/278), [#279](https://github.com/deghosal-2026/planner-critic-engine/issues/279), [#296](https://github.com/deghosal-2026/planner-critic-engine/issues/296), [#297](https://github.com/deghosal-2026/planner-critic-engine/issues/297), [#298](https://github.com/deghosal-2026/planner-critic-engine/issues/298) | ✅ Complete |
+| **M2** | Field Test | v0.2.3-M2 | [#281–#289](https://github.com/deghosal-2026/planner-critic-engine/issues/281) | ✅ Complete |
+| **M3** | Release Readiness | v0.2.3-M3 | [#290–#295](https://github.com/deghosal-2026/planner-critic-engine/issues/290) | 🔄 In progress |
 
 ## 2. Dependency Graph
 
