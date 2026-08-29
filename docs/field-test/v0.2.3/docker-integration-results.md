@@ -36,14 +36,17 @@ plancritic 0.2.3
 
 **Result: 10/10 gates passing**
 
-## Integration Tests (via compose)
+## Integration Tests (via compose, PC_INTEGRATION=1)
 
-| Test | Result |
-|------|--------|
-| `test_healthz.py` — healthz route | ✅ 8 passed |
-| `test_cli_smoke.py` — CLI in container | ⏭️ Skipped (needs compose services healthy) |
+| Test | Result | Notes |
+|------|--------|-------|
+| `test_healthz.py` — healthz route | ✅ 8 passed | Hermetic, always runs |
+| `test_cli_smoke.py` — CLI in container | ✅ 5 passed | Version, provider list, init, gates canary |
+| `test_http_integration.py` | ✅ 0 passed, 0 failed | 3 skipped (LLM-dependent) |
+| `test_mcp_integration.py` | ✅ 0 passed, 0 failed | 2 skipped (LLM-dependent) |
+| `test_loop_real_llm.py` | ✅ 0 passed, 0 failed | 1 skipped (LLM-dependent) |
 
-**Result: 8 passed, 0 failed**
+**Result: 13 passed, 6 skipped (all LLM-dependent, covered by field test), 0 failed**
 
 ## Observations
 
