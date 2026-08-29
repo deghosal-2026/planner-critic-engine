@@ -136,18 +136,40 @@ Execution order: #309 plan → #282 corpus → #310 fixtures → #311 scripts �
 - [ ] Learnings documented
 - [ ] Code review completed
 
-## 5. M3 — Release Readiness (#290–#295)
+## 5. M3 — Release Readiness (#290–#295, #317–#327)
 
-Strict sequential order: #290 docs → #291 packaging → #292 tags → #293 quality gate → #294 security → #295 tests.
+> **Expanded from v0.2.2:** Security scans now include bandit + gitleaks + truffleHog + pip-audit. Coverage gate > 90%. Lint gate (ruff + mypy strict). Full docs sweep. Vault article updates and dev.to publishing for all unblocked articles.
 
-| Issue | Scope | Gate to close |
-|-------|-------|---------------|
-| [#290](https://github.com/deghosal-2026/planner-critic-engine/issues/290) | Docs sweep — README, CHANGELOG, release notes, API reference, learnings | All docs current; no stale-doc contradictions; failure-mode register updated with M1 changes |
-| [#291](https://github.com/deghosal-2026/planner-critic-engine/issues/291) | Packaging & PyPI release — build, dist, Dockerfile pin, upload | Dist builds clean; Dockerfile pinned to v0.2.3; PyPI v0.2.3 live; pip install verified |
-| [#292](https://github.com/deghosal-2026/planner-critic-engine/issues/292) | Release tags and milestone closure — git tag, GitHub release, close milestones | Git tag v0.2.3; GitHub release published; all v0.2.3 milestones closed |
-| [#293](https://github.com/deghosal-2026/planner-critic-engine/issues/293) | Closure — final quality gate: lint strict, coverage > 90%, merge to main | Code review on full diff; ruff + mypy strict clean; coverage > 90%; all test suites green (deterministic + Docker + field test); merged to main |
-| [#294](https://github.com/deghosal-2026/planner-critic-engine/issues/294) | Security scan — truffleHog, dependency audit, secret detection | truffleHog clean; pip-audit clean; secret detection pass; no new vulnerabilities introduced |
-| [#295](https://github.com/deghosal-2026/planner-critic-engine/issues/295) | All tests passing — full deterministic suite + field test confirmed green | Full deterministic suite 100% pass; field test 0 true failures; Docker integration green |
+Strict sequential order: security scans → tests + coverage + lint → docs sweep → vault/articles → packaging → release tags → merge.
+
+| Issue | Title | Scope | Gate to close |
+|-------|-------|-------|---------------|
+| [#317](https://github.com/deghosal-2026/planner-critic-engine/issues/317) | Security scan — bandit static analysis | bandit on src/ and scripts/ | 0 new high-severity issues |
+| [#318](https://github.com/deghosal-2026/planner-critic-engine/issues/318) | Security scan — gitleaks secret detection | gitleaks on repo (exclude results/) | 0 verified secrets in committed code |
+| [#319](https://github.com/deghosal-2026/planner-critic-engine/issues/319) | Security scan — truffleHog, dependency audit | truffleHog filesystem + pip-audit | 0 verified secrets; 0 new dependency vulns |
+| [#320](https://github.com/deghosal-2026/planner-critic-engine/issues/320) | All tests passing — deterministic, Docker, field test | Full test suite across all dimensions | 100% pass; Docker green; field test 0 true failures |
+| [#321](https://github.com/deghosal-2026/planner-critic-engine/issues/321) | Coverage gate — test coverage > 90% | pytest-cov across src/ | > 90% line coverage; gap analysis if below |
+| [#322](https://github.com/deghosal-2026/planner-critic-engine/issues/322) | Lint gate — ruff + mypy strict clean | ruff check + mypy strict | Zero errors on v0.2.3 changes |
+| [#323](https://github.com/deghosal-2026/planner-critic-engine/issues/323) | Docs sweep — README, CHANGELOG, release notes, API, failure-modes, CLI | All 6 doc files updated | No stale contradictions; cross-references consistent |
+| [#326](https://github.com/deghosal-2026/planner-critic-engine/issues/326) | Update published articles in vault and dev.to with v0.2.3 findings | 4 planner-critic articles unblocked; vault updated; dev.to banners added | PUBLISH BLOCKED notes removed; v0.2.3 banners added; vault committed to main |
+| [#324](https://github.com/deghosal-2026/planner-critic-engine/issues/324) | Packaging & PyPI release — build, dist, Dockerfile pin, upload | sdist + wheel + Dockerfile + PyPI | pip install adversarial-debate==0.2.3 verified |
+| [#325](https://github.com/deghosal-2026/planner-critic-engine/issues/325) | Release tags and milestone closure — git tag, GitHub release | git tag v0.2.3 + GitHub release + close milestones | All milestones closed; announcement drafted |
+| [#327](https://github.com/deghosal-2026/planner-critic-engine/issues/327) | Closure — final quality gate: merge to main | code review + all checks + merge | feature-v0.2.3 merged to main; branch deleted |
+
+### M3 Exit Gate
+
+- [ ] All 11 issues closed
+- [ ] All 4 security scans clean (bandit, gitleaks, truffleHog, pip-audit)
+- [ ] All 3 test gates pass (deterministic 100%, Docker green, field test 0 true failures)
+- [ ] Coverage > 90%
+- [ ] Lint strict clean (ruff + mypy)
+- [ ] All docs current (README, CHANGELOG, release notes, API, failure-modes, CLI)
+- [ ] All 4 blocked articles updated and unblocked on dev.to
+- [ ] Vault committed to main
+- [ ] PyPI v0.2.3 live
+- [ ] GitHub release v0.2.3 published
+- [ ] feature-v0.2.3 merged to main
+- [ ] feature-v0.2.3 branch deleted
 
 ## 6. Global Exit Gates (every milestone)
 
