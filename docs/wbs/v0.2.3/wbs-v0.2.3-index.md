@@ -30,13 +30,74 @@ M1 (Corrections + Features)  ── fixes F-20, F-14, DecisionContext + Gate Can
 
 Scope: three community-raised correction issues from the dev.to series, plus the planned Gate Canary and Frozen-Claim Protocol. Each ships with tests.
 
-| Issue | Title | Deliverable | Success Criterion | Source |
-|-------|-------|-------------|-------------------|--------|
-| [#278](https://github.com/deghosal-2026/planner-critic-engine/issues/278) | Deterministic Gate Canary | Per-gate health check for each blocker class | `plancritic gates canary --check` exits 1 on any silent regression; 10 canary fixtures; integrated into eval sweep | [Artjoms Stukans](https://dev.to/artyomsv/comment/3dlpo) |
-| [#279](https://github.com/deghosal-2026/planner-critic-engine/issues/279) | Extended Frozen-Claim Protocol | Denominator completeness, artifact selection, determinism boundaries | Documentation complete; protocol extended per spec | — |
-| [#296](https://github.com/deghosal-2026/planner-critic-engine/issues/296) | F-20 — Deterministic-corruption blind spot | Transit-integrity check; redaction layer validated | Output JSON fields match pre-redaction values modulo known patterns; failure register updated | [Antonio Lopes Correia](https://dev.to/tonal/comment/3dmlo) |
-| [#297](https://github.com/deghosal-2026/planner-critic-engine/issues/297) | F-14 regression — approving_authority dormant on all shipped surfaces | approving_authority bound from stored AcceptanceContract on all 3 surfaces; MCP server passes principal | PermissionError fires from CLI/HTTP/MCP; F-14 status back to Closed | [Antonio Lopes Correia](https://dev.to/tonal/comment/3dmll) |
-| [#298](https://github.com/deghosal-2026/planner-critic-engine/issues/298) | DecisionContext metadata not populated | DecisionContext populated with real values from registry/transport | Trial records have model_id, version, temperature, prompt hash, tool-schema hash; convention documented | [Peter](https://dev.to/peterbuildssecure/comment/3dml0) |
+### #278 — Deterministic Gate Canary
+
+| Dimension | Details |
+|-----------|---------|
+| **Tests needed** | 10 canary `(good_plan, bad_plan)` fixtures in `tests/canary/` (one per gate class); `test_canary_check.py` — verifies `--check` exits 1 on deliberate gate break; `test_canary_report.py` — verifies `--report` JSON format; `test_canary_integration.py` — verifies eval sweep appends canary results; `test_canary_ci.py` — regression-detection precision test (break each gate, confirm canary catches it); CI integration test for canary fixture rot detection |
+| **Docs to update** | `docs/reference/cli.md` — `plancritic gates canary` subcommand; `docs/field-test/v0.2.3/field-test-results.md` — canary results format; `CHANGELOG.md`; `docs/reference/release-notes-v0.2.3.md` |
+| **Source** | [Artjoms Stukans](https://dev.to/artyomsv/comment/3dlpo) |
+
+### #279 — Extended Frozen-Claim Protocol
+
+| Dimension | Details |
+|-----------|---------|
+| **Tests needed** | `test_release_verify_strict.py` — validates denominator completeness, artifact selection freeze, determinism boundary annotations; test that existing frozen-claim protocol backward-compatible; test that `plancritic release verify --strict` rejects missing determinism annotation |
+| **Docs to update** | `docs/release/release-protocol.md` — denominator completeness requirement, artifact selection freeze, determinism boundary documentation; `docs/field-test/v0.2.3/field-test-plan.md` — updated template sections; `CHANGELOG.md` |
+
+### #296 — F-20 Deterministic-Corruption Blind Spot
+
+| Dimension | Details |
+|-----------|---------|
+| **Tests needed** | `test_transit_integrity.py` — boundary evaluator transit-integrity check; test that redaction does not corrupt numeric JSON fields; test that output JSON fields match pre-redaction values modulo known redaction patterns; test that redaction touching a wrong field causes evaluator failure |
+| **Docs to update** | `docs/reference/failure-modes.md` (already done — F-20 row added); design note in `docs/design/` — deterministic silence vs non-deterministic noise failure class distinction; `CHANGELOG.md` |
+| **Source** | [Antonio Lopes Correia](https://dev.to/tonal/comment/3dmlo) |
+
+### #297 — F-14 Regression (approving_authority)
+
+| Dimension | Details |
+|-----------|---------|
+| **Tests needed** | `test_authority_cli.py` — end-to-end PermissionError from CLI entry point; `test_authority_http.py` — end-to-end PermissionError from HTTP entry point; `test_authority_mcp.py` — end-to-end PermissionError from MCP entry point (both mcp_tools and mcp.py wrapper); `test_shared_escalation_manager.py` — shared helper function routes approving_authority correctly; `test_mcp_principal.py` — MCP tool schemas include principal and handlers forward it |
+| **Docs to update** | `docs/reference/failure-modes.md` — F-14 status back to Closed; `docs/reference/api.md` — approving_authority documented on CLI/HTTP/MCP surfaces; `CHANGELOG.md` |
+| **Source** | [Antonio Lopes Correia](https://dev.to/tonal/comment/3dmll) |
+
+### #298 — DecisionContext Not Populated
+
+| Dimension | Details |
+|-----------|---------|
+| **Tests needed** | `test_decision_context_populated.py` — stub critic test verifying DecisionContext in trial record comes from harness call parameters, not from critic response; test that when provider transport records model info in response, it's stored as separate `response_model_id` field |
+| **Docs to update** | `docs/design/decision-context.md` — convention documentation that DecisionContext fields must be sourced from harness's own call parameters; `docs/reference/api.md` — DecisionContext parameters on boundary evaluator; `CHANGELOG.md` |
+| **Source** | [Peter](https://dev.to/peterbuildssecure/comment/3dml0) |
+
+### M1 Issue Summary
+
+| Issue | Title | Parent | Tests | Docs | Status |
+|-------|-------|--------|-------|------|--------|
+| [#278](https://github.com/deghosal-2026/planner-critic-engine/issues/278) | Deterministic Gate Canary | — | 10 canary fixtures + 4 test files | CLI docs + field test report | 🔄 Open |
+| [#299](https://github.com/deghosal-2026/planner-critic-engine/issues/299) | Tests — Gate Canary fixtures and integration | #278 | 4 test files | — | 🔄 Open |
+| [#304](https://github.com/deghosal-2026/planner-critic-engine/issues/304) | Docs — CLI reference for Gate Canary | #278 | — | cli.md | 🔄 Open |
+| [#279](https://github.com/deghosal-2026/planner-critic-engine/issues/279) | Extended Frozen-Claim Protocol | — | 3 test files | Release protocol + field test plan | 🔄 Open |
+| [#303](https://github.com/deghosal-2026/planner-critic-engine/issues/303) | Tests — Frozen-Claim Protocol strict mode | #279 | 1 test file | — | 🔄 Open |
+| [#308](https://github.com/deghosal-2026/planner-critic-engine/issues/308) | Docs — release protocol additions | #279 | — | release-protocol.md | 🔄 Open |
+| [#296](https://github.com/deghosal-2026/planner-critic-engine/issues/296) | F-20 — Deterministic-corruption | — | 3 test files | Failure-mode register + design note | 🔄 Open |
+| [#300](https://github.com/deghosal-2026/planner-critic-engine/issues/300) | Tests — F-20 transit-integrity check | #296 | 1 test file | — | 🔄 Open |
+| [#305](https://github.com/deghosal-2026/planner-critic-engine/issues/305) | Docs — deterministic silence design note | #296 | — | design note | 🔄 Open |
+| [#297](https://github.com/deghosal-2026/planner-critic-engine/issues/297) | F-14 regression — approving_authority | — | 5 test files | Failure-mode register + API docs | 🔄 Open |
+| [#301](https://github.com/deghosal-2026/planner-critic-engine/issues/301) | Tests — F-14 enforcement on all surfaces | #297 | 5 test files | — | 🔄 Open |
+| [#307](https://github.com/deghosal-2026/planner-critic-engine/issues/307) | Docs — API reference updates | #297, #298 | — | api.md | 🔄 Open |
+| [#298](https://github.com/deghosal-2026/planner-critic-engine/issues/298) | DecisionContext population | — | 2 test files | Design convention doc + API docs | 🔄 Open |
+| [#302](https://github.com/deghosal-2026/planner-critic-engine/issues/302) | Tests — DecisionContext population | #298 | 1 test file | — | 🔄 Open |
+| [#306](https://github.com/deghosal-2026/planner-critic-engine/issues/306) | Docs — DecisionContext sourcing convention | #298 | — | design/decision-context.md | 🔄 Open |
+
+### M1 Exit Gate
+
+- [ ] All 15 issues closed (5 parent + 10 sub-tasks)
+- [ ] 17+ new tests passing (all deterministic, zero LLM calls)
+- [ ] All 6 docs files updated (failure-modes, CLI, API, release-protocol, design note, CHANGELOG)
+- [ ] Ruff clean, mypy strict clean
+- [ ] Full existing test suite green
+- [ ] Code review completed
+- [ ] Merged to `feature-v0.2.3`
 
 ## 4. M2 — Field Test (#281–#289)
 
