@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
-[![PyPI](https://img.shields.io/badge/pypi-v0.2.2-blue)](https://pypi.org/project/planner-critic/)
+[![PyPI](https://img.shields.io/badge/pypi-v0.2.3-blue)](https://pypi.org/project/planner-critic/)
 [![Ruff](https://img.shields.io/badge/code%20style-ruff-000000)](https://github.com/astral-sh/ruff)
 [![Type checked](https://img.shields.io/badge/mypy-strict-blue)](https://github.com/python/mypy)
 [![Coverage](https://img.shields.io/badge/coverage-91%25-brightgreen)](https://github.com/deghosal-2026/planner-critic-engine/actions)
