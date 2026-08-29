@@ -1,0 +1,346 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-09-root-credential-rotation",
+  "duration_seconds": 37.93,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-ir-09-root-credential-rotation-r3",
+    "goal_id": "ir-09-root-credential-rotation",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-ir-09-root-credential-rotation-r2",
+    "created_at": "2026-08-29T21:30:24.248115Z",
+    "tasks": [
+      {
+        "id": "revoke-credentials",
+        "description": "Revoke all compromised credentials immediately.",
+        "action": "revoke",
+        "target": "AWS root account and GitHub admin token",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "compromised credentials are identified",
+            "fact": "credentials_leak_identified",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "status of revoked credentials",
+          "how": "check AWS/GitHub admin console",
+          "expected": "credentials are marked as revoked"
+        },
+        "rollback": {
+          "trigger": "revoke action fails",
+          "action": "restore compromised credentials from backup",
+          "safety_guard": "verify restoration is successful",
+          "restores_state": [
+            "previous credentials restored"
+          ],
+          "restoration_evidence": "log of restored credentials"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "rotate-credentials",
+        "description": "Rotate all dependent credentials (IAM keys, OAuth tokens, service accounts).",
+        "action": "rotate",
+        "target": "all dependent credentials",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "revoke-credentials task completed",
+            "fact": "credentials_revoked",
+            "established_by": "revoke-credentials",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "functionality of services using new credentials",
+          "how": "run service health checks",
+          "expected": "all services function as expected"
+        },
+        "rollback": {
+          "trigger": "rotation fails",
+          "action": "revert to previous credentials",
+          "safety_guard": "ensure no service disruption",
+          "restores_state": [
+            "previously functional credentials"
+          ],
+          "restoration_evidence": "service health logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "audit-logs",
+        "description": "Audit CloudTrail and GitHub audit logs for unauthorized actions.",
+        "action": "audit",
+        "target": "CloudTrail and GitHub audit logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "rotate-credentials task completed",
+            "fact": "dependent_credentials_rotated",
+            "established_by": "rotate-credentials",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "unauthorized actions detected",
+          "how": "compare audit logs against known good state",
+          "expected": "no unauthorized actions found"
+        },
+        "rollback": {
+          "trigger": "discrepancies found",
+          "action": "reassess audit data",
+          "safety_guard": "document audit findings",
+          "restores_state": [
+            "audit records before discrepancies"
+          ],
+          "restoration_evidence": "audit review document"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "identify-revert-changes",
+        "description": "Identify and revert any unauthorized changes.",
+        "action": "revert",
+        "target": "unauthorized changes",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "audit-logs completed",
+            "fact": "log_audit_completed",
+            "established_by": "audit-logs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "system state after reversion",
+          "how": "conduct state comparison",
+          "expected": "system matches known good configuration"
+        },
+        "rollback": {
+          "trigger": "reversion fails",
+          "action": "restore from backup",
+          "safety_guard": "verify backup integrity",
+          "restores_state": [
+            "state before unauthorized changes"
+          ],
+          "restoration_evidence": "backup integrity report"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-dependent-services",
+        "description": "Verify all dependent services still function with new credentials.",
+        "action": "verify",
+        "target": "dependent services",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "unauthorized changes reverted",
+            "fact": "unauthorized_changes_reverted",
+            "established_by": "identify-revert-changes",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service status",
+          "how": "run automated tests",
+          "expected": "all services operational"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "revert to last known good credentials",
+          "safety_guard": "ensure services are functional",
+          "restores_state": [
+            "last known good state of services"
+          ],
+          "restoration_evidence": "service operational logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "implement-preventive-controls",
+        "description": "Implement preventive controls: MFA enforcement and credential scanning.",
+        "action": "implement",
+        "target": "MFA and credential scanner settings",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "verify-dependent-services completed",
+            "fact": "dependent_services_verified",
+            "established_by": "verify-dependent-services",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "preventive controls status",
+          "how": "check MFA settings and scanner configuration",
+          "expected": "MFA enforced and scanner operational"
+        },
+        "rollback": {
+          "trigger": "implementation fails",
+          "action": "restore previous security settings",
+          "safety_guard": "ensure service continuity",
+          "restores_state": [
+            "previous security configurations"
+          ],
+          "restoration_evidence": "configuration snapshot"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "revoke-credentials",
+        "to_task": "rotate-credentials",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "rotate-credentials",
+        "to_task": "audit-logs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "audit-logs",
+        "to_task": "identify-revert-changes",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "identify-revert-changes",
+        "to_task": "verify-dependent-services",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-dependent-services",
+        "to_task": "implement-preventive-controls",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:feasibility:audit-logs",
+      "task_id": "audit-logs",
+      "version": 3,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The task 'audit-logs' depends on 'dependent_credentials_rotated', which cannot be guaranteed immediately after revocation of credentials.",
+      "suggested_fix": "Ensure that the rotation of credentials is completed before starting the audit of logs.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:identify-revert-changes",
+      "task_id": "identify-revert-changes",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'identify-revert-changes' is sequenced before its prerequisite task 'audit-logs' is completed, which may lead to unnecessary reversion of changes.",
+      "suggested_fix": "Reorder the tasks to ensure 'audit-logs' is completed before 'identify-revert-changes' begins.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:verify-dependent-services",
+      "task_id": "verify-dependent-services",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'verify-dependent-services' depends on 'unauthorized_changes_reverted', a fact that may not be reliably established by 'identify-revert-changes'.",
+      "suggested_fix": "Ensure that changes are verified before relying on them in 'verify-dependent-services'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:weak_rollback:implement-preventive-controls",
+      "task_id": "implement-preventive-controls",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'implement-preventive-controls' lacks a sound method for restoring previous configurations if the implementation fails.",
+      "suggested_fix": "Add a robust rollback plan that ensures the state can revert to pre-implementation with clear restoration steps.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-09-root-credential-rotation:3:3",
+    "plan_id": "plan-ir-09-root-credential-rotation-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:feasibility:audit-logs",
+    "question": "Plan for goal 'ir-09-root-credential-rotation' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

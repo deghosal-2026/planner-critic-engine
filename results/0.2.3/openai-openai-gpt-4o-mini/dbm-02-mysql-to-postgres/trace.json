@@ -1,0 +1,302 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dbm-02-mysql-to-postgres",
+  "duration_seconds": 28.12,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-dbm-02-mysql-to-postgres-r2",
+    "goal_id": "dbm-02-mysql-to-postgres",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "dbm-02-mysql-to-postgres-v1",
+    "created_at": "2026-08-29T21:33:56.519125Z",
+    "tasks": [
+      {
+        "id": "setup_replication",
+        "description": "Set up a replication bridge from MySQL to PostgreSQL",
+        "action": "setup_replication",
+        "target": "MySQL/PostgreSQL",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "MySQL is accessible",
+            "fact": "mysql_healthy",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "PostgreSQL is accessible",
+            "fact": "postgres_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replication lag",
+          "how": "monitor replication status",
+          "expected": "0 lag"
+        },
+        "rollback": {
+          "trigger": "replication setup fails",
+          "action": "revert to previous configuration",
+          "safety_guard": "ensure no data loss during revert",
+          "restores_state": [
+            "replication bridge"
+          ],
+          "restoration_evidence": "verify that replication is not active"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "schema_conversion",
+        "description": "Perform schema diff and conversion",
+        "action": "convert_schema",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "schema compatibility",
+          "how": "run schema validation scripts",
+          "expected": "no errors"
+        },
+        "rollback": {
+          "trigger": "schema conversion fails",
+          "action": "restore original schema",
+          "safety_guard": "validate data integrity before restore",
+          "restores_state": [
+            "original schema"
+          ],
+          "restoration_evidence": "confirm schema match with backup"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "dual_write",
+        "description": "Run dual-write period to both databases",
+        "action": "dual_write",
+        "target": "MySQL/PostgreSQL",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Schema conversion is successful",
+            "fact": "schema_converted",
+            "established_by": "schema_conversion",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data written to both databases",
+          "how": "compare write logs of both databases",
+          "expected": "identical entries in both logs"
+        },
+        "rollback": {
+          "trigger": "dual write fails",
+          "action": "halt dual write operations",
+          "safety_guard": "ensure consistency in both databases",
+          "restores_state": [
+            "single write to MySQL"
+          ],
+          "restoration_evidence": "verify that no further data is lost"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "reconciliation",
+        "description": "Run reconciliation for row counts and checksums",
+        "action": "reconcile_data",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dual-write is completed",
+            "fact": "dual_write_completed",
+            "established_by": "dual_write",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover",
+        "description": "Execute cutover with CHECK constraint exposure",
+        "action": "execute_cutover",
+        "target": "PostgreSQL",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Reconciliation is successful",
+            "fact": "reconciliation_successful",
+            "established_by": "reconciliation",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data integrity and constraints",
+          "how": "run CHECK constraints validation",
+          "expected": "no violations"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "fail back to MySQL",
+          "safety_guard": "replay writes accurately",
+          "restores_state": [
+            "MySQL operational state"
+          ],
+          "restoration_evidence": "check for data loss during rollback"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup_replication",
+        "to_task": "schema_conversion",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "schema_conversion",
+        "to_task": "dual_write",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dual_write",
+        "to_task": "reconciliation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "reconciliation",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:setup_replication",
+      "task_id": "setup_replication",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Ensure MySQL and PostgreSQL are both truly accessible before proceeding with replication setup, as failure to confirm database health makes the task not achievable in a production environment.",
+      "suggested_fix": "Implement checks to confirm database accessibility beyond the environmental fact.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:cutover",
+      "task_id": "cutover",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for cutover lacks specificity on how to accurately replay writes to avoid data inconsistencies after a failback to MySQL.",
+      "suggested_fix": "Detail the steps to capture and accurately replay writes to ensure data integrity during rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:reconciliation",
+      "task_id": "reconciliation",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding verification steps for row counts and checksums during reconciliation to ensure data consistency.",
+      "suggested_fix": "Incorporate a verification step to compare row counts and checksums between MySQL and PostgreSQL.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:risk:dual_write",
+      "task_id": "dual_write",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Monitor closely for replication lag during dual write to prevent data loss.",
+      "suggested_fix": "Define a mechanism to handle potential replication lag during dual-write operations.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:schema_conversion",
+      "task_id": "schema_conversion",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Schema conversion must be completed before dual-write; ensure no schema changes occur after this to maintain data integrity.",
+      "suggested_fix": "Reassess task order to ensure schema conversion is completed and verified before any dual-write begins.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

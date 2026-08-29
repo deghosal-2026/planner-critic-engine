@@ -4,7 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
-[![PyPI](https://img.shields.io/badge/pypi-v0.2.2-blue)](https://pypi.org/project/planner-critic/)
+[![PyPI](https://img.shields.io/badge/pypi-v0.2.3-blue)](https://pypi.org/project/planner-critic/)
 [![Ruff](https://img.shields.io/badge/code%20style-ruff-000000)](https://github.com/astral-sh/ruff)
 [![Type checked](https://img.shields.io/badge/mypy-strict-blue)](https://github.com/python/mypy)
 [![Coverage](https://img.shields.io/badge/coverage-91%25-brightgreen)](https://github.com/deghosal-2026/planner-critic-engine/actions)
@@ -201,13 +201,18 @@ Full results: [field-test-results-0.2.2.md](docs/field-test/v0.2.2/field-test-re
 | **Field Test Results v0.2.0** | [results](docs/field-test/v0.2.0/field-test-results-0.2.0.md) | v0.2.0 results for reference |
 | **Field Test Results v0.1.0** | [results](docs/field-test/v0.1.0/field-test-results-0.1.0.md) | v0.1.0 results for reference |
 | **Field Test Plan** | [plan](docs/field-test/README.md) | Corpus, invariant assertions, execution guide |
+| **Release Notes v0.2.3** | [release-notes](docs/reference/release-notes-v0.2.3.md) | What's new, M1 fixes, field test results |
 | **Release Notes v0.2.2** | [release-notes](docs/reference/release-notes-v0.2.2.md) | What's new, M1-M5 changes, field test results |
 | **Release Notes v0.2.1** | [release-notes](docs/reference/release-notes-v0.2.1.md) | What's new, hardening, field test results |
 | **Release Notes v0.2.0** | [release-notes](docs/reference/release-notes-v0.2.0.md) | v0.2.0 release notes for reference |
 | **Release Notes v0.1.0** | [release-notes](docs/reference/release-notes-v0.1.0.md) | v0.1.0 release notes for reference |
-| **Architecture** | [architecture](docs/architecture/architecture-v0.1.0.md) | Component diagram, module map, data flow |
+
 | **API Reference** | [api](docs/reference/api.md) | CLI cheat-sheet, HTTP endpoints, MCP tools |
+| **Gate Canary CLI** | [gates-canary](docs/reference/cli-gates-canary.md) | `plancritic gates canary` subcommand reference |
+| **Frozen-Claim Release Protocol** | [release-protocol](docs/release/release-protocol.md) | Denominator completeness, artifact freeze, determinism boundaries |
 | **Design Decisions** | [decisions](docs/design/design-decisions.md) | DD-01..N decision records |
+| **Deterministic Silence Design Note** | [deterministic-silence](docs/design/deterministic-silence.md) | Why trusted layers need adversarial assertions (F-20) |
+| **DecisionContext Convention** | [decision-context](docs/design/decision-context.md) | Per-trial metadata sourcing rules (#298) |
 | **Domain Pack Design** | [domain-packs](docs/design/domain-pack-design.md) | Domain pack protocol, pack format, engine integration |
 | **Policy Engine Design** | [policy-engine](docs/design/policy-engine-design.md) | OPA/Rego/CEL integration |
 | **Enterprise Safety Design** | [enterprise-safety](docs/design/enterprise-safety-design.md) | Posture, budgets, state, ledger, quotas, redaction |

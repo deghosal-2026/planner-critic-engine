@@ -1,0 +1,363 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-08-ransomware-containment",
+  "duration_seconds": 25.07,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-ir-08-ransomware-containment-r2",
+    "goal_id": "ir-08-ransomware-containment",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plan-ir-08-v1",
+    "created_at": "2026-08-29T21:29:45.886004Z",
+    "tasks": [
+      {
+        "id": "isolate_server",
+        "description": "Isolate affected server from network",
+        "action": "disconnect",
+        "target": "affected_server",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "server shows signs of ransomware",
+            "fact": "server_encryption_signs",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "network status",
+          "how": "check connectivity",
+          "expected": "server is not reachable"
+        },
+        "rollback": {
+          "trigger": "isolation fails",
+          "action": "reconnect server",
+          "safety_guard": "verify server state",
+          "restores_state": [
+            "server connected to network"
+          ],
+          "restoration_evidence": "check network logs and server status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "snapshot_disk",
+        "description": "Take a forensic snapshot of the affected server's disk",
+        "action": "snapshot",
+        "target": "disk",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "server is isolated from network",
+            "fact": "server_isolated",
+            "established_by": "isolate_server",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "snapshot availability",
+          "how": "check snapshot logs",
+          "expected": "snapshot is present and complete"
+        },
+        "rollback": {
+          "trigger": "snapshot fails",
+          "action": "delete incomplete snapshot",
+          "safety_guard": "ensure disk integrity",
+          "restores_state": [
+            "disk state prior to snapshot"
+          ],
+          "restoration_evidence": "run disk integrity check before deletion"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "halt_propagation",
+        "description": "Identify and halt lateral propagation paths",
+        "action": "analyze_network",
+        "target": "network_paths",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "snapshot completed successfully",
+            "fact": "snapshot_completed",
+            "established_by": "snapshot_disk",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "network path status",
+          "how": "run network scan",
+          "expected": "no unauthorized connections found"
+        },
+        "rollback": {
+          "trigger": "analysis fails",
+          "action": "restore previous network settings",
+          "safety_guard": "validate network configuration",
+          "restores_state": [
+            "previous network settings restored"
+          ],
+          "restoration_evidence": "check network configuration logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_impact",
+        "description": "Verify no other systems are affected",
+        "action": "scan",
+        "target": "all_systems",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "lateral propagation halted",
+            "fact": "propagation_halted",
+            "established_by": "halt_propagation",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "system status",
+          "how": "run security scans",
+          "expected": "all systems healthy"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "alert security team",
+          "safety_guard": "ensure response team is engaged",
+          "restores_state": [
+            "alert sent to response team"
+          ],
+          "restoration_evidence": "check alert logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "restore_services",
+        "description": "Restore affected services from clean backups",
+        "action": "restore",
+        "target": "affected_services",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "all systems verified as healthy",
+            "fact": "impact_verified",
+            "established_by": "verify_impact",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service status",
+          "how": "check service health",
+          "expected": "services are operational"
+        },
+        "rollback": {
+          "trigger": "restore fails",
+          "action": "revert to previous version",
+          "safety_guard": "ensure backups are intact",
+          "restores_state": [
+            "previous version services restored"
+          ],
+          "restoration_evidence": "backup integrity check completed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_integrity",
+        "description": "Verify data integrity post-restore",
+        "action": "check_integrity",
+        "target": "restored_data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "services restored successfully",
+            "fact": "services_restored",
+            "established_by": "restore_services",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data integrity status",
+          "how": "run integrity checks",
+          "expected": "data matches known good"
+        },
+        "rollback": {
+          "trigger": "integrity check fails",
+          "action": "revert to backup",
+          "safety_guard": "cross-check with primary data",
+          "restores_state": [
+            "data reverted to backup state"
+          ],
+          "restoration_evidence": "verification logs of data integrity check"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "isolate_server",
+        "to_task": "snapshot_disk",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "snapshot_disk",
+        "to_task": "halt_propagation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "halt_propagation",
+        "to_task": "verify_impact",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_impact",
+        "to_task": "restore_services",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "restore_services",
+        "to_task": "verify_integrity",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:snapshot_disk",
+      "task_id": "snapshot_disk",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'snapshot_disk' is sequenced before the task 'isolate_server' which is a hard prerequisite.",
+      "suggested_fix": "Ensure 'isolate_server' is completed before 'snapshot_disk' is initiated.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:halt_propagation",
+      "task_id": "halt_propagation",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'halt_propagation' is sequenced before the task 'snapshot_disk' which is a hard prerequisite.",
+      "suggested_fix": "Ensure 'snapshot_disk' is completed before 'halt_propagation' is initiated.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:verify_impact",
+      "task_id": "verify_impact",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'verify_impact' is sequenced before the task 'halt_propagation' which is a hard prerequisite.",
+      "suggested_fix": "Ensure 'halt_propagation' is completed before 'verify_impact' is initiated.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:restore_services",
+      "task_id": "restore_services",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'restore_services' is sequenced before the task 'verify_impact' which is a hard prerequisite.",
+      "suggested_fix": "Ensure 'verify_impact' is completed before 'restore_services' is initiated.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:verify_integrity",
+      "task_id": "verify_integrity",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'verify_integrity' is sequenced before the task 'restore_services' which is a hard prerequisite.",
+      "suggested_fix": "Ensure 'restore_services' is completed before 'verify_integrity' is initiated.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-08-ransomware-containment:2:2",
+    "plan_id": "plan-ir-08-ransomware-containment-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:snapshot_disk",
+    "question": "Plan for goal 'ir-08-ransomware-containment' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

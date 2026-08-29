@@ -1,0 +1,292 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dr-01-failover-drill",
+  "duration_seconds": 40.14,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 4,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-dr-01-failover-drill-r4",
+    "goal_id": "dr-01-failover-drill",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-dr-01-failover-drill-r3",
+    "created_at": "2026-08-29T21:36:25.463736Z",
+    "tasks": [
+      {
+        "id": "lower-dns-ttl",
+        "description": "Lower DNS TTL to 60 seconds",
+        "action": "update",
+        "target": "Route53 DNS settings",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DNS service is reachable",
+            "fact": "dns_service_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "promote-replica",
+        "description": "Promote the us-west-2 read replica to primary",
+        "action": "promote",
+        "target": "RDS us-west-2",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DNS TTL is lowered",
+            "fact": "dns_ttl_lowered",
+            "established_by": "lower-dns-ttl",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "new primary status",
+          "how": "check RDS instance state",
+          "expected": "primary"
+        },
+        "rollback": {
+          "trigger": "promotion fails or conflicts detected",
+          "action": "revert promotion",
+          "safety_guard": "confirm replication is intact",
+          "restores_state": [
+            "us-west-2 read replica reverts to previous state"
+          ],
+          "restoration_evidence": "check replication status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update-connection-strings",
+        "description": "Update application connection strings to point to new primary",
+        "action": "update",
+        "target": "application config",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "application config is accessible",
+            "fact": "config_accessible",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "Promotion of read replica succeeded",
+            "fact": "promotion_successful",
+            "established_by": "promote-replica",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "connection strings",
+          "how": "check application configuration",
+          "expected": "points to new primary"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "revert connection strings to previous state",
+          "safety_guard": "verify previous connection settings",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-data-consistency",
+        "description": "Verify data consistency between primary and replica",
+        "action": "check",
+        "target": "RDS instance",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data consistency",
+          "how": "run consistency checks",
+          "expected": "data matches between instances"
+        },
+        "rollback": {
+          "trigger": "inconsistency found",
+          "action": "restore previous state",
+          "safety_guard": "verify integrity of restored data before and after restoration",
+          "restores_state": [
+            "previous data state of RDS instances"
+          ],
+          "restoration_evidence": "check data integrity after restoration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor-write-conflicts",
+        "description": "Monitor for write conflicts during failover",
+        "action": "monitor",
+        "target": "RDS metrics",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "write conflict alerts",
+          "how": "observe metrics",
+          "expected": "no alerts"
+        },
+        "rollback": {
+          "trigger": "write conflicts detected",
+          "action": "stop writes",
+          "safety_guard": "ensure no data loss",
+          "restores_state": [
+            "RDS instances before conflict detection"
+          ],
+          "restoration_evidence": "check state of RDS instances after stopping writes"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "lower-dns-ttl",
+        "to_task": "promote-replica",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote-replica",
+        "to_task": "update-connection-strings",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote-replica",
+        "to_task": "verify-data-consistency",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote-replica",
+        "to_task": "monitor-write-conflicts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-connection-strings",
+        "to_task": "verify-data-consistency",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:promote-replica",
+      "task_id": "promote-replica",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Promotion of read replica to primary is attempted without verifying that data consistency checks have been completed beforehand, which may lead to split-brain scenarios.",
+      "suggested_fix": "Add a step to verify data consistency before promoting the replica.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:update-connection-strings",
+      "task_id": "update-connection-strings",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Updating connection strings depends on the promotion of the read replica, which lacks confirmation of success before proceeding.",
+      "suggested_fix": "Ensure promotion success is verified before dependent tasks execute.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:verify-data-consistency",
+      "task_id": "verify-data-consistency",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Verification of data consistency is contingent on successful promotion of the read replica, yet promotion success is not established prior to this step.",
+      "suggested_fix": "Add verification of promotion status before executing data consistency checks.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:monitor-write-conflicts",
+      "task_id": "monitor-write-conflicts",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Monitoring for write conflicts relies on the successful promotion of the read replica, which is not verified prior to this step.",
+      "suggested_fix": "Ensure the promotion status of the read replica is confirmed before monitoring for write conflicts.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:dr-01-failover-drill:4:4",
+    "plan_id": "plan-dr-01-failover-drill-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:promote-replica",
+    "question": "Plan for goal 'dr-01-failover-drill' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

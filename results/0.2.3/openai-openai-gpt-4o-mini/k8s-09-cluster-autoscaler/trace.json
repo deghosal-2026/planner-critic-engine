@@ -1,0 +1,401 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-09-cluster-autoscaler",
+  "duration_seconds": 29.49,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-k8s-09-cluster-autoscaler-r2",
+    "goal_id": "k8s-09-cluster-autoscaler",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "k8s-09-cluster-autoscaler-plan",
+    "created_at": "2026-08-29T21:43:44.574072Z",
+    "tasks": [
+      {
+        "id": "install-cluster-autoscaler",
+        "description": "Install cluster-autoscaler using Helm",
+        "action": "install",
+        "target": "cluster-autoscaler",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Helm is configured",
+            "fact": "helm_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "cluster-autoscaler is running",
+          "how": "check Helm release status",
+          "expected": "installed"
+        },
+        "rollback": {
+          "trigger": "install fails",
+          "action": "uninstall cluster-autoscaler",
+          "safety_guard": "verify Helm status",
+          "restores_state": [
+            "cluster is not using cluster-autoscaler"
+          ],
+          "restoration_evidence": "check Helm release status for uninstalled"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure-auto-discovery",
+        "description": "Configure node group auto-discovery for cluster-autoscaler",
+        "action": "configure",
+        "target": "node-group-discovery",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cluster-autoscaler installed",
+            "fact": "cluster_autoscaler_installed",
+            "established_by": "install-cluster-autoscaler",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "auto-discovery configuration status",
+          "how": "check cluster-autoscaler logs",
+          "expected": "auto-discovery successfully configured"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "remove auto-discovery configuration",
+          "safety_guard": "validate previous configuration",
+          "restores_state": [
+            "auto-discovery is disabled"
+          ],
+          "restoration_evidence": "check previous configuration state"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "set-node-counts",
+        "description": "Set min/max node counts per group",
+        "action": "set",
+        "target": "node-counts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "auto-discovery configured",
+            "fact": "auto_discovery_configured",
+            "established_by": "configure-auto-discovery",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "tune-scale-down-delay",
+        "description": "Tune scale-down delay to 10 minutes",
+        "action": "configure",
+        "target": "scale-down-delay",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "min/max node counts set",
+            "fact": "node_counts_set",
+            "established_by": "set-node-counts",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-scale-up",
+        "description": "Verify scale-up triggers on pending pods",
+        "action": "verify",
+        "target": "scale-up",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "scale-down delay tuned",
+            "fact": "scale_down_delay_tuned",
+            "established_by": "tune-scale-down-delay",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "pending pods count",
+          "how": "check kubectl get pods",
+          "expected": "zero pending pods"
+        },
+        "rollback": {
+          "trigger": "scale-up verification fails",
+          "action": "reconfigure scale-up",
+          "safety_guard": "monitor pending pods",
+          "restores_state": [
+            "scale-up settings reverted"
+          ],
+          "restoration_evidence": "check previous scale-up configuration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-scale-down",
+        "description": "Verify scale-down drains nodes gracefully",
+        "action": "verify",
+        "target": "scale-down",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "scale-up verification complete",
+            "fact": "scale_up_verified",
+            "established_by": "verify-scale-up",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "PDB violations",
+          "how": "check PDB status",
+          "expected": "no violations"
+        },
+        "rollback": {
+          "trigger": "scale-down verification fails",
+          "action": "restore node configuration",
+          "safety_guard": "monitor PDB violations",
+          "restores_state": [
+            "node configuration prior to scale-down"
+          ],
+          "restoration_evidence": "check previous node state"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor-disruption",
+        "description": "Monitor for pod disruption using Prometheus and Grafana",
+        "action": "monitor",
+        "target": "pod-disruption",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "scale-down verification complete",
+            "fact": "scale_down_verified",
+            "established_by": "verify-scale-down",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "pod disruption rate",
+          "how": "check Grafana dashboard",
+          "expected": "within thresholds"
+        },
+        "rollback": {
+          "trigger": "disruption tolerance exceeded",
+          "action": "adjust PDBs",
+          "safety_guard": "consult logs",
+          "restores_state": [
+            "PDB settings before disruption"
+          ],
+          "restoration_evidence": "check previous PDB configuration"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "install-cluster-autoscaler",
+        "to_task": "configure-auto-discovery",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-auto-discovery",
+        "to_task": "set-node-counts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set-node-counts",
+        "to_task": "tune-scale-down-delay",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "tune-scale-down-delay",
+        "to_task": "verify-scale-up",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-scale-up",
+        "to_task": "verify-scale-down",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-scale-down",
+        "to_task": "monitor-disruption",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:set-node-counts",
+      "task_id": "set-node-counts",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Setting min/max node counts cannot be performed without prior validation of node group configurations. Ensure node groups are verified before attempting to set counts.",
+      "suggested_fix": "Add a task to verify node groups before setting node counts.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:feasibility:tune-scale-down-delay",
+      "task_id": "tune-scale-down-delay",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Tuning scale-down delay relies on the successful setting of node counts; if prior task fails, the delay adjustment becomes invalid.",
+      "suggested_fix": "Implement validation of min/max counts before tuning scale-down delay.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:verify-scale-up",
+      "task_id": "verify-scale-up",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider verifying that the cluster-autoscaler is properly targeting the intended node groups before checking for pending pods.",
+      "suggested_fix": "Add a verification step for node group targeting before scale-up verification.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:monitor-disruption",
+      "task_id": "monitor-disruption",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Monitoring for pod disruption should include an initial baseline assessment of pod states before proceeding with changes.",
+      "suggested_fix": "Include a step to capture baseline pod states prior to monitoring disruptions.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:monitor-disruption",
+      "task_id": "monitor-disruption",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The monitoring task depends on the successful verification of scale-down, which potentially might not cover scenarios where scale-down drains lead to PDB violations.",
+      "suggested_fix": "Add a verification step to ensure no PDB violations exist before proceeding to monitor for disruptions.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:tune-scale-down-delay",
+      "task_id": "tune-scale-down-delay",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for scale-down delay tuning lacks specific procedures; in case of failure, it should revert to a previously known good state.",
+      "suggested_fix": "Implement a specific rollback for restoring scale-down delay settings.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:verify-scale-down",
+      "task_id": "verify-scale-down",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback process for verify-scale-down lacks a recovery confirmation step, which may leave the system in an unknown state if the recovery action fails.",
+      "suggested_fix": "Include a verification step post-rollback to ensure the system is restored to a known good state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

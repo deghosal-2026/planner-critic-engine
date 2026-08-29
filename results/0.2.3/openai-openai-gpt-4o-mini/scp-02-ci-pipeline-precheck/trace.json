@@ -1,0 +1,260 @@
+{
+  "dimension": "core-api",
+  "goal_id": "scp-02-ci-pipeline-precheck",
+  "duration_seconds": 30.02,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-scp-02-ci-pipeline-precheck-r4",
+    "goal_id": "scp-02-ci-pipeline-precheck",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-scp-02-ci-pipeline-precheck-r3",
+    "created_at": "2026-08-29T21:33:47.610161Z",
+    "tasks": [
+      {
+        "id": "check_ci_pipeline",
+        "description": "Ensure CI pipeline checks are defined for each microservice",
+        "action": "validate",
+        "target": "microservices",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "microservices are deployed",
+            "fact": "microservices_deployed",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "deployment status is verified",
+            "fact": "deployment_verified",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "CI pipeline definitions",
+          "how": "check configurations",
+          "expected": "all microservices have defined CI pipelines"
+        },
+        "rollback": {
+          "trigger": "missing CI definition",
+          "action": "notify stakeholders and revert changes",
+          "safety_guard": "confirm CI definition exists",
+          "restores_state": [
+            "ensure CI definitions are in place"
+          ],
+          "restoration_evidence": "CI definitions verified"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_ci_checks",
+        "description": "Verify CI pipeline checks completion",
+        "action": "validate",
+        "target": "ci_checks",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CI pipeline checks are defined",
+            "fact": "ci_pipeline_checks_defined",
+            "established_by": "check_ci_pipeline",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "CI checks",
+          "how": "check CI pipeline validations",
+          "expected": "CI checks complete"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "notify stakeholders and halt processes",
+          "safety_guard": "confirm CI checks status",
+          "restores_state": [
+            "ensure CI checks are verified"
+          ],
+          "restoration_evidence": "CI checks verified"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "run_tests",
+        "description": "Execute the test suite for each microservice",
+        "action": "execute",
+        "target": "testing",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CI pipeline checks completed successfully",
+            "fact": "ci_checks_passed",
+            "established_by": "verify_ci_checks",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "test results",
+          "how": "analyze logs and reports",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "test suite fails",
+          "action": "halt deployment",
+          "safety_guard": "verify test results",
+          "restores_state": [
+            "ensure deployment is not advanced"
+          ],
+          "restoration_evidence": "deployment halted and results reviewed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "sign_artifacts",
+        "description": "Sign the artifacts after successful tests",
+        "action": "sign",
+        "target": "artifacts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "test suite executed without failures",
+            "fact": "tests_passed",
+            "established_by": "run_tests",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "artifact signatures",
+          "how": "check signature integrity",
+          "expected": "all artifacts are properly signed"
+        },
+        "rollback": {
+          "trigger": "artifact signing fails",
+          "action": "notify stakeholders and revert changes",
+          "safety_guard": "confirm signatures",
+          "restores_state": [
+            "ensure artifacts are unsigned and flagged",
+            "verify associated artifacts are reverted"
+          ],
+          "restoration_evidence": "artifact signing failure logged and noted"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_ci_pipeline",
+        "to_task": "verify_ci_checks",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_ci_checks",
+        "to_task": "run_tests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_tests",
+        "to_task": "sign_artifacts",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unverified_dependencies:verify_ci_checks",
+      "task_id": "verify_ci_checks",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task depends on 'ci_pipeline_checks_defined', which is not verified by an earlier task.",
+      "suggested_fix": "Ensure 'ci_pipeline_checks_defined' is established by the 'check_ci_pipeline' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:run_tests",
+      "task_id": "run_tests",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'run_tests' is ordered before verifying the outcomes of 'verify_ci_checks', which is its prerequisite.",
+      "suggested_fix": "Reorder the tasks to ensure 'verify_ci_checks' is executed before 'run_tests'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:sign_artifacts",
+      "task_id": "sign_artifacts",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'sign_artifacts' is placed before confirming that 'tests_passed' after 'run_tests'.",
+      "suggested_fix": "Reorder the tasks to ensure 'run_tests' is fully verified before 'sign_artifacts'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:scp-02-ci-pipeline-precheck:4:4",
+    "plan_id": "plan-scp-02-ci-pipeline-precheck-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unverified_dependencies:verify_ci_checks",
+    "question": "Plan for goal 'scp-02-ci-pipeline-precheck' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,473 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-12-major-version-upgrade",
+  "duration_seconds": 67.59,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-db-12-major-version-upgrade-r4",
+    "goal_id": "db-12-major-version-upgrade",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-db-12-major-version-upgrade-r3",
+    "created_at": "2026-08-29T21:32:39.716480Z",
+    "tasks": [
+      {
+        "id": "base_backup",
+        "description": "Take a base backup of the database",
+        "action": "pg_basebackup",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "db is reachable",
+            "fact": "db_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "backup completion",
+          "how": "check backup logs",
+          "expected": "backup successful"
+        },
+        "rollback": {
+          "trigger": "backup fails",
+          "action": "stop the upgrade process",
+          "safety_guard": "verify backup integrity",
+          "restores_state": [
+            "state of database before backup"
+          ],
+          "restoration_evidence": "backup logs verify successful backup"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "install_pg16",
+        "description": "Install PostgreSQL 16 binaries safely",
+        "action": "install",
+        "target": "PG16",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "previous version PG14 is installed",
+            "fact": "pg14_installed",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "installation process validated for safe coexistence with PG14",
+            "fact": "safe_installation_validated",
+            "established_by": "base_backup",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "installation status",
+          "how": "check installation logs",
+          "expected": "installation successful"
+        },
+        "rollback": {
+          "trigger": "installation fails",
+          "action": "remove installed PostgreSQL 16",
+          "safety_guard": "ensure no critical services are affected",
+          "restores_state": [
+            "PG14 is operational"
+          ],
+          "restoration_evidence": "confirm PG14 service status"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "pg_upgrade_check",
+        "description": "Run pg_upgrade --check for compatibility",
+        "action": "pg_upgrade_check",
+        "target": "PG16",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PG16 is installed",
+            "fact": "pg16_installed",
+            "established_by": "install_pg16",
+            "probe": null
+          },
+          {
+            "description": "base backup is complete",
+            "fact": "backup_successful",
+            "established_by": "base_backup",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "check results",
+          "how": "review logs",
+          "expected": "no issues found"
+        },
+        "rollback": {
+          "trigger": "check fails",
+          "action": "stop the upgrade process",
+          "safety_guard": "verify compatibility findings",
+          "restores_state": [
+            "state of database before compatibility check"
+          ],
+          "restoration_evidence": "compatibility check logs review"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "check_extension_compatibility",
+        "description": "Check extension compatibility between PG14 and PG16",
+        "action": "check_compatibility",
+        "target": "extensions",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "pg_upgrade compatibility check passed",
+            "fact": "check_passed",
+            "established_by": "pg_upgrade_check",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "extension compatibility results",
+          "how": "review compatibility check logs",
+          "expected": "all extensions compatible"
+        },
+        "rollback": {
+          "trigger": "extension compatibility check fails",
+          "action": "stop the upgrade process",
+          "safety_guard": "ensure compatibility is reviewed",
+          "restores_state": [
+            "state of extensions before check"
+          ],
+          "restoration_evidence": "compatibility review logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "stop_application_writes",
+        "description": "Stop application writes during maintenance window",
+        "action": "stop_writes",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "write status",
+          "how": "check application logs",
+          "expected": "no writes occurring"
+        },
+        "rollback": {
+          "trigger": "unable to stop writes",
+          "action": "restore previous state",
+          "safety_guard": "ensure no data loss",
+          "restores_state": [
+            "state of application before stop"
+          ],
+          "restoration_evidence": "application logs verify write status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "pg_upgrade_link_mode",
+        "description": "Run pg_upgrade --link-mode",
+        "action": "pg_upgrade_link",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "application writes stopped",
+            "fact": "writes_stopped",
+            "established_by": "stop_application_writes",
+            "probe": null
+          },
+          {
+            "description": "extension compatibility confirmed",
+            "fact": "extensions_compatible",
+            "established_by": "check_extension_compatibility",
+            "probe": null
+          },
+          {
+            "description": "pg_upgrade --check passed",
+            "fact": "check_passed",
+            "established_by": "pg_upgrade_check",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "upgrade status",
+          "how": "check upgrade logs",
+          "expected": "upgrade successful"
+        },
+        "rollback": {
+          "trigger": "upgrade fails",
+          "action": "restore from base backup",
+          "safety_guard": "confirm database integrity",
+          "restores_state": [
+            "state of database before upgrade"
+          ],
+          "restoration_evidence": "successful restore logs"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "start_pg16",
+        "description": "Start PostgreSQL 16",
+        "action": "start",
+        "target": "PG16",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "pg_upgrade with link mode succeeded",
+            "fact": "upgrade_successful",
+            "established_by": "pg_upgrade_link_mode",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "check PostgreSQL status",
+          "how": "query PostgreSQL instance",
+          "expected": "PostgreSQL 16 is running"
+        },
+        "rollback": {
+          "trigger": "failure to start PG16",
+          "action": "restore PostgreSQL 14",
+          "safety_guard": "ensure data integrity",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "analyze_db",
+        "description": "Run ANALYZE on the PostgreSQL 16 database",
+        "action": "analyze",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_application_compatibility",
+        "description": "Verify application compatibility with PG16",
+        "action": "verify_compatibility",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ANALYZE completed",
+            "fact": "analyze_completed",
+            "established_by": "analyze_db",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "compatibility results",
+          "how": "run application tests",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "compatibility tests fail",
+          "action": "restore from base backup",
+          "safety_guard": "ensure application stability",
+          "restores_state": [
+            "state of application before tests"
+          ],
+          "restoration_evidence": "application test logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "base_backup",
+        "to_task": "pg_upgrade_check",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "install_pg16",
+        "to_task": "pg_upgrade_check",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "pg_upgrade_check",
+        "to_task": "check_extension_compatibility",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check_extension_compatibility",
+        "to_task": "stop_application_writes",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "stop_application_writes",
+        "to_task": "pg_upgrade_link_mode",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "pg_upgrade_link_mode",
+        "to_task": "start_pg16",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "start_pg16",
+        "to_task": "analyze_db",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "analyze_db",
+        "to_task": "verify_application_compatibility",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:pg_upgrade_link_mode",
+      "task_id": "pg_upgrade_link_mode",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "pg_upgrade --link-mode is executed before ensuring both extension compatibility and successful backup restoration if needed.",
+      "suggested_fix": "Ensure that the rollback plan confirms database integrity before proceeding to pg_upgrade --link-mode.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:start_pg16",
+      "task_id": "start_pg16",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback plan does not specify how to restore PostgreSQL 14 effectively if PG16 fails to start, which may lead to data integrity loss.",
+      "suggested_fix": "Define and implement a clear rollback procedure for restoring PostgreSQL 14, including verification steps for data integrity.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:missing_steps:analyze_db",
+      "task_id": "analyze_db",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "ANALYZE task lacks preconditions to ensure it only runs after a successful upgrade and a valid new PG16 installation.",
+      "suggested_fix": "Add prerequisites confirming the successful upgrade and start of PG16 before running ANALYZE.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:missing_steps:verify_application_compatibility",
+      "task_id": "verify_application_compatibility",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The verify_application_compatibility task does not include verification of critical dependencies that might cause failures post-upgrade.",
+      "suggested_fix": "Include checks for extension compatibility and any necessary configurations that may affect application compatibility after upgrading.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:pg_upgrade_check",
+      "task_id": "pg_upgrade_check",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Dependency on backup success is not verified clearly in the rollback scenario, risking undefined state if backup fails.",
+      "suggested_fix": "Clarify and explicitly verify the backup success within the rollback procedures to ensure a defined path for reverting changes.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-12-major-version-upgrade:4:4",
+    "plan_id": "plan-db-12-major-version-upgrade-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:pg_upgrade_link_mode",
+    "question": "Plan for goal 'db-12-major-version-upgrade' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=9"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

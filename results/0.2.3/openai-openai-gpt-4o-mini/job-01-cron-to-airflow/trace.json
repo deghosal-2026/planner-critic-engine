@@ -1,0 +1,346 @@
+{
+  "dimension": "core-api",
+  "goal_id": "job-01-cron-to-airflow",
+  "duration_seconds": 33.45,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-job-01-cron-to-airflow-r2",
+    "goal_id": "job-01-cron-to-airflow",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "job-01-cron-to-airflow",
+    "created_at": "2026-08-29T21:36:34.568963Z",
+    "tasks": [
+      {
+        "id": "discover_jobs",
+        "description": "Discover and inventory all cron jobs from the servers",
+        "action": "extract crontab",
+        "target": "cron jobs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "discovered cron jobs count",
+          "how": "count the entries",
+          "expected": "> 0"
+        },
+        "rollback": {
+          "trigger": "discovery fails",
+          "action": "revert to previous inventory",
+          "safety_guard": "compare inventories",
+          "restores_state": [
+            "previous cron job inventory"
+          ],
+          "restoration_evidence": "ensure discovered jobs match previous inventory"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "analyze_dependencies",
+        "description": "Analyze script dependencies for discovered cron jobs",
+        "action": "analyze",
+        "target": "script dependencies",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cron jobs have been discovered",
+            "fact": "discover_jobs_done",
+            "established_by": "discover_jobs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "dependency map",
+          "how": "check against known dependencies",
+          "expected": "all dependencies covered"
+        },
+        "rollback": {
+          "trigger": "analysis fails",
+          "action": "revert to previous dependency map",
+          "safety_guard": "match dependencies with jobs",
+          "restores_state": [
+            "previous script dependency map"
+          ],
+          "restoration_evidence": "ensure dependency mapping matches previous state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "author_dags",
+        "description": "Author Airflow DAGs based on the cron job inventory",
+        "action": "create DAGs",
+        "target": "Airflow",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "job dependencies have been analyzed",
+            "fact": "dependencies_analyzed",
+            "established_by": "analyze_dependencies",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "DAG structure",
+          "how": "run DAG validation checks",
+          "expected": "valid DAGs without errors"
+        },
+        "rollback": {
+          "trigger": "DAG creation fails",
+          "action": "remove incomplete DAGs",
+          "safety_guard": "validate DAG integrity",
+          "restores_state": [
+            "previous Airflow state"
+          ],
+          "restoration_evidence": "confirm DAGs are not present in Airflow"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "backfill_check",
+        "description": "Run backfill parity check for cron and Airflow jobs",
+        "action": "execute backfill",
+        "target": "cron and Airflow output",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DAGs have been authored",
+            "fact": "DAGs_created",
+            "established_by": "author_dags",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "output consistency",
+          "how": "compare cron and Airflow outputs",
+          "expected": "outputs match"
+        },
+        "rollback": {
+          "trigger": "backfill fails",
+          "action": "re-enable cron jobs",
+          "safety_guard": "ensure Airflow is off",
+          "restores_state": [
+            "cron job scheduling state"
+          ],
+          "restoration_evidence": "verify cron jobs are active"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "execute_cutover",
+        "description": "Cutover from cron jobs to Airflow as the primary scheduler",
+        "action": "cutover",
+        "target": "job scheduling",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "backfill check completed",
+            "fact": "backfill_check_done",
+            "established_by": "backfill_check",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "job execution",
+          "how": "monitor logs for errors",
+          "expected": "no errors in Airflow logs"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "re-enable cron jobs",
+          "safety_guard": "confirm Airflow was not successful",
+          "restores_state": [
+            "previous job scheduling state"
+          ],
+          "restoration_evidence": "logs show no errors during cutover"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "retire_cron",
+        "description": "Retire cron jobs after successful cutover to Airflow",
+        "action": "disable cron jobs",
+        "target": "cron services",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cutover executed successfully",
+            "fact": "cutover_successful",
+            "established_by": "execute_cutover",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "cron job status",
+          "how": "check cron service status",
+          "expected": "cron jobs are disabled"
+        },
+        "rollback": {
+          "trigger": "retirement inadvertent",
+          "action": "re-enable cron jobs",
+          "safety_guard": "verify cutover was truly successful",
+          "restores_state": [
+            "active cron job state"
+          ],
+          "restoration_evidence": "confirm cron jobs are restored to schedule"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "discover_jobs",
+        "to_task": "analyze_dependencies",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "analyze_dependencies",
+        "to_task": "author_dags",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "author_dags",
+        "to_task": "backfill_check",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "backfill_check",
+        "to_task": "execute_cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "execute_cutover",
+        "to_task": "retire_cron",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:analyze_dependencies",
+      "task_id": "analyze_dependencies",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'analyze_dependencies' is executed before confirming that cron jobs have been discovered successfully.",
+      "suggested_fix": "Ensure that the task 'discover_jobs' is completed and verified before proceeding to 'analyze_dependencies'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:execute_cutover",
+      "task_id": "execute_cutover",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for 'execute_cutover' only assures re-enablement of cron jobs without confirming the success of previous steps, posing a high risk of inconsistency.",
+      "suggested_fix": "Implement a rollback that validates the integrity of both cron jobs and Airflow configuration before restoring the previous state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:backfill_check",
+      "task_id": "backfill_check",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The 'backfill_check' omits a detailed plan for handling timezone differences which could lead to mismatches in job execution.",
+      "suggested_fix": "Add steps to address timezone normalization during the backfill comparison process.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:risk:retire_cron",
+      "task_id": "retire_cron",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Retirement of cron jobs directly after cutover without a distinct verification step for backfill correctness could lead to data loss if issues are not caught beforehand.",
+      "suggested_fix": "Include explicit verification of data consistency before retirement of cron jobs.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:author_dags",
+      "task_id": "author_dags",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The dependencies for the DAGs being authored do not explicitly verify that the dependency map is accurate based on historical data.",
+      "suggested_fix": "Implement a verification step to check that newly authored DAGs accurately reflect historical job dependencies.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

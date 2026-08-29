@@ -1,0 +1,302 @@
+{
+  "dimension": "core-api",
+  "goal_id": "erp-01-module-adoption",
+  "duration_seconds": 32.68,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-erp-01-module-adoption-r2",
+    "goal_id": "erp-01-module-adoption",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "erp-01-module-adoption-v1",
+    "created_at": "2026-08-29T21:37:26.568595Z",
+    "tasks": [
+      {
+        "id": "configure_sap_ar",
+        "description": "Configure SAP AR: company code, credit control area, customer master data, payment terms",
+        "action": "configure",
+        "target": "SAP AR",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "SAP S/4HANA system is available",
+            "fact": "sap_system_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "migrate_data",
+        "description": "Migrate customer master data and open AR items from the legacy system",
+        "action": "migrate",
+        "target": "SAP AR",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Legacy data mapping is completed",
+            "fact": "data_mapping_complete",
+            "established_by": "configure_sap_ar",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "number of migrated records",
+          "how": "compare migrated records count",
+          "expected": "100K customers and 500K open items"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "rollback to legacy system",
+          "safety_guard": "verify integrity of legacy data",
+          "restores_state": [
+            "legacy system as is"
+          ],
+          "restoration_evidence": "verify system state before rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "parallel_run",
+        "description": "Run both legacy system and SAP AR for one billing cycle",
+        "action": "run",
+        "target": "billing cycle",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data migration has been successfully completed",
+            "fact": "migration_successful",
+            "established_by": "migrate_data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "invoice generation and payment posting accuracy",
+          "how": "compare outputs from both systems",
+          "expected": "outputs match for the billing cycle"
+        },
+        "rollback": {
+          "trigger": "issues found during parallel run",
+          "action": "revert to legacy billing",
+          "safety_guard": "restrict SAP AR to read-only access",
+          "restores_state": [
+            "legacy system operational state"
+          ],
+          "restoration_evidence": "check legacy billing functionality"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "finance_close_reconciliation",
+        "description": "Verify that the trial balance AR account reconciles between legacy and SAP AR",
+        "action": "reconcile",
+        "target": "trial balance",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Parallel run process is complete",
+            "fact": "parallel_run_complete",
+            "established_by": "parallel_run",
+            "probe": null
+          },
+          {
+            "description": "Outputs from the parallel run are correct",
+            "fact": "outputs_verified",
+            "established_by": "parallel_run",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "trial balance agreement",
+          "how": "run checks in Excel",
+          "expected": "trial balance figures match"
+        },
+        "rollback": {
+          "trigger": "reconciliation fails",
+          "action": "rollback to legacy billing",
+          "safety_guard": "restore legacy billing functionality",
+          "restores_state": [
+            "legacy billing operational state"
+          ],
+          "restoration_evidence": "ensure legacy system is functioning correctly"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover",
+        "description": "Switch to SAP AR as primary and decommission legacy billing",
+        "action": "cutover",
+        "target": "SAP AR",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Finance close reconciliation is successful",
+            "fact": "reconciliation_successful",
+            "established_by": "finance_close_reconciliation",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "successful transactions in SAP AR",
+          "how": "monitor transaction logs",
+          "expected": "all transactions processed without errors"
+        },
+        "rollback": {
+          "trigger": "issues arise post-cutover",
+          "action": "roll back to legacy billing",
+          "safety_guard": "ensuring legacy system is operational",
+          "restores_state": [
+            "full functionality of legacy billing system"
+          ],
+          "restoration_evidence": "confirm all legacy functionalities are restored"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "configure_sap_ar",
+        "to_task": "migrate_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate_data",
+        "to_task": "parallel_run",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "parallel_run",
+        "to_task": "finance_close_reconciliation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "finance_close_reconciliation",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:weak_rollback:migrate_data",
+      "task_id": "migrate_data",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for migration does not ensure the integrity of legacy data after failing.",
+      "suggested_fix": "Add procedures to verify the integrity of the legacy data before and after rollback to ensure no data corruption.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:parallel_run",
+      "task_id": "parallel_run",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for the parallel run lacks assurance for full restoration of legacy functionality.",
+      "suggested_fix": "Implement confirmation checks for the operational state of the legacy system before reverting SAP AR to read-only.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:finance_close_reconciliation",
+      "task_id": "finance_close_reconciliation",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback plan does not encompass full verification of legacy system functionality post-reconciliation failure.",
+      "suggested_fix": "Define specific tests or procedures that must be followed to ensure full functionality of the legacy system after rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:cutover",
+      "task_id": "cutover",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback procedure does not guarantee full restoration of legacy billing system functionalities even if it is operational.",
+      "suggested_fix": "Create a checklist of functionalities that need to be validated post-rollback to ensure the legacy system is fully operational.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:erp-01-module-adoption:2:2",
+    "plan_id": "plan-erp-01-module-adoption-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:weak_rollback:migrate_data",
+    "question": "Plan for goal 'erp-01-module-adoption' cannot be approved: blockers remain (llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

@@ -1,0 +1,300 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-05-chaos-experiment",
+  "duration_seconds": 33.55,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-obs-05-chaos-experiment-r3",
+    "goal_id": "obs-05-chaos-experiment",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-obs-05-chaos-experiment-r2",
+    "created_at": "2026-08-29T21:26:45.295088Z",
+    "tasks": [
+      {
+        "id": "inject-chaos",
+        "description": "Inject pod-kill chaos into inventory service",
+        "action": "inject",
+        "target": "chaos-mesh",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "chaos mesh status",
+          "how": "check via kubectl",
+          "expected": "chaos injection active"
+        },
+        "rollback": {
+          "trigger": "chaos injection fails",
+          "action": "remove chaos injection",
+          "safety_guard": "verify chaos mesh status",
+          "restores_state": [
+            "chaos mesh in previous stable state"
+          ],
+          "restoration_evidence": "ensure chaos mesh status is inactive"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "observe-recovery",
+        "description": "Observe recovery time via Prometheus metrics",
+        "action": "observe",
+        "target": "prometheus",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "chaos injection is active",
+            "fact": "chaos_injection_active",
+            "established_by": "inject-chaos",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "recovery time",
+          "how": "query prometheus metrics",
+          "expected": "recovery within 30 seconds"
+        },
+        "rollback": {
+          "trigger": "metrics are unavailable",
+          "action": "revert prometheus configurations",
+          "safety_guard": "ensure prometheus is operational",
+          "restores_state": [
+            "prometheus configurations to previous state"
+          ],
+          "restoration_evidence": "monitor prometheus stability post-revert"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "generate-report",
+        "description": "Generate chaos report with time-to-recover measurement",
+        "action": "generate",
+        "target": "chaos-report",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "recovery metrics are available",
+            "fact": "recovery_time_available",
+            "established_by": "observe-recovery",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "report generation success",
+          "how": "check report output",
+          "expected": "report is generated without errors"
+        },
+        "rollback": {
+          "trigger": "report generation fails",
+          "action": "discard report",
+          "safety_guard": "ensure report template is intact",
+          "restores_state": [
+            "no report generated"
+          ],
+          "restoration_evidence": "confirm absence of corrupted report"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-rollback",
+        "description": "Ensure original replica count is restored",
+        "action": "verify",
+        "target": "kubectl",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replica count",
+          "how": "check deployment status via kubectl",
+          "expected": "original replica count"
+        },
+        "rollback": {
+          "trigger": "rollback verification fails",
+          "action": "restore previous deployment",
+          "safety_guard": "check replica count",
+          "restores_state": [
+            "previous deployment state"
+          ],
+          "restoration_evidence": "deploy old version of service confirmed"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cleanup-chaos",
+        "description": "Clean up chaos injection",
+        "action": "cleanup",
+        "target": "chaos-mesh",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "chaos injection completed",
+            "fact": "chaos_injection_completed",
+            "established_by": "inject-chaos",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "cleanup confirmation",
+          "how": "check chaos mesh status",
+          "expected": "chaos injection inactive"
+        },
+        "rollback": {
+          "trigger": "cleanup fails",
+          "action": "restore chaos injection",
+          "safety_guard": "verify chaos mesh status",
+          "restores_state": [
+            "previous chaos mesh state"
+          ],
+          "restoration_evidence": "chaos mesh operational post-restore"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "inject-chaos",
+        "to_task": "observe-recovery",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "observe-recovery",
+        "to_task": "generate-report",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "observe-recovery",
+        "to_task": "verify-rollback",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "generate-report",
+        "to_task": "cleanup-chaos",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-rollback",
+        "to_task": "cleanup-chaos",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unverified_dependencies:observe-recovery",
+      "task_id": "observe-recovery",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'observe-recovery' depends on 'chaos_injection_active' which is not guaranteed as it relies on verification from 'inject-chaos'.",
+      "suggested_fix": "Ensure 'chaos_injection_active' is properly verified before proceeding with 'observe-recovery'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:generate-report",
+      "task_id": "generate-report",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'generate-report' depends on 'recovery_time_available' which is not guaranteed as it relies on verification from 'observe-recovery'.",
+      "suggested_fix": "Ensure 'recovery_time_available' is properly verified before proceeding with 'generate-report'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:verify-rollback",
+      "task_id": "verify-rollback",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'verify-rollback' has no hard prerequisites verified before it executes, leading to potential inconsistencies.",
+      "suggested_fix": "Establish a direct dependency or verification step from 'observe-recovery' before 'verify-rollback'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:cleanup-chaos",
+      "task_id": "cleanup-chaos",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'cleanup-chaos' depends on 'chaos_injection_completed' which is indirectly derived from 'inject-chaos' and its verification.",
+      "suggested_fix": "Verify existence of 'chaos_injection_completed' from a reliable source before 'cleanup-chaos' is executed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:obs-05-chaos-experiment:3:3",
+    "plan_id": "plan-obs-05-chaos-experiment-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unverified_dependencies:observe-recovery",
+    "question": "Plan for goal 'obs-05-chaos-experiment' cannot be approved: blockers remain (llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,392 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dbm-03-sqlserver-dialect",
+  "duration_seconds": 29.98,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-dbm-03-sqlserver-dialect-r2",
+    "goal_id": "dbm-03-sqlserver-dialect",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "dbm-03-sqlserver-dialect-plan",
+    "created_at": "2026-08-29T21:34:29.492459Z",
+    "tasks": [
+      {
+        "id": "rewrite-sql",
+        "description": "Rewrite T-SQL stored procedures to PL/pgSQL",
+        "action": "rewrite",
+        "target": "stored_procedures",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "T-SQL code is available",
+            "fact": "t_sql_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "stored procedure functionality",
+          "how": "run tests",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "rewrite fails",
+          "action": "restore original T-SQL",
+          "safety_guard": "verify stored procedure functionality",
+          "restores_state": [
+            "T-SQL is restored"
+          ],
+          "restoration_evidence": "stored procedure functionality is back to original"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "permissions-migration",
+        "description": "Migrate SQL Server permissions to PostgreSQL roles",
+        "action": "migrate",
+        "target": "permissions",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "SQL Server permissions are documented",
+            "fact": "permissions_documented",
+            "established_by": "rewrite-sql",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "permissions functionality",
+          "how": "test permissions",
+          "expected": "all permissions are functional in PostgreSQL"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "job-replatforming",
+        "description": "Re-platform SQL Agent jobs to pg_cron or Airflow",
+        "action": "replatform",
+        "target": "jobs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "SQL Agent jobs are listed",
+            "fact": "agent_jobs_listed",
+            "established_by": "permissions-migration",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "job execution",
+          "how": "check logs",
+          "expected": "all jobs execute successfully"
+        },
+        "rollback": {
+          "trigger": "job scheduling fails",
+          "action": "restore SQL Server jobs",
+          "safety_guard": "verify job execution",
+          "restores_state": [
+            "SQL Server jobs are restored"
+          ],
+          "restoration_evidence": "job execution logs show previous successful runs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "data-migration",
+        "description": "Migrate data from SQL Server to PostgreSQL using DMS or pgloader",
+        "action": "migrate",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Backup of SQL Server data is available",
+            "fact": "backup_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data consistency",
+          "how": "run checksum",
+          "expected": "checksums match for both databases"
+        },
+        "rollback": {
+          "trigger": "data migration fails",
+          "action": "restore from backup",
+          "safety_guard": "verify data integrity",
+          "restores_state": [
+            "data is back to SQL Server"
+          ],
+          "restoration_evidence": "data backups are intact and verified"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "dual-run-check",
+        "description": "Perform dual-run validation of the applications against both databases",
+        "action": "validate",
+        "target": "dual_run",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Application setup is complete",
+            "fact": "app_setup_complete",
+            "established_by": "data-migration",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application performance",
+          "how": "monitor logs",
+          "expected": "performance metrics are within acceptable range"
+        },
+        "rollback": {
+          "trigger": "validation fails",
+          "action": "revert to SQL Server",
+          "safety_guard": "verify application stability",
+          "restores_state": [
+            "application state is reverted to SQL Server"
+          ],
+          "restoration_evidence": "application log shows consistent state pre-validation"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover",
+        "description": "Cut over to PostgreSQL as the primary database",
+        "action": "cutover",
+        "target": "cutover-process",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Validation is successful",
+            "fact": "validation_successful",
+            "established_by": "dual-run-check",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application connection",
+          "how": "test connection",
+          "expected": "application connects to PostgreSQL"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "switch back to SQL Server",
+          "safety_guard": "monitor application health",
+          "restores_state": [
+            "cutover state reverted to SQL Server"
+          ],
+          "restoration_evidence": "application health metrics return to operational state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "retire-sqlserver",
+        "description": "Retire the SQL Server instance",
+        "action": "retire",
+        "target": "sqlserver",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Cutover is successful",
+            "fact": "cutover_successful",
+            "established_by": "cutover",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "SQL Server instance status",
+          "how": "check instance status",
+          "expected": "SQL Server instance is retired successfully"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "rewrite-sql",
+        "to_task": "permissions-migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "permissions-migration",
+        "to_task": "job-replatforming",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "job-replatforming",
+        "to_task": "data-migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "data-migration",
+        "to_task": "dual-run-check",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dual-run-check",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover",
+        "to_task": "retire-sqlserver",
+        "kind": "soft",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:permissions-migration",
+      "task_id": "permissions-migration",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Migration of SQL Server permissions to PostgreSQL roles may not be feasible as documentation of permissions could be incomplete.",
+      "suggested_fix": "Ensure comprehensive documentation of SQL Server permissions is validated before migration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:feasibility:job-replatforming",
+      "task_id": "job-replatforming",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Re-platforming SQL Agent jobs to pg_cron or Airflow could be unfeasible if the job execution logic cannot be translated.",
+      "suggested_fix": "Evaluate the complexity of SQL Agent jobs and ensure a mapping strategy is established prior to the task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:feasibility:data-migration",
+      "task_id": "data-migration",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Data migration may not be feasible if the backup of SQL Server data is not verified to be available.",
+      "suggested_fix": "Confirm that the backup of SQL Server data is complete and verified before proceeding with the migration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:cutover",
+      "task_id": "cutover",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Cutover to PostgreSQL should not occur before dual-run validation is confirmed as successful.",
+      "suggested_fix": "Reorder tasks to ensure dual-run validation is completed before initiating the cutover.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:data-migration",
+      "task_id": "data-migration",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for data migration lacks a sound method to verify data integrity post-restore.",
+      "suggested_fix": "Add a step to ensure data integrity verification after restoration from backup.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:cutover",
+      "task_id": "cutover",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback to SQL Server lacks clarity on monitoring criteria for application health.",
+      "suggested_fix": "Define specific health metrics to monitor during the rollback process to ensure application stability.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

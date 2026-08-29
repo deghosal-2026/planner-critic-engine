@@ -1,0 +1,330 @@
+{
+  "dimension": "core-api",
+  "goal_id": "id-02-zero-trust-rollout",
+  "duration_seconds": 39.05,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-id-02-zero-trust-rollout-r3",
+    "goal_id": "id-02-zero-trust-rollout",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-id-02-zero-trust-rollout-r2",
+    "created_at": "2026-08-29T21:46:06.998720Z",
+    "tasks": [
+      {
+        "id": "deploy-internal-ca",
+        "description": "Deploy internal CA using cert-manager",
+        "action": "deploy",
+        "target": "cert-manager",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "CA status",
+          "how": "check cert-manager status",
+          "expected": "running"
+        },
+        "rollback": {
+          "trigger": "CA deployment fails",
+          "action": "restore previous CA setup",
+          "safety_guard": "backup existing CA state",
+          "restores_state": [
+            "previous CA setup"
+          ],
+          "restoration_evidence": "verify CA is back to previous state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "issue-certificates",
+        "description": "Issue mTLS certificates to all services",
+        "action": "issue",
+        "target": "mTLS certs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CA deployment is successful",
+            "fact": "deploy_in_mtls_ca_success",
+            "established_by": "deploy-internal-ca",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "issued certificates",
+          "how": "list issued certs via cert-manager",
+          "expected": "all services have valid mTLS certs"
+        },
+        "rollback": {
+          "trigger": "certificate issuance fails",
+          "action": "revoke issued certificates",
+          "safety_guard": "verify service cert availability",
+          "restores_state": [
+            "no issued certificates"
+          ],
+          "restoration_evidence": "confirm all certificates are revoked"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure-service-mesh",
+        "description": "Configure service mesh (Istio) with STRICT mTLS",
+        "action": "configure",
+        "target": "Istio",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "All services have valid mTLS certificates",
+            "fact": "issued_mtls_certificates_confirmed",
+            "established_by": "issue-certificates",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service mesh mTLS settings",
+          "how": "check Istio configuration",
+          "expected": "mTLS is set to STRICT"
+        },
+        "rollback": {
+          "trigger": "configuration causes service disruption",
+          "action": "revert Istio configuration",
+          "safety_guard": "monitor service health",
+          "restores_state": [
+            "previous Istio configuration"
+          ],
+          "restoration_evidence": "verify Istio settings match previous version"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy-identity-aware-proxy",
+        "description": "Deploy identity-aware proxy (Google IAP or AWS ALB with OIDC)",
+        "action": "deploy",
+        "target": "identity-aware proxy",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "proxy infrastructure is available",
+            "fact": "proxy_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "proxy deployment status",
+          "how": "check proxy status",
+          "expected": "proxy is deployed and operational"
+        },
+        "rollback": {
+          "trigger": "proxy deployment fails",
+          "action": "remove proxy deployment",
+          "safety_guard": "verify rollback to operational state",
+          "restores_state": [
+            "no identity-aware proxy"
+          ],
+          "restoration_evidence": "confirm proxy has been successfully removed"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure-egress-firewall",
+        "description": "Configure egress firewall rules (default deny + allowlist)",
+        "action": "configure",
+        "target": "firewall",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "current egress rules established",
+            "fact": "firewall_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-mtls-traffic",
+        "description": "Verify all service-to-service traffic uses mTLS",
+        "action": "verify",
+        "target": "service traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "service mesh is configured with STRICT mTLS",
+            "fact": "service_mesh_strict_mtls_confirmed",
+            "established_by": "configure-service-mesh",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic mTLS status",
+          "how": "inspect traffic logs",
+          "expected": "all traffic is mTLS"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "revert to previous traffic settings",
+          "safety_guard": "ensure mTLS is enforced during rollback",
+          "restores_state": [
+            "previous traffic settings"
+          ],
+          "restoration_evidence": "confirm traffic settings have reverted"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor-latency",
+        "description": "Monitor latency introduced by identity-aware proxy",
+        "action": "monitor",
+        "target": "latency",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "proxy deployment is operational",
+            "fact": "proxy_deploy_complete",
+            "established_by": "deploy-identity-aware-proxy",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy-internal-ca",
+        "to_task": "issue-certificates",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "issue-certificates",
+        "to_task": "configure-service-mesh",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-service-mesh",
+        "to_task": "verify-mtls-traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-identity-aware-proxy",
+        "to_task": "monitor-latency",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-egress-firewall",
+        "to_task": "verify-mtls-traffic",
+        "kind": "soft",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:configure-service-mesh",
+      "task_id": "configure-service-mesh",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'configure-service-mesh' is sequenced before 'issue-certificates' is confirmed as successful.",
+      "suggested_fix": "Reorder tasks to ensure 'issue-certificates' is executed and verified before proceeding to 'configure-service-mesh'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:verify-mtls-traffic",
+      "task_id": "verify-mtls-traffic",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'verify-mtls-traffic' depends on 'configure-service-mesh', but 'configure-service-mesh' has unverified dependencies on 'issue-certificates'.",
+      "suggested_fix": "Ensure that the dependencies are verified and order of execution is correct to avoid reliance on unverified tasks.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:missing_steps:monitor-latency",
+      "task_id": "monitor-latency",
+      "version": 3,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "No rollback strategy is defined for 'monitor-latency', which may leave the system in a problematic state if monitoring identifies issues.",
+      "suggested_fix": "Add a rollback strategy for 'monitor-latency' to revert changes if latency exceeds acceptable thresholds.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:id-02-zero-trust-rollout:3:3",
+    "plan_id": "plan-id-02-zero-trust-rollout-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:configure-service-mesh",
+    "question": "Plan for goal 'id-02-zero-trust-rollout' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

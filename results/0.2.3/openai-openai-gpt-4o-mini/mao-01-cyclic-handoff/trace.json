@@ -1,0 +1,194 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mao-01-cyclic-handoff",
+  "duration_seconds": 12.9,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-mao-01-cyclic-handoff-r2",
+    "goal_id": "mao-01-cyclic-handoff",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plan-mao-01-cyclic-handoff",
+    "created_at": "2026-08-29T21:44:48.737748Z",
+    "tasks": [
+      {
+        "id": "migrate_schema",
+        "description": "Migrate the database schema",
+        "action": "migrate",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "schema version",
+          "how": "run checks",
+          "expected": "v2"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore from backup",
+          "safety_guard": "verify backup integrity",
+          "restores_state": [
+            "previous schema version"
+          ],
+          "restoration_evidence": "backup logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update_api",
+        "description": "Update API contracts",
+        "action": "update",
+        "target": "api",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "api contract version",
+          "how": "check versioning system",
+          "expected": "v1.2"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "revert api contracts",
+          "safety_guard": "verify api contract integrity",
+          "restores_state": [
+            "previous API contracts"
+          ],
+          "restoration_evidence": "API versioning history"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "route_traffic",
+        "description": "Route traffic to new API",
+        "action": "route",
+        "target": "traffic",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "traffic distribution",
+          "how": "monitor traffic logs",
+          "expected": "90% to v1.2"
+        },
+        "rollback": {
+          "trigger": "routing fails",
+          "action": "revert traffic routing",
+          "safety_guard": "verify traffic flow",
+          "restores_state": [
+            "previous traffic distribution"
+          ],
+          "restoration_evidence": "traffic logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "migrate_schema",
+        "to_task": "update_api",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_api",
+        "to_task": "route_traffic",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:update_api",
+      "task_id": "update_api",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'update_api' is executed before verifying 'migrate_schema' completion, which may lead to inconsistent API contracts if the schema migration fails.",
+      "suggested_fix": "Add a dependency from 'update_api' to 'migrate_schema' to ensure proper execution order.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:route_traffic",
+      "task_id": "route_traffic",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'route_traffic' is executed before verifying 'update_api' completion, potentially leading to traffic routing to an outdated API if the update fails.",
+      "suggested_fix": "Add a dependency from 'route_traffic' to 'update_api' to ensure proper execution order.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:route_traffic",
+      "task_id": "route_traffic",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'route_traffic' depends on the completion of 'update_api' but lacks verification to confirm that the API contracts have been successfully updated.",
+      "suggested_fix": "Include a verification step after 'update_api' to ensure the API contracts are valid before proceeding to 'route_traffic'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mao-01-cyclic-handoff:2:2",
+    "plan_id": "plan-mao-01-cyclic-handoff-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:update_api",
+    "question": "Plan for goal 'mao-01-cyclic-handoff' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

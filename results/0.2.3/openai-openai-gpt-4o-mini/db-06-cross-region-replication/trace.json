@@ -1,0 +1,386 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-06-cross-region-replication",
+  "duration_seconds": 61.33,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-db-06-cross-region-replication-r4",
+    "goal_id": "db-06-cross-region-replication",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-db-06-cross-region-replication-r3",
+    "created_at": "2026-08-29T21:28:40.718168Z",
+    "tasks": [
+      {
+        "id": "setup_primary_replication",
+        "description": "Set up logical replication on primary PostgreSQL instance in us-east-1",
+        "action": "configure_replication",
+        "target": "primary_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "primary PostgreSQL instance is operational",
+            "fact": "primary_db_running",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replication status",
+          "how": "run pg_stat_replication query",
+          "expected": "no errors"
+        },
+        "rollback": {
+          "trigger": "replication setup fails",
+          "action": "remove replication configuration",
+          "safety_guard": "verify replication settings",
+          "restores_state": [
+            "replication configuration removed"
+          ],
+          "restoration_evidence": "successful backup of previous settings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "filter_databases",
+        "description": "Configure replication to filter only critical databases",
+        "action": "filter_databases",
+        "target": "replication_filter",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "logical replication is established",
+            "fact": "replication_established",
+            "established_by": "setup_primary_replication",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "filtered databases list",
+          "how": "check replication configuration",
+          "expected": "12 critical databases"
+        },
+        "rollback": {
+          "trigger": "filtering fails",
+          "action": "reset database filtering",
+          "safety_guard": "verify filtered databases",
+          "restores_state": [
+            "database filtering reset"
+          ],
+          "restoration_evidence": "previous filtering configuration restored"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "setup_standby_replication",
+        "description": "Set up standby PostgreSQL instance in eu-west-1",
+        "action": "configure_standby",
+        "target": "standby_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "standby PostgreSQL instance is operational",
+            "fact": "standby_db_created",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "filtered databases are confirmed operational",
+            "fact": "filtered_databases_operational",
+            "established_by": "filter_databases",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "standby status",
+          "how": "run pg_stat_replication query",
+          "expected": "no errors"
+        },
+        "rollback": {
+          "trigger": "standby setup fails",
+          "action": "remove standby configuration",
+          "safety_guard": "verify standby settings",
+          "restores_state": [
+            "standby configuration removed"
+          ],
+          "restoration_evidence": "successful backup of previous settings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_standby_setup",
+        "description": "Verify that standby replication is successfully established",
+        "action": "check_standby_replication",
+        "target": "standby_db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "standby replication setup is confirmed",
+            "fact": "standby_setup_completed",
+            "established_by": "setup_standby_replication",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "standby replication status",
+          "how": "run pg_stat_replication query",
+          "expected": "standby is connected and replicating"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "reset standby configuration",
+          "safety_guard": "verify standby settings",
+          "restores_state": [
+            "standby configuration reset"
+          ],
+          "restoration_evidence": "previous standby configuration verified"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "test_replication",
+        "description": "Test replication integrity and lag",
+        "action": "test_replication",
+        "target": "replication_test",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "replication lag",
+          "how": "check pg_xlog_location",
+          "expected": "< 5 seconds"
+        },
+        "rollback": {
+          "trigger": "test fails",
+          "action": "reset replication settings",
+          "safety_guard": "verify prior state",
+          "restores_state": [
+            "replication settings reset"
+          ],
+          "restoration_evidence": "previous configuration verified"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "setup_failback_procedure",
+        "description": "Implement automated failback procedure with defined simulation steps",
+        "action": "configure_failback",
+        "target": "failback",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "failback procedure",
+          "how": "simulate failback",
+          "expected": "successful recovery without data loss"
+        },
+        "rollback": {
+          "trigger": "failback setup fails",
+          "action": "remove failback configuration",
+          "safety_guard": "verify failback settings",
+          "restores_state": [
+            "failback configuration removed"
+          ],
+          "restoration_evidence": "successful backup of prior settings"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "quarterly_dr_drill",
+        "description": "Automate and verify full disaster recovery drill quarterly",
+        "action": "run_dr_drill",
+        "target": "dr_drill",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "dr drill results",
+          "how": "compare outputs to expected",
+          "expected": "successful DR with minimal issues"
+        },
+        "rollback": {
+          "trigger": "dr drill fails",
+          "action": "revert to previous drill configurations",
+          "safety_guard": "verify drill integrity",
+          "restores_state": [
+            "drill configuration reverted"
+          ],
+          "restoration_evidence": "previous configurations retained"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "setup_primary_replication",
+        "to_task": "filter_databases",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "filter_databases",
+        "to_task": "setup_standby_replication",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_standby_replication",
+        "to_task": "verify_standby_setup",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_standby_setup",
+        "to_task": "test_replication",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test_replication",
+        "to_task": "setup_failback_procedure",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_failback_procedure",
+        "to_task": "quarterly_dr_drill",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:feasibility:filter_databases",
+      "task_id": "filter_databases",
+      "version": 4,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The task cannot be executed as it requires established logical replication which is not guaranteed at this point.",
+      "suggested_fix": "Ensure logical replication is set up before filtering databases.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:setup_standby_replication",
+      "task_id": "setup_standby_replication",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "This task cannot proceed as it depends on filtered databases being confirmed operational, which are validated in a later task.",
+      "suggested_fix": "Reorder tasks to ensure that filtered databases are confirmed before setting up standby replication.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:test_replication",
+      "task_id": "test_replication",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "This task relies on the success of prior tasks without verification of whether the setup was completed successfully.",
+      "suggested_fix": "Add verification dependencies to ensure prior tasks were successful before testing replication.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:setup_failback_procedure",
+      "task_id": "setup_failback_procedure",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for this task does not adequately ensure the system can recover to a safe state after failure.",
+      "suggested_fix": "Implement a more robust rollback procedure that includes verification and restoration of all prior configurations.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:missing_steps:quarterly_dr_drill",
+      "task_id": "quarterly_dr_drill",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider including steps to handle potential failure points during the disaster recovery drill execution.",
+      "suggested_fix": "Add contingency planning steps to address possible issues that could arise during the DR drill.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-06-cross-region-replication:4:4",
+    "plan_id": "plan-db-06-cross-region-replication-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:feasibility:filter_databases",
+    "question": "Plan for goal 'db-06-cross-region-replication' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

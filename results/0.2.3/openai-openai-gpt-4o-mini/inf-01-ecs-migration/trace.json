@@ -1,0 +1,347 @@
+{
+  "dimension": "core-api",
+  "goal_id": "inf-01-ecs-migration",
+  "duration_seconds": 32.63,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-inf-01-ecs-migration-r3",
+    "goal_id": "inf-01-ecs-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-inf-01-ecs-migration-r2",
+    "created_at": "2026-08-29T21:31:16.175496Z",
+    "tasks": [
+      {
+        "id": "backup-instances",
+        "description": "Back up the EC2 instances configuration",
+        "action": "backup",
+        "target": "ec2-instances",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "EC2 instances are running",
+            "fact": "instances_running",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "backup completion",
+          "how": "check backup logs",
+          "expected": "backup successful"
+        },
+        "rollback": {
+          "trigger": "backup fails",
+          "action": "restore EC2 instances to previous state",
+          "safety_guard": "verify backup integrity",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "drain-traffic",
+        "description": "Drain traffic from EC2 instances",
+        "action": "drain",
+        "target": "ec2-instances",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Backup of EC2 instances is completed",
+            "fact": "backup_completed",
+            "established_by": "backup-instances",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic flow",
+          "how": "check logs",
+          "expected": "no traffic loss"
+        },
+        "rollback": {
+          "trigger": "traffic drain fails",
+          "action": "resume traffic to instances",
+          "safety_guard": "verify traffic return",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "migrate-to-ecs",
+        "description": "Migrate workloads from EC2 to ECS Fargate",
+        "action": "migrate",
+        "target": "ecs-fargate",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Traffic drain completed",
+            "fact": "traffic_drained",
+            "established_by": "drain-traffic",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application status",
+          "how": "check health checks",
+          "expected": "all services running"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore EC2 instances from backup",
+          "safety_guard": "ensure data consistency",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover",
+        "description": "Cutover traffic to ECS Fargate services",
+        "action": "cutover",
+        "target": "ecs-fargate",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Migration completed successfully",
+            "fact": "migration_successful",
+            "established_by": "migrate-to-ecs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic routing",
+          "how": "monitor DNS changes",
+          "expected": "traffic flows to ECS"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "redirect traffic back to EC2",
+          "safety_guard": "confirm rollback readiness",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "backup-instances",
+        "to_task": "drain-traffic",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "drain-traffic",
+        "to_task": "migrate-to-ecs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate-to-ecs",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plan-inf-01-ecs-migration-r3:3:drain-traffic:rollback_state_undeclared",
+      "task_id": "drain-traffic",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'drain-traffic' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-inf-01-ecs-migration-r3:3:migrate-to-ecs:rollback_state_undeclared",
+      "task_id": "migrate-to-ecs",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'migrate-to-ecs' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-inf-01-ecs-migration-r3:3:cutover:rollback_state_undeclared",
+      "task_id": "cutover",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'cutover' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-inf-01-ecs-migration-r3:3:drain-traffic:rollback_state_undeclared",
+      "task_id": "drain-traffic",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'drain-traffic' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-inf-01-ecs-migration-r3:3:migrate-to-ecs:rollback_state_undeclared",
+      "task_id": "migrate-to-ecs",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'migrate-to-ecs' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-inf-01-ecs-migration-r3:3:cutover:rollback_state_undeclared",
+      "task_id": "cutover",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'cutover' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:missing_steps:drain-traffic",
+      "task_id": "drain-traffic",
+      "version": 3,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding steps to verify all instances are correctly draining traffic before proceeding to migration.",
+      "suggested_fix": "Add a verification step to ensure traffic has fully transitioned away from EC2 instances.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:missing_steps:cutover",
+      "task_id": "cutover",
+      "version": 3,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The cutover task could also cover scenarios where DNS propagation delays cause traffic to be routed incorrectly.",
+      "suggested_fix": "Include a step to monitor and handle DNS propagation issues during the cutover.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:cutover",
+      "task_id": "cutover",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The success of the cutover relies on the migration being successful, but no verification of the migration process completion is mentioned.",
+      "suggested_fix": "Add a specific check after the migration to confirm that it's successful before proceeding to cutover.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:inf-01-ecs-migration:3:3",
+    "plan_id": "plan-inf-01-ecs-migration-r3",
+    "version": 3,
+    "blocker_finding_id": null,
+    "question": "Plan for goal 'inf-01-ecs-migration' did not converge (converged_stalled). Decide next step.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

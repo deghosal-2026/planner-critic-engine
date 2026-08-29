@@ -1,0 +1,243 @@
+{
+  "dimension": "core-api",
+  "goal_id": "adv-02-auth-service-deploy",
+  "duration_seconds": 18.36,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-adv-02-auth-service-deploy-r2",
+    "goal_id": "adv-02-auth-service-deploy",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "adv-02-auth-service-deploy-v1",
+    "created_at": "2026-08-29T21:27:09.982273Z",
+    "tasks": [
+      {
+        "id": "run-tests",
+        "description": "Run all unit tests and integration tests",
+        "action": "test",
+        "target": "code",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Code is pushed to repository",
+            "fact": "code_pushed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy-canary",
+        "description": "Deploy canary version of authentication service",
+        "action": "deploy",
+        "target": "auth-service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Tests have passed",
+            "fact": "tests_passed",
+            "established_by": "run-tests",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "canary service metrics",
+          "how": "monitor logs and performance",
+          "expected": "meet predefined thresholds"
+        },
+        "rollback": {
+          "trigger": "canary deployment fails",
+          "action": "rollback canary deployment",
+          "safety_guard": "verify canary functionality",
+          "restores_state": [
+            "previous canary version"
+          ],
+          "restoration_evidence": "logs showing canary was restored successfully"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "full-deploy",
+        "description": "Deploy the full version of authentication service",
+        "action": "deploy",
+        "target": "auth-service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Canary deployment is successful",
+            "fact": "canary_successful",
+            "established_by": "deploy-canary",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "full service functionality",
+          "how": "test API endpoints",
+          "expected": "all endpoints return expected responses"
+        },
+        "rollback": {
+          "trigger": "full deployment fails",
+          "action": "rollback full deployment",
+          "safety_guard": "verify previous stable version",
+          "restores_state": [
+            "previous full version"
+          ],
+          "restoration_evidence": "logs showing full service was restored successfully"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "enable-feature-flag",
+        "description": "Enable feature flag for the authentication service",
+        "action": "enable",
+        "target": "feature-flag-auth",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Full deployment is successful",
+            "fact": "full_deployment_successful",
+            "established_by": "full-deploy",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "feature flag status",
+          "how": "check feature flag configuration",
+          "expected": "feature flag is enabled"
+        },
+        "rollback": {
+          "trigger": "feature flag causes issues",
+          "action": "disable feature flag",
+          "safety_guard": "verify that disabling resolves issues",
+          "restores_state": [
+            "feature flag is disabled"
+          ],
+          "restoration_evidence": "logs showing the feature flag was disabled successfully"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "run-tests",
+        "to_task": "deploy-canary",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-canary",
+        "to_task": "full-deploy",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "full-deploy",
+        "to_task": "enable-feature-flag",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:run-tests",
+      "task_id": "run-tests",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The plan does not confirm if the testing environment is set up adequately to run all unit and integration tests.",
+      "suggested_fix": "Ensure that the appropriate CI testing environment and dependencies are established before running tests.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:full-deploy",
+      "task_id": "full-deploy",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Full deploy is scheduled before confirming the performances of the canary deployment.",
+      "suggested_fix": "Ensure that canary deployment success is verified before proceeding to full deployment.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:enable-feature-flag",
+      "task_id": "enable-feature-flag",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The enabling of the feature flag is dependent on the full deployment being successful, which does not guarantee prior verification of critical functionality.",
+      "suggested_fix": "Introduce a verification step confirming that the full deployment functions correctly before enabling the feature flag.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:full-deploy",
+      "task_id": "full-deploy",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback strategy for the full deployment does not ensure that the previous stable version is guaranteed to function after restoration.",
+      "suggested_fix": "Implement thorough verification protocols to confirm that the last stable version is operational before a rollback is executed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

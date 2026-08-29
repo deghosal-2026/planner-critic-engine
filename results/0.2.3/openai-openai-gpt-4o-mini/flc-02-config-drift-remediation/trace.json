@@ -1,0 +1,260 @@
+{
+  "dimension": "core-api",
+  "goal_id": "flc-02-config-drift-remediation",
+  "duration_seconds": 20.44,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-flc-02-config-drift-remediation-r2",
+    "goal_id": "flc-02-config-drift-remediation",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "flc-02-config-drift-remediation-plan",
+    "created_at": "2026-08-29T21:40:58.831132Z",
+    "tasks": [
+      {
+        "id": "detect_drift",
+        "description": "Identify hosts that have drifted from the desired state",
+        "action": "run noop mode",
+        "target": "Puppet",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Puppet is operational",
+            "fact": "puppet_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "list of drifted hosts",
+          "how": "check output logs",
+          "expected": "detection report generated"
+        },
+        "rollback": {
+          "trigger": "detection fails",
+          "action": "notify admin",
+          "safety_guard": "ensure fallback communication",
+          "restores_state": [
+            "previous detection state"
+          ],
+          "restoration_evidence": "confirmation of admin notification"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "classify_drift",
+        "description": "Categorize drift by type",
+        "action": "analyze drifted hosts",
+        "target": "drift analysis",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "drifted hosts detected",
+            "fact": "hosts_detected",
+            "established_by": "detect_drift",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "drift classification report",
+          "how": "check classification output",
+          "expected": "classification completed"
+        },
+        "rollback": {
+          "trigger": "classification fails",
+          "action": "notify admin of classification issue",
+          "safety_guard": "ensure fallback communication",
+          "restores_state": [
+            "prior classification state"
+          ],
+          "restoration_evidence": "confirmation of admin notification"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "remediate_drift",
+        "description": "Auto-remediate drifted hosts in batches",
+        "action": "apply configuration",
+        "target": "drifted hosts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "drift classified",
+            "fact": "drift_classified",
+            "established_by": "classify_drift",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service health",
+          "how": "monitor service state",
+          "expected": "all services running"
+        },
+        "rollback": {
+          "trigger": "remediation fails",
+          "action": "revert to previous config",
+          "safety_guard": "validate service status",
+          "restores_state": [
+            "previous configuration state"
+          ],
+          "restoration_evidence": "confirmation of service status post-reversion"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "generate_report",
+        "description": "Generate a report of drift status and remediation",
+        "action": "compile findings",
+        "target": "drift report",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "remediation completed",
+            "fact": "remediation_status",
+            "established_by": "remediate_drift",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "report contents",
+          "how": "review generated report",
+          "expected": "accurate report reflecting drift and remediation"
+        },
+        "rollback": {
+          "trigger": "report generation fails",
+          "action": "notify admin of report issue",
+          "safety_guard": "ensure fallback communication",
+          "restores_state": [
+            "previous reporting state"
+          ],
+          "restoration_evidence": "confirmation of admin notification"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "detect_drift",
+        "to_task": "classify_drift",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "classify_drift",
+        "to_task": "remediate_drift",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "remediate_drift",
+        "to_task": "generate_report",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:detect_drift",
+      "task_id": "detect_drift",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The action 'run noop mode' may be infeasible if Puppet is not correctly configured or if the environment is not suitable for running in noop mode.",
+      "suggested_fix": "Ensure Puppet is properly configured and operational in the current environment before executing this task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:classify_drift",
+      "task_id": "classify_drift",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'classify_drift' is sequenced before the successful detection of drifted hosts, which is ordered incorrectly.",
+      "suggested_fix": "Ensure that 'classify_drift' only executes after 'detect_drift' has successfully completed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:remediate_drift",
+      "task_id": "remediate_drift",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for 'remediate_drift' lacks detail on how to validate the reversion of the previous configuration, which could lead to service states that are not in the expected prior state.",
+      "suggested_fix": "Enhance the rollback plan to provide detailed steps on how to verify that the service state is restored to the previous working configuration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:generate_report",
+      "task_id": "generate_report",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider including additional reporting components such as errors encountered during remediation and success metrics to provide a comprehensive overview.",
+      "suggested_fix": "Expand the scope of the report to reflect not just status but also performance metrics and errors for better analysis.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

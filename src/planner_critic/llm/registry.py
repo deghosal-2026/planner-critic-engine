@@ -64,6 +64,8 @@ class ProviderSpec:
     transport: str
     base_url: str
     model: str
+    model_version: str = ""
+    temperature: float | None = None
     api_key: str | None = None
     max_tokens: int | None = None
     timeout_s: float | None = None
@@ -126,11 +128,16 @@ class ProviderRegistry:
                 max_tokens_raw = spec_dict.get("max_tokens")
                 timeout_raw = spec_dict.get("timeout_s")
                 suppress_thinking_raw = spec_dict.get("suppress_thinking")
+                model_version_raw = spec_dict.get("model_version")
+                temperature_raw = spec_dict.get("temperature")
                 providers[name] = ProviderSpec(
                     name=name,
                     transport=str(spec_dict.get("transport", "openai-compatible")),
                     base_url=str(spec_dict.get("base_url", "")),
                     model=str(spec_dict.get("model", "")),
+                    model_version=str(model_version_raw)
+                    if isinstance(model_version_raw, str)
+                    else "",
                     api_key=str(api_key) if isinstance(api_key, str) else None,
                     max_tokens=(
                         int(max_tokens_raw) if isinstance(max_tokens_raw, (int, float)) else None
@@ -141,6 +148,9 @@ class ProviderRegistry:
                     suppress_thinking=bool(suppress_thinking_raw)
                     if isinstance(suppress_thinking_raw, bool)
                     else False,
+                    temperature=float(temperature_raw)
+                    if isinstance(temperature_raw, (int, float))
+                    else None,
                 )
         raw_roles = data.get("roles")
         roles: dict[str, str] = {}
@@ -168,6 +178,8 @@ class ProviderRegistry:
         max_tokens: int | None = None,
         timeout_s: float | None = None,
         suppress_thinking: bool = False,
+        model_version: str = "",
+        temperature: float | None = None,
     ) -> None:
         """Add (or replace) a provider and optionally bind it to a role.
 
@@ -183,6 +195,8 @@ class ProviderRegistry:
             suppress_thinking: When True, send vLLM's thinking-suppression
                 kwargs (Qwen-family models). Off by default for strict
                 OpenAI-compatible endpoints.
+            model_version: Optional model version string for DecisionContext.
+            temperature: Optional temperature setting for DecisionContext.
         """
         self.providers[name] = ProviderSpec(
             name=name,
@@ -193,6 +207,8 @@ class ProviderRegistry:
             max_tokens=max_tokens,
             timeout_s=timeout_s,
             suppress_thinking=suppress_thinking,
+            model_version=model_version,
+            temperature=temperature,
         )
         if role is not None:
             self.roles[role] = name
@@ -230,11 +246,13 @@ class ProviderRegistry:
         lines.append("[providers]")
         for name, spec in self.providers.items():
             api = f'\napi_key = "{spec.api_key}"' if spec.api_key else ""
+            ver = f'\nmodel_version = "{spec.model_version}"' if spec.model_version else ""
+            temp = f"\ntemperature = {spec.temperature}" if spec.temperature is not None else ""
             lines.append(
                 f'[providers."{name}"]\n'
                 f'transport = "{spec.transport}"\n'
                 f'base_url = "{spec.base_url}"\n'
-                f'model = "{spec.model}"{api}'
+                f'model = "{spec.model}"{api}{ver}{temp}'
             )
         return "\n".join(lines) + "\n"
 

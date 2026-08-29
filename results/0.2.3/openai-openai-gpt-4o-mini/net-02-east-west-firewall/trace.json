@@ -1,0 +1,430 @@
+{
+  "dimension": "core-api",
+  "goal_id": "net-02-east-west-firewall",
+  "duration_seconds": 62.08,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-net-02-east-west-firewall-r4",
+    "goal_id": "net-02-east-west-firewall",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-net-02-east-west-firewall-r3",
+    "created_at": "2026-08-29T21:54:15.266738Z",
+    "tasks": [
+      {
+        "id": "baseline-traffic",
+        "description": "Baseline current traffic patterns across the Kubernetes cluster",
+        "action": "observe",
+        "target": "traffic patterns",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kubernetes cluster is accessible",
+            "fact": "k8s_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Kubernetes accessibility",
+          "how": "check cluster status",
+          "expected": "Kubernetes cluster is accessible"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "define-allow-list",
+        "description": "Define allow-list rules based on observed traffic patterns",
+        "action": "create",
+        "target": "allow-list",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Traffic patterns have been baselined",
+            "fact": "traffic_baselined",
+            "established_by": "baseline-traffic",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "allow-list coverage",
+          "how": "compare against traffic logs",
+          "expected": "all traffic patterns accounted for"
+        },
+        "rollback": {
+          "trigger": "allow-list is missing infrequent patterns",
+          "action": "revert to previous rules",
+          "safety_guard": "verify no critical services are blocked",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy-audit-policies",
+        "description": "Deploy Calico policies in audit mode",
+        "action": "deploy",
+        "target": "Calico policies",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Allow-list rules are defined",
+            "fact": "allow_list_defined",
+            "established_by": "define-allow-list",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "policies deployed",
+          "how": "check policy status",
+          "expected": "policies are in audit mode"
+        },
+        "rollback": {
+          "trigger": "deployment of policies failed",
+          "action": "remove faulty policies",
+          "safety_guard": "ensure no critical service disruption",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-traffic-not-blocked",
+        "description": "Verify that no legitimate traffic is blocked",
+        "action": "check",
+        "target": "traffic flow",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Calico policies are in audit mode",
+            "fact": "policies_auditing",
+            "established_by": "deploy-audit-policies",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic logs",
+          "how": "tcpdump and Prometheus metrics",
+          "expected": "all expected traffic flows are functioning"
+        },
+        "rollback": {
+          "trigger": "legitimate traffic is blocked",
+          "action": "revert Calico policies to previous state",
+          "safety_guard": "ensure rollback does not affect other traffic",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "switch-enforce-mode",
+        "description": "Switch to enforce mode for Calico policies",
+        "action": "update",
+        "target": "Calico policies",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Legitimate traffic has been verified",
+            "fact": "traffic_verified",
+            "established_by": "verify-traffic-not-blocked",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service interactions",
+          "how": "monitor logs for denied connections",
+          "expected": "no critical service interactions are denied"
+        },
+        "rollback": {
+          "trigger": "critical service-to-service communication is blocked",
+          "action": "switch back to audit mode",
+          "safety_guard": "monitor service dependencies before rollback",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor-denied-connections",
+        "description": "Monitor for denied connections after switching to enforce mode",
+        "action": "monitor",
+        "target": "connection logs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Calico policies are in enforce mode",
+            "fact": "policies_enforcing",
+            "established_by": "switch-enforce-mode",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "denied connection logs",
+          "how": "analyze connection logs",
+          "expected": "no unexpected denials for legitimate traffic"
+        },
+        "rollback": {
+          "trigger": "incorrectly denied critical connections",
+          "action": "revert to previous monitoring state",
+          "safety_guard": "restore logs integrity",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "baseline-traffic",
+        "to_task": "define-allow-list",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "define-allow-list",
+        "to_task": "deploy-audit-policies",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-audit-policies",
+        "to_task": "verify-traffic-not-blocked",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-traffic-not-blocked",
+        "to_task": "switch-enforce-mode",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "switch-enforce-mode",
+        "to_task": "monitor-denied-connections",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plan-net-02-east-west-firewall-r4:4:define-allow-list:rollback_state_undeclared",
+      "task_id": "define-allow-list",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'define-allow-list' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-net-02-east-west-firewall-r4:4:verify-traffic-not-blocked:rollback_state_undeclared",
+      "task_id": "verify-traffic-not-blocked",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify-traffic-not-blocked' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-net-02-east-west-firewall-r4:4:switch-enforce-mode:rollback_state_undeclared",
+      "task_id": "switch-enforce-mode",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'switch-enforce-mode' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-net-02-east-west-firewall-r4:4:define-allow-list:rollback_state_undeclared",
+      "task_id": "define-allow-list",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'define-allow-list' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-net-02-east-west-firewall-r4:4:verify-traffic-not-blocked:rollback_state_undeclared",
+      "task_id": "verify-traffic-not-blocked",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify-traffic-not-blocked' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-net-02-east-west-firewall-r4:4:switch-enforce-mode:rollback_state_undeclared",
+      "task_id": "switch-enforce-mode",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'switch-enforce-mode' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:define-allow-list",
+      "task_id": "define-allow-list",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task to define allow-list rules is executed before baselining traffic patterns, which is a hard prerequisite.",
+      "suggested_fix": "Ensure the 'baseline-traffic' task runs and completes successfully before 'define-allow-list'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:switch-enforce-mode",
+      "task_id": "switch-enforce-mode",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task to switch to enforce mode depends on verification of legitimate traffic, but the rollback does not account for ensuring that all critical services remain functional before proceeding.",
+      "suggested_fix": "Add a verification step to confirm that all critical services are operational before executing 'switch-enforce-mode'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:switch-enforce-mode",
+      "task_id": "switch-enforce-mode",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action for switching to enforce mode may not ensure all critical services are upheld, risking service downtime if not careful.",
+      "suggested_fix": "Enhance the rollback procedure to include a verification of critical service dependencies before switching back to audit mode.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:missing_steps:monitor-denied-connections",
+      "task_id": "monitor-denied-connections",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The monitoring of denied connections post-enforce mode could include additional checks for service specific interactions that may not be covered.",
+      "suggested_fix": "Include a step to specifically verify critical service relations and unexpected denials in the monitoring process.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:net-02-east-west-firewall:4:4",
+    "plan_id": "plan-net-02-east-west-firewall-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:define-allow-list",
+    "question": "Plan for goal 'net-02-east-west-firewall' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

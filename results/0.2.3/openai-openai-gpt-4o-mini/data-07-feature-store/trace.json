@@ -1,0 +1,300 @@
+{
+  "dimension": "core-api",
+  "goal_id": "data-07-feature-store",
+  "duration_seconds": 15.12,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-data-07-feature-store-r2",
+    "goal_id": "data-07-feature-store",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "data-07-feature-store-plan",
+    "created_at": "2026-08-29T21:43:33.477716Z",
+    "tasks": [
+      {
+        "id": "define_features",
+        "description": "Define feature specifications for ML",
+        "action": "define",
+        "target": "feature_specs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "project requirements gathered",
+            "fact": "requirements_defined",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "backfill_features",
+        "description": "Backfill historical features from data warehouse",
+        "action": "backfill",
+        "target": "historical_features",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "feature availability in production",
+          "how": "query feature store",
+          "expected": "all historical features available"
+        },
+        "rollback": {
+          "trigger": "backfill fails or takes too long",
+          "action": "revert to previous state",
+          "safety_guard": "ensure backup of current state exists",
+          "restores_state": [
+            "historical_features"
+          ],
+          "restoration_evidence": "check availability of historical features in production"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy_feast",
+        "description": "Deploy Feast online serving",
+        "action": "deploy",
+        "target": "feast_service",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Feast service health",
+          "how": "ping service",
+          "expected": "service responds correctly"
+        },
+        "rollback": {
+          "trigger": "deployment failure",
+          "action": "roll back to previous version",
+          "safety_guard": "check service health before rollback",
+          "restores_state": [
+            "feast_service"
+          ],
+          "restoration_evidence": "service responds correctly before and after rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_parity",
+        "description": "Verify online-offline parity",
+        "action": "verify",
+        "target": "parity",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "parity metrics",
+          "how": "compare online and offline metrics",
+          "expected": "metrics within acceptable skew limits"
+        },
+        "rollback": {
+          "trigger": "parity skew detected",
+          "action": "reconfigure serving to fallback",
+          "safety_guard": "ensure fallback mechanisms are ready",
+          "restores_state": [
+            "previous_serving_config"
+          ],
+          "restoration_evidence": "check metrics post-restoration"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "integrate_ml_pipeline",
+        "description": "Integrate Feast with ML training pipeline",
+        "action": "integrate",
+        "target": "ml_pipeline",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Feast service deployed",
+            "fact": "feast_deployed",
+            "established_by": "deploy_feast",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "integration successful",
+          "how": "run integration tests",
+          "expected": "all tests pass"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor_feature_freshness",
+        "description": "Monitor feature freshness for updates",
+        "action": "monitor",
+        "target": "feature_freshness",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "integration completed",
+            "fact": "pipeline_integrated",
+            "established_by": "integrate_ml_pipeline",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define_features",
+        "to_task": "backfill_features",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "backfill_features",
+        "to_task": "deploy_feast",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_feast",
+        "to_task": "verify_parity",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_feast",
+        "to_task": "integrate_ml_pipeline",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "integrate_ml_pipeline",
+        "to_task": "monitor_feature_freshness",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:backfill_features",
+      "task_id": "backfill_features",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Backfill historical features task should not occur before defining feature specifications.",
+      "suggested_fix": "Reorder tasks to ensure 'define_features' is completed before 'backfill_features'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:deploy_feast",
+      "task_id": "deploy_feast",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Deploy Feast task should not occur before backfilling historical features.",
+      "suggested_fix": "Reorder tasks to ensure 'backfill_features' is completed before 'deploy_feast'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:verify_parity",
+      "task_id": "verify_parity",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Verify online-offline parity task should not occur before deploying Feast.",
+      "suggested_fix": "Reorder tasks to ensure 'deploy_feast' is completed before 'verify_parity'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:integrate_ml_pipeline",
+      "task_id": "integrate_ml_pipeline",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Integrate ML pipeline task should not occur before deploying Feast.",
+      "suggested_fix": "Reorder tasks to ensure 'deploy_feast' is completed before 'integrate_ml_pipeline'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:monitor_feature_freshness",
+      "task_id": "monitor_feature_freshness",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Monitor feature freshness task should not occur before integrating ML pipeline.",
+      "suggested_fix": "Reorder tasks to ensure 'integrate_ml_pipeline' is completed before 'monitor_feature_freshness'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

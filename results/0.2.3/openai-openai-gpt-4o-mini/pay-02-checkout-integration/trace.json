@@ -1,0 +1,328 @@
+{
+  "dimension": "core-api",
+  "goal_id": "pay-02-checkout-integration",
+  "duration_seconds": 21.7,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-pay-02-checkout-integration-r2",
+    "goal_id": "pay-02-checkout-integration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "pay-02-checkout-integration-plan",
+    "created_at": "2026-08-29T21:29:08.991032Z",
+    "tasks": [
+      {
+        "id": "sdk_swap",
+        "description": "Replace Stripe Elements with Adyen Web Drop-in component",
+        "action": "replace",
+        "target": "checkout form",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "development environment is set up with required tools",
+            "fact": "dev_env_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "checkout form functionality",
+          "how": "run component tests in Jest",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "revert to Stripe Elements",
+          "safety_guard": "verify functional coverage in Jest",
+          "restores_state": [
+            "checkout form state"
+          ],
+          "restoration_evidence": "functional tests in Jest show no regressions"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "tokenization_migration",
+        "description": "Migrate tokenization from Stripe to Adyen",
+        "action": "migrate",
+        "target": "backend",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Adyen account is configured for tokenization",
+            "fact": "adyen_tokenization_ready",
+            "established_by": "sdk_swap",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "backend accepts Adyen token format",
+          "how": "run integration tests",
+          "expected": "all token scenarios succeed"
+        },
+        "rollback": {
+          "trigger": "new token format breaks backend",
+          "action": "restore Stripe token handling",
+          "safety_guard": "verify backend token acceptance",
+          "restores_state": [
+            "tokenization state"
+          ],
+          "restoration_evidence": "previous tokenization tests pass"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "3ds_sca_configuration",
+        "description": "Configure Strong Customer Authentication flow",
+        "action": "configure",
+        "target": "3DS2 implementation",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Adyen SDK is integrated into the project",
+            "fact": "adyen_sdk_integrated",
+            "established_by": "sdk_swap",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "3DS2 challenge flow",
+          "how": "test with various card networks",
+          "expected": "successful challenge flows"
+        },
+        "rollback": {
+          "trigger": "3DS flow fails",
+          "action": "reset to previous 3DS setup",
+          "safety_guard": "ensure previous configuration is intact",
+          "restores_state": [
+            "3DS configuration state"
+          ],
+          "restoration_evidence": "previous 3DS configuration tests pass"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "sandbox_testing",
+        "description": "Test all card networks and 3DS flows in Adyen sandbox",
+        "action": "test",
+        "target": "Adyen sandbox",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "3DS configuration is complete",
+            "fact": "3ds_sca_configured",
+            "established_by": "3ds_sca_configuration",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "sandbox testing results",
+          "how": "check logs and metrics",
+          "expected": "no errors or issues reported"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "canary_release",
+        "description": "Deploy the new checkout feature to 5% of users via feature flag",
+        "action": "deploy",
+        "target": "5% of users",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "sandbox testing has completed successfully",
+            "fact": "sandbox_tests_passed",
+            "established_by": "sandbox_testing",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "error rates in production",
+          "how": "monitor analytics",
+          "expected": "error rates below threshold"
+        },
+        "rollback": {
+          "trigger": "high error rate detected",
+          "action": "revert feature flag to Stripe Elements",
+          "safety_guard": "monitor logs for error spikes",
+          "restores_state": [
+            "previous feature state"
+          ],
+          "restoration_evidence": "monitoring shows normal error rates"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "full_rollout",
+        "description": "Release the new checkout feature to 100% of users",
+        "action": "release",
+        "target": "all users",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary release was successful without issues",
+            "fact": "canary_release_successful",
+            "established_by": "canary_release",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "user feedback and error logs",
+          "how": "collect user metrics",
+          "expected": "no critical issues reported"
+        },
+        "rollback": {
+          "trigger": "critical issue found post rollout",
+          "action": "disable new feature and revert to old checkout",
+          "safety_guard": "ensure rollback process is tested",
+          "restores_state": [
+            "full rollout state"
+          ],
+          "restoration_evidence": "monitoring shows no new critical issues"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "sdk_swap",
+        "to_task": "tokenization_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "tokenization_migration",
+        "to_task": "3ds_sca_configuration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "3ds_sca_configuration",
+        "to_task": "sandbox_testing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "sandbox_testing",
+        "to_task": "canary_release",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "canary_release",
+        "to_task": "full_rollout",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:sandbox_testing",
+      "task_id": "sandbox_testing",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The task relies on the completion of 3DS configuration, which may not be verified until all critical tests pass.",
+      "suggested_fix": "Ensure 3DS flow testing is completed successfully before proceeding with sandbox testing.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:canary_release",
+      "task_id": "canary_release",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Canary release is dependent on successful sandbox testing, which has a rollback step missing. This can lead to uncontrollable rollbacks if issues arise post-deployment.",
+      "suggested_fix": "Establish a rollback plan for the canary release that includes resetting to the previous feature flag state without adverse impacts.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:full_rollout",
+      "task_id": "full_rollout",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Full rollout depends on the successful completion of canary release, but no rollback plan ensures safety if critical issues are found post rollout.",
+      "suggested_fix": "Incorporate a robust rollback plan for the full rollout that guarantees the ability to revert to the previous checkout system.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:tokenization_migration",
+      "task_id": "tokenization_migration",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider documenting how to handle situations where the new token format cannot be accepted for legacy systems post-migration.",
+      "suggested_fix": "Add a contingency plan for legacy system compatibility during the tokenization migration process.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

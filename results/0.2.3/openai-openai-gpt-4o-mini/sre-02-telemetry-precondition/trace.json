@@ -1,0 +1,170 @@
+{
+  "dimension": "core-api",
+  "goal_id": "sre-02-telemetry-precondition",
+  "duration_seconds": 15.36,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-sre-02-telemetry-precondition-r2",
+    "goal_id": "sre-02-telemetry-precondition",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plan-sre-02-telemetry-precondition",
+    "created_at": "2026-08-29T21:38:23.463379Z",
+    "tasks": [
+      {
+        "id": "check_health",
+        "description": "Check health of pods in the batch",
+        "action": "check_health",
+        "target": "pods",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "pod health status",
+          "how": "query prometheus for health metrics",
+          "expected": "all pods are healthy"
+        },
+        "rollback": {
+          "trigger": "health check fails",
+          "action": "notify team and hold drain",
+          "safety_guard": "repeat health check after delay",
+          "restores_state": [
+            "pod health is restored"
+          ],
+          "restoration_evidence": "metrics show all pods healthy"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "drain_batch",
+        "description": "Drain a batch of pods",
+        "action": "drain",
+        "target": "pods",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "health check confirms previous batch",
+            "fact": "previous_batch_healthy",
+            "established_by": "check_health",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "drain success",
+          "how": "check kubectl logs for confirmation",
+          "expected": "drain command returns success"
+        },
+        "rollback": {
+          "trigger": "drain fails",
+          "action": "restore pod state and replace unscheduled pods",
+          "safety_guard": "confirm pod states and provision resources as needed",
+          "restores_state": [
+            "pods reverted to pre-drain condition"
+          ],
+          "restoration_evidence": "logs show rollback success and pods are running"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_health",
+        "to_task": "drain_batch",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:drain_batch",
+      "task_id": "drain_batch",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'drain_batch' depends on 'check_health' for the verification of the previous batch's health, but this dependency is not clearly established. It should be explicitly stated that 'check_health' must complete successfully before 'drain_batch' can proceed.",
+      "suggested_fix": "Verify the dependency link to ensure 'check_health' must succeed before 'drain_batch' execution.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:drain_batch",
+      "task_id": "drain_batch",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'drain_batch' lacks assurance that pod state restoration will execute correctly under all failure conditions, particularly if multiple pods are involved.",
+      "suggested_fix": "Enhance the rollback procedure to explicitly clarify how pod states will be reverted, especially in edge cases.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:drain_batch",
+      "task_id": "drain_batch",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The plan could also include a confirmation step after the health check before proceeding to drain the batch to double-check the state of the pods.",
+      "suggested_fix": "Add a confirmation step to validate pod health status immediately before the drain operation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:sre-02-telemetry-precondition:2:2",
+    "plan_id": "plan-sre-02-telemetry-precondition-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unverified_dependencies:drain_batch",
+    "question": "Plan for goal 'sre-02-telemetry-precondition' cannot be approved: blockers remain (llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=2"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

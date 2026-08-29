@@ -1,0 +1,419 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mch-01-env-promotion",
+  "duration_seconds": 61.68,
+  "result": {
+    "status": "escalated",
+    "reason_code": "plan_oscillation_detected",
+    "revision_count": 4,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-mch-01-env-promotion-r4",
+    "goal_id": "mch-01-env-promotion",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-mch-01-env-promotion-r3",
+    "created_at": "2026-08-29T21:46:51.043087Z",
+    "tasks": [
+      {
+        "id": "deploy-dev",
+        "description": "Deploy API version to development environment",
+        "action": "deploy",
+        "target": "dev",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dev environment is accessible",
+            "fact": "dev_env_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-dev",
+        "description": "Run unit tests on development deployment",
+        "action": "test",
+        "target": "dev",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "unit test results",
+          "how": "check logs",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "unit tests fail",
+          "action": "rollback deployment",
+          "safety_guard": "run backup tests",
+          "restores_state": [
+            "deploy-dev"
+          ],
+          "restoration_evidence": "verify backup integrity"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "promote-to-staging",
+        "description": "Promote API version to staging environment",
+        "action": "promote",
+        "target": "staging",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "previous dev stage passed",
+            "fact": "dev_tests_passed",
+            "established_by": "verify-dev",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "promotion success confirmation",
+          "how": "check staging logs",
+          "expected": "promotion log's success message"
+        },
+        "rollback": {
+          "trigger": "promotion fails",
+          "action": "revert to previous version",
+          "safety_guard": "validate prior state",
+          "restores_state": [
+            "deploy-staging"
+          ],
+          "restoration_evidence": "check previous version logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy-staging",
+        "description": "Deploy API version to staging environment",
+        "action": "deploy",
+        "target": "staging",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "staging environment is accessible",
+            "fact": "staging_env_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment confirmation",
+          "how": "check deployment logs",
+          "expected": "deployment log's success message"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-staging",
+        "description": "Run integration tests and smoke tests in staging",
+        "action": "test",
+        "target": "staging",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "integration and smoke test results",
+          "how": "check test suite",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "integration tests or smoke tests fail",
+          "action": "rollback staging deployment",
+          "safety_guard": "ensure logs are intact",
+          "restores_state": [
+            "deploy-staging"
+          ],
+          "restoration_evidence": "check logs for consistency"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "promote-to-prod",
+        "description": "Promote API version to production environment",
+        "action": "promote",
+        "target": "prod",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "previous staging stage passed",
+            "fact": "staging_tests_passed",
+            "established_by": "verify-staging",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "production promotion success confirmation",
+          "how": "check production logs",
+          "expected": "promotion log's success message"
+        },
+        "rollback": {
+          "trigger": "promotion fails",
+          "action": "revert to previous version",
+          "safety_guard": "validate prior state",
+          "restores_state": [
+            "deploy-prod"
+          ],
+          "restoration_evidence": "check previous version logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "canary-release-5",
+        "description": "Release API to 5% of production traffic",
+        "action": "release",
+        "target": "prod",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "canary performance metrics",
+          "how": "check Prometheus metrics",
+          "expected": "no critical errors"
+        },
+        "rollback": {
+          "trigger": "issues detected",
+          "action": "remove canary traffic",
+          "safety_guard": "monitor logs for errors",
+          "restores_state": [
+            "full-production"
+          ],
+          "restoration_evidence": "check for normal traffic levels"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "canary-release-25",
+        "description": "Increase API traffic to 25% after 5% success",
+        "action": "release",
+        "target": "prod",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "5% canary release was successful",
+            "fact": "canary_release_5_success",
+            "established_by": "canary-release-5",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "canary performance metrics",
+          "how": "check Prometheus metrics",
+          "expected": "no critical errors"
+        },
+        "rollback": {
+          "trigger": "issues detected",
+          "action": "remove canary traffic",
+          "safety_guard": "monitor logs for errors",
+          "restores_state": [
+            "canary-release-5"
+          ],
+          "restoration_evidence": "check Prometheus metrics for stability"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "full-release",
+        "description": "Release API to 100% of production traffic",
+        "action": "release",
+        "target": "prod",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "25% canary release was successful",
+            "fact": "canary_release_25_success",
+            "established_by": "canary-release-25",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "production performance metrics",
+          "how": "check Prometheus metrics",
+          "expected": "100% traffic stable"
+        },
+        "rollback": {
+          "trigger": "issues detected",
+          "action": "remove full traffic",
+          "safety_guard": "monitor logs for errors",
+          "restores_state": [
+            "canary-release-25"
+          ],
+          "restoration_evidence": "check metrics for anomalies"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy-dev",
+        "to_task": "verify-dev",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-dev",
+        "to_task": "promote-to-staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote-to-staging",
+        "to_task": "deploy-staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy-staging",
+        "to_task": "verify-staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-staging",
+        "to_task": "promote-to-prod",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "promote-to-prod",
+        "to_task": "canary-release-5",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "canary-release-5",
+        "to_task": "canary-release-25",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "canary-release-25",
+        "to_task": "full-release",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:promote-to-staging",
+      "task_id": "promote-to-staging",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The promotion to staging occurs before deploy-staging is completed.",
+      "suggested_fix": "Ensure 'deploy-staging' is completed successfully before proceeding to 'promote-to-staging'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:missing_steps:canary-release-5",
+      "task_id": "canary-release-5",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding health checks after 5% canary release to ensure system stability.",
+      "suggested_fix": "Insert health checks between 'canary-release-5' and 'canary-release-25'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:missing_steps:canary-release-25",
+      "task_id": "canary-release-25",
+      "version": 4,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding health checks after 25% canary release to confirm system is functioning as expected.",
+      "suggested_fix": "Insert health checks between 'canary-release-25' and 'full-release'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:promote-to-prod",
+      "task_id": "promote-to-prod",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task relies on 'staging_tests_passed' which is never established.",
+      "suggested_fix": "Ensure that 'staging_tests_passed' is verified after 'verify-staging'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mch-01-env-promotion:4:4",
+    "plan_id": "plan-mch-01-env-promotion-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:promote-to-staging",
+    "question": "Plan for goal 'mch-01-env-promotion' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=9"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

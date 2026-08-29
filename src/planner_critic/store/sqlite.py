@@ -19,6 +19,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, cast
 
+from ..schema.acceptance import AcceptanceContract
 from ..schema.plan import PlanVersion
 from ..types import Escalation, ExecutionTrace, Finding
 from .base import PlanDiff, PlanStore, StoreUnavailable, _compute_diff
@@ -43,6 +44,7 @@ class SQLiteStore(PlanStore):
             StoreUnavailable: if the database cannot be opened or migrated.
         """
         self._path = str(path)
+        self._contracts: dict[str, AcceptanceContract] = {}
         try:
             self._conn = sqlite3.connect(self._path)
             self._conn.row_factory = sqlite3.Row
@@ -234,6 +236,14 @@ class SQLiteStore(PlanStore):
     def close(self) -> None:
         """Close the underlying connection."""
         self._conn.close()
+
+    def put_acceptance_contract(self, contract: AcceptanceContract) -> None:
+        """Persist an acceptance contract by goal_id."""
+        self._contracts[contract.goal_id] = contract
+
+    def get_acceptance_contract(self, goal_id: str) -> AcceptanceContract | None:
+        """Return the acceptance contract for a goal, or None."""
+        return self._contracts.get(goal_id)
 
     # -- internals ------------------------------------------------------------
     def _execute(self, sql: str, params: tuple[Any, ...] | dict[str, Any]) -> None:

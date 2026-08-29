@@ -1,0 +1,358 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ai-01-llm-gateway",
+  "duration_seconds": 25.61,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-ai-01-llm-gateway-r2",
+    "goal_id": "ai-01-llm-gateway",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "ai-01-llm-gateway-plan",
+    "created_at": "2026-08-29T21:28:50.152192Z",
+    "tasks": [
+      {
+        "id": "deploy_gateway",
+        "description": "Deploy the LLM gateway with API key management",
+        "action": "deploy",
+        "target": "LiteLLM",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Helm is installed",
+            "fact": "helm_installed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "gateway availability",
+          "how": "ping gateway endpoint",
+          "expected": "gateway responds"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "destroy gateway",
+          "safety_guard": "ensure no active consumers",
+          "restores_state": [
+            "no gateway deployed"
+          ],
+          "restoration_evidence": "check if the gateway is destroyed and no resources are active"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_rate_limiting",
+        "description": "Configure rate limiting per consumer (100 requests/min)",
+        "action": "configure",
+        "target": "rate limiting",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "gateway is deployed",
+            "fact": "gateway_deployed",
+            "established_by": "deploy_gateway",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "rate limit functionality",
+          "how": "send requests to the gateway and measure responses",
+          "expected": "limited to 100 requests/min"
+        },
+        "rollback": {
+          "trigger": "rate limiting configuration fails",
+          "action": "remove rate limiting",
+          "safety_guard": "ensure no ongoing usage exceeds limits",
+          "restores_state": [
+            "rate limiting removed"
+          ],
+          "restoration_evidence": "check if rate limiting is absent and logs are normal"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "set_up_canary_routing",
+        "description": "Set up canary routing (90% GPT-4o-mini, 10% Claude)",
+        "action": "configure",
+        "target": "routing",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "rate limiting is configured",
+            "fact": "rate_limiting_configured",
+            "established_by": "configure_rate_limiting",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_model_routing",
+        "description": "Configure model routing rules for optimal selection",
+        "action": "configure",
+        "target": "model routing",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary routing set up",
+            "fact": "canary_routing_set_up",
+            "established_by": "set_up_canary_routing",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "model selection accuracy",
+          "how": "review routing logs",
+          "expected": "meets quality standards"
+        },
+        "rollback": {
+          "trigger": "routing fails",
+          "action": "reset to default routing",
+          "safety_guard": "ensure fallback to previous model",
+          "restores_state": [
+            "previous routing restored"
+          ],
+          "restoration_evidence": "check routing logs for previous configurations"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy_monitoring",
+        "description": "Deploy monitoring for token usage, latency, error rate",
+        "action": "deploy",
+        "target": "monitoring tools",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "model routing is configured",
+            "fact": "model_routing_configured",
+            "established_by": "configure_model_routing",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "monitoring reports",
+          "how": "check monitoring dashboard",
+          "expected": "all metrics are being reported"
+        },
+        "rollback": {
+          "trigger": "monitoring deployment fails",
+          "action": "remove monitoring tools",
+          "safety_guard": "ensure no critical metrics are impacted",
+          "restores_state": [
+            "monitoring removed"
+          ],
+          "restoration_evidence": "check if monitoring tools are absent"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_failover",
+        "description": "Verify failover to backup provider",
+        "action": "test",
+        "target": "failover mechanism",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "monitoring is deployed",
+            "fact": "monitoring_deployed",
+            "established_by": "deploy_monitoring",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "failover response time",
+          "how": "simulate primary provider failure",
+          "expected": "failover occurs within threshold"
+        },
+        "rollback": {
+          "trigger": "failover test fails",
+          "action": "revert to primary provider",
+          "safety_guard": "monitor traffic during switch",
+          "restores_state": [
+            "use primary provider restored"
+          ],
+          "restoration_evidence": "check if traffic is redirected to the primary provider"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_gateway",
+        "to_task": "configure_rate_limiting",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_rate_limiting",
+        "to_task": "set_up_canary_routing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set_up_canary_routing",
+        "to_task": "configure_model_routing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_model_routing",
+        "to_task": "deploy_monitoring",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_monitoring",
+        "to_task": "verify_failover",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:set_up_canary_routing",
+      "task_id": "set_up_canary_routing",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Canary routing is set up before verifying rate limiting configuration, which is essential to ensure that rate limits are enforced prior to routing traffic.",
+      "suggested_fix": "Reorder tasks to ensure 'configure_rate_limiting' is completed and verified before 'set_up_canary_routing'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:configure_model_routing",
+      "task_id": "configure_model_routing",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Model routing depends on canary routing being set up, but 'set_up_canary_routing' does not have a verification step, which risks proceeding without confirmation of successful canary routing setup.",
+      "suggested_fix": "Add verification to 'set_up_canary_routing' to confirm that the canary routing is operational before moving to 'configure_model_routing'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:set_up_canary_routing",
+      "task_id": "set_up_canary_routing",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The task to set up canary routing does not include rollback steps, which may lead to challenges in reverting configurations if issues arise during deployment.",
+      "suggested_fix": "Include rollback actions for 'set_up_canary_routing' to safely revert to the previous route if necessary.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:configure_model_routing",
+      "task_id": "configure_model_routing",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Model routing configuration could benefit from additional steps to verify the logic behind the optimal model selection, reducing potential misrouting risks.",
+      "suggested_fix": "Add verification steps for the model selection logic post-configuration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:verify_failover",
+      "task_id": "verify_failover",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Failover verification lacks a preliminary step to ensure the primary provider is operational before testing failover scenarios.",
+      "suggested_fix": "Add a pre-check task to verify the primary provider is functioning correctly before initiating the failover test.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:deploy_monitoring",
+      "task_id": "deploy_monitoring",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for monitoring tools does not address potential impacts on ongoing metrics gathering, which could lead to critical blind spots.",
+      "suggested_fix": "Adjust rollback for 'deploy_monitoring' to ensure a temporary monitoring solution remains operational during the process.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,287 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dr-03-both-sides-failover",
+  "duration_seconds": 16.56,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-dr-03-both-sides-failover-r2",
+    "goal_id": "dr-03-both-sides-failover",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "dr-03-both-sides-failover-v1",
+    "created_at": "2026-08-29T21:36:52.207889Z",
+    "tasks": [
+      {
+        "id": "failover_dns",
+        "description": "Failover DNS from primary to secondary region",
+        "action": "failover",
+        "target": "Route53",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "primary DNS is healthy",
+            "fact": "dns_primary_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "DNS resolution",
+          "how": "resolve DNS query",
+          "expected": "secondary region IP"
+        },
+        "rollback": {
+          "trigger": "failover fails",
+          "action": "restore DNS to primary",
+          "safety_guard": "check DNS records",
+          "restores_state": [
+            "primary DNS records"
+          ],
+          "restoration_evidence": "confirmed primary DNS records restored"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "scale_up_secondary",
+        "description": "Scale up application deployment in secondary region",
+        "action": "scale_up",
+        "target": "ArgoCD",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DNS failover is successful",
+            "fact": "dns_failover_success",
+            "established_by": "failover_dns",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application health",
+          "how": "check application metrics",
+          "expected": "up and running"
+        },
+        "rollback": {
+          "trigger": "scale up fails",
+          "action": "scale down secondary",
+          "safety_guard": "check application status",
+          "restores_state": [
+            "previous application state"
+          ],
+          "restoration_evidence": "application successfully scaled down and verified operational"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "scale_down_primary",
+        "description": "Scale down application deployment in primary region",
+        "action": "scale_down",
+        "target": "ArgoCD",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "secondary application is healthy",
+            "fact": "app_secondary_healthy",
+            "established_by": "scale_up_secondary",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application deployment state",
+          "how": "check deployment metrics and logs",
+          "expected": "primary application scaled down correctly"
+        },
+        "rollback": {
+          "trigger": "scale down fails",
+          "action": "resize primary application",
+          "safety_guard": "check application metrics",
+          "restores_state": [
+            "previous deployment state"
+          ],
+          "restoration_evidence": "metrics indicate primary application is restored"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_data_consistency",
+        "description": "Verify data consistency across regions",
+        "action": "check_data",
+        "target": "database",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "both applications are running",
+            "fact": "apps_running",
+            "established_by": "scale_up_secondary",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data consistency",
+          "how": "compare databases",
+          "expected": "data matches"
+        },
+        "rollback": {
+          "trigger": "data inconsistency found",
+          "action": "rollback to last consistent state",
+          "safety_guard": "check audit logs",
+          "restores_state": [
+            "last known consistent database state"
+          ],
+          "restoration_evidence": "audit logs confirm rollback"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutback_traffic",
+        "description": "Cut back traffic to primary region",
+        "action": "cutback",
+        "target": "Route53",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "data consistency verified",
+            "fact": "data_consistency_verified",
+            "established_by": "verify_data_consistency",
+            "probe": null
+          },
+          {
+            "description": "secondary application is healthy",
+            "fact": "app_secondary_healthy",
+            "established_by": "scale_up_secondary",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "no split-brain conditions",
+          "how": "monitor application behavior",
+          "expected": "no discrepancies"
+        },
+        "rollback": {
+          "trigger": "traffic cutback fails",
+          "action": "restore traffic to primary",
+          "safety_guard": "check traffic flow",
+          "restores_state": [
+            "full traffic to primary"
+          ],
+          "restoration_evidence": "verified traffic flows back to primary without issues"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "failover_dns",
+        "to_task": "scale_up_secondary",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "scale_up_secondary",
+        "to_task": "scale_down_primary",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "scale_up_secondary",
+        "to_task": "verify_data_consistency",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_data_consistency",
+        "to_task": "cutback_traffic",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:cutback_traffic",
+      "task_id": "cutback_traffic",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Cutback traffic before ensuring secondary application is fully healthy may lead to service disruption.",
+      "suggested_fix": "Reorder cutback_traffic to occur only after both applications are confirmed healthy and data consistency is verified.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:cutback_traffic",
+      "task_id": "cutback_traffic",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Traffic cutback depends on the health of the secondary application, which is not explicitly verified before cutback.",
+      "suggested_fix": "Add an independent verification step to confirm that the secondary application is healthy before proceeding with traffic cutback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:risk:scale_up_secondary",
+      "task_id": "scale_up_secondary",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Scaling up secondary application without ensuring DNS failover may increase risk of inconsistency.",
+      "suggested_fix": "Consider synchronizing scaling actions with DNS failover verification.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

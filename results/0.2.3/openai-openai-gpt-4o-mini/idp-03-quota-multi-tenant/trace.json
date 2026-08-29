@@ -1,0 +1,163 @@
+{
+  "dimension": "core-api",
+  "goal_id": "idp-03-quota-multi-tenant",
+  "duration_seconds": 6.0,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "idp-03-quota-multi-tenant",
+    "goal_id": "idp-03-quota-multi-tenant",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-29T21:26:11.492382Z",
+    "tasks": [
+      {
+        "id": "quota-check",
+        "description": "Check for existing resource quota on the Kubernetes node",
+        "action": "check",
+        "target": "custom-quota-api",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "custom-quota-api is reachable",
+            "fact": "quota_api_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "scale-service",
+        "description": "Scale the service's CPU requests on the Kubernetes node",
+        "action": "scale",
+        "target": "kubectl",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service CPU requests",
+          "how": "check the service configuration",
+          "expected": "CPU requests <= 50% of node"
+        },
+        "rollback": {
+          "trigger": "scaling fails or causes issues",
+          "action": "rollback service to previous CPU requests",
+          "safety_guard": "verify service stability post-rollback",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "quota-check",
+        "to_task": "scale-service",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:idp-03-quota-multi-tenant:1:scale-service:rollback_state_undeclared",
+      "task_id": "scale-service",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'scale-service' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:idp-03-quota-multi-tenant:1:scale-service:rollback_state_undeclared",
+      "task_id": "scale-service",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'scale-service' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:unverified_dependencies:scale-service",
+      "task_id": "scale-service",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'scale-service' task depends on the successful completion of 'quota-check' for quota validation, but lacks verification that the quota has been checked before scaling.",
+      "suggested_fix": "Ensure that 'scale-service' task verifies that 'quota-check' has succeeded before execution.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:weak_rollback:scale-service",
+      "task_id": "scale-service",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback procedure for 'scale-service' does not include a clear method of restoring the CPU requests to a known good state if the service fails post-scaling.",
+      "suggested_fix": "Define specific actions to restore previous configurations or document recovery steps more clearly.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=2"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

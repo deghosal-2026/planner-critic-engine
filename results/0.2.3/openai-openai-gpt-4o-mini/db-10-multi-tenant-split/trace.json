@@ -1,0 +1,419 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-10-multi-tenant-split",
+  "duration_seconds": 67.19,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-db-10-multi-tenant-split-r4",
+    "goal_id": "db-10-multi-tenant-split",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-db-10-multi-tenant-split-r3",
+    "created_at": "2026-08-29T21:31:02.202963Z",
+    "tasks": [
+      {
+        "id": "enumerate_tenants",
+        "description": "Enumerate all tenants from the shared database or use fallback list",
+        "action": "query",
+        "target": "tenant_list",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "shared database is accessible",
+            "fact": "db_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "tenants are enumerated",
+          "how": "check if tenant_list matches expected output",
+          "expected": "tenant_list is not empty"
+        },
+        "rollback": {
+          "trigger": "failed to enumerate tenants",
+          "action": "use fallback tenant list",
+          "safety_guard": "verify fallback list validity",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "provision_databases",
+        "description": "Provision dedicated databases for each tenant",
+        "action": "provision",
+        "target": "dedicated_dbs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "tenant list is available",
+            "fact": "tenant_list",
+            "established_by": "enumerate_tenants",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "database provisioning success",
+          "how": "check db existence",
+          "expected": "all tenants have dedicated dbs"
+        },
+        "rollback": {
+          "trigger": "provisioning fails",
+          "action": "delete tenant databases",
+          "safety_guard": "verify no data loss",
+          "restores_state": [
+            "no dedicated databases exist"
+          ],
+          "restoration_evidence": "all databases are listed as deleted"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_provisioned_databases",
+        "description": "Verify that dedicated databases are fully provisioned",
+        "action": "verify",
+        "target": "dedicated_dbs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "provisioning of databases is attempted",
+            "fact": "dedicated_dbs_provisioned",
+            "established_by": "provision_databases",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "dedicated databases exist",
+          "how": "check existence of each tenant database",
+          "expected": "all dedicated databases exist"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "migrate_data",
+        "description": "Migrate data with row-level filtering to dedicated databases",
+        "action": "migrate",
+        "target": "dedicated_dbs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dedicated databases are verified as provisioned",
+            "fact": "dedicated_dbs_verified",
+            "established_by": "verify_provisioned_databases",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "row counts per tenant",
+          "how": "compare row counts before and after migration",
+          "expected": "row counts match expected values"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore data from shared db",
+          "safety_guard": "validate data integrity",
+          "restores_state": [
+            "data in dedicated dbs matches shared db"
+          ],
+          "restoration_evidence": "data integrity checks performed"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "setup_connection_routing",
+        "description": "Set up connection routing layer for per-tenant access",
+        "action": "configure",
+        "target": "HAProxy",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dedicated databases are confirmed provisioned",
+            "fact": "dedicated_dbs_verified",
+            "established_by": "verify_provisioned_databases",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "routing layer is operational",
+          "how": "test routing functionality",
+          "expected": "routing functions as expected"
+        },
+        "rollback": {
+          "trigger": "setup routing fails",
+          "action": "revert to previous routing configuration",
+          "safety_guard": "verify that routing layer is not operational",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "dual_write",
+        "description": "Implement dual-write to both shared and per-tenant databases during migration",
+        "action": "configure",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "connection routing is set up",
+            "fact": "routing_setup",
+            "established_by": "setup_connection_routing",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data consistency",
+          "how": "validate writes to shared and per-tenant databases",
+          "expected": "writes are consistent across both databases"
+        },
+        "rollback": {
+          "trigger": "dual-write configuration fails",
+          "action": "revert to single write",
+          "safety_guard": "ensure no data loss from shared db",
+          "restores_state": [
+            "application moves back to single-write mode"
+          ],
+          "restoration_evidence": "application functionality checks"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_row_counts",
+        "description": "Verify row counts for each tenant after migration",
+        "action": "verify",
+        "target": "data_integrity",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "data migration is complete",
+            "fact": "data_migrated",
+            "established_by": "migrate_data",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "row counts are accurate",
+          "how": "compare expected and actual row counts",
+          "expected": "all row counts match"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover_connections",
+        "description": "Cutover application connections tenant-by-tenant to dedicated databases",
+        "action": "cutover",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "row counts verified for all tenants",
+            "fact": "row_counts_verified",
+            "established_by": "verify_row_counts",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application connectivity",
+          "how": "test application functionality per tenant",
+          "expected": "all tenants connect successfully to dedicated dbs"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "revert back to shared DB",
+          "safety_guard": "verify application state",
+          "restores_state": [
+            "application connections revert to shared DB"
+          ],
+          "restoration_evidence": "connection testing for shared DB"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "enumerate_tenants",
+        "to_task": "provision_databases",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "provision_databases",
+        "to_task": "verify_provisioned_databases",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_provisioned_databases",
+        "to_task": "migrate_data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate_data",
+        "to_task": "setup_connection_routing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_connection_routing",
+        "to_task": "dual_write",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate_data",
+        "to_task": "verify_row_counts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_row_counts",
+        "to_task": "cutover_connections",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:verify_provisioned_databases",
+      "task_id": "verify_provisioned_databases",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'verify_provisioned_databases' is sequenced after 'provision_databases' without ensuring successful provisioning.",
+      "suggested_fix": "Move 'verify_provisioned_databases' to follow directly after successful completion of 'provision_databases'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:migrate_data",
+      "task_id": "migrate_data",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'migrate_data' is sequenced before verifying if dedicated databases are provisioned.",
+      "suggested_fix": "Ensure 'verify_provisioned_databases' is completed successfully before starting 'migrate_data'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:setup_connection_routing",
+      "task_id": "setup_connection_routing",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'setup_connection_routing' is sequenced before ensuring data migration is complete.",
+      "suggested_fix": "Move 'setup_connection_routing' to follow after the successful completion of 'migrate_data'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:dual_write",
+      "task_id": "dual_write",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'dual_write' is dependent on 'setup_connection_routing', which has not been confirmed as successful.",
+      "suggested_fix": "Ensure 'setup_connection_routing' is completed and verified before proceeding to 'dual_write'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:cutover_connections",
+      "task_id": "cutover_connections",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'cutover_connections' is sequenced before verifying row counts after data migration.",
+      "suggested_fix": "Move 'cutover_connections' to follow after the successful verification of row counts in 'verify_row_counts'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:db-10-multi-tenant-split:4:4",
+    "plan_id": "plan-db-10-multi-tenant-split-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:verify_provisioned_databases",
+    "question": "Plan for goal 'db-10-multi-tenant-split' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

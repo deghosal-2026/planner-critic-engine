@@ -1,0 +1,348 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ci-02-hotfix-rollback",
+  "duration_seconds": 41.76,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-ci-02-hotfix-rollback-r4",
+    "goal_id": "ci-02-hotfix-rollback",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-ci-02-hotfix-rollback-r3",
+    "created_at": "2026-08-29T21:36:10.783664Z",
+    "tasks": [
+      {
+        "id": "confirm_commit",
+        "description": "Confirm the offending commit has been correctly identified",
+        "action": "check commit",
+        "target": "repository",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "offending commit confirmed",
+          "how": "check commit logs",
+          "expected": "offending commit identified correctly"
+        },
+        "rollback": {
+          "trigger": "confirmation fails",
+          "action": "notify team",
+          "safety_guard": "inform about next steps",
+          "restores_state": [
+            "commit_identified"
+          ],
+          "restoration_evidence": "confirmation reviews indicate successful identification"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "revert_commit",
+        "description": "Revert the offending commit",
+        "action": "git revert",
+        "target": "repository",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "offending commit is confirmed",
+            "fact": "offending_commit_confirmed",
+            "established_by": "confirm_commit",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "commit history",
+          "how": "check Git logs",
+          "expected": "previous commit is the HEAD"
+        },
+        "rollback": {
+          "trigger": "revert fails",
+          "action": "restore previous branch",
+          "safety_guard": "verify repository state",
+          "restores_state": [
+            "previous_state"
+          ],
+          "restoration_evidence": "verify commit history matches expected state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "docker_build",
+        "description": "Build the Docker image",
+        "action": "docker build",
+        "target": "docker_image",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dockerfile is available",
+            "fact": "dockerfile_present",
+            "established_by": "revert_commit",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "docker image",
+          "how": "check image exists",
+          "expected": "docker image created successfully"
+        },
+        "rollback": {
+          "trigger": "build fails",
+          "action": "archive failed image state",
+          "safety_guard": "check Dockerfile integrity",
+          "restores_state": [
+            "docker_image_absent"
+          ],
+          "restoration_evidence": "no image with the specified tag exists"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "docker_image_verification",
+        "description": "Verify the Docker image has been created successfully",
+        "action": "check image",
+        "target": "docker_image",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Docker image build has completed",
+            "fact": "docker_image_created",
+            "established_by": "docker_build",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "image existence",
+          "how": "check if image exists",
+          "expected": "docker image created successfully"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "kubectl_deploy",
+        "description": "Deploy the new Docker image",
+        "action": "kubectl apply",
+        "target": "kubernetes_deployment",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Docker image is built successfully",
+            "fact": "docker_image_built",
+            "established_by": "docker_image_verification",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment status",
+          "how": "check Kubernetes health",
+          "expected": "deployment to be running"
+        },
+        "rollback": {
+          "trigger": "deploy fails",
+          "action": "rollback to previous version",
+          "safety_guard": "verify deployment health",
+          "restores_state": [
+            "previous_deployment_state"
+          ],
+          "restoration_evidence": "previous version is active"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_downstream",
+        "description": "Verify downstream services",
+        "action": "check health",
+        "target": "downstream_services",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kubernetes deployment is successful",
+            "fact": "deployment_successful",
+            "established_by": "kubectl_deploy",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service health",
+          "how": "check health endpoints",
+          "expected": "all downstream services are healthy"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "notify team for troubleshooting",
+          "safety_guard": "check service logs",
+          "restores_state": [
+            "downstream_services_unknown"
+          ],
+          "restoration_evidence": "services are not responding"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "confirm_commit",
+        "to_task": "revert_commit",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "revert_commit",
+        "to_task": "docker_build",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "docker_build",
+        "to_task": "docker_image_verification",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "docker_image_verification",
+        "to_task": "kubectl_deploy",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "kubectl_deploy",
+        "to_task": "verify_downstream",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unsafe_sequencing:revert_commit",
+      "task_id": "revert_commit",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'revert_commit' is executed before confirming the offending commit in 'confirm_commit'.",
+      "suggested_fix": "Ensure 'confirm_commit' is completed and confirmed before executing 'revert_commit'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:docker_build",
+      "task_id": "docker_build",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'docker_build' depends on 'revert_commit' confirming the offending commit, but 'confirm_commit' does not establish the 'offending_commit_confirmed' fact in its verification process.",
+      "suggested_fix": "Update the verification in 'confirm_commit' to establish 'offending_commit_confirmed' before proceeding to 'revert_commit'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:kubectl_deploy",
+      "task_id": "kubectl_deploy",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'kubectl_deploy' cannot proceed because it relies on the fact 'docker_image_built', but 'docker_image_verification' does not establish this fact in its verification process.",
+      "suggested_fix": "Ensure 'docker_image_verification' establishes 'docker_image_built' before proceeding to 'kubectl_deploy'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:docker_build",
+      "task_id": "docker_build",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'docker_build' rollback procedure lacks a complete restoration process as it only archives failed image state instead of fully restoring the environment.",
+      "suggested_fix": "Enhance the rollback process to fully restore the Docker environment to its previous state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:kubectl_deploy",
+      "task_id": "kubectl_deploy",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Task 'kubectl_deploy' rollback process lacks a clear verification of the previous deployment state after failure.",
+      "suggested_fix": "Specify the checks needed to confirm that the previous deployment state is restored appropriately after rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ci-02-hotfix-rollback:4:4",
+    "plan_id": "plan-ci-02-hotfix-rollback-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:revert_commit",
+    "question": "Plan for goal 'ci-02-hotfix-rollback' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

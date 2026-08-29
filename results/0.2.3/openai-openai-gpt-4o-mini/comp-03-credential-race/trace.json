@@ -1,0 +1,287 @@
+{
+  "dimension": "core-api",
+  "goal_id": "comp-03-credential-race",
+  "duration_seconds": 10.18,
+  "result": {
+    "status": "escalated",
+    "reason_code": "replan_aborted",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "comp-03-credential-race-plan",
+    "goal_id": "comp-03-credential-race",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-29T21:40:35.287842Z",
+    "tasks": [
+      {
+        "id": "rotate-credentials",
+        "description": "Rotate database credentials in Vault",
+        "action": "rotate",
+        "target": "vault",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Vault service is accessible",
+            "fact": "vault_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "credentials are updated",
+          "how": "check vault for new credentials",
+          "expected": "new credentials exist in vault"
+        },
+        "rollback": {
+          "trigger": "rotation fails",
+          "action": "revert to old credentials",
+          "safety_guard": "ensure old credentials are valid",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy-payment-service",
+        "description": "Deploy the payment service using old credentials",
+        "action": "deploy",
+        "target": "payment-service",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Old credentials are still valid",
+            "fact": "old_credentials_valid",
+            "established_by": "rotate-credentials",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "service is up and running",
+          "how": "check service status",
+          "expected": "service responds successfully"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to previous version",
+          "safety_guard": "check service health",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "rotate-credentials",
+        "to_task": "deploy-payment-service",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:comp-03-credential-race-plan:1:rotate-credentials:rollback_state_undeclared",
+      "task_id": "rotate-credentials",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'rotate-credentials' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:comp-03-credential-race-plan:1:deploy-payment-service:rollback_state_undeclared",
+      "task_id": "deploy-payment-service",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'deploy-payment-service' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:comp-03-credential-race-plan:1:rotate-credentials:rollback_state_undeclared",
+      "task_id": "rotate-credentials",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'rotate-credentials' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:comp-03-credential-race-plan:1:deploy-payment-service:rollback_state_undeclared",
+      "task_id": "deploy-payment-service",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'deploy-payment-service' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:deploy-payment-service",
+      "task_id": "deploy-payment-service",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The deployment of the payment service using old credentials occurs after the credential rotation, which may lead to the use of stale credentials if not properly validated.",
+      "suggested_fix": "Change the order of tasks to ensure deployment occurs only after verifying new credentials.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:weak_rollback:rotate-credentials",
+      "task_id": "rotate-credentials",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback action for credential rotation only reverts to old credentials without verifying their validity, which may lead to a non-functional state.",
+      "suggested_fix": "Ensure the rollback action includes re-validation of old credentials before using them.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:unverified_dependencies:deploy-payment-service",
+      "task_id": "deploy-payment-service",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The deployment task depends on the validity of old credentials, which is not guaranteed after rotation, creating a risk of failure.",
+      "suggested_fix": "Introduce a verification step to confirm old credentials are valid before deployment.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:feasibility:deploy-payment-service",
+      "task_id": "deploy-payment-service",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Deploying the payment service with old credentials may be unachievable if those credentials have become invalid during rotation.",
+      "suggested_fix": "Implement a check to ascertain the validity of old credentials before proceeding with deployment.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:missing_steps:rotate-credentials",
+      "task_id": "rotate-credentials",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding a step to verify that new credentials are fully operational before moving to deployment.",
+      "suggested_fix": "Add a verification step after rotating credentials to confirm they are working as expected.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:risk:deploy-payment-service",
+      "task_id": "deploy-payment-service",
+      "version": 1,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Using old credentials for deployment poses a significant risk if the rotation process affects their validity.",
+      "suggested_fix": "Assess potential changes to old credentials during the rotation to mitigate risks.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:comp-03-credential-race:1:1",
+    "plan_id": "comp-03-credential-race-plan",
+    "version": 1,
+    "blocker_finding_id": "crit:1:unsafe_sequencing:deploy-payment-service",
+    "question": "Plan for goal 'comp-03-credential-race' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "mandatory_blocker_replan_aborted",
+      "pass": false,
+      "message": "blocker replan_aborted missing"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

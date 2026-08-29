@@ -20,6 +20,7 @@ from .escalate import build_escalate_parser, run_escalate
 from .eval import build_eval_parser, run_eval
 from .field_test import build_field_test_parser, run_field_test
 from .findings import build_findings_parser, run_findings
+from .gates_canary import build_gates_parser, run_gates_canary
 from .init import build_init_parser, run_init
 from .lessons import build_lessons_parser, run_lessons
 from .migrate import build_migrate_parser, run_migrate
@@ -43,6 +44,7 @@ __all__ = [
     "build_eval_parser",
     "build_field_test_parser",
     "build_findings_parser",
+    "build_gates_parser",
     "build_init_parser",
     "build_lessons_parser",
     "build_migrate_parser",
@@ -64,6 +66,7 @@ __all__ = [
     "run_eval",
     "run_field_test",
     "run_findings",
+    "run_gates_canary",
     "run_init",
     "run_lessons",
     "run_migrate",

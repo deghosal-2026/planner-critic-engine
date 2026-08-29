@@ -1,0 +1,318 @@
+{
+  "dimension": "core-api",
+  "goal_id": "adv-04-cert-rotation",
+  "duration_seconds": 5.45,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "adv-04-cert-rotation-plan",
+    "goal_id": "adv-04-cert-rotation",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-29T21:27:24.500925Z",
+    "tasks": [
+      {
+        "id": "check_services",
+        "description": "Check the list of all production services",
+        "action": "list",
+        "target": "services",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "services reachable",
+            "fact": "services_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "generate_certs",
+        "description": "Generate new TLS certificates for each service",
+        "action": "generate",
+        "target": "tls_certs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "certificate validity",
+          "how": "check SAN entries and key match",
+          "expected": "valid certificates with correct SANs"
+        },
+        "rollback": {
+          "trigger": "certificate generation fails",
+          "action": "restore old certificates",
+          "safety_guard": "verify old certificates are intact",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy_certs",
+        "description": "Deploy new TLS certificates to services",
+        "action": "deploy",
+        "target": "services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service availability",
+          "how": "perform health checks",
+          "expected": "all services operational with new certificates"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "revert to old certificates",
+          "safety_guard": "verify services are still working with old certs",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_services",
+        "description": "Verify that each service is using the new certificate",
+        "action": "verify",
+        "target": "services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "certificate used by service",
+          "how": "check service logs or endpoints",
+          "expected": "services show new certificates"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "revert to old certificates",
+          "safety_guard": "verify services operational with old certs",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_services",
+        "to_task": "generate_certs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "generate_certs",
+        "to_task": "deploy_certs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_certs",
+        "to_task": "verify_services",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:adv-04-cert-rotation-plan:1:generate_certs:rollback_state_undeclared",
+      "task_id": "generate_certs",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'generate_certs' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:adv-04-cert-rotation-plan:1:deploy_certs:rollback_state_undeclared",
+      "task_id": "deploy_certs",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'deploy_certs' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:adv-04-cert-rotation-plan:1:verify_services:rollback_state_undeclared",
+      "task_id": "verify_services",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_services' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:adv-04-cert-rotation-plan:1:generate_certs:rollback_state_undeclared",
+      "task_id": "generate_certs",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'generate_certs' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:adv-04-cert-rotation-plan:1:deploy_certs:rollback_state_undeclared",
+      "task_id": "deploy_certs",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'deploy_certs' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:adv-04-cert-rotation-plan:1:verify_services:rollback_state_undeclared",
+      "task_id": "verify_services",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_services' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:feasibility:check_services",
+      "task_id": "check_services",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The task relies on services being reachable, which could fail due to network issues or service outages. This presents a feasibility risk in production.",
+      "suggested_fix": "Implement a fallback mechanism to ensure service availability during the check.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:weak_rollback:generate_certs",
+      "task_id": "generate_certs",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for certificate generation lacks a clear restoration evidence step, risking unrecoverable state if generation fails.",
+      "suggested_fix": "Include proper log verification or a backup method for recovery evidence.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:deploy_certs",
+      "task_id": "deploy_certs",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The deployment of new certificates occurs before verifying their validity, risking service disruption if invalid certificates are used.",
+      "suggested_fix": "Reorder tasks to ensure 'generate_certs' is fully validated before 'deploy_certs'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:unverified_dependencies:verify_services",
+      "task_id": "verify_services",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "This step depends on the successful deployment of certificates but lacks verification that certificates were correctly deployed before executing.",
+      "suggested_fix": "Ensure verification of deployment success is included as a prerequisite for 'verify_services'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

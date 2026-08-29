@@ -12,7 +12,7 @@ import re
 from typing import Any, ClassVar, cast
 
 from ..engine import Engine
-from ..escalation import EscalationManager
+from ..escalation import EscalationManager, build_escalation_manager
 from ..explain import explain as build_explain
 from ..gates import run_deterministic_gates
 from ..llm.registry import ProviderRegistry
@@ -297,7 +297,7 @@ class PlannerCriticHTTPServer:
     # ---- Handler: POST /escalations/{id}/approve ----------------------------
 
     def _handle_escalate_approve(self, escalation_id: str, body: dict[str, Any]) -> dict[str, Any]:
-        manager = EscalationManager(self.store)
+        manager = build_escalation_manager(self.store, escalation_id=escalation_id)
         note = (body or {}).get("note", "")
         principal = (body or {}).get("principal")
         resolved = manager.resolve(escalation_id, "approved", note=note, principal=principal)
@@ -309,7 +309,7 @@ class PlannerCriticHTTPServer:
     # ---- Handler: POST /escalations/{id}/deny -------------------------------
 
     def _handle_escalate_deny(self, escalation_id: str, body: dict[str, Any]) -> dict[str, Any]:
-        manager = EscalationManager(self.store)
+        manager = build_escalation_manager(self.store, escalation_id=escalation_id)
         note = (body or {}).get("note", "")
         principal = (body or {}).get("principal")
         resolved = manager.resolve(escalation_id, "denied", note=note, principal=principal)

@@ -1,0 +1,339 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-05-velero-backup",
+  "duration_seconds": 40.88,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-plat-05-velero-backup-r3",
+    "goal_id": "plat-05-velero-backup",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-plat-05-velero-backup-r2",
+    "created_at": "2026-08-29T21:31:24.775465Z",
+    "tasks": [
+      {
+        "id": "install_velero",
+        "description": "Install Velero with object storage plugin (AWS S3)",
+        "action": "install",
+        "target": "Velero",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Velero installed",
+          "how": "run 'velero version' command",
+          "expected": "version info"
+        },
+        "rollback": {
+          "trigger": "installation fails",
+          "action": "uninstall Velero",
+          "safety_guard": "check Velero status",
+          "restores_state": [
+            "not installed"
+          ],
+          "restoration_evidence": "confirm Velero is uninstalled"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_backup_schedule",
+        "description": "Configure daily backup schedules with 30-day retention policy",
+        "action": "configure",
+        "target": "backup schedule",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Velero is installed",
+            "fact": "velero_installed",
+            "established_by": "install_velero",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "backup schedule configured",
+          "how": "check Velero schedule configuration",
+          "expected": "daily backups with 30-day retention"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "reset backup schedule",
+          "safety_guard": "verify previous schedule",
+          "restores_state": [
+            "previous schedule"
+          ],
+          "restoration_evidence": "confirm backup schedule returns to previous state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "manual_backup",
+        "description": "Execute a manual backup",
+        "action": "backup",
+        "target": "backup",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Velero is installed and verified",
+            "fact": "velero_installed",
+            "established_by": "install_velero",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "manual backup completed",
+          "how": "check backup logs",
+          "expected": "successful backup entry in logs"
+        },
+        "rollback": {
+          "trigger": "backup fails",
+          "action": "no rollback applicable",
+          "safety_guard": "check logs for manual backup",
+          "restores_state": [
+            "no manual backup executed"
+          ],
+          "restoration_evidence": "confirm absence of backup entries"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "full_restore",
+        "description": "Perform full restore to a validation namespace",
+        "action": "restore",
+        "target": "validation namespace",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Manual backup completed successfully",
+            "fact": "manual_backup_success",
+            "established_by": "manual_backup",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "namespace restored",
+          "how": "check application state in validation namespace",
+          "expected": "application functionality verified"
+        },
+        "rollback": {
+          "trigger": "restore fails",
+          "action": "clean validation namespace",
+          "safety_guard": "verify namespace state",
+          "restores_state": [
+            "old namespace state"
+          ],
+          "restoration_evidence": "confirm validation namespace is clean"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_application_functionality",
+        "description": "Verify application functionality post-restore",
+        "action": "check",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Full restore completed successfully",
+            "fact": "full_restore_success",
+            "established_by": "full_restore",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application functionality",
+          "how": "run application tests",
+          "expected": "all tests pass"
+        },
+        "rollback": {
+          "trigger": "application not functional",
+          "action": "rollback to previous version",
+          "safety_guard": "verify application state before rollback",
+          "restores_state": [
+            "application previous version"
+          ],
+          "restoration_evidence": "confirm application functionality restored"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "validate_alerts",
+        "description": "Validate automated alerts on backup failures",
+        "action": "check",
+        "target": "alerts",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Backup schedule is successfully configured",
+            "fact": "backup_schedule_configured",
+            "established_by": "configure_backup_schedule",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "alerts functionality",
+          "how": "trigger backup failure",
+          "expected": "alerts sent"
+        },
+        "rollback": {
+          "trigger": "alert configuration fails",
+          "action": "reset alert configuration",
+          "safety_guard": "ensure alert system functional",
+          "restores_state": [
+            "previous alert configuration"
+          ],
+          "restoration_evidence": "confirm alerts restored to previous settings"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "install_velero",
+        "to_task": "configure_backup_schedule",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_backup_schedule",
+        "to_task": "manual_backup",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "manual_backup",
+        "to_task": "full_restore",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "full_restore",
+        "to_task": "verify_application_functionality",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_backup_schedule",
+        "to_task": "validate_alerts",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unverified_dependencies:manual_backup",
+      "task_id": "manual_backup",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'manual_backup' relies on the fact 'velero_installed' which has not been verified by any prior task in this plan.",
+      "suggested_fix": "Add a verification step to ensure 'velero_installed' before executing 'manual_backup'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:full_restore",
+      "task_id": "full_restore",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'full_restore' relies on the fact 'manual_backup_success' which is unverified, creating a dependency on an unverifiable state.",
+      "suggested_fix": "Add a step to verify the success of 'manual_backup' before allowing 'full_restore' to proceed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:verify_application_functionality",
+      "task_id": "verify_application_functionality",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'verify_application_functionality' depends on 'full_restore_success' which has not been established in previous steps.",
+      "suggested_fix": "Implement a verification mechanism to confirm 'full_restore' was successful before proceeding to 'verify_application_functionality'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:validate_alerts",
+      "task_id": "validate_alerts",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'validate_alerts' is dependent on 'backup_schedule_configured', which is a fact that has not been verified earlier in the plan.",
+      "suggested_fix": "Ensure that 'configure_backup_schedule' includes a verification stage to confirm the backup schedule is successfully configured before proceeding to 'validate_alerts'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:plat-05-velero-backup:3:3",
+    "plan_id": "plan-plat-05-velero-backup-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unverified_dependencies:manual_backup",
+    "question": "Plan for goal 'plat-05-velero-backup' cannot be approved: blockers remain (llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

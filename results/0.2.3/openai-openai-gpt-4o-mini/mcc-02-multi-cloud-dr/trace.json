@@ -1,0 +1,286 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mcc-02-multi-cloud-dr",
+  "duration_seconds": 40.52,
+  "result": {
+    "status": "escalated",
+    "reason_code": "plan_oscillation_detected",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-mcc-02-multi-cloud-dr-r4",
+    "goal_id": "mcc-02-multi-cloud-dr",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-mcc-02-multi-cloud-dr-r3",
+    "created_at": "2026-08-29T21:52:56.217238Z",
+    "tasks": [
+      {
+        "id": "establish_replication",
+        "description": "Establish cross-cloud database async replication from AWS to GCP/Azure",
+        "action": "configure_replication",
+        "target": "database",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "AWS database is accessible",
+            "fact": "aws_db_accessible",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "GCP/Azure environment is ready",
+            "fact": "gcp_azure_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replication status",
+          "how": "check replication metrics",
+          "expected": "replication is healthy"
+        },
+        "rollback": {
+          "trigger": "replication setup fails",
+          "action": "remove replication configs",
+          "safety_guard": "verify no databases are in inconsistent state",
+          "restores_state": [
+            "no replication established"
+          ],
+          "restoration_evidence": "check database state is consistent"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_dns_failover",
+        "description": "Configure a global DNS failover using Route 53 for health-checked routing to GCP",
+        "action": "setup_dns_failover",
+        "target": "DNS",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Route 53 is set up and configured",
+            "fact": "route53_configured",
+            "established_by": "establish_replication",
+            "probe": null
+          },
+          {
+            "description": "Replication is healthy",
+            "fact": "replication_healthy",
+            "established_by": "establish_replication",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replication health",
+          "how": "check replication metrics",
+          "expected": "replication is healthy"
+        },
+        "rollback": {
+          "trigger": "DNS failover setup fails",
+          "action": "reset DNS configurations",
+          "safety_guard": "ensure previous configurations are intact",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "dr_failover_drill",
+        "description": "Run a disaster recovery failover drill",
+        "action": "perform_drill",
+        "target": "GCP",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DNS failover is correctly set up",
+            "fact": "dns_failover_ready",
+            "established_by": "configure_dns_failover",
+            "probe": null
+          },
+          {
+            "description": "Replication from AWS to GCP is healthy",
+            "fact": "replication_healthy",
+            "established_by": "establish_replication",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "DNS failover functioning",
+          "how": "perform health checks",
+          "expected": "DNS routes traffic correctly"
+        },
+        "rollback": {
+          "trigger": "drill detects issues",
+          "action": "fail back to AWS",
+          "safety_guard": "ensure traffic routed back with no lost requests",
+          "restores_state": [
+            "services running on AWS"
+          ],
+          "restoration_evidence": "check application and traffic logs"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "execute_failback",
+        "description": "Execute failback to AWS as primary after drill",
+        "action": "failback",
+        "target": "AWS",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data from GCP is synchronized back to AWS",
+            "fact": "data_synchronized",
+            "established_by": "dr_failover_drill",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data synchronization",
+          "how": "compare checksums and application logs",
+          "expected": "data is synchronized correctly"
+        },
+        "rollback": {
+          "trigger": "failback fails",
+          "action": "restore to GCP",
+          "safety_guard": "verify data integrity across cloud",
+          "restores_state": [
+            "services running on GCP"
+          ],
+          "restoration_evidence": "check application service status"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "establish_replication",
+        "to_task": "configure_dns_failover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_dns_failover",
+        "to_task": "dr_failover_drill",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dr_failover_drill",
+        "to_task": "execute_failback",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:feasibility:establish_replication",
+      "task_id": "establish_replication",
+      "version": 4,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "AWS database access and GCP/Azure environment readiness must be confirmed before replication is established.",
+      "suggested_fix": "Ensure AWS database access and GCP/Azure readiness are confirmed prior to establishing replication.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:configure_dns_failover",
+      "task_id": "configure_dns_failover",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "DNS failover configuration should not proceed before successful establishment of replication.",
+      "suggested_fix": "Re-order the tasks so that 'configure_dns_failover' follows successful completion of 'establish_replication'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:dr_failover_drill",
+      "task_id": "dr_failover_drill",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The DR failover drill cannot execute until DNS failover is correctly set up and verified.",
+      "suggested_fix": "Ensure 'dr_failover_drill' follows completion of 'configure_dns_failover' and its verification.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:execute_failback",
+      "task_id": "execute_failback",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Data synchronization must be confirmed as successful before executing failback to AWS.",
+      "suggested_fix": "Add a verification step to confirm that data from GCP is indeed synchronized back to AWS before executing failback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mcc-02-multi-cloud-dr:4:4",
+    "plan_id": "plan-mcc-02-multi-cloud-dr-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:feasibility:establish_replication",
+    "question": "Plan for goal 'mcc-02-multi-cloud-dr' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

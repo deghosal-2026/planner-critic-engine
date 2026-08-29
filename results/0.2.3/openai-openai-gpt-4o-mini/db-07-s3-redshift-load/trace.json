@@ -1,0 +1,257 @@
+{
+  "dimension": "core-api",
+  "goal_id": "db-07-s3-redshift-load",
+  "duration_seconds": 12.85,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-db-07-s3-redshift-load-r2",
+    "goal_id": "db-07-s3-redshift-load",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "db-07-s3-redshift-load-plan",
+    "created_at": "2026-08-29T21:28:54.611812Z",
+    "tasks": [
+      {
+        "id": "fetch_manifest",
+        "description": "Fetch the manifest file from S3",
+        "action": "fetch",
+        "target": "manifest",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "S3 is accessible",
+            "fact": "s3_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "check_wlm_slots",
+        "description": "Check Redshift WLM slots availability",
+        "action": "check",
+        "target": "wlm",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "available WLM slots",
+          "how": "query WLM system table",
+          "expected": ">= 3"
+        },
+        "rollback": {
+          "trigger": "insufficient slots",
+          "action": "alert admin and pause ETL",
+          "safety_guard": "verify admin notification",
+          "restores_state": [
+            "wlm_available"
+          ],
+          "restoration_evidence": "admin alert log"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "copy_data_to_staging",
+        "description": "Copy data from S3 to Redshift staging area",
+        "action": "copy",
+        "target": "staging_table",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "row count and data integrity",
+          "how": "compare with manifest",
+          "expected": "matches manifest row count"
+        },
+        "rollback": {
+          "trigger": "COPY command fails",
+          "action": "delete partial staging data",
+          "safety_guard": "verify staging data integrity",
+          "restores_state": [
+            "staging_empty"
+          ],
+          "restoration_evidence": "staging table verification"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "swap_partitions",
+        "description": "Swap the staging data with the production data",
+        "action": "swap",
+        "target": "production_table",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "row count in production",
+          "how": "run count query",
+          "expected": "matches staging row count"
+        },
+        "rollback": {
+          "trigger": "swap fails",
+          "action": "revert to previous production data",
+          "safety_guard": "verify production data integrity",
+          "restores_state": [
+            "production_previous"
+          ],
+          "restoration_evidence": "production state log"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "vacuum_and_analyze",
+        "description": "Vacuum and analyze Redshift table after data swap",
+        "action": "run",
+        "target": "vacuum_analyze",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "data swap completed successfully",
+            "fact": "swap_successful",
+            "established_by": "swap_partitions",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "table health",
+          "how": "run analyze query",
+          "expected": "table statistics updated"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "fetch_manifest",
+        "to_task": "check_wlm_slots",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check_wlm_slots",
+        "to_task": "copy_data_to_staging",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "copy_data_to_staging",
+        "to_task": "swap_partitions",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "swap_partitions",
+        "to_task": "vacuum_and_analyze",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:copy_data_to_staging",
+      "task_id": "copy_data_to_staging",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'copy_data_to_staging' should have a precondition verifying that the WLM slots are available before executing the copy operation.",
+      "suggested_fix": "Add a dependency on 'check_wlm_slots' to ensure it is completed successfully before copying data.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:copy_data_to_staging",
+      "task_id": "copy_data_to_staging",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'copy_data_to_staging' lacks a clear method to ensure that all partial data is deleted accurately in case of a failure.",
+      "suggested_fix": "Implement a stronger rollback strategy that includes a verification step to confirm that all partial data has been removed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:swap_partitions",
+      "task_id": "swap_partitions",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'swap_partitions' does not adequately ensure the restoration of the previous production data, as it relies on the integrity verification that may not cover all failure modes.",
+      "suggested_fix": "Enhance the rollback process to include a complete restoration procedure that guarantees the production table is fully reverted to the last known good state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:vacuum_and_analyze",
+      "task_id": "vacuum_and_analyze",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding a step to verify that the vacuum and analyze operations have completed successfully before concluding the ETL process.",
+      "suggested_fix": "Add a verification step after 'vacuum_and_analyze' to confirm that table health is as expected.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,239 @@
+{
+  "dimension": "core-api",
+  "goal_id": "arch-03-kafka-rebalance",
+  "duration_seconds": 28.6,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-arch-03-kafka-rebalance-r3",
+    "goal_id": "arch-03-kafka-rebalance",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-arch-03-kafka-rebalance-r2",
+    "created_at": "2026-08-29T21:31:52.834568Z",
+    "tasks": [
+      {
+        "id": "add_brokers",
+        "description": "Add 3 new brokers to the Kafka cluster",
+        "action": "add",
+        "target": "kafka brokers",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "broker count",
+          "how": "run kafka-cli command",
+          "expected": "6"
+        },
+        "rollback": {
+          "trigger": "broker addition fails",
+          "action": "remove added brokers",
+          "safety_guard": "verify cluster state",
+          "restores_state": [
+            "kafka has 3 brokers before addition"
+          ],
+          "restoration_evidence": "confirm broker count is 3"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_isr_health",
+        "description": "Verify ISR health for all partitions",
+        "action": "check",
+        "target": "ISR",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "ISR status",
+          "how": "run kafka-cli command",
+          "expected": "all ISRs healthy"
+        },
+        "rollback": {
+          "trigger": "ISR health check fails",
+          "action": "notify team",
+          "safety_guard": "check metrics",
+          "restores_state": [
+            "previous ISR health"
+          ],
+          "restoration_evidence": "metrics show healthy ISRs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "reassign_partitions",
+        "description": "Reassign partition replicas across all brokers",
+        "action": "reassign",
+        "target": "partitions",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ISR health is verified",
+            "fact": "isr_healthy",
+            "established_by": "verify_isr_health",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replica assignment",
+          "how": "run kafka-cli command",
+          "expected": "correct replica distribution"
+        },
+        "rollback": {
+          "trigger": "reassignment fails",
+          "action": "restore previous assignment",
+          "safety_guard": "verify partition health",
+          "restores_state": [
+            "previous partition assignments"
+          ],
+          "restoration_evidence": "confirm partition assignment matches previous state"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "rebalance_consumer_groups",
+        "description": "Rebalance producer/consumer groups",
+        "action": "rebalance",
+        "target": "consumer groups",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ISR health is verified",
+            "fact": "isr_healthy",
+            "established_by": "verify_isr_health",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "consumer lag",
+          "how": "run kafka-consumer-groups.sh",
+          "expected": "lag < 30s"
+        },
+        "rollback": {
+          "trigger": "rebalance fails",
+          "action": "restore previous consumer state",
+          "safety_guard": "monitor for lag",
+          "restores_state": [
+            "previous consumer states"
+          ],
+          "restoration_evidence": "confirm consumer lag is less than previous state"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "add_brokers",
+        "to_task": "verify_isr_health",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_isr_health",
+        "to_task": "reassign_partitions",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "reassign_partitions",
+        "to_task": "rebalance_consumer_groups",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:verify_isr_health",
+      "task_id": "verify_isr_health",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'verify_isr_health' is dependent on task 'add_brokers' which is not yet executed.",
+      "suggested_fix": "Reorder the tasks to ensure 'add_brokers' is completed before 'verify_isr_health'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:reassign_partitions",
+      "task_id": "reassign_partitions",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'reassign_partitions' depends on fact 'isr_healthy' established by 'verify_isr_health', which is not confirmed due to premature execution.",
+      "suggested_fix": "Ensure 'verify_isr_health' is executed and verified before 'reassign_partitions'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:rebalance_consumer_groups",
+      "task_id": "rebalance_consumer_groups",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'rebalance_consumer_groups' depends on fact 'isr_healthy' from 'verify_isr_health', which has not been confirmed yet.",
+      "suggested_fix": "Execute 'verify_isr_health' successfully to ensure dependencies are met before proceeding with 'rebalance_consumer_groups'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:arch-03-kafka-rebalance:3:3",
+    "plan_id": "plan-arch-03-kafka-rebalance-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:verify_isr_health",
+    "question": "Plan for goal 'arch-03-kafka-rebalance' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

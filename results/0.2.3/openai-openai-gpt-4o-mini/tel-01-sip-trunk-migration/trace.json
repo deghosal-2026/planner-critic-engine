@@ -1,0 +1,517 @@
+{
+  "dimension": "core-api",
+  "goal_id": "tel-01-sip-trunk-migration",
+  "duration_seconds": 52.96,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-tel-01-sip-trunk-migration-r4",
+    "goal_id": "tel-01-sip-trunk-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-tel-01-sip-trunk-migration-r3",
+    "created_at": "2026-08-29T21:39:32.305976Z",
+    "tasks": [
+      {
+        "id": "submit_porting_request",
+        "description": "Submit number porting request to Carrier B",
+        "action": "submit",
+        "target": "Carrier B",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Carrier B has available numbers",
+            "fact": "carrier_b_number_availability",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "porting request status",
+          "how": "check response from Carrier B",
+          "expected": "request accepted"
+        },
+        "rollback": {
+          "trigger": "submission fails",
+          "action": "retry submission",
+          "safety_guard": "check submission logs",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_new_sip_trunk",
+        "description": "Configure the new SIP trunk on Carrier B",
+        "action": "configure",
+        "target": "Carrier B SIP trunk",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "SIP configuration parameters are available",
+            "fact": "sip_parameters_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "SIP trunk setup completion",
+          "how": "check SIP trunk status",
+          "expected": "active and operational"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "revert to previous configuration",
+          "safety_guard": "verify previous configuration integrity",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "run_dual_trunk_period",
+        "description": "Run dual-trunk period with both trunks active",
+        "action": "activate",
+        "target": "both trunks",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Both trunks are configured successfully",
+            "fact": "trunks_configured",
+            "established_by": "configure_new_sip_trunk",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "dual-trunk health check",
+          "how": "monitor call traffic",
+          "expected": "both trunks operational"
+        },
+        "rollback": {
+          "trigger": "trunking fails",
+          "action": "revert to single trunk configuration",
+          "safety_guard": "ensure all calls routed to original trunk",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_dual_trunk",
+        "description": "Verify the successful operation of the dual trunk setup",
+        "action": "verify",
+        "target": "dual trunk",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dual trunking period is active",
+            "fact": "dual_trunking_active",
+            "established_by": "run_dual_trunk_period",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "dual trunk operation status",
+          "how": "check operational metrics and call quality",
+          "expected": "both trunks support calls without issues"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "revert to previous configuration",
+          "safety_guard": "verify call quality metrics before reverting",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "execute_cutover",
+        "description": "Execute cutover to switch inbound routing to Carrier B only",
+        "action": "cutover",
+        "target": "Carrier B trunk",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Dual trunk operation verified successfully",
+            "fact": "dual_trunk_verified",
+            "established_by": "verify_dual_trunk",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "inbound call routing",
+          "how": "monitor call completion",
+          "expected": "100% inbound calls via Carrier B"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "re-route inbound to Carrier A",
+          "safety_guard": "monitor call quality before reverting",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_migration",
+        "description": "Verify migration success including call quality and compatibility",
+        "action": "verify",
+        "target": "SIP migration",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Cutover completed successfully",
+            "fact": "cutover_successful",
+            "established_by": "execute_cutover",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "call performance metrics",
+          "how": "analyze logging and call data",
+          "expected": "success across all metrics, including fallback scenarios"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "revert to Carrier A",
+          "safety_guard": "ensure call quality metrics are met",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "release_old_carrier",
+        "description": "Release old carrier Carrier A after successful migration",
+        "action": "release",
+        "target": "Carrier A",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Migration verified and successful",
+            "fact": "migration_verified",
+            "established_by": "verify_migration",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "old carrier release confirmation",
+          "how": "check service termination log",
+          "expected": "Carrier A service terminated"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "submit_porting_request",
+        "to_task": "configure_new_sip_trunk",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_new_sip_trunk",
+        "to_task": "run_dual_trunk_period",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_dual_trunk_period",
+        "to_task": "verify_dual_trunk",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_dual_trunk",
+        "to_task": "execute_cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "execute_cutover",
+        "to_task": "verify_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_migration",
+        "to_task": "release_old_carrier",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plan-tel-01-sip-trunk-migration-r4:4:submit_porting_request:rollback_state_undeclared",
+      "task_id": "submit_porting_request",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'submit_porting_request' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-tel-01-sip-trunk-migration-r4:4:configure_new_sip_trunk:rollback_state_undeclared",
+      "task_id": "configure_new_sip_trunk",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'configure_new_sip_trunk' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-tel-01-sip-trunk-migration-r4:4:verify_dual_trunk:rollback_state_undeclared",
+      "task_id": "verify_dual_trunk",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_dual_trunk' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-tel-01-sip-trunk-migration-r4:4:execute_cutover:rollback_state_undeclared",
+      "task_id": "execute_cutover",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'execute_cutover' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-tel-01-sip-trunk-migration-r4:4:verify_migration:rollback_state_undeclared",
+      "task_id": "verify_migration",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_migration' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-tel-01-sip-trunk-migration-r4:4:submit_porting_request:rollback_state_undeclared",
+      "task_id": "submit_porting_request",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'submit_porting_request' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-tel-01-sip-trunk-migration-r4:4:configure_new_sip_trunk:rollback_state_undeclared",
+      "task_id": "configure_new_sip_trunk",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'configure_new_sip_trunk' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-tel-01-sip-trunk-migration-r4:4:verify_dual_trunk:rollback_state_undeclared",
+      "task_id": "verify_dual_trunk",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_dual_trunk' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-tel-01-sip-trunk-migration-r4:4:execute_cutover:rollback_state_undeclared",
+      "task_id": "execute_cutover",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'execute_cutover' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-tel-01-sip-trunk-migration-r4:4:verify_migration:rollback_state_undeclared",
+      "task_id": "verify_migration",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_migration' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:configure_new_sip_trunk",
+      "task_id": "configure_new_sip_trunk",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'configure_new_sip_trunk' is ordered before confirming successful submission of 'submit_porting_request'; proceed only after successful porting request verification.",
+      "suggested_fix": "Change order to validate 'submit_porting_request' completion before starting 'configure_new_sip_trunk'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:execute_cutover",
+      "task_id": "execute_cutover",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollout plan for 'execute_cutover' lacks a comprehensive rollback strategy in the event of a cutover failure.",
+      "suggested_fix": "Enhance rollback for 'execute_cutover' to include specific steps for reverting routing configurations.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:verify_migration",
+      "task_id": "verify_migration",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The successful execution of 'verify_migration' depends on 'execute_cutover' which lacks verified rollback and stability assurances.",
+      "suggested_fix": "Ensure 'execute_cutover' has a sound rollback before relying on its completion for 'verify_migration'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:tel-01-sip-trunk-migration:4:4",
+    "plan_id": "plan-tel-01-sip-trunk-migration-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:configure_new_sip_trunk",
+    "question": "Plan for goal 'tel-01-sip-trunk-migration' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

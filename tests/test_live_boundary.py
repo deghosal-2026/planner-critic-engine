@@ -178,3 +178,49 @@ def json_dumps(obj: object) -> str:
     import json
 
     return json.dumps(obj, default=str)
+
+
+class TestDecisionContext:
+    """DecisionContext population and sourcing convention (#298)."""
+
+    def test_decision_context_appears_in_trial_records(self) -> None:
+        """When DecisionContext is passed, trial records include its fields."""
+        from planner_critic.eval.live_boundary import DecisionContext
+
+        ctx = DecisionContext(
+            model_id="test-model",
+            model_version="1.0.0",
+            temperature=0.5,
+            system_prompt_hash="abc123",
+            tool_schema_hash="def456",
+            timestamp="2026-08-29T12:00:00+00:00",
+        )
+        report = run_live_boundary_cases(_SteadyCritic(), trials=2, decision_context=ctx)
+        assert report["cases_evaluated"] > 0
+        # Check that aggregate report includes context fields
+        assert report["decision_context"]["model_id"] == "test-model"
+        assert report["decision_context"]["model_version"] == "1.0.0"
+        assert report["decision_context"]["temperature"] == 0.5
+        assert report["decision_context"]["system_prompt_hash"] == "abc123"
+        assert report["decision_context"]["tool_schema_hash"] == "def456"
+        assert report["decision_context"]["timestamp"] == "2026-08-29T12:00:00+00:00"
+
+    def test_decision_context_default_when_not_provided(self) -> None:
+        """When no DecisionContext is passed, trial records use defaults."""
+        report = run_live_boundary_cases(_SteadyCritic(), trials=2)
+        assert report["decision_context"]["model_id"] == "unknown"
+
+    def test_decision_context_overrides_stub_metadata(self) -> None:
+        """Explicit DecisionContext takes precedence — stub critic metadata
+        does not leak into the decision context (sourcing convention)."""
+        from planner_critic.eval.live_boundary import DecisionContext
+
+        ctx = DecisionContext(model_id="explicit-model", timestamp="2026-08-29T12:00:00+00:00")
+
+        class _StubWithMetaCritic(CriticRole):
+            def audit(self, plan: PlanVersion, findings: list[Finding]) -> list[Finding]:
+                return []
+
+        report = run_live_boundary_cases(_StubWithMetaCritic(), trials=2, decision_context=ctx)
+        assert report["decision_context"]["model_id"] == "explicit-model"
+        assert report["decision_context"]["model_id"] != "unknown"

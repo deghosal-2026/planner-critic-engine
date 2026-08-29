@@ -1,0 +1,300 @@
+{
+  "dimension": "core-api",
+  "goal_id": "arch-07-graphql-federation",
+  "duration_seconds": 24.07,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-arch-07-graphql-federation-r2",
+    "goal_id": "arch-07-graphql-federation",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "arch-07-graphql-federation-v1",
+    "created_at": "2026-08-29T21:34:19.966047Z",
+    "tasks": [
+      {
+        "id": "define_subgraphs",
+        "description": "Define subgraph schemas for each microservice",
+        "action": "define",
+        "target": "subgraph schemas",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "All microservices are running",
+            "fact": "microservices_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy_router",
+        "description": "Deploy Apollo Router as the federation gateway",
+        "action": "deploy",
+        "target": "Apollo Router",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "subgraph schemas are defined",
+            "fact": "subgraph_defined",
+            "established_by": "define_subgraphs",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Apollo Router status",
+          "how": "check health endpoint",
+          "expected": "healthy"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to previous gateway",
+          "safety_guard": "ensure previous version is stable",
+          "restores_state": [
+            "Apollo Router is in a stable state"
+          ],
+          "restoration_evidence": "check health endpoint returns healthy"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "migrate_client_queries",
+        "description": "Migrate client queries from REST to federated GraphQL",
+        "action": "migrate",
+        "target": "client queries",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Apollo Router is deployed",
+            "fact": "router_deployed",
+            "established_by": "deploy_router",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "client query performance",
+          "how": "monitor application logs",
+          "expected": "no errors with GraphQL"
+        },
+        "rollback": {
+          "trigger": "migration issues detected",
+          "action": "revert client code to REST",
+          "safety_guard": "ensure REST endpoints are operational",
+          "restores_state": [
+            "client queries are in a REST state"
+          ],
+          "restoration_evidence": "HTTP status responses from REST endpoints"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_query_limits",
+        "description": "Verify query complexity limits are set",
+        "action": "verify",
+        "target": "GraphQL queries",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Apollo Router is deployed",
+            "fact": "router_deployed",
+            "established_by": "deploy_router",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "query complexity limits",
+          "how": "check configuration settings",
+          "expected": "limits are appropriately set"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "setup_caching",
+        "description": "Set up caching and persisted queries",
+        "action": "setup",
+        "target": "caching",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Apollo Router is deployed",
+            "fact": "router_deployed",
+            "established_by": "deploy_router",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "caching mechanism performance",
+          "how": "monitor cache hits and misses",
+          "expected": "higher cache hit rate"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor_n_plus_1",
+        "description": "Monitor for N+1 query issues",
+        "action": "monitor",
+        "target": "N+1 queries",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Client queries migrated",
+            "fact": "client_migrated",
+            "established_by": "migrate_client_queries",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "N+1 query occurrences",
+          "how": "check logs for query patterns",
+          "expected": "no N+1 issues detected"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define_subgraphs",
+        "to_task": "deploy_router",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_router",
+        "to_task": "migrate_client_queries",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_router",
+        "to_task": "verify_query_limits",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_router",
+        "to_task": "setup_caching",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate_client_queries",
+        "to_task": "monitor_n_plus_1",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:define_subgraphs",
+      "task_id": "define_subgraphs",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The 'define_subgraphs' task must be completed before deploying the router, which is not guaranteed if tasks are executed in parallel without proper synchronization.",
+      "suggested_fix": "Ensure 'define_subgraphs' is completed before the 'deploy_router' task starts.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:deploy_router",
+      "task_id": "deploy_router",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'deploy_router' does not account for the state of the entire infrastructure, potentially leaving the gateway in an unstable state without a reliable method to restore service.",
+      "suggested_fix": "Add a comprehensive rollback plan to restore all affected components to a fully operational state, not just the Apollo Router.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:migrate_client_queries",
+      "task_id": "migrate_client_queries",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The migration task depends on the successful deployment of the router, but there is no verification of this dependency being met within the task's outline.",
+      "suggested_fix": "Include a verification step to check that 'deploy_router' was successful before proceeding with 'migrate_client_queries'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:monitor_n_plus_1",
+      "task_id": "monitor_n_plus_1",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'monitor_n_plus_1' task relies on the successful completion of client migration, but this dependency is not verified, potentially leading to monitoring non-existent or incomplete data.",
+      "suggested_fix": "Add a verification step to confirm successful completion of 'migrate_client_queries' before proceeding to 'monitor_n_plus_1'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

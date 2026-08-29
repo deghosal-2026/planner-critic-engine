@@ -1,0 +1,226 @@
+{
+  "dimension": "core-api",
+  "goal_id": "arch-02-cms-migration",
+  "duration_seconds": 12.82,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-arch-02-cms-migration-r2",
+    "goal_id": "arch-02-cms-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "arch-02-cms-migration-plan",
+    "created_at": "2026-08-29T21:31:25.886839Z",
+    "tasks": [
+      {
+        "id": "export_content",
+        "description": "Export all posts, pages, and media from WordPress",
+        "action": "export",
+        "target": "wp-content",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "WordPress site is reachable",
+            "fact": "wp_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "transform_content_model",
+        "description": "Transform exported content to Contentful content model",
+        "action": "transform",
+        "target": "contentful-model",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "content integrity checksums",
+          "how": "run checksum comparisons",
+          "expected": "checksums match"
+        },
+        "rollback": {
+          "trigger": "transformation fails",
+          "action": "restore original content",
+          "safety_guard": "verify content integrity before transformation",
+          "restores_state": [
+            "original content"
+          ],
+          "restoration_evidence": "verify checksums of restored content"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "set_up_redirects",
+        "description": "Set up 301 redirects from old URLs to new URLs",
+        "action": "setup_redirects",
+        "target": "redirects",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Redirect rules must be defined",
+            "fact": "redirect_rules",
+            "established_by": "transform_content_model",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "redirects functionality",
+          "how": "test old URLs against new URLs",
+          "expected": "all old URLs redirect correctly"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "decommission_wp",
+        "description": "Decommission WordPress infrastructure once migration is complete",
+        "action": "decommission",
+        "target": "wp-infrastructure",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "functional testing of new site",
+          "how": "browse new site and check all pages",
+          "expected": "all pages functional without errors"
+        },
+        "rollback": {
+          "trigger": "migration issues arise",
+          "action": "restore WordPress infrastructure",
+          "safety_guard": "ensure all data is safely backed up",
+          "restores_state": [
+            "WordPress infrastructure"
+          ],
+          "restoration_evidence": "confirm WordPress is operational"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "export_content",
+        "to_task": "transform_content_model",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "transform_content_model",
+        "to_task": "set_up_redirects",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set_up_redirects",
+        "to_task": "decommission_wp",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:set_up_redirects",
+      "task_id": "set_up_redirects",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'set_up_redirects' depends on the precondition 'redirect_rules' which is never established.",
+      "suggested_fix": "Ensure 'redirect_rules' is defined as a fact in a previous task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:transform_content_model",
+      "task_id": "transform_content_model",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for 'transform_content_model' lacks evidence verification for restored state.",
+      "suggested_fix": "Include a method to verify success of the rollback restoration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:export_content",
+      "task_id": "export_content",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider including a step for validating the export is complete and correct before continuing.",
+      "suggested_fix": "Add a verification step after the content export.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:decommission_wp",
+      "task_id": "decommission_wp",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Include a step to verify all content has been successfully migrated before decommissioning.",
+      "suggested_fix": "Add a verification step to confirm migration success before decommissioning.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,307 @@
+{
+  "dimension": "core-api",
+  "goal_id": "erp-03-data-conversion",
+  "duration_seconds": 27.88,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-erp-03-data-conversion-r2",
+    "goal_id": "erp-03-data-conversion",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "erp-03-data-conversion-plan",
+    "created_at": "2026-08-29T21:38:21.870597Z",
+    "tasks": [
+      {
+        "id": "extract",
+        "description": "Extract data from Oracle EBS",
+        "action": "export",
+        "target": "Oracle EBS",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Oracle EBS is reachable",
+            "fact": "oracle_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "extraction logs",
+          "how": "review logs for errors",
+          "expected": "no errors in extraction logs"
+        },
+        "rollback": {
+          "trigger": "extraction fails",
+          "action": "retry extraction",
+          "safety_guard": "verify connectivity to Oracle EBS",
+          "restores_state": [
+            "data not extracted"
+          ],
+          "restoration_evidence": "successful extraction logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "transform_validate",
+        "description": "Transform and validate data",
+        "action": "transform",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data has been extracted successfully",
+            "fact": "extraction_complete",
+            "established_by": "extract",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data integrity report",
+          "how": "run validation scripts",
+          "expected": "all mandatory fields valid and no duplicates"
+        },
+        "rollback": {
+          "trigger": "validation fails",
+          "action": "revert changes to original data",
+          "safety_guard": "backup transformed data",
+          "restores_state": [
+            "data in original state"
+          ],
+          "restoration_evidence": "original data backup"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "map_migrate",
+        "description": "Load data into SAP",
+        "action": "load",
+        "target": "SAP S/4HANA",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data has been transformed and validated",
+            "fact": "transformation_complete",
+            "established_by": "transform_validate",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "record counts and financial totals",
+          "how": "compare counts and totals between Oracle EBS and SAP",
+          "expected": "record counts and totals match"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "revert SAP to pre-conversion state",
+          "safety_guard": "ensure backup from Oracle EBS is valid",
+          "restores_state": [
+            "data in SAP not updated"
+          ],
+          "restoration_evidence": "SAP pre-conversion backups"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "reconcile",
+        "description": "Reconcile data between Oracle EBS and SAP",
+        "action": "verify",
+        "target": "data integrity",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data has been loaded into SAP successfully",
+            "fact": "migration_complete",
+            "established_by": "map_migrate",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data integrity",
+          "how": "compare data between Oracle EBS and SAP",
+          "expected": "data matches in both systems"
+        },
+        "rollback": {
+          "trigger": "reconciliation fails",
+          "action": "revert reconciliation changes",
+          "safety_guard": "verify previous reconciliation state",
+          "restores_state": [
+            "data reconciliation state"
+          ],
+          "restoration_evidence": "reconciliation logs"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify",
+        "description": "Verify data with business users",
+        "action": "validate",
+        "target": "business users",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Data reconciliation is complete",
+            "fact": "reconciliation_complete",
+            "established_by": "reconcile",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "business user approval",
+          "how": "feedback collection",
+          "expected": "business users confirm data accuracy"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "extract",
+        "to_task": "transform_validate",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "transform_validate",
+        "to_task": "map_migrate",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "map_migrate",
+        "to_task": "reconcile",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "reconcile",
+        "to_task": "verify",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:risk:extract",
+      "task_id": "extract",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Extraction from Oracle EBS is dependent on its availability which can be affected by network issues.",
+      "suggested_fix": "Consider implementing a retry mechanism for transient failures.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:transform_validate",
+      "task_id": "transform_validate",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Transformation and validation might need to cover edge cases such as empty fields or unexpected data formats.",
+      "suggested_fix": "Add checks for handling edge cases in data validation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:risk:map_migrate",
+      "task_id": "map_migrate",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Loading into SAP S/4HANA may take considerable time given the volume of data (5M records) and could affect performance.",
+      "suggested_fix": "Conduct performance testing prior to migration to assess impact.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:reconcile",
+      "task_id": "reconcile",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Data reconciliation could benefit from additional steps to log discrepancies and how they are resolved.",
+      "suggested_fix": "Incorporate discrepancy logging and resolution tracking as part of the reconciliation process.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:verify",
+      "task_id": "verify",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The verify task lacks a rollback plan, meaning issues uncovered in this step could lead to irretrievable errors.",
+      "suggested_fix": "Implement a rollback plan that allows for reverting data validation outcomes.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

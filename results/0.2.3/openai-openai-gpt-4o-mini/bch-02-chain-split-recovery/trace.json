@@ -1,0 +1,325 @@
+{
+  "dimension": "core-api",
+  "goal_id": "bch-02-chain-split-recovery",
+  "duration_seconds": 25.43,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-bch-02-chain-split-recovery-r2",
+    "goal_id": "bch-02-chain-split-recovery",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "bch-02-chain-split-recovery-v1",
+    "created_at": "2026-08-29T21:35:21.222368Z",
+    "tasks": [
+      {
+        "id": "detect_split",
+        "description": "Detect the chain split by monitoring finality gaps and comparing chain heads across nodes",
+        "action": "monitor",
+        "target": "chain_finality",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "validator nodes are operational",
+            "fact": "nodes_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "finality status",
+          "how": "check logs and metrics",
+          "expected": "finality gaps detected"
+        },
+        "rollback": {
+          "trigger": "detection fails",
+          "action": "review logs for inconsistencies",
+          "safety_guard": "ensure monitoring tools are functional",
+          "restores_state": [
+            "no split detected"
+          ],
+          "restoration_evidence": "logs examined for inconsistencies"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "pause_attestation",
+        "description": "Pause the validator client to stop further attestations",
+        "action": "pause",
+        "target": "validator_client",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "split detected",
+            "fact": "split_detected",
+            "established_by": "detect_split",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "validator client status",
+          "how": "query client health",
+          "expected": "client is paused"
+        },
+        "rollback": {
+          "trigger": "pause fails",
+          "action": "restart validator client",
+          "safety_guard": "validate client status",
+          "restores_state": [
+            "client is active"
+          ],
+          "restoration_evidence": "client status confirmed active"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "identify_canonical_chain",
+        "description": "Identify the canonical chain using block explorers and community consensus",
+        "action": "consult",
+        "target": "canonical_chain",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "attestation paused",
+            "fact": "client_paused",
+            "established_by": "pause_attestation",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "canonical chain identification",
+          "how": "cross-reference multiple sources",
+          "expected": "confirmed canonical chain"
+        },
+        "rollback": {
+          "trigger": "identification fails",
+          "action": "document potential forks for later analysis",
+          "safety_guard": "consult backup resources",
+          "restores_state": [
+            "no canonical chain identified"
+          ],
+          "restoration_evidence": "documented forks available for review"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "resync_beacon_node",
+        "description": "Resync the beacon node to the identified canonical chain",
+        "action": "resync",
+        "target": "beacon_node",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canonical chain identified",
+            "fact": "canonical_chain_identified",
+            "established_by": "identify_canonical_chain",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "resync completion",
+          "how": "check synchronization status",
+          "expected": "node is fully synced to canonical chain"
+        },
+        "rollback": {
+          "trigger": "resync fails",
+          "action": "analyze resync logs and restore settings",
+          "safety_guard": "ensure recovery procedures are in place",
+          "restores_state": [
+            "node is unsynced"
+          ],
+          "restoration_evidence": "logs analyzed for resync errors"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_attestation_behavior",
+        "description": "Verify that attestation behavior resumes correctly and no slashing events occurred",
+        "action": "verify",
+        "target": "attestation_behavior",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "beacon node resynced",
+            "fact": "beacon_node_synced",
+            "established_by": "resync_beacon_node",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "attestation behavior and slashing events",
+          "how": "analyze validation reports",
+          "expected": "no slashing events, normal behavior"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "perform forensic analysis and check slashing protection",
+          "safety_guard": "maintain logs for analysis",
+          "restores_state": [
+            "attestation behavior flawed"
+          ],
+          "restoration_evidence": "forensic analysis completed"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "detect_split",
+        "to_task": "pause_attestation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "pause_attestation",
+        "to_task": "identify_canonical_chain",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "identify_canonical_chain",
+        "to_task": "resync_beacon_node",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "resync_beacon_node",
+        "to_task": "verify_attestation_behavior",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:detect_split",
+      "task_id": "detect_split",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The action requires operational validator nodes but does not confirm their operational status beyond the initial environment context.",
+      "suggested_fix": "Add a validation step before detecting the split to ensure 'nodes_healthy' is verified.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:pause_attestation",
+      "task_id": "pause_attestation",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'pause_attestation' is listed as dependent on 'detect_split', but if 'detect_split' fails, 'pause_attestation' should not be executed as it could lead to incorrect operation.",
+      "suggested_fix": "Implement a conditional check to ensure 'pause_attestation' does not execute if 'detect_split' determines no split.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:identify_canonical_chain",
+      "task_id": "identify_canonical_chain",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider including a check to handle the scenario where community consensus is not reached or block explorers provide conflicting information.",
+      "suggested_fix": "Add a step to manage consensus disagreements, such as continuing to monitor for changes or using a fixed set of sources.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:resync_beacon_node",
+      "task_id": "resync_beacon_node",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback process does not specify what recovery or emergency protocols are in place if the node cannot resync to the canonical chain after multiple failures.",
+      "suggested_fix": "Include a contingency plan for prolonged resync failures, such as switching to alternative data sources or node settings.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:verify_attestation_behavior",
+      "task_id": "verify_attestation_behavior",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The 'verify_attestation_behavior' relies on 'beacon_node_synced' but does not explicitly verify its status prior to execution.",
+      "suggested_fix": "Add a verification step before 'verify_attestation_behavior' to ensure that the beacon node is confirmed to be in a synced state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:bch-02-chain-split-recovery:2:2",
+    "plan_id": "plan-bch-02-chain-split-recovery-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:feasibility:detect_split",
+    "question": "Plan for goal 'bch-02-chain-split-recovery' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

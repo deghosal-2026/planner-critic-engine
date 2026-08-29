@@ -1,0 +1,282 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-02-loki-stack",
+  "duration_seconds": 21.88,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-obs-02-loki-stack-r2",
+    "goal_id": "obs-02-loki-stack",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "obs-02-loki-stack",
+    "created_at": "2026-08-29T21:25:42.425442Z",
+    "tasks": [
+      {
+        "id": "deploy-promtail",
+        "description": "Deploy Promtail to aggregate application logs from all pods",
+        "action": "helm install",
+        "target": "promtail",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kubernetes cluster is accessible",
+            "fact": "k8s_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure-loki",
+        "description": "Deploy Loki for log storage and indexing",
+        "action": "helm install",
+        "target": "loki",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Loki service status",
+          "how": "check service health",
+          "expected": "healthy"
+        },
+        "rollback": {
+          "trigger": "Loki deployment fails",
+          "action": "uninstall Loki",
+          "safety_guard": "verify cleanup of resources",
+          "restores_state": [
+            "Loki in the previous stable state"
+          ],
+          "restoration_evidence": "check log entries are intact"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "setup-grafana",
+        "description": "Deploy Grafana for log visualization",
+        "action": "helm install",
+        "target": "grafana",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Loki should be running",
+            "fact": "loki_running",
+            "established_by": "configure-loki",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Grafana service status",
+          "how": "check service health",
+          "expected": "healthy"
+        },
+        "rollback": {
+          "trigger": "Grafana deployment fails",
+          "action": "uninstall Grafana",
+          "safety_guard": "verify cleanup of resources",
+          "restores_state": [
+            "Grafana in the previous stable state"
+          ],
+          "restoration_evidence": "check Grafana dashboard is accessible"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure-s3-backend",
+        "description": "Set up S3 bucket backend for Loki retention",
+        "action": "configure",
+        "target": "loki",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "S3 backend connectivity",
+          "how": "ping S3 endpoint",
+          "expected": "connected"
+        },
+        "rollback": {
+          "trigger": "S3 backend configuration fails",
+          "action": "revert to local storage",
+          "safety_guard": "ensure local storage is intact",
+          "restores_state": [
+            "Loki local storage configuration"
+          ],
+          "restoration_evidence": "verify local storage has previous logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "set-log-retention",
+        "description": "Configure 7-day log retention policy in Loki",
+        "action": "configure",
+        "target": "loki",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "log retention setting",
+          "how": "query retention settings",
+          "expected": "7 days"
+        },
+        "rollback": {
+          "trigger": "Retention configuration fails",
+          "action": "revert to previous retention policy",
+          "safety_guard": "verify logs are intact",
+          "restores_state": [
+            "Loki with previous retention policy"
+          ],
+          "restoration_evidence": "check logs within retention period"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy-promtail",
+        "to_task": "configure-loki",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-loki",
+        "to_task": "setup-grafana",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-loki",
+        "to_task": "configure-s3-backend",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-s3-backend",
+        "to_task": "set-log-retention",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:deploy-promtail",
+      "task_id": "deploy-promtail",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The task requires Kubernetes access, but the environment for deployment is not guaranteed to support this unless explicitly confirmed.",
+      "suggested_fix": "Ensure the Kubernetes cluster is accessible before proceeding with deployment.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:configure-loki",
+      "task_id": "configure-loki",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The task should include a precondition to check that Promtail has been successfully deployed and is running since Loki depends on incoming log streams.",
+      "suggested_fix": "Add a precondition to verify that Promtail is operational.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:setup-grafana",
+      "task_id": "setup-grafana",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Add a verification step for successful installation of Grafana before setup to ensure that it was properly deployed and is healthy.",
+      "suggested_fix": "Ensure Grafana installation success is verified prior to setting up.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:configure-s3-backend",
+      "task_id": "configure-s3-backend",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task depends on Loki being running, but this is not verified before configuring S3 backend.",
+      "suggested_fix": "Add a precondition to confirm Loki is running before executing this task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:set-log-retention",
+      "task_id": "set-log-retention",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "This task relies on the S3 backend configuration being successful, yet there is no verification that it has been set up correctly.",
+      "suggested_fix": "Add a dependency check to ensure S3 backend configuration is verified before applying log retention settings.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

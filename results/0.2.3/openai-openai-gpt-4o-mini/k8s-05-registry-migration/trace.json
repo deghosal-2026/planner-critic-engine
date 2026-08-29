@@ -1,0 +1,561 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-05-registry-migration",
+  "duration_seconds": 42.91,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-k8s-05-registry-migration-r4",
+    "goal_id": "k8s-05-registry-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-k8s-05-registry-migration-r3",
+    "created_at": "2026-08-29T21:41:05.959335Z",
+    "tasks": [
+      {
+        "id": "pull-images",
+        "description": "Pull the current images from Docker Hub for all microservices",
+        "action": "pull",
+        "target": "docker_images",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "pull success",
+          "how": "check image digests",
+          "expected": "images pulled successfully"
+        },
+        "rollback": {
+          "trigger": "pull fails",
+          "action": "notify failure",
+          "safety_guard": "check for pull errors",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "retag-images",
+        "description": "Retag images with the ECR repository URI",
+        "action": "retag",
+        "target": "ecr_images",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "retag success",
+          "how": "check image tags in local repository",
+          "expected": "images retagged successfully"
+        },
+        "rollback": {
+          "trigger": "retag fails",
+          "action": "notify failure",
+          "safety_guard": "check for retag errors",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "push-images",
+        "description": "Push retagged images to ECR",
+        "action": "push",
+        "target": "ecr",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "push success",
+          "how": "check pushed image tags in ECR",
+          "expected": "images pushed successfully"
+        },
+        "rollback": {
+          "trigger": "push fails",
+          "action": "notify failure",
+          "safety_guard": "check for push errors",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-images",
+        "description": "Verify that images are correctly available in ECR",
+        "action": "verify",
+        "target": "ecr",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "image availability in ECR",
+          "how": "check ECR for image tags",
+          "expected": "images verified in ECR"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "notify failure",
+          "safety_guard": "check verification errors",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update-manifests",
+        "description": "Update Deployment and StatefulSet manifests to reference new ECR images",
+        "action": "update",
+        "target": "manifests",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "manifest update success",
+          "how": "validate manifest files",
+          "expected": "manifests updated correctly"
+        },
+        "rollback": {
+          "trigger": "update fails",
+          "action": "restore old manifests",
+          "safety_guard": "verify old manifests exist",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "trigger-rollout",
+        "description": "Trigger a rolling restart of all services",
+        "action": "rollout",
+        "target": "services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "rollback success",
+          "how": "check service configurations and logs",
+          "expected": "previous configurations restored"
+        },
+        "rollback": {
+          "trigger": "rollout fails",
+          "action": "restore previous configurations and image references",
+          "safety_guard": "verify all image tags are restored",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-services",
+        "description": "Verify that every service pod pulls from ECR and serves traffic normally",
+        "action": "verify",
+        "target": "services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service health",
+          "how": "monitor traffic logs for each service",
+          "expected": "normal traffic from all services"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "rollback to Docker Hub",
+          "safety_guard": "check service health",
+          "restores_state": [
+            "services restored to Docker Hub"
+          ],
+          "restoration_evidence": "service health verified"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "pull-images",
+        "to_task": "retag-images",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "retag-images",
+        "to_task": "push-images",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "push-images",
+        "to_task": "verify-images",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-images",
+        "to_task": "update-manifests",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update-manifests",
+        "to_task": "trigger-rollout",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "trigger-rollout",
+        "to_task": "verify-services",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plan-k8s-05-registry-migration-r4:4:pull-images:rollback_state_undeclared",
+      "task_id": "pull-images",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'pull-images' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-k8s-05-registry-migration-r4:4:retag-images:rollback_state_undeclared",
+      "task_id": "retag-images",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'retag-images' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-k8s-05-registry-migration-r4:4:push-images:rollback_state_undeclared",
+      "task_id": "push-images",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'push-images' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-k8s-05-registry-migration-r4:4:verify-images:rollback_state_undeclared",
+      "task_id": "verify-images",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify-images' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-k8s-05-registry-migration-r4:4:update-manifests:rollback_state_undeclared",
+      "task_id": "update-manifests",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'update-manifests' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-k8s-05-registry-migration-r4:4:trigger-rollout:rollback_state_undeclared",
+      "task_id": "trigger-rollout",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'trigger-rollout' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-k8s-05-registry-migration-r4:4:pull-images:rollback_state_undeclared",
+      "task_id": "pull-images",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'pull-images' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-k8s-05-registry-migration-r4:4:retag-images:rollback_state_undeclared",
+      "task_id": "retag-images",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'retag-images' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-k8s-05-registry-migration-r4:4:push-images:rollback_state_undeclared",
+      "task_id": "push-images",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'push-images' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-k8s-05-registry-migration-r4:4:verify-images:rollback_state_undeclared",
+      "task_id": "verify-images",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify-images' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-k8s-05-registry-migration-r4:4:update-manifests:rollback_state_undeclared",
+      "task_id": "update-manifests",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'update-manifests' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-k8s-05-registry-migration-r4:4:trigger-rollout:rollback_state_undeclared",
+      "task_id": "trigger-rollout",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'trigger-rollout' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:retag-images",
+      "task_id": "retag-images",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'retag-images' depends on the successful execution of 'pull-images', which occurs before it, but there is no verification of successful image pull prior to retagging.",
+      "suggested_fix": "Add verification step after 'pull-images' to ensure images are successfully pulled before proceeding to 'retag-images'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:push-images",
+      "task_id": "push-images",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'push-images' is executed before verifying the success of 'retag-images', which could lead to pushing unretagged images.",
+      "suggested_fix": "Add a dependency on the verification of 'retag-images' before executing 'push-images'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:verify-images",
+      "task_id": "verify-images",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'verify-images' should ensure images are successfully pushed before performing verification.",
+      "suggested_fix": "Add a dependency on the successful execution of 'push-images' before executing 'verify-images'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:update-manifests",
+      "task_id": "update-manifests",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'update-manifests' must wait for 'verify-images' to confirm that images are available in ECR before updating manifests.",
+      "suggested_fix": "Add a dependency on the successful execution of 'verify-images' before executing 'update-manifests'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:trigger-rollout",
+      "task_id": "trigger-rollout",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'trigger-rollout' should only be executed after confirming that 'update-manifests' completed successfully.",
+      "suggested_fix": "Add a dependency on the successful execution of 'update-manifests' before executing 'trigger-rollout'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:verify-services",
+      "task_id": "verify-services",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'verify-services' must execute after 'trigger-rollout' is confirmed successful, ensuring that services are deployed with updated configurations.",
+      "suggested_fix": "Add a dependency on the successful execution of 'trigger-rollout' before executing 'verify-services'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-05-registry-migration:4:4",
+    "plan_id": "plan-k8s-05-registry-migration-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:retag-images",
+    "question": "Plan for goal 'k8s-05-registry-migration' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=7"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

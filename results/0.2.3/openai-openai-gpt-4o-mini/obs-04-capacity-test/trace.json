@@ -1,0 +1,300 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-04-capacity-test",
+  "duration_seconds": 20.18,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-obs-04-capacity-test-r2",
+    "goal_id": "obs-04-capacity-test",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "obs-04-capacity-test-plan",
+    "created_at": "2026-08-29T21:26:10.431301Z",
+    "tasks": [
+      {
+        "id": "define-slo",
+        "description": "Define SLO targets for the checkout service",
+        "action": "define",
+        "target": "SLOs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "performance metrics requirements are known",
+            "fact": "metrics_known",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "run-k6-test",
+        "description": "Run k6 ramp-up test from 10 to 500 RPS over 10 min",
+        "action": "run",
+        "target": "k6",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "test results",
+          "how": "check response times and error rates",
+          "expected": "p99 latency <500ms, error rate <0.1%"
+        },
+        "rollback": {
+          "trigger": "test fails",
+          "action": "stop test and analyze results",
+          "safety_guard": "confirm no critical issues found",
+          "restores_state": [
+            "previous test state"
+          ],
+          "restoration_evidence": "verify no ongoing test conflicts"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "collect-metrics",
+        "description": "Collect Prometheus metrics during the test",
+        "action": "collect",
+        "target": "Prometheus",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "k6 test is running",
+            "fact": "test_running",
+            "established_by": "run-k6-test",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "collected metrics",
+          "how": "validate metrics against expected parameters",
+          "expected": "metrics match test criteria"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "analyze-bottlenecks",
+        "description": "Analyze collected metrics to identify bottlenecks",
+        "action": "analyze",
+        "target": "metrics",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "metrics collected",
+            "fact": "metrics_collected",
+            "established_by": "collect-metrics",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "right-size-hpa",
+        "description": "Right-size HPA limits based on analysis",
+        "action": "adjust",
+        "target": "HPA",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "HPA limits",
+          "how": "compare against performance requirements",
+          "expected": "limits meet SLO guidelines"
+        },
+        "rollback": {
+          "trigger": "wrong limits set",
+          "action": "revert to previous HPA limits",
+          "safety_guard": "verify previous limits stability",
+          "restores_state": [
+            "previous HPA configuration"
+          ],
+          "restoration_evidence": "validate previous HPA performance"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "re-test-slos",
+        "description": "Re-test to confirm SLOs hold at target load",
+        "action": "re-test",
+        "target": "SLOs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "SLO results",
+          "how": "run final checks after adjusting load",
+          "expected": "p99 latency <500ms, error rate <0.1%"
+        },
+        "rollback": {
+          "trigger": "re-test fails",
+          "action": "revert to previous settings and configure alerts",
+          "safety_guard": "ensure alerts are effective",
+          "restores_state": [
+            "previous SLO settings"
+          ],
+          "restoration_evidence": "validate SLO alerts and settings"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define-slo",
+        "to_task": "run-k6-test",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run-k6-test",
+        "to_task": "collect-metrics",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "collect-metrics",
+        "to_task": "analyze-bottlenecks",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "analyze-bottlenecks",
+        "to_task": "right-size-hpa",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "right-size-hpa",
+        "to_task": "re-test-slos",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:run-k6-test",
+      "task_id": "run-k6-test",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The run-k6-test task has no preconditions set but depends on defined SLOs, which must be established first.",
+      "suggested_fix": "Add a hard prerequisite for run-k6-test to depend on the completion of define-slo.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:collect-metrics",
+      "task_id": "collect-metrics",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The collect-metrics task should include preconditions explicitly verifying that the k6 test is active and metrics collection is setup appropriately.",
+      "suggested_fix": "Ensure that the precondition for the collect-metrics task confirms that metrics collection is appropriately initialized.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:analyze-bottlenecks",
+      "task_id": "analyze-bottlenecks",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The analyze-bottlenecks task may benefit from additional checks or dependencies indicating that analysis should only proceed once sufficient metrics are collected and deemed valid.",
+      "suggested_fix": "Include a verification step that metrics are valid before running the bottleneck analysis.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:right-size-hpa",
+      "task_id": "right-size-hpa",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for right-size-hpa lacks verification criteria to confirm the stability of the previous HPA limits after the rollback action.",
+      "suggested_fix": "Develop a verification protocol for ensuring previous HPA limits are stable after rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:re-test-slos",
+      "task_id": "re-test-slos",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback strategy for re-test-slos is inadequate as it relies on effective alert configuration without validating alert functionality post-rollback.",
+      "suggested_fix": "Include steps to validate alert settings effectiveness as part of the rollback process.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

@@ -1,0 +1,178 @@
+{
+  "dimension": "core-api",
+  "goal_id": "data-03-great-expectations",
+  "duration_seconds": 8.39,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-data-03-great-expectations-r2",
+    "goal_id": "data-03-great-expectations",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "data-03-great-expectations-plan",
+    "created_at": "2026-08-29T21:41:57.107204Z",
+    "tasks": [
+      {
+        "id": "define_expectations",
+        "description": "Define expectations for data quality",
+        "action": "define",
+        "target": "expectations",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "great_expectations is installed",
+            "fact": "ge_installed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "run_checks",
+        "description": "Run data quality checks",
+        "action": "run",
+        "target": "data_checks",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data quality report",
+          "how": "check report generated",
+          "expected": "no failures"
+        },
+        "rollback": {
+          "trigger": "check fails",
+          "action": "revert to last good state",
+          "safety_guard": "confirm previous state backup exists",
+          "restores_state": [
+            "last_good_state"
+          ],
+          "restoration_evidence": "previous_backup_validate"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "alert_on_failure",
+        "description": "Alert team on check failure via Slack",
+        "action": "notify",
+        "target": "slack",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Slack integration set up",
+            "fact": "slack_connected",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Slack notification",
+          "how": "check Slack channel",
+          "expected": "notification received"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define_expectations",
+        "to_task": "run_checks",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "run_checks",
+        "to_task": "alert_on_failure",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:run_checks",
+      "task_id": "run_checks",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Run checks task is sequenced before defining expectations, which is a hard prerequisite.",
+      "suggested_fix": "Reorder tasks to ensure 'define_expectations' runs before 'run_checks'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:run_checks",
+      "task_id": "run_checks",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for run_checks lacks a clear safety guard to ensure that the previous state was successfully restored.",
+      "suggested_fix": "Add a verification step to confirm that the previous state is valid after rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:alert_on_failure",
+      "task_id": "alert_on_failure",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "warning",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The alert_on_failure task depends on successful execution of run_checks, but there is no verification step ensuring that run_checks completed successfully before this task runs.",
+      "suggested_fix": "Include a verification mechanism to confirm execution success of 'run_checks' before proceeding to 'alert_on_failure'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

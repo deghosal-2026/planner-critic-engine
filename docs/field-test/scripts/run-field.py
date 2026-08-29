@@ -49,7 +49,7 @@ MLX_API_KEY = os.environ.get("MLX_API_KEY", "omlx-test")
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 GOALS_ROOT = Path(__file__).resolve().parent.parent / "goals"
-RESULTS_ROOT = REPO_ROOT / "results" / "0.2.2"
+RESULTS_ROOT = REPO_ROOT / "results" / "0.2.3"
 FIELD_TEST_DIR = Path(__file__).resolve().parent.parent  # docs/field-test
 BENCH_DIR = FIELD_TEST_DIR / "scripts"
 
@@ -122,8 +122,7 @@ def run_validate(args) -> None:
 def run_subsystem_hermetic(args) -> None:
     """P2: deterministic WBS coverage tests via pytest ($0)."""
     test_dirs = [
-        "tests/field_test_v0_2_0",
-        "tests/field_test_v0_2_1",
+        "tests/field_test",
     ]
     label = " ".join(d for d in test_dirs if (REPO_ROOT / d).exists())
     print(f"[subsystem] hermetic WBS coverage: pytest {label} --no-cov")

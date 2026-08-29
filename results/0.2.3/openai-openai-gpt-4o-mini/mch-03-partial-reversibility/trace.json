@@ -1,0 +1,290 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mch-03-partial-reversibility",
+  "duration_seconds": 35.39,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 4
+  },
+  "plan": {
+    "id": "plan-mch-03-partial-reversibility-r4",
+    "goal_id": "mch-03-partial-reversibility",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-mch-03-partial-reversibility-r3",
+    "created_at": "2026-08-29T21:47:51.815476Z",
+    "tasks": [
+      {
+        "id": "schema_migration",
+        "description": "Apply schema migration to add the new column",
+        "action": "migrate",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "db is reachable",
+            "fact": "db_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "schema contains the new column",
+          "how": "run SQL query",
+          "expected": "new column exists"
+        },
+        "rollback": {
+          "trigger": "migration fails or is rolled back",
+          "action": "DROP COLUMN",
+          "safety_guard": "verify with schema check",
+          "restores_state": [
+            "schema returns to pre-migration state"
+          ],
+          "restoration_evidence": "check schema version"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_schema_migration",
+        "description": "Verify the schema migration has been successful",
+        "action": "verify",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "schema migration applied",
+            "fact": "schema_migration",
+            "established_by": "schema_migration",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "new column existence",
+          "how": "run SQL query",
+          "expected": "new column exists"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_schema_structure",
+        "description": "Verify the schema structure before proceeding to data backfill",
+        "action": "verify",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "schema migration has been verified",
+            "fact": "verify_schema_migration",
+            "established_by": "verify_schema_migration",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "schema structure integrity",
+          "how": "run SQL query to check columns",
+          "expected": "schema structure is as expected"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_column_intended_use",
+        "description": "Verify that the new column will be used for backfill",
+        "action": "check",
+        "target": "column use",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "schema structure has been verified",
+            "fact": "verify_schema_structure",
+            "established_by": "verify_schema_structure",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "column intended for data backfill",
+          "how": "run business logic check",
+          "expected": "column is intended for its new purpose"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "data_backfill",
+        "description": "Backfill data for the new column",
+        "action": "update",
+        "target": "table",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "column intended for use has been verified",
+            "fact": "verify_column_intended_use",
+            "established_by": "verify_column_intended_use",
+            "probe": null
+          },
+          {
+            "description": "schema structure has been verified",
+            "fact": "verify_schema_structure",
+            "established_by": "verify_schema_structure",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "data integrity of the new column",
+          "how": "verify rows updated exist",
+          "expected": "rows count matches expected updated count"
+        },
+        "rollback": {
+          "trigger": "backfill fails",
+          "action": "restore to stable state of the table",
+          "safety_guard": "verify data consistency prior to rollback",
+          "restores_state": [
+            "table returns to pre-backfill state"
+          ],
+          "restoration_evidence": "check row counts and data integrity"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "schema_migration",
+        "to_task": "verify_schema_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_schema_migration",
+        "to_task": "verify_schema_structure",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_schema_structure",
+        "to_task": "verify_column_intended_use",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_column_intended_use",
+        "to_task": "data_backfill",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:feasibility:data_backfill",
+      "task_id": "data_backfill",
+      "version": 4,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "Data backfill cannot be performed if the column has been repurposed mid-migration; this creates an unresolvable state during the plan execution.",
+      "suggested_fix": "Ensure that the plan includes checks to prevent column repurposing while backfilling.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:data_backfill",
+      "task_id": "data_backfill",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for data backfill lacks a sound method to undo irreversible changes if critical failure occurs; restoring to a stable state may not cover all scenarios.",
+      "suggested_fix": "Implement a more robust rollback strategy to handle cases where the backfill is interrupted.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:data_backfill",
+      "task_id": "data_backfill",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Data backfill is sequenced to execute before verifying if the column is suited for backfill, which violates prerequisite completion.",
+      "suggested_fix": "Reorder the tasks to ensure that all preconditions are verified before initiating the data backfill.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:data_backfill",
+      "task_id": "data_backfill",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Data backfill depends on the column being intended for use, but this dependency is not guaranteed to be valid in the migration context.",
+      "suggested_fix": "Clarify and enforce the dependency check to ensure that the column's intended use is verified before proceeding.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mch-03-partial-reversibility:4:4",
+    "plan_id": "plan-mch-03-partial-reversibility-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:feasibility:data_backfill",
+    "question": "Plan for goal 'mch-03-partial-reversibility' cannot be approved: blockers remain (llm_feasibility; llm_unsafe_sequencing; llm_unverified_dependencies; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

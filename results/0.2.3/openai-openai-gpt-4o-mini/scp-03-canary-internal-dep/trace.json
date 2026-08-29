@@ -1,0 +1,191 @@
+{
+  "dimension": "core-api",
+  "goal_id": "scp-03-canary-internal-dep",
+  "duration_seconds": 11.51,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-scp-03-canary-internal-dep-r2",
+    "goal_id": "scp-03-canary-internal-dep",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "scp-03-canary-internal-dep-v1",
+    "created_at": "2026-08-29T21:33:58.890840Z",
+    "tasks": [
+      {
+        "id": "deploy_canary",
+        "description": "Deploy the patched core library to canary services",
+        "action": "deploy",
+        "target": "canary_services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service health",
+          "how": "monitor using prometheus",
+          "expected": "all canary services healthy"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to previous version",
+          "safety_guard": "ensure previous version is stable",
+          "restores_state": [
+            "canary_services"
+          ],
+          "restoration_evidence": "all services reverted to last stable version"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_canary",
+        "description": "Verify the performance and stability of the canary deployment",
+        "action": "verify",
+        "target": "canary_services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service metrics",
+          "how": "analyze data in prometheus",
+          "expected": "performance within acceptable thresholds"
+        },
+        "rollback": {
+          "trigger": "canary verification fails",
+          "action": "stop canary deployment",
+          "safety_guard": "alert on failure",
+          "restores_state": [
+            "canary_services"
+          ],
+          "restoration_evidence": "performance metrics reviewed and found to meet stability criteria"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy_remaining",
+        "description": "Deploy the patched core library to remaining services",
+        "action": "deploy",
+        "target": "remaining_services",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "canary deployment verified",
+            "fact": "canary_verified",
+            "established_by": "verify_canary",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "deployment success",
+          "how": "check service availability",
+          "expected": "all remaining services operational"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "rollback to previous version",
+          "safety_guard": "ensure previous version is stable",
+          "restores_state": [
+            "remaining_services"
+          ],
+          "restoration_evidence": "all services reverted to last stable version"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_canary",
+        "to_task": "verify_canary",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_canary",
+        "to_task": "deploy_remaining",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:deploy_remaining",
+      "task_id": "deploy_remaining",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The task 'deploy_remaining' is sequenced before confirming that the canary deployment has been verified, violating the canary deployment pattern.",
+      "suggested_fix": "Ensure 'deploy_remaining' only executes after 'verify_canary' confirms the canary deployment is successful.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:deploy_canary",
+      "task_id": "deploy_canary",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'deploy_canary' lacks details on the verification of the restored state, relying solely on the stability of the previous version.",
+      "suggested_fix": "Include a verification step to ensure that the stable version is properly restored upon rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:verify_canary",
+      "task_id": "verify_canary",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for 'verify_canary' does not specify how to restore the state if the canary verification fails, only stopping further deployment.",
+      "suggested_fix": "Define a clear mechanism to restore canary services to a functional state in case of verification failure.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=3"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

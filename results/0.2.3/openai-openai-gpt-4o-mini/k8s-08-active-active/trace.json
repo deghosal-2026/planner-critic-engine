@@ -1,0 +1,297 @@
+{
+  "dimension": "core-api",
+  "goal_id": "k8s-08-active-active",
+  "duration_seconds": 28.41,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-k8s-08-active-active-r2",
+    "goal_id": "k8s-08-active-active",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "k8s-08-active-active-plan",
+    "created_at": "2026-08-29T21:43:15.125809Z",
+    "tasks": [
+      {
+        "id": "deploy_k8s_us",
+        "description": "Deploy Kubernetes stack in us-east-1",
+        "action": "deploy",
+        "target": "k8s_us",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "us-east-1 region is available",
+            "fact": "us_region_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Kubernetes cluster health",
+          "how": "kubectl get nodes",
+          "expected": "all nodes ready"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "destroy k8s stack in us-east-1",
+          "safety_guard": "validate rollback by checking cluster state",
+          "restores_state": [
+            "k8s_us destroyed"
+          ],
+          "restoration_evidence": "verify k8s stack removal in us-east-1"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy_k8s_eu",
+        "description": "Deploy Kubernetes stack in eu-west-1",
+        "action": "deploy",
+        "target": "k8s_eu",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "eu-west-1 region is available",
+            "fact": "eu_region_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Kubernetes cluster health",
+          "how": "kubectl get nodes",
+          "expected": "all nodes ready"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "destroy k8s stack in eu-west-1",
+          "safety_guard": "validate rollback by checking cluster state",
+          "restores_state": [
+            "k8s_eu destroyed"
+          ],
+          "restoration_evidence": "verify k8s stack removal in eu-west-1"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_db_replication",
+        "description": "Configure PostgreSQL streaming replication",
+        "action": "configure",
+        "target": "postgres_replication",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PostgreSQL is installed in both regions",
+            "fact": "postgres_installed",
+            "established_by": "deploy_k8s_us",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "streaming replication status",
+          "how": "run pg_stat_replication query",
+          "expected": "replication is active"
+        },
+        "rollback": {
+          "trigger": "replication configuration fails",
+          "action": "reset replication settings",
+          "safety_guard": "verify database integrity",
+          "restores_state": [
+            "replication settings reset"
+          ],
+          "restoration_evidence": "confirm replication settings in PostgreSQL"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "set_up_traffic_routing",
+        "description": "Set up global traffic routing with AWS Global Accelerator",
+        "action": "setup",
+        "target": "global_traffic",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "global accelerator service is available",
+            "fact": "gac_service_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic distribution",
+          "how": "monitor AWS metrics",
+          "expected": "traffic is distributed equally"
+        },
+        "rollback": {
+          "trigger": "traffic routing setup fails",
+          "action": "delete global accelerator",
+          "safety_guard": "ensure no traffic is routed incorrectly",
+          "restores_state": [
+            "global accelerator removed"
+          ],
+          "restoration_evidence": "confirm global accelerator deletion"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "simulate_region_failure",
+        "description": "Simulate region-level failure by taking us-east-1 offline",
+        "action": "simulate",
+        "target": "us-east-1",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "traffic routing is configured",
+            "fact": "routing_configured",
+            "established_by": "set_up_traffic_routing",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "traffic absorption by eu-west-1",
+          "how": "monitor traffic metrics",
+          "expected": "eu-west-1 absorbs 100% of traffic within 60 seconds"
+        },
+        "rollback": {
+          "trigger": "simulation fails",
+          "action": "reset traffic to normal state",
+          "safety_guard": "verify all traffic routes correctly",
+          "restores_state": [
+            "traffic routing restored"
+          ],
+          "restoration_evidence": "confirm normal traffic flow"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy_k8s_us",
+        "to_task": "configure_db_replication",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_k8s_eu",
+        "to_task": "configure_db_replication",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_k8s_us",
+        "to_task": "set_up_traffic_routing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "deploy_k8s_eu",
+        "to_task": "set_up_traffic_routing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "set_up_traffic_routing",
+        "to_task": "simulate_region_failure",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:configure_db_replication",
+      "task_id": "configure_db_replication",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "PostgreSQL replication configuration is attempted before deploying PostgreSQL in both regions.",
+      "suggested_fix": "Ensure PostgreSQL is deployed and healthy in both regions before configuring replication.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:set_up_traffic_routing",
+      "task_id": "set_up_traffic_routing",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Traffic routing setup is attempted before configuring PostgreSQL replication, which is critical for routing traffic correctly.",
+      "suggested_fix": "Reorder the tasks to configure PostgreSQL replication before setting up traffic routing.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:simulate_region_failure",
+      "task_id": "simulate_region_failure",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Simulation of region-level failure is dependent on traffic routing being configured, but this is executed before ensuring replication is healthy.",
+      "suggested_fix": "Ensure that PostgreSQL replication is verified active before simulating the region failure.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:k8s-08-active-active:2:2",
+    "plan_id": "plan-k8s-08-active-active-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:configure_db_replication",
+    "question": "Plan for goal 'k8s-08-active-active' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

@@ -1,0 +1,629 @@
+{
+  "dimension": "core-api",
+  "goal_id": "win-03-datacenter-exit",
+  "duration_seconds": 49.43,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-win-03-datacenter-exit-r4",
+    "goal_id": "win-03-datacenter-exit",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-win-03-datacenter-exit-r3",
+    "created_at": "2026-08-29T21:42:18.741985Z",
+    "tasks": [
+      {
+        "id": "provision-cloud-infra",
+        "description": "Provision cloud infrastructure (EC2, RDS, EFS)",
+        "action": "provision",
+        "target": "AWS",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "cloud resources readiness",
+          "how": "check status in AWS console",
+          "expected": "all resources are available"
+        },
+        "rollback": {
+          "trigger": "provisioning fails",
+          "action": "delete cloud resources",
+          "safety_guard": "verify resources are not in use",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "replicate-data",
+        "description": "Replicate data (database backup/restore + file sync)",
+        "action": "sync",
+        "target": "AWS",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data consistency",
+          "how": "run integrity checks",
+          "expected": "data matches on-prem and cloud"
+        },
+        "rollback": {
+          "trigger": "data sync fails",
+          "action": "restore from latest backup",
+          "safety_guard": "verify data integrity",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "establish-network-connectivity",
+        "description": "Establish network connectivity (VPN/DirectConnect)",
+        "action": "connect",
+        "target": "AWS",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cloud infra is provisioned",
+            "fact": "provision-cloud-infra",
+            "established_by": "provision-cloud-infra",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "network connectivity status",
+          "how": "ping network endpoints",
+          "expected": "successful pings to AWS"
+        },
+        "rollback": {
+          "trigger": "network connectivity issues",
+          "action": "revert to previous configuration",
+          "safety_guard": "ensure previous config is valid",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "dual-run",
+        "description": "Run a dual-run period (traffic to both on-prem and cloud)",
+        "action": "run",
+        "target": "both",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "traffic flow",
+          "how": "monitor traffic patterns",
+          "expected": "traffic is balanced"
+        },
+        "rollback": {
+          "trigger": "issues during dual-run",
+          "action": "redirect traffic back to on-prem",
+          "safety_guard": "ensure on-prem is fully operational",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-in-cloud",
+        "description": "Verify application functionality in cloud",
+        "action": "verify",
+        "target": "AWS",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application performance",
+          "how": "run performance tests",
+          "expected": "application performs within acceptable limits"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "switch back to on-prem",
+          "safety_guard": "ensure all data is intact",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "execute-cutover",
+        "description": "Execute cutover (DNS flip + load balancer drain)",
+        "action": "execute",
+        "target": "cutover",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service accessibility",
+          "how": "ping services",
+          "expected": "services are reachable in cloud"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "DNS revert, re-enable on-prem load balancer",
+          "safety_guard": "verify DNS propagation",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "post-rollback-verification",
+        "description": "Verify services are operational on-prem after rollback",
+        "action": "verify",
+        "target": "on-prem",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service operational status",
+          "how": "check service availability",
+          "expected": "services are running on-prem"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "contact support team",
+          "safety_guard": "document all service statuses",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "decommission-on-prem-dc",
+        "description": "Decommission the on-prem datacenter",
+        "action": "decommission",
+        "target": "on-prem",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "confirmed decommission",
+          "how": "check datacenter status",
+          "expected": "all servers are shut down and leases canceled"
+        },
+        "rollback": {
+          "trigger": "decommissioning issues",
+          "action": "re-establish on-prem infrastructure",
+          "safety_guard": "confirm components are salvageable",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "provision-cloud-infra",
+        "to_task": "replicate-data",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "replicate-data",
+        "to_task": "establish-network-connectivity",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "establish-network-connectivity",
+        "to_task": "dual-run",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dual-run",
+        "to_task": "verify-in-cloud",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify-in-cloud",
+        "to_task": "execute-cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "execute-cutover",
+        "to_task": "post-rollback-verification",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "post-rollback-verification",
+        "to_task": "decommission-on-prem-dc",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plan-win-03-datacenter-exit-r4:4:provision-cloud-infra:rollback_state_undeclared",
+      "task_id": "provision-cloud-infra",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'provision-cloud-infra' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-win-03-datacenter-exit-r4:4:replicate-data:rollback_state_undeclared",
+      "task_id": "replicate-data",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'replicate-data' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-win-03-datacenter-exit-r4:4:dual-run:rollback_state_undeclared",
+      "task_id": "dual-run",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'dual-run' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-win-03-datacenter-exit-r4:4:verify-in-cloud:rollback_state_undeclared",
+      "task_id": "verify-in-cloud",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify-in-cloud' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-win-03-datacenter-exit-r4:4:execute-cutover:rollback_state_undeclared",
+      "task_id": "execute-cutover",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'execute-cutover' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-win-03-datacenter-exit-r4:4:decommission-on-prem-dc:rollback_state_undeclared",
+      "task_id": "decommission-on-prem-dc",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'decommission-on-prem-dc' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-win-03-datacenter-exit-r4:4:provision-cloud-infra:rollback_state_undeclared",
+      "task_id": "provision-cloud-infra",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'provision-cloud-infra' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-win-03-datacenter-exit-r4:4:replicate-data:rollback_state_undeclared",
+      "task_id": "replicate-data",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'replicate-data' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-win-03-datacenter-exit-r4:4:dual-run:rollback_state_undeclared",
+      "task_id": "dual-run",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'dual-run' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-win-03-datacenter-exit-r4:4:verify-in-cloud:rollback_state_undeclared",
+      "task_id": "verify-in-cloud",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify-in-cloud' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-win-03-datacenter-exit-r4:4:execute-cutover:rollback_state_undeclared",
+      "task_id": "execute-cutover",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'execute-cutover' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-win-03-datacenter-exit-r4:4:decommission-on-prem-dc:rollback_state_undeclared",
+      "task_id": "decommission-on-prem-dc",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'decommission-on-prem-dc' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:replicate-data",
+      "task_id": "replicate-data",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Data replication cannot proceed until cloud infrastructure is successfully provisioned, but the task has no precondition dependency.",
+      "suggested_fix": "Add a hard dependency on 'provision-cloud-infra' for the 'replicate-data' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:establish-network-connectivity",
+      "task_id": "establish-network-connectivity",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Network connectivity cannot be established until data is replicated, but the task has no precondition dependency on 'replicate-data'.",
+      "suggested_fix": "Add a hard dependency on 'replicate-data' for the 'establish-network-connectivity' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:dual-run",
+      "task_id": "dual-run",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Dual-run period cannot start until network connectivity is established, but the task has no precondition dependency.",
+      "suggested_fix": "Add a hard dependency on 'establish-network-connectivity' for the 'dual-run' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:verify-in-cloud",
+      "task_id": "verify-in-cloud",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Verification of application in the cloud cannot occur until the dual-run is complete, but the task has no precondition dependency.",
+      "suggested_fix": "Add a hard dependency on 'dual-run' for the 'verify-in-cloud' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:execute-cutover",
+      "task_id": "execute-cutover",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Cutover execution cannot happen before verifying application functionality in the cloud, but the task has no precondition dependency.",
+      "suggested_fix": "Add a hard dependency on 'verify-in-cloud' for the 'execute-cutover' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:post-rollback-verification",
+      "task_id": "post-rollback-verification",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Post-rollback verification cannot proceed without executing the cutover first, but the task has no precondition dependency.",
+      "suggested_fix": "Add a hard dependency on 'execute-cutover' for the 'post-rollback-verification' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unsafe_sequencing:decommission-on-prem-dc",
+      "task_id": "decommission-on-prem-dc",
+      "version": 4,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Decommissioning the on-prem datacenter cannot occur until post-rollback verification is complete, but the task has no precondition dependency.",
+      "suggested_fix": "Add a hard dependency on 'post-rollback-verification' for the 'decommission-on-prem-dc' task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:weak_rollback:execute-cutover",
+      "task_id": "execute-cutover",
+      "version": 4,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for cutover does not guarantee that the original state can be restored if DNS propagation issues occur.",
+      "suggested_fix": "Enhance the rollback plan to include additional checks for DNS state before performing the revert.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:win-03-datacenter-exit:4:4",
+    "plan_id": "plan-win-03-datacenter-exit-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unsafe_sequencing:replicate-data",
+    "question": "Plan for goal 'win-03-datacenter-exit' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

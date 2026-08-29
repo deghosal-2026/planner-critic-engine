@@ -1,0 +1,204 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-04-vault-rotation",
+  "duration_seconds": 33.3,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-ir-04-vault-rotation-r4",
+    "goal_id": "ir-04-vault-rotation",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-ir-04-vault-rotation-r3",
+    "created_at": "2026-08-29T21:28:20.717116Z",
+    "tasks": [
+      {
+        "id": "generate_password",
+        "description": "Generate a new password via Vault's dynamic secrets engine",
+        "action": "generate",
+        "target": "vault",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "new password validity",
+          "how": "attempt to authenticate with new password",
+          "expected": "authentication success"
+        },
+        "rollback": {
+          "trigger": "password generation fails",
+          "action": "notify admin",
+          "safety_guard": "ensure password is not in use",
+          "restores_state": [
+            "previous password is retained"
+          ],
+          "restoration_evidence": "logs confirm pre-existing password is still valid"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_database",
+        "description": "Verify application can execute a simple SELECT against the database with the new credential",
+        "action": "select",
+        "target": "database",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "SELECT query results",
+          "how": "run test query",
+          "expected": "results returned"
+        },
+        "rollback": {
+          "trigger": "SELECT fails",
+          "action": "revert to old password",
+          "safety_guard": "confirm rollback is safe",
+          "restores_state": [
+            "database accessible via old credentials"
+          ],
+          "restoration_evidence": "successful SELECT results with old password"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "update_services",
+        "description": "Update all consuming services to use the new lease",
+        "action": "update",
+        "target": "services",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "service connection",
+          "how": "run health checks on services",
+          "expected": "all services operational"
+        },
+        "rollback": {
+          "trigger": "service update fails",
+          "action": "revert to old password",
+          "safety_guard": "confirm rollback is safe",
+          "restores_state": [
+            "services return to prior state with old password"
+          ],
+          "restoration_evidence": "service logs indicate successful reconnection with old password"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "revoke_old_lease",
+        "description": "Revoke the old Vault lease",
+        "action": "revoke",
+        "target": "vault",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "new password is confirmed working",
+            "fact": "new_password_verified",
+            "established_by": "verify_database",
+            "probe": null
+          },
+          {
+            "description": "services are operational",
+            "fact": "services_verified",
+            "established_by": "update_services",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "lease revoke success",
+          "how": "check Vault's lease status",
+          "expected": "old lease is no longer valid"
+        },
+        "rollback": {
+          "trigger": "revoke fails",
+          "action": "restore old lease",
+          "safety_guard": "confirm rollback is safe",
+          "restores_state": [
+            "old lease is active again"
+          ],
+          "restoration_evidence": "Vault confirms old lease status is active"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "generate_password",
+        "to_task": "verify_database",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_database",
+        "to_task": "update_services",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "update_services",
+        "to_task": "revoke_old_lease",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unverified_dependencies:revoke_old_lease",
+      "task_id": "revoke_old_lease",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'revoke_old_lease' relies on unverified dependencies ('new_password_verified' and 'services_verified') without prior verification steps confirming their state.",
+      "suggested_fix": "Ensure that the dependencies 'new_password_verified' and 'services_verified' are verified before executing 'revoke_old_lease'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-04-vault-rotation:4:4",
+    "plan_id": "plan-ir-04-vault-rotation-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unverified_dependencies:revoke_old_lease",
+    "question": "Plan for goal 'ir-04-vault-rotation' cannot be approved: blockers remain (llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

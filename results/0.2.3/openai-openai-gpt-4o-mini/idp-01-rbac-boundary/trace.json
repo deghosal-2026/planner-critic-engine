@@ -1,0 +1,311 @@
+{
+  "dimension": "core-api",
+  "goal_id": "idp-01-rbac-boundary",
+  "duration_seconds": 47.95,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 4,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-idp-01-rbac-boundary-r4",
+    "goal_id": "idp-01-rbac-boundary",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-idp-01-rbac-boundary-r3",
+    "created_at": "2026-08-29T21:25:51.895950Z",
+    "tasks": [
+      {
+        "id": "check_k8s_access",
+        "description": "Check if Kubernetes cluster is reachable and healthy",
+        "action": "kubectl cluster-info",
+        "target": "k8s-cluster",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "cluster status",
+          "how": "check cluster health",
+          "expected": "Kubernetes cluster is reachable and healthy"
+        },
+        "rollback": {
+          "trigger": "Kubernetes cluster unreachable",
+          "action": "log error",
+          "safety_guard": "verify cluster status",
+          "restores_state": [
+            "Kubernetes cluster is healthy"
+          ],
+          "restoration_evidence": "confirmed that cluster is reachable after rollback"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "create_namespace",
+        "description": "Create a new namespace for the service",
+        "action": "kubectl create namespace",
+        "target": "service-namespace",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kubernetes cluster is reachable",
+            "fact": "k8s_cluster_healthy",
+            "established_by": "check_k8s_access",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "Namespace exists",
+          "how": "check namespaces list",
+          "expected": "service-namespace in the list"
+        },
+        "rollback": {
+          "trigger": "Namespace creation fails",
+          "action": "delete namespace",
+          "safety_guard": "verify namespace does not exist",
+          "restores_state": [
+            "service-namespace is removed"
+          ],
+          "restoration_evidence": "service-namespace no longer listed"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "create_serviceaccount",
+        "description": "Create a ServiceAccount in the newly created namespace",
+        "action": "kubectl create serviceaccount",
+        "target": "serviceaccount",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "ServiceAccount exists",
+          "how": "check ServiceAccount list",
+          "expected": "serviceaccount in service-namespace"
+        },
+        "rollback": {
+          "trigger": "ServiceAccount creation fails",
+          "action": "delete ServiceAccount",
+          "safety_guard": "verify ServiceAccount does not exist",
+          "restores_state": [
+            "ServiceAccount is removed"
+          ],
+          "restoration_evidence": "ServiceAccount no longer listed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "create_role",
+        "description": "Create a Role with least-privilege permissions",
+        "action": "kubectl create role",
+        "target": "role",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Role exists",
+          "how": "check Role list",
+          "expected": "role with specific permissions in service-namespace"
+        },
+        "rollback": {
+          "trigger": "Role creation fails",
+          "action": "delete Role",
+          "safety_guard": "verify Role does not exist",
+          "restores_state": [
+            "Role is removed"
+          ],
+          "restoration_evidence": "Role no longer listed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "bind_role_to_serviceaccount",
+        "description": "Bind the role to the ServiceAccount",
+        "action": "kubectl create rolebinding",
+        "target": "rolebinding",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "RoleBinding exists",
+          "how": "check RoleBinding list",
+          "expected": "rolebinding in service-namespace"
+        },
+        "rollback": {
+          "trigger": "RoleBinding creation fails",
+          "action": "delete RoleBinding",
+          "safety_guard": "verify RoleBinding does not exist",
+          "restores_state": [
+            "RoleBinding is removed"
+          ],
+          "restoration_evidence": "RoleBinding no longer listed"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy_service",
+        "description": "Deploy the service using helm",
+        "action": "helm install",
+        "target": "service-deployment",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Deployment status",
+          "how": "check deployment status",
+          "expected": "deployment is complete"
+        },
+        "rollback": {
+          "trigger": "Deployment fails",
+          "action": "uninstall release",
+          "safety_guard": "verify service is not running",
+          "restores_state": [
+            "Cluster is in a known healthy state"
+          ],
+          "restoration_evidence": "All components are confirmed removed"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_k8s_access",
+        "to_task": "create_namespace",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_namespace",
+        "to_task": "create_serviceaccount",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_serviceaccount",
+        "to_task": "create_role",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_role",
+        "to_task": "bind_role_to_serviceaccount",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "bind_role_to_serviceaccount",
+        "to_task": "deploy_service",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:4:unverified_dependencies:create_serviceaccount",
+      "task_id": "create_serviceaccount",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The creation of the ServiceAccount does not verify that the namespace exists before execution.",
+      "suggested_fix": "Add a precondition to 'create_serviceaccount' that checks if the 'create_namespace' task has been executed successfully.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:create_role",
+      "task_id": "create_role",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The creation of the Role lacks verification that the ServiceAccount exists before execution.",
+      "suggested_fix": "Add a precondition to 'create_role' that checks if the 'create_serviceaccount' task has been completed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:bind_role_to_serviceaccount",
+      "task_id": "bind_role_to_serviceaccount",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The binding of the role to the ServiceAccount does not verify that the Role exists before execution.",
+      "suggested_fix": "Add a precondition to 'bind_role_to_serviceaccount' that checks if the 'create_role' task has been executed successfully.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:4:unverified_dependencies:deploy_service",
+      "task_id": "deploy_service",
+      "version": 4,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The deployment does not verify that the role binding has been established before execution.",
+      "suggested_fix": "Add a precondition to 'deploy_service' that checks if the 'bind_role_to_serviceaccount' task has been completed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:idp-01-rbac-boundary:4:4",
+    "plan_id": "plan-idp-01-rbac-boundary-r4",
+    "version": 4,
+    "blocker_finding_id": "crit:4:unverified_dependencies:create_serviceaccount",
+    "question": "Plan for goal 'idp-01-rbac-boundary' cannot be approved: blockers remain (llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": false,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

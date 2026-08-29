@@ -1,0 +1,432 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-01-p0-incident",
+  "duration_seconds": 27.86,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-ir-01-p0-incident-r3",
+    "goal_id": "ir-01-p0-incident",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-ir-01-p0-incident-r2",
+    "created_at": "2026-08-29T21:26:38.914259Z",
+    "tasks": [
+      {
+        "id": "page_on_call",
+        "description": "Page on-call engineer via PagerDuty",
+        "action": "page",
+        "target": "on-call",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "PagerDuty is reachable",
+            "fact": "pagerduty_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "diagnose_cause",
+        "description": "Diagnose cause of degradation",
+        "action": "diagnose",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "diagnosis report",
+          "how": "review logs and metrics",
+          "expected": "disk full identified"
+        },
+        "rollback": {
+          "trigger": "diagnosis inconclusive",
+          "action": "revert to previous state",
+          "safety_guard": "verify system stability",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "enlarge_volume",
+        "description": "Enlarge the volume of the DB",
+        "action": "resize",
+        "target": "db_volume",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "User has necessary AWS permissions",
+            "fact": "aws_permissions_confirmed",
+            "established_by": "env",
+            "probe": null
+          },
+          {
+            "description": "Available resources for resizing",
+            "fact": "resources_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "volume size",
+          "how": "check size via aws-cli",
+          "expected": "volume size increased"
+        },
+        "rollback": {
+          "trigger": "resize fails",
+          "action": "revert volume size",
+          "safety_guard": "check for data loss",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "restart_replica",
+        "description": "Restart the DB replica after resizing",
+        "action": "restart",
+        "target": "db_replica",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Volume has been successfully enlarged",
+            "fact": "volume_enlarged",
+            "established_by": "enlarge_volume",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replica status",
+          "how": "check status via kubectl",
+          "expected": "replica is healthy"
+        },
+        "rollback": {
+          "trigger": "restart fails",
+          "action": "restore configuration",
+          "safety_guard": "check replica integrity",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_replication_lag",
+        "description": "Verify replication lag returns to zero",
+        "action": "check",
+        "target": "replication_lag",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "DB replica is healthy",
+            "fact": "replica_healthy",
+            "established_by": "restart_replica",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "replication lag",
+          "how": "check via monitoring system",
+          "expected": "lag returns to zero"
+        },
+        "rollback": {
+          "trigger": "check fails",
+          "action": "revert changes",
+          "safety_guard": "ensure replication reconnection",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "write_postmortem",
+        "description": "Write postmortem report",
+        "action": "compose",
+        "target": "postmortem",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Replication lag verified",
+            "fact": "lag_zero",
+            "established_by": "verify_replication_lag",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "page_on_call",
+        "to_task": "diagnose_cause",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "diagnose_cause",
+        "to_task": "enlarge_volume",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "enlarge_volume",
+        "to_task": "restart_replica",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "restart_replica",
+        "to_task": "verify_replication_lag",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_replication_lag",
+        "to_task": "write_postmortem",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plan-ir-01-p0-incident-r3:3:diagnose_cause:rollback_state_undeclared",
+      "task_id": "diagnose_cause",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'diagnose_cause' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-ir-01-p0-incident-r3:3:enlarge_volume:rollback_state_undeclared",
+      "task_id": "enlarge_volume",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'enlarge_volume' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-ir-01-p0-incident-r3:3:restart_replica:rollback_state_undeclared",
+      "task_id": "restart_replica",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'restart_replica' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-ir-01-p0-incident-r3:3:diagnose_cause:rollback_state_undeclared",
+      "task_id": "diagnose_cause",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'diagnose_cause' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-ir-01-p0-incident-r3:3:enlarge_volume:rollback_state_undeclared",
+      "task_id": "enlarge_volume",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'enlarge_volume' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plan-ir-01-p0-incident-r3:3:restart_replica:rollback_state_undeclared",
+      "task_id": "restart_replica",
+      "version": 3,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'restart_replica' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unsafe_sequencing:enlarge_volume",
+      "task_id": "enlarge_volume",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Task 'enlarge_volume' cannot proceed until the cause of degradation is diagnosed and confirmed as 'disk full'.",
+      "suggested_fix": "Reorder tasks to ensure 'diagnose_cause' completes successfully before 'enlarge_volume'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:unverified_dependencies:restart_replica",
+      "task_id": "restart_replica",
+      "version": 3,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Task 'restart_replica' depends on 'volume_enlarged' which is not verified directly after task completion, creating a risk of assumption errors.",
+      "suggested_fix": "Add a verification step to confirm enlargement of the volume immediately after 'enlarge_volume'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:weak_rollback:enlarge_volume",
+      "task_id": "enlarge_volume",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for 'enlarge_volume' lacks a definitive restoration evidence for volume size, increasing risk after resize failure.",
+      "suggested_fix": "Implement a method to record and verify the original volume size before the resize operation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:weak_rollback:restart_replica",
+      "task_id": "restart_replica",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback action for 'restart_replica' lacks specific evidence of configuration state prior to the restart, which could complicate recovery.",
+      "suggested_fix": "Ensure that the configuration state is saved before the restart operation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:missing_steps:verify_replication_lag",
+      "task_id": "verify_replication_lag",
+      "version": 3,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider adding verification of data consistency post-restart to ensure all data is intact after resizing and restarting operations.",
+      "suggested_fix": "Add a verification step to ensure data integrity after 'restart_replica' and before 'verify_replication_lag'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:ir-01-p0-incident:3:3",
+    "plan_id": "plan-ir-01-p0-incident-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:enlarge_volume",
+    "question": "Plan for goal 'ir-01-p0-incident' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_unverified_dependencies). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

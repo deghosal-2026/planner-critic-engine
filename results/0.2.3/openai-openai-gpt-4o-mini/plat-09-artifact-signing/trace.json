@@ -1,0 +1,440 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-09-artifact-signing",
+  "duration_seconds": 15.84,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plat-09-artifact-signing-v1",
+    "goal_id": "plat-09-artifact-signing",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-29T21:32:42.941250Z",
+    "tasks": [
+      {
+        "id": "integrate_cosign",
+        "description": "Integrate Cosign for container image signing",
+        "action": "integrate",
+        "target": "Cosign",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Cosign and build tools are configured",
+            "fact": "tools_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "successful signing of an image",
+          "how": "check signed image metadata",
+          "expected": "image has valid signature"
+        },
+        "rollback": {
+          "trigger": "integration fails",
+          "action": "remove Cosign integration",
+          "safety_guard": "verify no new images are signed",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "generate_sbom",
+        "description": "Generate SBOM with Syft for every build",
+        "action": "generate",
+        "target": "SBOM",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Syft is available for use",
+            "fact": "syft_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "store_signatures",
+        "description": "Store signatures in Rekor transparency log",
+        "action": "store",
+        "target": "Rekor",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Rekor service is up",
+            "fact": "rekor_healthy",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "signature presence in Rekor",
+          "how": "query Rekor log",
+          "expected": "signature is retrievable from Rekor"
+        },
+        "rollback": {
+          "trigger": "storage fails",
+          "action": "remove from Rekor",
+          "safety_guard": "ensure signatures are kept in local cache",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "kyverno_policy",
+        "description": "Configure Kyverno policy to reject unsigned images in production clusters",
+        "action": "configure",
+        "target": "Kyverno",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Kyverno is installed and configured",
+            "fact": "kyverno_ready",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "policy enforcement results",
+          "how": "review Kyverno logs",
+          "expected": "only signed images are deployed"
+        },
+        "rollback": {
+          "trigger": "policy blocks deploys",
+          "action": "disable Kyverno policy",
+          "safety_guard": "monitor for blocked images",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_images",
+        "description": "Verify all deployed images have valid signatures",
+        "action": "verify",
+        "target": "images",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Signing and verification system is operational",
+            "fact": "verification_system_ready",
+            "established_by": "integrate_cosign",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "image signatures",
+          "how": "check signatures against Rekor",
+          "expected": "all deployed images have valid signatures"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "alert team to review images",
+          "safety_guard": "document all verification failures",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "key_rotation",
+        "description": "Set up key rotation procedure",
+        "action": "set up",
+        "target": "key management",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Current keys are stored securely",
+            "fact": "keys_secured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "integrate_cosign",
+        "to_task": "store_signatures",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "generate_sbom",
+        "to_task": "store_signatures",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "store_signatures",
+        "to_task": "kyverno_policy",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "kyverno_policy",
+        "to_task": "verify_images",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify_images",
+        "to_task": "key_rotation",
+        "kind": "soft",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:plat-09-artifact-signing-v1:1:integrate_cosign:rollback_state_undeclared",
+      "task_id": "integrate_cosign",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'integrate_cosign' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plat-09-artifact-signing-v1:1:store_signatures:rollback_state_undeclared",
+      "task_id": "store_signatures",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'store_signatures' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plat-09-artifact-signing-v1:1:kyverno_policy:rollback_state_undeclared",
+      "task_id": "kyverno_policy",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'kyverno_policy' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plat-09-artifact-signing-v1:1:verify_images:rollback_state_undeclared",
+      "task_id": "verify_images",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_images' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plat-09-artifact-signing-v1:1:integrate_cosign:rollback_state_undeclared",
+      "task_id": "integrate_cosign",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'integrate_cosign' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plat-09-artifact-signing-v1:1:store_signatures:rollback_state_undeclared",
+      "task_id": "store_signatures",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'store_signatures' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plat-09-artifact-signing-v1:1:kyverno_policy:rollback_state_undeclared",
+      "task_id": "kyverno_policy",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'kyverno_policy' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:plat-09-artifact-signing-v1:1:verify_images:rollback_state_undeclared",
+      "task_id": "verify_images",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify_images' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:unverified_dependencies:verify_images",
+      "task_id": "verify_images",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Verification of images depends on the successful integration of Cosign, but no verification step for 'integrate_cosign' has been established prior to this task.",
+      "suggested_fix": "Ensure verification of the Cosign integration is completed before proceeding to the verification of images.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:kyverno_policy",
+      "task_id": "kyverno_policy",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Kyverno policy configuration is dependent on the successful storage of signatures, but it is sequenced before 'store_signatures'.",
+      "suggested_fix": "Restructure the plan to ensure 'store_signatures' is completed before 'kyverno_policy' is executed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:missing_steps:generate_sbom",
+      "task_id": "generate_sbom",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The SBOM generation step lacks a rollback procedure, which could lead to issues if the generation fails.",
+      "suggested_fix": "Implement a rollback action for the SBOM generation step to revert any changes made in case of failure.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:missing_steps:key_rotation",
+      "task_id": "key_rotation",
+      "version": 1,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The key rotation step lacks a verification and rollback procedure, presenting a risk if the key rotation process encounters issues.",
+      "suggested_fix": "Add a rollback procedure and a verification step to confirm the key rotation was successful.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

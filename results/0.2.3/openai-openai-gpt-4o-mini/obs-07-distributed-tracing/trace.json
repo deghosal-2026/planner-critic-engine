@@ -1,0 +1,429 @@
+{
+  "dimension": "core-api",
+  "goal_id": "obs-07-distributed-tracing",
+  "duration_seconds": 10.51,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "obs-07-distributed-tracing",
+    "goal_id": "obs-07-distributed-tracing",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-29T21:27:01.024742Z",
+    "tasks": [
+      {
+        "id": "instrument-services",
+        "description": "Instrument all microservices with OpenTelemetry SDK",
+        "action": "instrument",
+        "target": "microservices",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "instrumentation success",
+          "how": "check for OTel SDK initialization logs",
+          "expected": "OTel initialized successfully in all services"
+        },
+        "rollback": {
+          "trigger": "instrumentation fails",
+          "action": "revert to previous instrumentation",
+          "safety_guard": "verify service functionality after rollback",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy-jaeger-collector",
+        "description": "Deploy Jaeger collector using Helm",
+        "action": "deploy",
+        "target": "jaeger",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "kubectl is configured correctly",
+            "fact": "kubectl_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure-exporters",
+        "description": "Configure exporters in all microservices",
+        "action": "configure",
+        "target": "exporters",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "exporters are correctly configured",
+          "how": "check logs for exporter success messages",
+          "expected": "success message for all configurations"
+        },
+        "rollback": {
+          "trigger": "exporters configuration fails",
+          "action": "remove faulty configuration",
+          "safety_guard": "verify exporter connectivity",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "add-trace-correlation-ids",
+        "description": "Add trace correlation IDs to all logs",
+        "action": "modify",
+        "target": "logs",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "log entries contain correlation IDs",
+          "how": "review sample logs",
+          "expected": "trace IDs present in all logs"
+        },
+        "rollback": {
+          "trigger": "log modification fails",
+          "action": "remove correlation ID injection",
+          "safety_guard": "verify log integrity",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "setup-alerting",
+        "description": "Set up alerting on p99 latency anomalies via Prometheus",
+        "action": "setup",
+        "target": "alerting",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Prometheus is deployed",
+            "fact": "prometheus_deployed",
+            "established_by": "deploy-jaeger-collector",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-trace-propagation",
+        "description": "Verify trace propagation across service boundaries",
+        "action": "test",
+        "target": "tracing",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "trace propagation across services",
+          "how": "run integration tests",
+          "expected": "full trace propagation with no gaps"
+        },
+        "rollback": {
+          "trigger": "trace propagation fails",
+          "action": "rollback tracing configuration",
+          "safety_guard": "verify tracing setup before rollback",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "deploy-jaeger-collector",
+        "to_task": "setup-alerting",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "instrument-services",
+        "to_task": "configure-exporters",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-exporters",
+        "to_task": "add-trace-correlation-ids",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "add-trace-correlation-ids",
+        "to_task": "verify-trace-propagation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "instrument-services",
+        "to_task": "verify-trace-propagation",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:obs-07-distributed-tracing:1:instrument-services:rollback_state_undeclared",
+      "task_id": "instrument-services",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'instrument-services' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:obs-07-distributed-tracing:1:configure-exporters:rollback_state_undeclared",
+      "task_id": "configure-exporters",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'configure-exporters' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:obs-07-distributed-tracing:1:add-trace-correlation-ids:rollback_state_undeclared",
+      "task_id": "add-trace-correlation-ids",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'add-trace-correlation-ids' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:obs-07-distributed-tracing:1:verify-trace-propagation:rollback_state_undeclared",
+      "task_id": "verify-trace-propagation",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify-trace-propagation' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:obs-07-distributed-tracing:1:instrument-services:rollback_state_undeclared",
+      "task_id": "instrument-services",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'instrument-services' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:obs-07-distributed-tracing:1:configure-exporters:rollback_state_undeclared",
+      "task_id": "configure-exporters",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'configure-exporters' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:obs-07-distributed-tracing:1:add-trace-correlation-ids:rollback_state_undeclared",
+      "task_id": "add-trace-correlation-ids",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'add-trace-correlation-ids' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:obs-07-distributed-tracing:1:verify-trace-propagation:rollback_state_undeclared",
+      "task_id": "verify-trace-propagation",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify-trace-propagation' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:setup-alerting",
+      "task_id": "setup-alerting",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Setup alerting is dependent on deploy-jaeger-collector, which might not be fully operational yet.",
+      "suggested_fix": "Ensure deploy-jaeger-collector task is completed and verified before proceeding with setup-alerting.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:unverified_dependencies:setup-alerting",
+      "task_id": "setup-alerting",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Setup alerting task depends on Prometheus being deployed and it is only established by the deploy-jaeger-collector task, which may not be verified.",
+      "suggested_fix": "Verify that Prometheus is correctly deployed before starting the setup-alerting task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:unverified_dependencies:configure-exporters",
+      "task_id": "configure-exporters",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Configure exporters task does not have preconditions verified, which could result in failures.",
+      "suggested_fix": "Add verification steps to ensure all services are ready for exporter configuration before proceeding.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:weak_rollback:add-trace-correlation-ids",
+      "task_id": "add-trace-correlation-ids",
+      "version": 1,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "Rollback for adding trace correlation IDs lacks clear restoration evidence, making recovery harder.",
+      "suggested_fix": "Include more specific post-rollback checks or evidence to confirm successful restoration of state.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:risk:verify-trace-propagation",
+      "task_id": "verify-trace-propagation",
+      "version": 1,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "Verifying trace propagation carries a critical risk due to high complexity and potential gaps in traces.",
+      "suggested_fix": "Consider running a stress test and review integration scenarios that might lead to gaps before performing this task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

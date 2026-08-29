@@ -1,0 +1,234 @@
+{
+  "dimension": "core-api",
+  "goal_id": "plat-03-precommit-rollout",
+  "duration_seconds": 13.28,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-plat-03-precommit-rollout-r2",
+    "goal_id": "plat-03-precommit-rollout",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plat-03-precommit-rollout-v1",
+    "created_at": "2026-08-29T21:30:14.575269Z",
+    "tasks": [
+      {
+        "id": "define-config",
+        "description": "Define shared .pre-commit-config.yaml for hooks",
+        "action": "create_file",
+        "target": ".pre-commit-config.yaml",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "pre-commit tool is installed",
+            "fact": "pre_commit_installed",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "install-precommit",
+        "description": "Install pre-commit CI on all repositories",
+        "action": "install",
+        "target": "repos",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "installation status",
+          "how": "check pre-commit status",
+          "expected": "installed"
+        },
+        "rollback": {
+          "trigger": "installation fails",
+          "action": "revert changes",
+          "safety_guard": "verify repository integrity",
+          "restores_state": [
+            "repos to pre-installation state"
+          ],
+          "restoration_evidence": "installation logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "enforce-hooks",
+        "description": "Enforce hook passing in CI pipelines",
+        "action": "update_pipelines",
+        "target": "ci",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "branch protection status",
+          "how": "query CI settings",
+          "expected": "hooks required"
+        },
+        "rollback": {
+          "trigger": "enforcement fails",
+          "action": "remove branch protection rules",
+          "safety_guard": "verify previous rules intact",
+          "restores_state": [
+            "previous branch protection rules"
+          ],
+          "restoration_evidence": "CI configuration logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "generate-report",
+        "description": "Generate adoption report showing compliance per team",
+        "action": "compile_report",
+        "target": "report",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "hooks are installed",
+            "fact": "hooks_installed",
+            "established_by": "install-precommit",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "report contents",
+          "how": "analyze report output",
+          "expected": "compliance metrics are present"
+        },
+        "rollback": {
+          "trigger": "report generation fails",
+          "action": "discard incomplete report",
+          "safety_guard": "verify previous reports exist",
+          "restores_state": [
+            "previous report state"
+          ],
+          "restoration_evidence": "repository history"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define-config",
+        "to_task": "install-precommit",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "install-precommit",
+        "to_task": "enforce-hooks",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "enforce-hooks",
+        "to_task": "generate-report",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:feasibility:define-config",
+      "task_id": "define-config",
+      "version": 2,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "The task for defining the .pre-commit-config.yaml cannot be executed unless the pre-commit tool is installed.",
+      "suggested_fix": "Ensure the pre-commit tool is installed before executing this task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:install-precommit",
+      "task_id": "install-precommit",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The success of 'install-precommit' depends on the completion of 'define-config', but there is no verification that 'define-config' was executed successfully.",
+      "suggested_fix": "Add a verification step to ensure 'define-config' has completed successfully before proceeding with 'install-precommit'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:enforce-hooks",
+      "task_id": "enforce-hooks",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task 'enforce-hooks' depends on the successful installation of hooks as per 'install-precommit', but the installation lacks a reliable verification step after its execution.",
+      "suggested_fix": "Ensure that 'install-precommit' has successfully installed hooks before proceeding with 'enforce-hooks' by including a verification stage.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:generate-report",
+      "task_id": "generate-report",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Generating the report depends on the installation of hooks from 'install-precommit', but there's no confirmation that they have been successfully installed.",
+      "suggested_fix": "Add a verification to confirm that hooks are installed before executing 'generate-report'.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

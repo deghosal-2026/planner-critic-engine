@@ -1,0 +1,356 @@
+{
+  "dimension": "core-api",
+  "goal_id": "id-01-idp-migration",
+  "duration_seconds": 23.72,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 2,
+    "llm_calls": 2
+  },
+  "plan": {
+    "id": "plan-id-01-idp-migration-r2",
+    "goal_id": "id-01-idp-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "id-01-idp-migration-plan",
+    "created_at": "2026-08-29T21:45:29.027023Z",
+    "tasks": [
+      {
+        "id": "configure_okta",
+        "description": "Configure Okta as new IdP with SAML 2.0 and OIDC",
+        "action": "configure",
+        "target": "Okta",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "Okta IdP configuration",
+          "how": "check configuration settings",
+          "expected": "correct SAML 2.0 and OIDC settings"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "revert changes",
+          "safety_guard": "verify previous configuration intact",
+          "restores_state": [
+            "previous Okta configuration"
+          ],
+          "restoration_evidence": "configuration backup"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "setup_mfa",
+        "description": "Set up MFA enforcement for users",
+        "action": "setup",
+        "target": "MFA",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "configure_okta must complete successfully",
+            "fact": "configure_okta_completed",
+            "established_by": "configure_okta",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "MFA functionality",
+          "how": "test MFA login flows",
+          "expected": "successful MFA verification"
+        },
+        "rollback": {
+          "trigger": "MFA setup fails",
+          "action": "disable new MFA",
+          "safety_guard": "verify fallback MFA method",
+          "restores_state": [
+            "previous MFA settings"
+          ],
+          "restoration_evidence": "MFA settings backup"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "migrate_applications",
+        "description": "Migrate all applications from SAML to Okta",
+        "action": "migrate",
+        "target": "applications",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "setup_mfa must complete successfully",
+            "fact": "setup_mfa_completed",
+            "established_by": "setup_mfa",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application authentication",
+          "how": "test login for all applications",
+          "expected": "all apps authenticate successfully against Okta"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "revert applications to SAML",
+          "safety_guard": "ensure applications are reachable",
+          "restores_state": [
+            "previous application configurations"
+          ],
+          "restoration_evidence": "application backup"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "test_session_compatibility",
+        "description": "Test session compatibility to ensure no users get logged out",
+        "action": "test",
+        "target": "sessions",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "migrate_applications must complete successfully",
+            "fact": "migrate_applications_completed",
+            "established_by": "migrate_applications",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "user sessions",
+          "how": "check active session states",
+          "expected": "no sessions are invalidated"
+        },
+        "rollback": {
+          "trigger": "session issues detected",
+          "action": "restore session states",
+          "safety_guard": "verify session data integrity",
+          "restores_state": [
+            "previous session states"
+          ],
+          "restoration_evidence": "session states backup"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover_dns",
+        "description": "Cutover DNS for the IdP endpoint to Okta",
+        "action": "update",
+        "target": "DNS records",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "test_session_compatibility must complete successfully",
+            "fact": "test_session_compatibility_completed",
+            "established_by": "test_session_compatibility",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "DNS records",
+          "how": "check DNS propagation",
+          "expected": "DNS points to Okta IdP"
+        },
+        "rollback": {
+          "trigger": "DNS cutover fails",
+          "action": "rollback to previous IdP",
+          "safety_guard": "verify previous DNS state",
+          "restores_state": [
+            "previous DNS records"
+          ],
+          "restoration_evidence": "DNS records backup"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify_authentication",
+        "description": "Verify all applications authenticate against Okta",
+        "action": "verify",
+        "target": "authentication",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cutover_dns must complete successfully",
+            "fact": "cutover_dns_completed",
+            "established_by": "cutover_dns",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "authentication success",
+          "how": "simulate logins for all apps",
+          "expected": "all applications authenticate against Okta successfully"
+        },
+        "rollback": {
+          "trigger": "authentication issues found",
+          "action": "revert to SAML IdP",
+          "safety_guard": "ensure rollback does not affect existing sessions",
+          "restores_state": [
+            "previous authentication settings"
+          ],
+          "restoration_evidence": "authentication settings backup"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "configure_okta",
+        "to_task": "setup_mfa",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup_mfa",
+        "to_task": "migrate_applications",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "migrate_applications",
+        "to_task": "test_session_compatibility",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test_session_compatibility",
+        "to_task": "cutover_dns",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover_dns",
+        "to_task": "verify_authentication",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:setup_mfa",
+      "task_id": "setup_mfa",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The setup_mfa task is sequenced to run before its prerequisite task configure_okta is verified as completed.",
+      "suggested_fix": "Ensure that setup_mfa is only executed after configure_okta is successfully completed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:migrate_applications",
+      "task_id": "migrate_applications",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The migrate_applications task is sequenced to run before its prerequisite task setup_mfa is verified as completed.",
+      "suggested_fix": "Ensure that migrate_applications is only executed after setup_mfa is successfully completed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:test_session_compatibility",
+      "task_id": "test_session_compatibility",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The test_session_compatibility task is sequenced to run before its prerequisite task migrate_applications is verified as completed.",
+      "suggested_fix": "Ensure that test_session_compatibility is only executed after migrate_applications is successfully completed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:cutover_dns",
+      "task_id": "cutover_dns",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The cutover_dns task is sequenced to run before its prerequisite task test_session_compatibility is verified as completed.",
+      "suggested_fix": "Ensure that cutover_dns is only executed after test_session_compatibility is successfully completed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:verify_authentication",
+      "task_id": "verify_authentication",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The verify_authentication task is sequenced to run before its prerequisite task cutover_dns is verified as completed.",
+      "suggested_fix": "Ensure that verify_authentication is only executed after cutover_dns is successfully completed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:id-01-idp-migration:2:2",
+    "plan_id": "plan-id-01-idp-migration-r2",
+    "version": 2,
+    "blocker_finding_id": "crit:2:unsafe_sequencing:setup_mfa",
+    "question": "Plan for goal 'id-01-idp-migration' cannot be approved: blockers remain (llm_unsafe_sequencing). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=6"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

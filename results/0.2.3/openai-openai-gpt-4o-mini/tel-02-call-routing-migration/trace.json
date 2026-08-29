@@ -1,0 +1,308 @@
+{
+  "dimension": "core-api",
+  "goal_id": "tel-02-call-routing-migration",
+  "duration_seconds": 22.07,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-tel-02-call-routing-migration-r2",
+    "goal_id": "tel-02-call-routing-migration",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "tel-02-call-routing-migration",
+    "created_at": "2026-08-29T21:39:52.353986Z",
+    "tasks": [
+      {
+        "id": "dial_plan_rework",
+        "description": "Rework the dial plan to map legacy dial patterns to the new platform's routing model",
+        "action": "map_dial_patterns",
+        "target": "new_routing_model",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "dial plan mapping accuracy",
+          "how": "run test calls",
+          "expected": "correct routing"
+        },
+        "rollback": {
+          "trigger": "mapping fails",
+          "action": "revert to legacy patterns",
+          "safety_guard": "verify legacy functionality",
+          "restores_state": [
+            "legacy dial patterns"
+          ],
+          "restoration_evidence": "confirmation of routing behavior"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_routing_table",
+        "description": "Import rules and set up queues and IVR menus",
+        "action": "configure_routing",
+        "target": "cloud_platform",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "dial_plan_rework completed successfully",
+            "fact": "dial_plan_mapped",
+            "established_by": "dial_plan_rework",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "routing table consistency",
+          "how": "check configurations",
+          "expected": "all rules imported correctly"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "restore previous routing configuration",
+          "safety_guard": "validate restoration",
+          "restores_state": [
+            "previous routing configuration"
+          ],
+          "restoration_evidence": "configuration snapshots"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "test_routes",
+        "description": "Test routes by placing test calls through major routing paths",
+        "action": "test_call_routes",
+        "target": "new_routing",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "routing table configured",
+            "fact": "routing_table_ready",
+            "established_by": "configure_routing_table",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "test route success rate",
+          "how": "monitor call completion",
+          "expected": "success rate above threshold"
+        },
+        "rollback": {
+          "trigger": "route testing fails",
+          "action": "recheck configurations",
+          "safety_guard": "restore default settings",
+          "restores_state": [
+            "initial test routes"
+          ],
+          "restoration_evidence": "test call logs"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "execute_cutover",
+        "description": "Cutover by switching inbound DIDs to the new platform",
+        "action": "cutover",
+        "target": "inbound_DIDs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "routes tested successfully",
+            "fact": "routes_verified",
+            "established_by": "test_routes",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "call flow functionality",
+          "how": "monitor call metrics",
+          "expected": "calls routed correctly"
+        },
+        "rollback": {
+          "trigger": "cutover fails",
+          "action": "reroute DIDs back to legacy PBX",
+          "safety_guard": "confirm cutover status",
+          "restores_state": [
+            "legacy DID routing"
+          ],
+          "restoration_evidence": "verification of call routing"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "monitor",
+        "description": "Monitor call metrics post cutover",
+        "action": "monitor_metrics",
+        "target": "call_center",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cutover executed",
+            "fact": "DIDs_cut_over",
+            "established_by": "execute_cutover",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "call volume and quality",
+          "how": "analyze metrics reports",
+          "expected": "metrics within acceptable range"
+        },
+        "rollback": {
+          "trigger": "monitoring fails",
+          "action": "revert to last known good metrics",
+          "safety_guard": "confirm stability",
+          "restores_state": [
+            "previous monitoring state"
+          ],
+          "restoration_evidence": "history of call metrics"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "dial_plan_rework",
+        "to_task": "configure_routing_table",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_routing_table",
+        "to_task": "test_routes",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "test_routes",
+        "to_task": "execute_cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "execute_cutover",
+        "to_task": "monitor",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unsafe_sequencing:execute_cutover",
+      "task_id": "execute_cutover",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Cutover task depends on the successful testing of routes but is ordered immediately after the testing task without confirming that the cutover is safe.",
+      "suggested_fix": "Ensure that the execute_cutover task is sequenced only after a verification of route testing has confirmed that all tests have passed.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:execute_cutover",
+      "task_id": "execute_cutover",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for the cutover lacks a clear verification step to ensure that re-routing to the legacy PBX will be successful.",
+      "suggested_fix": "Add validation steps to the rollback plan to confirm the legacy PBX is ready and can accept calls before executing the cutover.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unverified_dependencies:configure_routing_table",
+      "task_id": "configure_routing_table",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The task depends on the successful completion of dial plan rework, but there is no verification established to ensure that the dial plan mapping is validated before proceeding.",
+      "suggested_fix": "Include an explicit verification step after the dial_plan_rework task to confirm that the mapping has been accurately completed before the configure_routing_table task starts.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:configure_routing_table",
+      "task_id": "configure_routing_table",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback plan for the configuration lacks detailed steps on how to validate restoration has occurred, which can lead to issues if the rollback is required.",
+      "suggested_fix": "Add more explicit criteria for validating the restoration of the previous routing configuration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:risk:test_routes",
+      "task_id": "test_routes",
+      "version": 2,
+      "heuristic_family": "risk",
+      "severity": "warning",
+      "reason_code": "llm_risk",
+      "message": "There is a risk that not all route traversal scenarios are tested, potentially missing edge cases or failures in less common paths.",
+      "suggested_fix": "Consider expanding the test scenarios to include edge cases such as holiday schedules and overflow chains to mitigate risks.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

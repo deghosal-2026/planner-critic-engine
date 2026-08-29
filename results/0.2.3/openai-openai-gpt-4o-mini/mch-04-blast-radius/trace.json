@@ -1,0 +1,226 @@
+{
+  "dimension": "core-api",
+  "goal_id": "mch-04-blast-radius",
+  "duration_seconds": 30.23,
+  "result": {
+    "status": "escalated",
+    "reason_code": "converged_stalled",
+    "revision_count": 3,
+    "llm_calls": 3
+  },
+  "plan": {
+    "id": "plan-mch-04-blast-radius-r3",
+    "goal_id": "mch-04-blast-radius",
+    "plan_schema_version": "0.1.0",
+    "version": 3,
+    "parent_version": "plan-mch-04-blast-radius-r2",
+    "created_at": "2026-08-29T21:48:23.314374Z",
+    "tasks": [
+      {
+        "id": "check_auth",
+        "description": "Check compatibility of auth service",
+        "action": "check",
+        "target": "auth",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "auth service status",
+          "how": "check response",
+          "expected": "200 OK"
+        },
+        "rollback": {
+          "trigger": "auth check fails",
+          "action": "no rollback needed",
+          "safety_guard": "only primary service will be rolled back",
+          "restores_state": [
+            "auth service to previous state"
+          ],
+          "restoration_evidence": "auth service response confirmed as working"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "check_billing",
+        "description": "Check compatibility of billing service",
+        "action": "check",
+        "target": "billing",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "billing service status",
+          "how": "check response",
+          "expected": "200 OK"
+        },
+        "rollback": {
+          "trigger": "billing check fails",
+          "action": "no rollback needed",
+          "safety_guard": "only primary service will be rolled back",
+          "restores_state": [
+            "billing service to previous state"
+          ],
+          "restoration_evidence": "billing service response confirmed as working"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "check_notifications",
+        "description": "Check compatibility of notifications service",
+        "action": "check",
+        "target": "notifications",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "notifications service status",
+          "how": "check response",
+          "expected": "200 OK"
+        },
+        "rollback": {
+          "trigger": "notifications check fails",
+          "action": "no rollback needed",
+          "safety_guard": "only primary service will be rolled back",
+          "restores_state": [
+            "notifications service to previous state"
+          ],
+          "restoration_evidence": "notifications service response confirmed as working"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "deploy_api_gateway",
+        "description": "Deploy changes to the API gateway",
+        "action": "deploy",
+        "target": "api_gateway",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "API gateway response",
+          "how": "check response",
+          "expected": "200 OK"
+        },
+        "rollback": {
+          "trigger": "deployment fails",
+          "action": "revert only API gateway changes",
+          "safety_guard": "ensure auth, billing, notifications are unaffected",
+          "restores_state": [
+            "API gateway to previous state, reverting only its changes"
+          ],
+          "restoration_evidence": "API gateway response confirmed as working"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "check_auth",
+        "to_task": "check_billing",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check_auth",
+        "to_task": "check_notifications",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check_billing",
+        "to_task": "check_notifications",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "check_auth",
+        "to_task": "deploy_api_gateway",
+        "kind": "hard",
+        "reason": "Ensure that auth service is verified before deploying API gateway"
+      },
+      {
+        "from_task": "check_billing",
+        "to_task": "deploy_api_gateway",
+        "kind": "hard",
+        "reason": "Ensure that billing service is verified before deploying API gateway"
+      },
+      {
+        "from_task": "check_notifications",
+        "to_task": "deploy_api_gateway",
+        "kind": "hard",
+        "reason": "Ensure that notifications service is verified before deploying API gateway"
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:3:unsafe_sequencing:deploy_api_gateway",
+      "task_id": "deploy_api_gateway",
+      "version": 3,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "The deployment of the API gateway occurs before the verification of dependent services has completed successfully.",
+      "suggested_fix": "Reorder the tasks to ensure that 'deploy_api_gateway' occurs only after 'check_auth', 'check_billing', and 'check_notifications' are all successful.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:3:weak_rollback:deploy_api_gateway",
+      "task_id": "deploy_api_gateway",
+      "version": 3,
+      "heuristic_family": "weak_rollback",
+      "severity": "blocker",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for the API gateway does not address the potential impact on dependent services if they were negatively affected by the deployment.",
+      "suggested_fix": "Implement a rollback strategy that includes checks to ascertain the state of dependent services and revert their state if necessary.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:mch-04-blast-radius:3:3",
+    "plan_id": "plan-mch-04-blast-radius-r3",
+    "version": 3,
+    "blocker_finding_id": "crit:3:unsafe_sequencing:deploy_api_gateway",
+    "question": "Plan for goal 'mch-04-blast-radius' cannot be approved: blockers remain (llm_unsafe_sequencing; llm_weak_rollback). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=3"
+    },
+    {
+      "name": "min_tasks",
+      "pass": false,
+      "message": "tasks=4"
+    }
+  ],
+  "error": null,
+  "pass": false
+}

@@ -1,0 +1,336 @@
+{
+  "dimension": "core-api",
+  "goal_id": "dbm-01-oracle-to-postgres",
+  "duration_seconds": 50.18,
+  "result": {
+    "status": "escalated",
+    "reason_code": "revision_cap_reached",
+    "revision_count": 4,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-dbm-01-oracle-to-postgres-r4",
+    "goal_id": "dbm-01-oracle-to-postgres",
+    "plan_schema_version": "0.1.0",
+    "version": 4,
+    "parent_version": "plan-dbm-01-oracle-to-postgres-r3",
+    "created_at": "2026-08-29T21:33:35.151049Z",
+    "tasks": [
+      {
+        "id": "schema_conversion",
+        "description": "Convert Oracle data types to PostgreSQL, sequences, and triggers",
+        "action": "convert",
+        "target": "schema",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "schema structure and types",
+          "how": "compare schema definitions",
+          "expected": "schemas match"
+        },
+        "rollback": {
+          "trigger": "conversion fails",
+          "action": "revert schema changes",
+          "safety_guard": "verify backup integrity",
+          "restores_state": [
+            "previously existing schema"
+          ],
+          "restoration_evidence": "schema comparison information"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "type_mapping_validation",
+        "description": "Validate mapped data types from Oracle to PostgreSQL",
+        "action": "validate",
+        "target": "data types",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "schema has been converted",
+            "fact": "schema_conversion_complete",
+            "established_by": "schema_conversion",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "mapped data types",
+          "how": "check data type mappings",
+          "expected": "types correctly mapped"
+        },
+        "rollback": {
+          "trigger": "type mapping validation fails",
+          "action": "revert type mappings",
+          "safety_guard": "check backup of mappings",
+          "restores_state": [
+            "previous mappings"
+          ],
+          "restoration_evidence": "validation results"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "data_migration",
+        "description": "Migrate data using AWS DMS or ora2pg",
+        "action": "migrate",
+        "target": "data",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "data integrity and completeness",
+          "how": "run row count and checksum",
+          "expected": "data matches Oracle"
+        },
+        "rollback": {
+          "trigger": "migration fails",
+          "action": "restore from Oracle",
+          "safety_guard": "verify data integrity",
+          "restores_state": [
+            "previous database state"
+          ],
+          "restoration_evidence": "restoration logs"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "dual_write_shadow",
+        "description": "Implement dual-write for shadow period",
+        "action": "setup",
+        "target": "application writes",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application writes to both databases",
+          "how": "monitor application logs",
+          "expected": "writes to both databases confirmed"
+        },
+        "rollback": {
+          "trigger": "shadow fails",
+          "action": "disable dual-write",
+          "safety_guard": "ensure application stability",
+          "restores_state": [
+            "previous write configuration"
+          ],
+          "restoration_evidence": "application log review"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "reconciliation_check",
+        "description": "Perform reconciliation check on migrated data",
+        "action": "check",
+        "target": "data integrity",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "row counts and checksums",
+          "how": "compare counts and checksums",
+          "expected": "counts and checksums match"
+        },
+        "rollback": {
+          "trigger": "reconciliation fails",
+          "action": "revert to Oracle",
+          "safety_guard": "verify backup integrity",
+          "restores_state": [
+            "previous data state"
+          ],
+          "restoration_evidence": "reconciliation logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify",
+        "description": "Verify the application functionality after cutover",
+        "action": "verify",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "cutover is complete",
+            "fact": "cutover_completed",
+            "established_by": "cutover",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "application metrics and logs",
+          "how": "monitor performance metrics",
+          "expected": "metrics indicate normal operation"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "revert to Oracle",
+          "safety_guard": "ensure stability of rollback",
+          "restores_state": [
+            "previous application state"
+          ],
+          "restoration_evidence": "system metrics before rollback"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "cutover",
+        "description": "Switch reads and writes to PostgreSQL",
+        "action": "cutover",
+        "target": "application",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "application functionality",
+          "how": "run smoke tests",
+          "expected": "application functions correctly on PostgreSQL"
+        },
+        "rollback": {
+          "trigger": "cutover issues",
+          "action": "fail back to Oracle",
+          "safety_guard": "validate dual-write buffer state before rollback",
+          "restores_state": [
+            "previous configuration"
+          ],
+          "restoration_evidence": "cutover logs"
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "retire_oracle",
+        "description": "Retire the Oracle database post-migration",
+        "action": "retire",
+        "target": "db",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "verification successful",
+            "fact": "verification_complete",
+            "established_by": "verify",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "successful retirement of Oracle",
+          "how": "confirm no ongoing references",
+          "expected": "Oracle database is retired without issues"
+        },
+        "rollback": {
+          "trigger": "retirement fails",
+          "action": "restore Oracle database",
+          "safety_guard": "ensure data integrity",
+          "restores_state": [
+            "number of references before retirement"
+          ],
+          "restoration_evidence": "retirement logs"
+        },
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "schema_conversion",
+        "to_task": "type_mapping_validation",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "schema_conversion",
+        "to_task": "data_migration",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "data_migration",
+        "to_task": "dual_write_shadow",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "dual_write_shadow",
+        "to_task": "reconciliation_check",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "reconciliation_check",
+        "to_task": "verify",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "verify",
+        "to_task": "cutover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "cutover",
+        "to_task": "retire_oracle",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "preconditions_referenced:plan-dbm-01-oracle-to-postgres-r4:4:verify:cutover_completed",
+      "task_id": "verify",
+      "version": 4,
+      "heuristic_family": null,
+      "severity": "blocker",
+      "reason_code": "unverified_precondition",
+      "message": "precondition 'cutover_completed' on task 'verify' references no established fact from an earlier task",
+      "suggested_fix": "Point the precondition at an earlier task that establishes 'cutover_completed'",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": {
+    "id": "escalation:dbm-01-oracle-to-postgres:4:4",
+    "plan_id": "plan-dbm-01-oracle-to-postgres-r4",
+    "version": 4,
+    "blocker_finding_id": "preconditions_referenced:plan-dbm-01-oracle-to-postgres-r4:4:verify:cutover_completed",
+    "question": "Plan for goal 'dbm-01-oracle-to-postgres' cannot be approved: blockers remain (unverified_precondition). Decide whether to patch, override, or abandon.",
+    "status": "open",
+    "resolution": null,
+    "resolved_at": null,
+    "resolved_by": null
+  },
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "escalated"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=4"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=8"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

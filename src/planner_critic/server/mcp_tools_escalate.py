@@ -11,16 +11,29 @@ from __future__ import annotations
 import json
 from typing import Literal, cast
 
-from ..escalation import EscalationManager
+from ..escalation import EscalationManager, build_escalation_manager
 from ..roles import CriticRole
 from ..schema.plan import PlanVersion
 from ..store.sqlite import SQLiteStore
 from ..types import Finding
 
 
-def _open_manager(store_path: str) -> tuple[SQLiteStore, EscalationManager]:
-    """Open a store and create a manager; caller must close the store."""
+def _open_manager(
+    store_path: str,
+    escalation_id: str | None = None,
+) -> tuple[SQLiteStore, EscalationManager]:
+    """Open a store and create a manager with authority pre-bound.
+
+    Args:
+        store_path: Path to the SQLite plan store.
+        escalation_id: Optional escalation id to look up approving_authority.
+
+    Returns:
+        (store, manager) — caller must close the store.
+    """
     store = SQLiteStore(store_path)
+    if escalation_id is not None:
+        return store, build_escalation_manager(store, escalation_id=escalation_id)
     return store, EscalationManager(store)
 
 
@@ -71,7 +84,7 @@ def escalate_approve(
     Returns:
         The resolved escalation dictionary.
     """
-    store, manager = _open_manager(store_path)
+    store, manager = _open_manager(store_path, escalation_id=escalation_id)
     try:
         if patch_json is not None:
             patch = PlanVersion.from_dict(json.loads(patch_json))
@@ -99,7 +112,7 @@ def escalate_deny(
     Returns:
         The resolved escalation dictionary.
     """
-    store, manager = _open_manager(store_path)
+    store, manager = _open_manager(store_path, escalation_id=escalation_id)
     try:
         resolved = manager.resolve(escalation_id, "denied", note=note, principal=principal)
         return resolved.model_dump(mode="json")

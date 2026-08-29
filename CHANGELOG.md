@@ -1,5 +1,37 @@
 # Changelog
 
+## v0.2.3 (2026-08-29)
+
+**Measurement Infrastructure** — F-20 deterministic-corruption fix, F-14 approving_authority enforcement, DecisionContext population, Gate Canary, Frozen-Claim Protocol extension.
+
+### Corrections (M1)
+- **DecisionContext populated** (#298): `model_id`, `model_version`, `temperature`, prompt hash, timestamp now sourced from provider spec at call time. New optional `model_version`/`temperature` fields on `ProviderSpec`.
+- **Transit-integrity check** (F-20, #296): `verify_transit_integrity()` asserts numeric/boolean fields survive redaction. 0 corruption events on boundary evaluator.
+- **approving_authority enforcement** (F-14, #297): contract persistence added to `PlanStore`, `build_escalation_manager()` helper, all 4 surfaces (CLI/HTTP/MCP/MCP server) now enforce `PermissionError`.
+- **Failure-mode register**: F-14 reopened → closed, F-20 added.
+
+### Features (M1)
+- **Deterministic Gate Canary** (#278): `plancritic gates canary --check` — 10 gate fixture pairs, 10/10 passing. Zero LLM cost.
+- **Extended Frozen-Claim Protocol** (#279): denominator completeness, artifact selection freeze, determinism boundary documentation.
+
+### Field Test (M2)
+- 183 goals across 43 domains — 0 errors, 83 approved, 100 escalated
+- Boundary evaluator: label_flip=1.0, migration=0.0, underclaim=0
+- Gate Canary: 10/10 on dev and Docker
+- DecisionContext: populated (model_id=openai/gpt-4o-mini)
+- Transit-integrity: 0 corruption events
+- Docker integration: 13 tests passed
+- Total cost: $0.60
+
+### Tests
+- 14 new deterministic tests (F-20 transit-integrity, DecisionContext, Gate Canary, F-14 authority)
+- Total: 1359 passed, 15 skipped
+
+### Infrastructure
+- Docker image ships `gates` subcommand
+- Canary fixtures packaged with wheel (src/planner_critic/canary/)
+- Version bumped to 0.2.3 in pyproject.toml, __init__.py, Dockerfile
+
 ## v0.2.2 (2026-08-27)
 
 ### Foundation Corrections (M1)

@@ -1,0 +1,349 @@
+{
+  "dimension": "core-api",
+  "goal_id": "src-02-ilm-lifecycle",
+  "duration_seconds": 12.07,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 1,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "src-02-ilm-lifecycle-plan",
+    "goal_id": "src-02-ilm-lifecycle",
+    "plan_schema_version": "0.1.0",
+    "version": 1,
+    "parent_version": null,
+    "created_at": "2026-08-29T21:35:22.795447Z",
+    "tasks": [
+      {
+        "id": "define-ilm-policy",
+        "description": "Define the Index Lifecycle Management (ILM) policy",
+        "action": "define",
+        "target": "ilm_policy",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "ILM policy requirements are established",
+            "fact": "ilm_policy_requirements",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure-node-attrs",
+        "description": "Configure node attribute-based tier allocation for ILM",
+        "action": "configure",
+        "target": "node_attrs",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "Node attributes are available",
+            "fact": "node_attributes_available",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "setup-index-rollover",
+        "description": "Set up index rollover configuration",
+        "action": "setup",
+        "target": "index_rollover",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "index rollover status",
+          "how": "check rollover settings via API",
+          "expected": "max_size 50GB or max_age 1d"
+        },
+        "rollback": {
+          "trigger": "rollover fails",
+          "action": "remove rollover settings",
+          "safety_guard": "check index settings before rollback",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "repoint-aliases",
+        "description": "Re-point aliases to the new managed indices",
+        "action": "repoint",
+        "target": "aliases",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "alias mappings",
+          "how": "verify through API",
+          "expected": "aliases point to new managed indices"
+        },
+        "rollback": {
+          "trigger": "alias repointing fails",
+          "action": "restore original aliases",
+          "safety_guard": "record original alias mappings",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "verify-ilm-active",
+        "description": "Verify that the ILM policy is active using ILM explain API",
+        "action": "verify",
+        "target": "ilm_status",
+        "parallel_group": null,
+        "preconditions": [],
+        "verification": {
+          "what": "ILM policy status",
+          "how": "use ILM explain API",
+          "expected": "policy is active"
+        },
+        "rollback": {
+          "trigger": "verification fails",
+          "action": "detach policy and revert to manual management",
+          "safety_guard": "ensure manual management settings are intact",
+          "restores_state": null,
+          "restoration_evidence": null
+        },
+        "risk_class": "critical",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "define-ilm-policy",
+        "to_task": "configure-node-attrs",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure-node-attrs",
+        "to_task": "setup-index-rollover",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "setup-index-rollover",
+        "to_task": "repoint-aliases",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "repoint-aliases",
+        "to_task": "verify-ilm-active",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "rollback_credible:src-02-ilm-lifecycle-plan:1:setup-index-rollover:rollback_state_undeclared",
+      "task_id": "setup-index-rollover",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'setup-index-rollover' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:src-02-ilm-lifecycle-plan:1:repoint-aliases:rollback_state_undeclared",
+      "task_id": "repoint-aliases",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'repoint-aliases' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:src-02-ilm-lifecycle-plan:1:verify-ilm-active:rollback_state_undeclared",
+      "task_id": "verify-ilm-active",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify-ilm-active' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:src-02-ilm-lifecycle-plan:1:setup-index-rollover:rollback_state_undeclared",
+      "task_id": "setup-index-rollover",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'setup-index-rollover' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:src-02-ilm-lifecycle-plan:1:repoint-aliases:rollback_state_undeclared",
+      "task_id": "repoint-aliases",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'repoint-aliases' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "rollback_credible:src-02-ilm-lifecycle-plan:1:verify-ilm-active:rollback_state_undeclared",
+      "task_id": "verify-ilm-active",
+      "version": 1,
+      "heuristic_family": null,
+      "severity": "warning",
+      "reason_code": "rollback_state_undeclared",
+      "message": "high-risk task 'verify-ilm-active' has rollback but does not declare what state it restores (restores_state) or how restoration is verified (restoration_evidence)",
+      "suggested_fix": "Add restores_state and restoration_evidence fields to the rollback step",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:feasibility:define-ilm-policy",
+      "task_id": "define-ilm-policy",
+      "version": 1,
+      "heuristic_family": "feasibility",
+      "severity": "blocker",
+      "reason_code": "llm_feasibility",
+      "message": "ILM policy requirements are not established before defining the policy, making the task unachievable.",
+      "suggested_fix": "Establish the ILM policy requirements before the define-ilm-policy task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:unverified_dependencies:setup-index-rollover",
+      "task_id": "setup-index-rollover",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Setting up index rollover depends on an undefined state regarding the ILM policy, which may not be verified prior to its execution.",
+      "suggested_fix": "Ensure that the ILM policy is defined and verified before executing the setup-index-rollover task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:unverified_dependencies:repoint-aliases",
+      "task_id": "repoint-aliases",
+      "version": 1,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "Re-pointing aliases depends on successful index rollover, which has not been verified before this task.",
+      "suggested_fix": "Verify that the index rollover is correctly set up before executing the repoint-aliases task.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:1:unsafe_sequencing:verify-ilm-active",
+      "task_id": "verify-ilm-active",
+      "version": 1,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Verification of ILM policy is executed before the execution of previous tasks, which may lead to undefined states.",
+      "suggested_fix": "Execute the verify-ilm-active task only after confirming that all preceding tasks have completed successfully.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=1"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}

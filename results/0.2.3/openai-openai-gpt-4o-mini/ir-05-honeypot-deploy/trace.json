@@ -1,0 +1,311 @@
+{
+  "dimension": "core-api",
+  "goal_id": "ir-05-honeypot-deploy",
+  "duration_seconds": 14.4,
+  "result": {
+    "status": "approved",
+    "reason_code": "approved",
+    "revision_count": 2,
+    "llm_calls": 1
+  },
+  "plan": {
+    "id": "plan-ir-05-honeypot-deploy-r2",
+    "goal_id": "ir-05-honeypot-deploy",
+    "plan_schema_version": "0.1.0",
+    "version": 2,
+    "parent_version": "plan-ir-05-honeypot-deploy",
+    "created_at": "2026-08-29T21:28:32.804417Z",
+    "tasks": [
+      {
+        "id": "create_token_aws_key",
+        "description": "Create a fake AWS access key token in a public repository",
+        "action": "create",
+        "target": "AWS access key token",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "public repo is accessible",
+            "fact": "repo_accessible",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "create_token_db_string",
+        "description": "Create a fake database connection string in CI environment variable",
+        "action": "create",
+        "target": "DB connection string token",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "CI environment is configured",
+            "fact": "ci_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "create_token_api_key",
+        "description": "Create a fake API key in a configuration file",
+        "action": "create",
+        "target": "API key token",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "config file is editable",
+            "fact": "config_file_editable",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": null,
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "configure_alerts",
+        "description": "Configure each token with an alerting webhook to PagerDuty",
+        "action": "configure",
+        "target": "PagerDuty webhook",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "all tokens are created",
+            "fact": "tokens_created",
+            "established_by": "create_token_aws_key",
+            "probe": null
+          },
+          {
+            "description": "PagerDuty account is configured",
+            "fact": "pagerduty_configured",
+            "established_by": "env",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "PagerDuty alert functionality",
+          "how": "send test alert",
+          "expected": "alert received in PagerDuty"
+        },
+        "rollback": {
+          "trigger": "configuration fails",
+          "action": "remove webhook configuration",
+          "safety_guard": "verify configuration integrity",
+          "restores_state": [
+            "no webhook configuration exists"
+          ],
+          "restoration_evidence": "state validated through PagerDuty logs"
+        },
+        "risk_class": "high",
+        "blast_radius": "medium",
+        "satisfies": null
+      },
+      {
+        "id": "write_response_playbook",
+        "description": "Write a 3-step response playbook for token alerts",
+        "action": "write",
+        "target": "response playbook",
+        "parallel_group": null,
+        "preconditions": [
+          {
+            "description": "alerts are configured correctly",
+            "fact": "alerts_configured",
+            "established_by": "configure_alerts",
+            "probe": null
+          }
+        ],
+        "verification": {
+          "what": "response playbook completeness",
+          "how": "review playbook against alert procedures",
+          "expected": "playbook contains all required steps"
+        },
+        "rollback": null,
+        "risk_class": "medium",
+        "blast_radius": "medium",
+        "satisfies": null
+      }
+    ],
+    "dependencies": [
+      {
+        "from_task": "create_token_aws_key",
+        "to_task": "configure_alerts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_token_db_string",
+        "to_task": "configure_alerts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "create_token_api_key",
+        "to_task": "configure_alerts",
+        "kind": "hard",
+        "reason": ""
+      },
+      {
+        "from_task": "configure_alerts",
+        "to_task": "write_response_playbook",
+        "kind": "hard",
+        "reason": ""
+      }
+    ],
+    "branches": []
+  },
+  "findings": [
+    {
+      "id": "crit:2:unverified_dependencies:configure_alerts",
+      "task_id": "configure_alerts",
+      "version": 2,
+      "heuristic_family": "unverified_dependencies",
+      "severity": "blocker",
+      "reason_code": "llm_unverified_dependencies",
+      "message": "The configuration of alerts depends on the status of token creation, but there is no verification of 'tokens_created' prior to running this task.",
+      "suggested_fix": "Ensure each token creation task verifies successful creation before proceeding to the alert configuration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:weak_rollback:configure_alerts",
+      "task_id": "configure_alerts",
+      "version": 2,
+      "heuristic_family": "weak_rollback",
+      "severity": "warning",
+      "reason_code": "llm_weak_rollback",
+      "message": "The rollback for configuring alerts does not guarantee complete restoration in the case of configuration failure as it lacks verification during rollback execution.",
+      "suggested_fix": "Add a step to verify the webhook's restoration state post-rollback.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:write_response_playbook",
+      "task_id": "write_response_playbook",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The response playbook should detail roles and responsibilities for each step to enhance clarity and accountability.",
+      "suggested_fix": "Include specific roles and responsibilities in the response playbook.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:unsafe_sequencing:write_response_playbook",
+      "task_id": "write_response_playbook",
+      "version": 2,
+      "heuristic_family": "unsafe_sequencing",
+      "severity": "blocker",
+      "reason_code": "llm_unsafe_sequencing",
+      "message": "Writing the response playbook happens before ensuring the alerts are fully functional, which could lead to a playbook that is not relevant.",
+      "suggested_fix": "Reorder the tasks so that writing the response playbook follows the verification of alert configurations.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:create_token_aws_key",
+      "task_id": "create_token_aws_key",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Consider including a step that confirms the public repository's accessibility after creating the token to ensure completion of the task.",
+      "suggested_fix": "Add a verification step to confirm repository accessibility post-creation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:create_token_db_string",
+      "task_id": "create_token_db_string",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "Omission of validity checks on the CI environment configuration could result in an incomplete setup.",
+      "suggested_fix": "Include a step to validate the CI environment after configuration.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    },
+    {
+      "id": "crit:2:missing_steps:create_token_api_key",
+      "task_id": "create_token_api_key",
+      "version": 2,
+      "heuristic_family": "missing_steps",
+      "severity": "warning",
+      "reason_code": "llm_missing_steps",
+      "message": "The plan lacks validation for the configuration file's editing capability prior to token creation, risking task execution failure.",
+      "suggested_fix": "Add a check that verifies the configuration file is indeed editable before attempting token creation.",
+      "raw_severity": null,
+      "normalized_severity": null,
+      "drift_delta": 0,
+      "edge_id": null,
+      "observed_state": null,
+      "evidence_refs": [],
+      "finding_schema_version": "0.2.0"
+    }
+  ],
+  "escalation": null,
+  "checks": [
+    {
+      "name": "approve_expected",
+      "pass": true,
+      "message": "approved"
+    },
+    {
+      "name": "max_revisions",
+      "pass": true,
+      "message": "revs=2"
+    },
+    {
+      "name": "min_tasks",
+      "pass": true,
+      "message": "tasks=5"
+    }
+  ],
+  "error": null,
+  "pass": true
+}
