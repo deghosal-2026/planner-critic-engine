@@ -274,6 +274,7 @@ def run_live_boundary_cases(
             "temperature": ctx.temperature,
             "system_prompt_hash": ctx.system_prompt_hash,
             "tool_schema_hash": ctx.tool_schema_hash,
+            "timestamp": ctx.timestamp,
         },
         "cases": case_records,
     }
