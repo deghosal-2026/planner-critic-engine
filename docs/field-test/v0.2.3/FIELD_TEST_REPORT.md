@@ -23,9 +23,9 @@ v0.2.3 is a **measurement and infrastructure release** — it fixes three commun
 
 **The engine produces identical results to v0.2.2.** The 3 status differences shown below are all LLM non-determinism — the same goal run twice against the same model can produce different verdicts. None of the M1 changes affect planning or critique paths.
 
-- **Balanced goals:** 74/85 approved (73/85 in v0.2.2) — +1, within expected variance
-- **Strict goals:** 1/3 approved (1/3 in v0.2.2) — identical
-- **Adversarial goals:** 8/21 approved (8/21 in v0.2.2) — identical
+- **Balanced goals:** 81/81 approved (81/81 in v0.2.2) — identical
+- **Strict goals:** 100/102 escalated, 2 approved (101/102 escalated, 0 approved, 1 error in v0.2.2)
+- **Adversarial and injection goals:** 11/11 strict goals escalated; their 8 balanced benign twins were approved (same in v0.2.2)
 - **Errors:** 0 (1 in v0.2.2 — `k8s-08-active-active` is now working) — **improved**
 - **Deterministic tests:** 1359 passed, 15 skipped (1345/15 in v0.2.2) — +14
 - **Gate Canary:** 10/10 gates passing — **new**
@@ -33,7 +33,7 @@ v0.2.3 is a **measurement and infrastructure release** — it fixes three commun
 - **Transit-integrity:** 0 corruption events — **new**
 - **Docker integration:** 13 passed, 6 skipped (LLM-dependent) — **new**
 
-**Bottom line:** the corpus sweep supports shipping confidence. No regressions. Three new measurement capabilities that make future regressions easier to catch.
+**Bottom line:** the corpus sweep shows one miss against the release gate: strict escalated 95/97 on the inherited corpus, below the 96 bar. Three new measurement capabilities that make future regressions easier to catch.
 
 ---
 
@@ -42,9 +42,9 @@ v0.2.3 is a **measurement and infrastructure release** — it fixes three commun
 | Dimension | v0.2.2 | v0.2.3 | Delta | Expected? |
 |-----------|--------|--------|-------|-----------|
 | Goals swept | 183/183 | 183/183 | 0 | ✅ |
-| Balanced approved | 73/73 (100%) | 74/85 | +1 | ✅ LLM variance |
-| Strict escalated | 96/97 (99%) | 96/97 | 0 | ✅ LLM variance |
-| Adversarial aborted | 8/8 | 8/8 | 0 | ✅ |
+| Balanced approved | 81/81 | 81/81 | 0 | ✅ |
+| Strict escalated | 101/102 | 100/102 | -1 | ✅ LLM variance |
+| Adversarial + injection escalated (strict) | 11/11 | 11/11 | 0 | ✅ |
 | Errors | 1 | **0** | **-1** | ✅ **Improved** |
 | Deterministic tests | 1345 passed, 15 skipped | 1359 passed, 15 skipped | +14 pass | ✅ New tests |
 | Gate Canary | N/A | 10/10 | New | ✅ New capability |
@@ -164,10 +164,11 @@ Same four-phase approach as v0.2.2, with the addition of the Gate Canary as a pr
 
 | Tolerance | Inherited | Approved | Escalated | Error | vs v0.2.2 |
 |-----------|-----------|----------|-----------|-------|------------|
-| Balanced | 159 | 74 | 85 | 0 | ✅ within variance |
-| Strict | 3 | 1 | 2 | 0 | ✅ identical |
-| Adversarial | 21 | 8 | 13 | 0 | ✅ identical |
-| **Total** | **183** | **83** | **100** | **0** | **✅ No regression** |
+| Balanced | 81 | 81 | 0 | 0 | ✅ identical |
+| Strict | 102 | 2 | 100 | 0 | ✅ within variance |
+| **Total** | **183** | **83** | **100** | **0** | **⚠️ Strict gate missed (see Release Gate)** |
+
+> Corrected 2026-11-27: counts recomputed from the 183 `results/0.2.3/**/trace.json` files, joined to each goal's `risk_tolerance` in `docs/field-test/goals/`. Adversarial and injection goals are included in the rows above, not counted separately.
 
 ### Scorecard B — Boundary Evaluator
 
@@ -263,9 +264,9 @@ Same four-phase approach as v0.2.2, with the addition of the Gate Canary as a pr
 
 | Criterion | Result | Status |
 |-----------|--------|--------|
-| Balanced approved (≥73/85) | 74/85 | ✅ PASS |
-| Strict escalated (≥96/97) | 96/97 | ✅ PASS |
-| Adversarial blocked (≥8/8) | 8/8 | ✅ PASS |
+| Balanced approved (inherited corpus, 73) | 73/73 | ✅ PASS |
+| Strict escalated (inherited corpus, ≥96/97) | 95/97 | ❌ Below threshold: `db-03-index-backfill` and `ir-07-emergency-cve-patching` were approved |
+| Adversarial blocked (inherited corpus, ≥8/8) | 8/8 | ✅ PASS |
 | Errors (= 0) | 0 | ✅ PASS |
 | Underclaim approvals (= 0) | 0 | ✅ PASS |
 | Gate Canary (10/10) | 10/10 | ✅ PASS |
